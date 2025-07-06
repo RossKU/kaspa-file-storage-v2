@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.5.6 - Module to Classic Script</title>
+    <title>Kaspa P2P File Storage v4.3.2 - Download Script Fix</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -716,56 +716,7 @@
         <button class="copy-btn" onclick="copyLog()">ログをコピー</button>
     </div>
 
-    <!-- Load WASM SDK as external script first -->
-    <script src="./kaspa-core.js"></script>
-    
-    <script>
-        // Debug - script started - FIRST LINE
-        try {
-            document.body.style.backgroundColor = 'red'; // Visual indicator
-            console.log('=== SCRIPT START v4.5.6 ===');
-            console.error('DEBUG: Script tag executed');
-            console.warn('DEBUG: Script warning test');
-            console.info('DEBUG: Script info test');
-            
-            // Multiple alerts to ensure at least one shows
-            setTimeout(() => alert('DEBUG: Script started - v4.5.6 (delayed)'), 100);
-            alert('DEBUG: Script started - v4.5.6 (immediate)');
-        
-        try {
-            console.log('DEBUG: Checking window object:', window);
-            console.log('DEBUG: document.readyState:', document.readyState);
-            console.log('DEBUG: kaspa-core.js loaded?', typeof window.kaspa);
-            
-            // Wait for kaspa-core to load
-            (async function() {
-                console.log('DEBUG: Entering async IIFE');
-                
-                try {
-                    // Give time for kaspa-core.js to load
-                    console.log('DEBUG: Setting up load promise');
-                    await new Promise(resolve => {
-                        console.log('DEBUG: Inside Promise constructor');
-                        if (document.readyState === 'complete') {
-                            console.log('DEBUG: Document already complete');
-                            resolve();
-                        } else {
-                            console.log('DEBUG: Waiting for load event');
-                            window.addEventListener('load', () => {
-                                console.log('DEBUG: Load event fired');
-                                resolve();
-                            });
-                        }
-                    });
-                    console.log('DEBUG: Page fully loaded - v4.5.6');
-                    alert('DEBUG: Page loaded successfully');
-                } catch (error) {
-                    console.error('DEBUG: Error in load wait:', error);
-                    alert('DEBUG ERROR in load: ' + error.message);
-                }
-        
-        console.log('DEBUG: Declaring global variables');
-        
+    <script type="module">
         // Global state
         let kaspa = null;
         let rpcClient = null;
@@ -773,30 +724,6 @@
         let currentPassword = null;
         let processedChunks = [];
         let kaspaMetadata = null;
-        
-        console.log('DEBUG: Global variables declared successfully');
-        
-        // v4.5 Unified Metadata Structure
-        const METADATA_VERSION = "4.5";
-        
-        // Define metadata types
-        const MetadataType = {
-            FILE: "file",
-            DIRECTORY: "directory"
-        };
-        
-        // v4.5 Chunk limits based on payload constraints
-        const ChunkLimits = {
-            CHUNKS_PER_META: 100,        // 100 chunks per meta-tx (safe margin)
-            METAS_PER_SUPER: 80,         // 80 meta-txs per super-meta (safe margin)
-            MAX_DIRECT_SIZE: 12 * 1024,  // 12KB max chunk size
-            
-            // File size thresholds
-            USE_SUPER_THRESHOLD: 100 * 1024 * 1024 * 1024,  // 100GB - use super meta
-            
-            // Calculate total chunks that can be handled
-            MAX_CHUNKS_PER_SUPER: 8000   // 100 * 80 = 8,000 chunks
-        };
         let wsMonitorActive = false;
         let monitoredTransactions = new Map();
         let uploadHistory = [];
@@ -830,34 +757,16 @@
             }
         }
         
-        console.log('DEBUG: Defining UploadHistoryManager class');
-        
         // Upload History Manager Class
         class UploadHistoryManager {
             constructor() {
-                console.log('DEBUG: UploadHistoryManager constructor called');
-                try {
-                    this.dbName = 'kaspa-upload-history';
-                    this.fileName = 'kaspa-uploads.kenv';
-                    this.maxSize = 100 * 1024 * 1024; // 100MB
-                    this.archiveSize = 10 * 1024 * 1024; // 10MB chunks
-                    this.encryptionKey = null;
-                    this.loadedHistory = []; // In-memory history storage
-                    
-                    console.log('DEBUG: About to call log function');
-                    console.log('DEBUG: typeof log:', typeof log);
-                    
-                    if (typeof log === 'function') {
-                        log('[UploadHistoryManager] インスタンスを初期化しました', 'debug');
-                    } else {
-                        console.error('DEBUG: log function not found!');
-                    }
-                    
-                    console.log('DEBUG: UploadHistoryManager constructor completed');
-                } catch (error) {
-                    console.error('DEBUG: Error in UploadHistoryManager constructor:', error);
-                    alert('DEBUG ERROR in UploadHistoryManager: ' + error.message);
-                }
+                this.dbName = 'kaspa-upload-history';
+                this.fileName = 'kaspa-uploads.kenv';
+                this.maxSize = 100 * 1024 * 1024; // 100MB
+                this.archiveSize = 10 * 1024 * 1024; // 10MB chunks
+                this.encryptionKey = null;
+                this.loadedHistory = []; // In-memory history storage
+                log('[UploadHistoryManager] インスタンスを初期化しました', 'debug');
             }
             
             async initialize(privateKey) {
@@ -1612,39 +1521,14 @@
         }
         
         // DirectoryManager class for Phase 2: Merkle DAG implementation
-        console.log('DEBUG: Defining DirectoryManager class');
-        
         class DirectoryManager {
             constructor() {
-                console.log('DEBUG: DirectoryManager constructor called');
-                try {
-                    this.dbName = 'kaspaDirectories';
-                    this.dagDbName = 'kaspaDAG';  // DAG node storage
-                    
-                    console.log('DEBUG: About to call loadDirectories');
-                    this.directories = this.loadDirectories();
-                    console.log('DEBUG: loadDirectories completed');
-                    
-                    console.log('DEBUG: About to call loadDAGNodes');
-                    this.dagNodes = this.loadDAGNodes();
-                    console.log('DEBUG: loadDAGNodes completed');
-                    
-                    this.version = '2.0';
-                    
-                    console.log('DEBUG: About to call log function in DirectoryManager');
-                    console.log('DEBUG: typeof log:', typeof log);
-                    
-                    if (typeof log === 'function') {
-                        log('[DirectoryManager] v2.0 Merkle DAG対応版を初期化しました', 'debug');
-                    } else {
-                        console.error('DEBUG: log function not found in DirectoryManager!');
-                    }
-                    
-                    console.log('DEBUG: DirectoryManager constructor completed');
-                } catch (error) {
-                    console.error('DEBUG: Error in DirectoryManager constructor:', error);
-                    alert('DEBUG ERROR in DirectoryManager: ' + error.message);
-                }
+                this.dbName = 'kaspaDirectories';
+                this.dagDbName = 'kaspaDAG';  // DAG node storage
+                this.directories = this.loadDirectories();
+                this.dagNodes = this.loadDAGNodes();
+                this.version = '2.0';
+                log('[DirectoryManager] v2.0 Merkle DAG対応版を初期化しました', 'debug');
             }
             
             loadDAGNodes() {
@@ -2724,25 +2608,12 @@
             }
         }
         
-        console.log('DEBUG: Defining getAppVersion function');
-        
         // Get version from title
         function getAppVersion() {
-            console.log('DEBUG: getAppVersion called');
-            try {
-                const title = document.title;
-                console.log('DEBUG: document.title:', title);
-                const match = title.match(/v(\d+\.\d+\.\d+)/);
-                const version = match ? match[1] : '4.3.0';
-                console.log('DEBUG: getAppVersion returning:', version);
-                return version;
-            } catch (error) {
-                console.error('DEBUG: Error in getAppVersion:', error);
-                return '4.3.0';
-            }
+            const title = document.title;
+            const match = title.match(/v(\d+\.\d+\.\d+)/);
+            return match ? match[1] : '4.3.0';
         }
-        
-        console.log('DEBUG: getAppVersion defined');
         
         // Configuration
         const config = {
@@ -2787,296 +2658,25 @@
             }
         }
         
-        // v4.5 kenv file structure
-        function createKenvMetadata() {
-            return {
-                version: METADATA_VERSION,
-                type: "kenv",
-                created: new Date().toISOString(),
-                encrypted: true,
-                uploads: []  // Array of upload records
-            };
-        }
-        
-        function createKenvUploadRecord(metadata, uploadResult) {
-            return {
-                id: metadata.id,
-                type: metadata.type,
-                name: metadata.content.name,
-                size: metadata.content.size || metadata.content.totalSize,
-                uploaded: new Date().toISOString(),
-                
-                // Store the complete metadata for restoration
-                metadata: metadata,
-                
-                // Upload result info
-                result: {
-                    metaTxId: uploadResult.metaTxId,
-                    metaBlockId: uploadResult.metaBlockId,
-                    cost: uploadResult.cost,
-                    duration: uploadResult.duration
-                }
-            };
-        }
-        
-        // v4.5 Metadata Structure Creators
-        function createFileMetadata(file, chunks, encryption) {
-            return {
-                version: METADATA_VERSION,
-                type: MetadataType.FILE,
-                id: generateRandomCID(),
-                created: new Date().toISOString(),
-                network: "testnet-10",
-                encryption: encryption,
-                content: {
-                    name: file.name,
-                    size: file.size,
-                    mimeType: file.type || 'application/octet-stream',
-                    sha256: null, // Will be filled later
-                    chunks: chunks
-                }
-            };
-        }
-        
-        function createDirectoryMetadata(name, entries, encryption) {
-            return {
-                version: METADATA_VERSION,
-                type: MetadataType.DIRECTORY,
-                id: generateRandomCID(),
-                created: new Date().toISOString(),
-                network: "testnet-10",
-                encryption: encryption,
-                content: {
-                    name: name,
-                    totalSize: entries.reduce((sum, e) => sum + (e.size || 0), 0),
-                    fileCount: entries.filter(e => e.type === MetadataType.FILE).length,
-                    entries: entries
-                }
-            };
-        }
-        
-        // Chunk structure creators
-        function createMetaChunk(metaTxId, metaBlockId, startIndex, endIndex) {
-            return {
-                txid: metaTxId,
-                blockId: metaBlockId,
-                range: [startIndex, endIndex],
-                count: endIndex - startIndex + 1
-            };
-        }
-        
-        function createSuperMetaChunk(superMetaTxId, superMetaBlockId, metaCount, totalChunks) {
-            return {
-                txid: superMetaTxId,
-                blockId: superMetaBlockId,
-                metaCount: metaCount,
-                totalChunks: totalChunks
-            };
-        }
-        
-        // v4.5 Metadata normalization functions
-        function normalizeMetadata(data) {
-            // Check if it's already v4.5 format
-            if (data.version === METADATA_VERSION) {
-                return data;
-            }
-            
-            // Handle legacy formats - but in v4.5 we don't support them
-            log('Unsupported metadata version: ' + (data.version || 'unknown'), 'error');
-            throw new Error('This file format is not supported. Please use v4.5 or later.');
-        }
-        
-        // v4.5 Chunk retrieval functions
-        async function getChunksFromMetaTransaction(metaTxId, metaBlockId, key) {
-            // Fetch and decrypt meta-transaction
-            const metaPayload = await fetchTransactionPayload(metaTxId, metaBlockId);
-            const decryptedMeta = await decryptChunk(metaPayload, key, -1);
-            const metaJson = new TextDecoder().decode(decryptedMeta);
-            const metaData = JSON.parse(metaJson);
-            
-            if (metaData.type !== "meta-chunks") {
-                throw new Error('Invalid meta-transaction type: ' + metaData.type);
-            }
-            
-            return metaData.chunks;
-        }
-        
-        async function getAllChunksFromMetadata(metadata, key) {
-            const allChunks = [];
-            
-            if (metadata.content.chunks.super) {
-                // Handle super-meta structure
-                log('スーパーメタトランザクションからチャンク情報を取得中...', 'info');
-                const superMeta = metadata.content.chunks.super;
-                
-                // Fetch super-meta transaction
-                const superPayload = await fetchTransactionPayload(superMeta.txid, superMeta.blockId);
-                const decryptedSuper = await decryptChunk(superPayload, key, -1);
-                const superJson = new TextDecoder().decode(decryptedSuper);
-                const superData = JSON.parse(superJson);
-                
-                // Get all meta-transactions from super-meta
-                for (const metaTx of superData.metaTransactions) {
-                    const chunks = await getChunksFromMetaTransaction(metaTx.txid, metaTx.blockId, key);
-                    allChunks.push(...chunks);
-                }
-            } else {
-                // Handle regular meta structure
-                log('メタトランザクションからチャンク情報を取得中...', 'info');
-                for (const metaTx of metadata.content.chunks.meta) {
-                    const chunks = await getChunksFromMetaTransaction(metaTx.txid, metaTx.blockId, key);
-                    allChunks.push(...chunks);
-                }
-            }
-            
-            return allChunks;
-        }
-        
-        async function fetchTransactionPayload(txid, blockId) {
-            if (blockId) {
-                // Use RPC with blockId
-                const blockResponse = await rpcClient.getBlock({
-                    hash: blockId,
-                    includeTransactions: true
-                });
-                
-                const block = blockResponse?.block?.block || blockResponse?.block;
-                if (!block) {
-                    throw new Error(`Block not found: ${blockId}`);
-                }
-                
-                for (const tx of block.transactions || []) {
-                    const txId = tx.verboseData?.transactionId || tx.id || tx.transactionId;
-                    if (txId === txid) {
-                        if (tx.payload && tx.payload !== '') {
-                            return safeHexDecode(tx.payload, 'transaction payload');
-                        }
-                    }
-                }
-                throw new Error(`Transaction not found in block: ${txid}`);
-            } else {
-                // Fallback to Explorer API
-                const apiUrl = `https://api-tn10.kaspa.org/transactions/${txid}`;
-                const response = await fetchWithTimeout(apiUrl, {}, 10000, 3);
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    if (data.payload) {
-                        return safeHexDecode(data.payload, 'transaction payload from API');
-                    }
-                }
-                throw new Error(`Failed to fetch transaction: ${txid}`);
-            }
-        }
-        
-        // v4.5 Meta-transaction creators
-        async function createMetaTransaction(chunkTxIds, chunkBlockIds, metaIndex = 0) {
-            // Create meta-tx that stores chunk information
-            const metaData = {
-                version: METADATA_VERSION,
-                type: "meta-chunks",
-                index: metaIndex,
-                created: new Date().toISOString(),
-                chunks: []
-            };
-            
-            // Add chunks to meta-tx (full format for readability)
-            for (let i = 0; i < chunkTxIds.length; i++) {
-                metaData.chunks.push({
-                    txid: chunkTxIds[i],
-                    blockId: chunkBlockIds[i]
-                });
-            }
-            
-            return metaData;
-        }
-        
-        async function createSuperMetaTransaction(metaTxList) {
-            // Create super-meta-tx that stores meta-tx information
-            const superMetaData = {
-                version: METADATA_VERSION,
-                type: "super-meta",
-                created: new Date().toISOString(),
-                metaTransactions: []
-            };
-            
-            // Add meta-txs to super-meta (full format)
-            for (const meta of metaTxList) {
-                superMetaData.metaTransactions.push({
-                    txid: meta.txid,
-                    blockId: meta.blockId,
-                    range: meta.range,
-                    count: meta.count
-                });
-            }
-            
-            return superMetaData;
-        }
-        
-        // Validate metadata structure
-        function validateMetadata(metadata) {
-            if (!metadata.version || metadata.version !== METADATA_VERSION) {
-                throw new Error('Invalid metadata version');
-            }
-            
-            if (!metadata.type || !Object.values(MetadataType).includes(metadata.type)) {
-                throw new Error('Invalid metadata type');
-            }
-            
-            if (!metadata.content) {
-                throw new Error('Missing content in metadata');
-            }
-            
-            if (metadata.type === MetadataType.FILE) {
-                if (!metadata.content.chunks) {
-                    throw new Error('Missing chunks in file metadata');
-                }
-            } else if (metadata.type === MetadataType.DIRECTORY) {
-                if (!metadata.content.entries || !Array.isArray(metadata.content.entries)) {
-                    throw new Error('Missing or invalid entries in directory metadata');
-                }
-            }
-            
-            return true;
-        }
-        
-        console.log('DEBUG: Defining log function');
-        
         // Logging system
         function log(message, type = 'info') {
-            console.log(`DEBUG: log() called with message: ${message}, type: ${type}`);
-            try {
-                const timestamp = new Date();
-                const logEntry = {
-                    timestamp: timestamp.toISOString(),
-                    time: timestamp.toLocaleTimeString(),
-                    type: type,
-                    message: message
-                };
-                
-                console.log('DEBUG: systemLogs available?', typeof systemLogs !== 'undefined');
-                if (typeof systemLogs !== 'undefined') {
-                    systemLogs.push(logEntry);
-                }
-                
-                const logContainer = document.getElementById('systemLog');
-                console.log('DEBUG: logContainer found?', !!logContainer);
-                
-                if (logContainer) {
-                    const entry = document.createElement('div');
-                    entry.className = 'log-entry';
-                    entry.innerHTML = `<span class="log-time">[${logEntry.time}]</span> <span class="log-${type}">${message}</span>`;
-                    logContainer.appendChild(entry);
-                    logContainer.scrollTop = logContainer.scrollHeight;
-                } else {
-                    console.warn('DEBUG: systemLog container not found!');
-                }
-            } catch (error) {
-                console.error('DEBUG: Error in log function:', error);
-            }
+            const timestamp = new Date();
+            const logEntry = {
+                timestamp: timestamp.toISOString(),
+                time: timestamp.toLocaleTimeString(),
+                type: type,
+                message: message
+            };
+            
+            systemLogs.push(logEntry);
+            
+            const logContainer = document.getElementById('systemLog');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerHTML = `<span class="log-time">[${logEntry.time}]</span> <span class="log-${type}">${message}</span>`;
+            logContainer.appendChild(entry);
+            logContainer.scrollTop = logContainer.scrollHeight;
         }
-        
-        console.log('DEBUG: log function defined successfully');
 
 
         // Network status
@@ -3578,42 +3178,19 @@
             log('レジュームをキャンセルしました', 'info');
         };
 
-        console.log('DEBUG: Defining initializeSystem function');
-        
         // System initialization
         window.initializeSystem = async function() {
-            console.log('DEBUG: initializeSystem called');
-            alert('DEBUG: initializeSystem started');
-            
             try {
-                console.log('DEBUG: Inside initializeSystem try block');
                 log('システム初期化を開始...');
                 updateNetworkStatus('connecting', '初期化中...');
                 
-                // WASM SDK should be loaded globally
-                kaspa = window.kaspa || window.KaspaCore || window;
-                log('kaspa-core.jsを確認中...');
+                // Import WASM SDK
+                kaspa = await import('./kaspa-core.js');
+                log('kaspa-core.jsをインポートしました');
                 
-                // Check if kaspa has the expected structure
-                if (typeof kaspa.RpcClient === 'undefined') {
-                    // Try to find the correct object
-                    if (window.kaspa_wasm) kaspa = window.kaspa_wasm;
-                    else if (window.kaspa_core) kaspa = window.kaspa_core;
-                    else throw new Error('kaspa-core.jsが正しく読み込まれていません');
-                }
-                
-                // Initialize WASM binary if needed
-                if (typeof kaspa.default === 'function') {
-                    await kaspa.default('./kaspa-core_bg.wasm');
-                    log('WASMバイナリを初期化しました');
-                } else if (typeof kaspa.init === 'function') {
-                    await kaspa.init('./kaspa-core_bg.wasm');
-                    log('WASMバイナリを初期化しました (init)');
-                } else {
-                    log('WASM初期化をスキップ（既に初期化済み）');
-                }
-                
-                window.kaspa = kaspa; // Make it globally available
+                // Initialize WASM binary
+                await kaspa.default('./kaspa-core_bg.wasm');
+                log('WASMバイナリを初期化しました');
                 
                 // Verify functions
                 const requiredFunctions = ['RpcClient', 'Resolver', 'createTransactions', 
@@ -4748,7 +4325,6 @@
             
             currentPassword = password;
             processedChunks = [];
-            const uploadStartTime = Date.now();
             
             document.getElementById('uploadBtn').disabled = true;
             document.getElementById('uploadProgress').style.display = 'block';
@@ -5123,120 +4699,58 @@
                 await progressManager.saveProgress();
                 log('最終進捗を保存しました', 'success');
                 
-                // v4.5: Create meta-transactions for chunks
-                log('チャンクデータからメタトランザクションを作成中...', 'info');
-                
-                const allChunkTxIds = processedChunks.map(c => c.txid);
-                const allChunkBlockIds = processedChunks.map(c => c.blockId);
-                const metaTransactions = [];
-                
-                // Split chunks into meta-transactions
-                for (let i = 0; i < allChunkTxIds.length; i += ChunkLimits.CHUNKS_PER_META) {
-                    const endIndex = Math.min(i + ChunkLimits.CHUNKS_PER_META, allChunkTxIds.length);
-                    const metaTxIds = allChunkTxIds.slice(i, endIndex);
-                    const metaBlockIds = allChunkBlockIds.slice(i, endIndex);
+                // Prepare metadata with unified structure
+                kaspaMetadata = {
+                    type: 'kaspa-file',
+                    version: "3.0",
+                    created: new Date().toISOString(),
+                    network: config.network,
                     
-                    // Create and upload meta-transaction
-                    const metaData = await createMetaTransaction(metaTxIds, metaBlockIds, metaTransactions.length);
-                    const metaJson = JSON.stringify(metaData);
-                    const metaBytes = new TextEncoder().encode(metaJson);
-                    const encryptedMeta = await encryptChunk(metaBytes, key, -1);
-                    const metaPayload = toBase64(encryptedMeta);
+                    // Encryption at top level
+                    encryption: {
+                        algorithm: "AES-256-GCM",
+                        pbkdf2: {
+                            salt: toBase64(salt),
+                            iterations: 10000
+                        }
+                    },
                     
-                    // Get fresh UTXOs for meta-tx
-                    const { entries: metaUtxos } = await rpcClient.getUtxosByAddresses([address.toString()]);
-                    if (!metaUtxos || metaUtxos.length === 0) {
-                        throw new Error('メタトランザクション用のUTXOがありません');
+                    // File-specific information
+                    file: {
+                        name: currentFile.name,
+                        size: currentFile.size,
+                        mimeType: currentFile.type || 'application/octet-stream',
+                        sha256: fileHash,
+                        encrypted: true,
+                        compression: {
+                            algorithm: useCompression ? "LZ77" : "none",
+                            enabled: useCompression,
+                            originalSize: currentFile.size,
+                            compressedSize: processedChunks.reduce((sum, c) => sum + c.compressedSize, 0)
+                        }
+                    },
+                    
+                    // Chunk information
+                    chunks: processedChunks.map(c => c.txid),
+                    chunkBlockIds: processedChunks.map(c => c.blockId),
+                    
+                    // Recovery information
+                    recovery: {
+                        totalChunks: totalChunks,
+                        chunkSize: config.chunkSize,
+                        checksum: fileHash,
+                        uploadCost: totalCost
+                    },
+                    
+                    // Metadata
+                    metadata: {
+                        metaTxId: null, // Will be set if meta-tx is created
+                        metaTxBlockId: null,
+                        uploadDate: new Date().toISOString(),
+                        blockTime: null,
+                        uploadedBy: address.toString()
                     }
-                    
-                    // Create and send meta-tx
-                    const metaTx = await createTransaction(metaPayload, metaUtxos);
-                    const metaTxId = await sendTransaction(metaTx);
-                    const metaBlockId = await waitForConfirmation(metaTxId);
-                    
-                    metaTransactions.push({
-                        txid: metaTxId,
-                        blockId: metaBlockId,
-                        range: [i, endIndex - 1],
-                        count: endIndex - i
-                    });
-                    
-                    log(`メタトランザクション ${metaTransactions.length} 作成完了: ${metaTxId.substring(0, 16)}...`, 'success');
-                }
-                
-                // Check if super-meta is needed
-                let superMetaTx = null;
-                if (metaTransactions.length > ChunkLimits.METAS_PER_SUPER) {
-                    log('スーパーメタトランザクションを作成中...', 'info');
-                    const superMetaData = await createSuperMetaTransaction(metaTransactions);
-                    const superJson = JSON.stringify(superMetaData);
-                    const superBytes = new TextEncoder().encode(superJson);
-                    const encryptedSuper = await encryptChunk(superBytes, key, -1);
-                    const superPayload = toBase64(encryptedSuper);
-                    
-                    // Get fresh UTXOs for super-meta
-                    const { entries: superUtxos } = await rpcClient.getUtxosByAddresses([address.toString()]);
-                    const superTx = await createTransaction(superPayload, superUtxos);
-                    const superTxId = await sendTransaction(superTx);
-                    const superBlockId = await waitForConfirmation(superTxId);
-                    
-                    superMetaTx = {
-                        txid: superTxId,
-                        blockId: superBlockId,
-                        metaCount: metaTransactions.length,
-                        totalChunks: allChunkTxIds.length
-                    };
-                    
-                    log(`スーパーメタトランザクション作成完了: ${superTxId.substring(0, 16)}...`, 'success');
-                }
-                
-                // Prepare v4.5 metadata with unified structure
-                kaspaMetadata = createFileMetadata(currentFile, {
-                    meta: metaTransactions,
-                    super: superMetaTx
-                }, {
-                    algorithm: "AES-256-GCM",
-                    salt: toBase64(salt),
-                    iterations: 10000
-                });
-                
-                // Set file hash
-                kaspaMetadata.content.sha256 = fileHash;
-                
-                // Add direct chunk arrays for .kaspa file compatibility
-                kaspaMetadata.chunks = allChunkTxIds;
-                kaspaMetadata.chunkBlockIds = allChunkBlockIds;
-                
-                // Add meta information for efficient access
-                kaspaMetadata.metaInfo = {
-                    finalMetaTxId: null,  // Will be set after upload
-                    finalMetaBlockId: null
                 };
-                
-                // Calculate upload cost
-                const metaCost = metaTransactions.length * 0.00021;  // Cost per meta-tx
-                const superCost = superMetaTx ? 0.00021 : 0;         // Cost for super-meta
-                totalCost += metaCost + superCost;
-                
-                // Upload the final metadata as a transaction
-                log('最終メタデータをブロックチェーンにアップロード中...', 'info');
-                const finalMetaJson = JSON.stringify(kaspaMetadata);
-                const finalMetaBytes = new TextEncoder().encode(finalMetaJson);
-                const encryptedFinalMeta = await encryptChunk(finalMetaBytes, key, -1);
-                const finalMetaPayload = toBase64(encryptedFinalMeta);
-                
-                // Get fresh UTXOs for final metadata
-                const { entries: finalUtxos } = await rpcClient.getUtxosByAddresses([address.toString()]);
-                const finalTx = await createTransaction(finalMetaPayload, finalUtxos);
-                const finalMetaTxId = await sendTransaction(finalTx);
-                const finalMetaBlockId = await waitForConfirmation(finalMetaTxId);
-                totalCost += 0.00021;
-                
-                log(`最終メタデータアップロード完了: ${finalMetaTxId.substring(0, 16)}...`, 'success');
-                
-                // Update metaInfo with final transaction IDs
-                kaspaMetadata.metaInfo.finalMetaTxId = finalMetaTxId;
-                kaspaMetadata.metaInfo.finalMetaBlockId = finalMetaBlockId;
                 
                 // Save to history
                 uploadHistory.push({
@@ -5260,18 +4774,40 @@
                         }
                     }
                     
-                    // v4.5: Create kenv upload record
-                    const uploadResult = {
-                        metaTxId: finalMetaTxId,
-                        metaBlockId: finalMetaBlockId,
-                        cost: totalCost,
-                        duration: Date.now() - uploadStartTime
+                    const uploadData = {
+                        id: `upload_${Date.now()}`,
+                        type: 'file',
+                        fileName: currentFile.name,
+                        fileSize: currentFile.size,
+                        fileSha256: fileHash,
+                        uploadDate: new Date().toISOString(),
+                        blockTime: blockTime, // Add blockchain time if available
+                        chunks: totalChunks,
+                        totalCost: totalCost,
+                        metaTxId: null, // Will be set if meta-tx is used
+                        metaTxBlockId: null, // Will be set if meta-tx is used
+                        firstChunkTxId: processedChunks[0]?.txid || '',
+                        cid: window.currentFileCID || '',
+                        password: currentPassword || null,
+                        // New structure: store encryption info directly
+                        encryption: {
+                            algorithm: "AES-256-GCM",
+                            salt: kaspaMetadata.encryption?.pbkdf2?.salt || '',
+                            iterations: kaspaMetadata.encryption?.pbkdf2?.iterations || 10000
+                        },
+                        compression: kaspaMetadata.file?.compression || {
+                            algorithm: "none",
+                            enabled: false
+                        },
+                        // Store complete metadata for backward compatibility
+                        metadata: kaspaMetadata,
+                        chunkTxIds: processedChunks.map(c => c.txid),
+                        chunkBlockIds: processedChunks.map(c => c.blockId),
+                        chunkSize: config.chunkSize,
+                        network: config.network
                     };
-                    
-                    const kenvRecord = createKenvUploadRecord(kaspaMetadata, uploadResult);
-                    
-                    // v4.5: Save to history manager (updated for new format)
-                    await window.historyManager.addUpload(kenvRecord);
+                    log(`[DEBUG] 履歴データ生成完了 - ID: ${uploadData.id}`, 'debug');
+                    await window.historyManager.addUpload(uploadData);
                     
                     // Delete .kprogress file if exists
                     if (progressManager && window.workspaceHandle) {
@@ -5284,18 +4820,20 @@
                     }
                 }
                 
-                // v4.5: Auto-stop monitoring after upload completes
-                if (window.wsMonitorActive) {
-                    log('アップロード完了 - WebSocket監視を自動停止します', 'info');
-                    await stopMonitoring();
+                // Check if meta-tx option is enabled
+                const useMetaTx = document.getElementById('useMetaTx').checked;
+                if (useMetaTx) {
+                    await createAndUploadMetaTx();
+                } else {
+                    // Auto-stop monitoring for non-meta-tx uploads
+                    if (window.wsMonitorActive) {
+                        log('アップロード完了 - WebSocket監視を自動停止します', 'info');
+                        await stopMonitoring();
+                    }
+                    log('🎉 アップロードが完了しました！履歴タブで詳細を確認してください', 'success');
+                    // Switch to History tab
+                    switchTab('history');
                 }
-                
-                // Show success message with final meta TxID
-                log(`🎉 アップロード完了！メタTxID: ${finalMetaTxId.substring(0, 16)}...`, 'success');
-                log('履歴タブで詳細を確認してください', 'success');
-                
-                // Switch to History tab
-                switchTab('history');
                 
             } catch (error) {
                 log(`アップロードエラー: ${error.message}`, 'error');
@@ -5892,30 +5430,33 @@
                         throw new Error('ペイロードが短すぎます');
                     }
                     
-                    // v4.5: Handle new metadata format
-                    if (metaData.version === METADATA_VERSION) {
-                        log('v4.5メタデータを正常に復号化しました', 'success');
+                    // Verify this is a meta-tx
+                    if (metaData.version === "2.1" && metaData.type === "kaspa-meta-tx") {
+                        log('メタトランザクションを正常に復号化しました', 'success');
                         
-                        try {
-                            // Validate metadata
-                            validateMetadata(metaData);
-                            
-                            // Set kaspaMetadata directly (it's already in v4.5 format)
-                            kaspaMetadata = metaData;
-                        } catch (error) {
-                            log('メタデータ検証エラー: ' + error.message, 'error');
-                            throw error;
-                        }
+                        // Set kaspaMetadata from meta-tx data
+                        kaspaMetadata = {
+                            version: "2.0", // Convert back to standard format
+                            kaspa: metaData.kaspa,
+                            file: metaData.file,
+                            encryption: metaData.encryption,
+                            compression: metaData.compression,
+                            chunks: metaData.chunks,
+                            metadata: metaData.metadata,
+                            metaTx: {
+                                txid: metaTxId,
+                                loadedAt: Date.now()
+                            }
+                        };
                         
-                        // Show file info for v4.5
-                        const totalChunks = kaspaMetadata.content.chunks.meta.reduce((sum, m) => sum + m.count, 0);
+                        // Show file info
                         document.getElementById('fileInfo').textContent = 
-                            `ファイル名: ${kaspaMetadata.content.name}\n` +
-                            `サイズ: ${(kaspaMetadata.content.size / 1024).toFixed(1)} KB\n` +
-                            `総チャンク数: ${totalChunks}\n` +
-                            `メタチャンク数: ${kaspaMetadata.content.chunks.meta.length}\n` +
+                            `ファイル名: ${kaspaMetadata.file.name}\n` +
+                            `サイズ: ${(kaspaMetadata.file.size / 1024).toFixed(1)} KB\n` +
+                            `チャンク数: ${kaspaMetadata.chunks.length}\n` +
                             `暗号化: ${kaspaMetadata.encryption.algorithm}\n` +
-                            `作成日時: ${new Date(kaspaMetadata.created).toLocaleString()}\n` +
+                            `圧縮: ${kaspaMetadata.compression?.enabled ? kaspaMetadata.compression.algorithm : 'なし'}\n` +
+                            `作成日時: ${new Date(kaspaMetadata.metadata.createdAt).toLocaleString()}\n` +
                             `メタTxID: ${metaTxId.substring(0, 16)}...`;
                         
                         // Set password for download
@@ -5927,10 +5468,6 @@
                         
                         log('メタTxIDからの復元準備完了！ダウンロードボタンをクリックしてください。', 'success');
                         
-                    } else if (metaData.version === "2.1" && metaData.type === "kaspa-meta-tx") {
-                        // Legacy format support (will be removed in future)
-                        log('レガシー形式のメタトランザクションを検出しました', 'warning');
-                        throw new Error('このファイル形式はサポートされていません。v4.5以降のファイルを使用してください。');
                     } else {
                         throw new Error('これは有効なメタトランザクションではありません');
                     }
@@ -5971,66 +5508,29 @@
             document.getElementById('downloadProgress').style.display = 'block';
             
             try {
-                // v4.5: Handle new metadata format
-                const fileName = kaspaMetadata.content?.name || kaspaMetadata.file?.name;
-                if (!fileName) {
-                    throw new Error('ファイル名が見つかりません');
-                }
-                
-                log(`ダウンロード開始: ${fileName}`);
+                log(`ダウンロード開始: ${kaspaMetadata.file.name}`);
                 
                 // Derive key
-                let salt;
-                if (kaspaMetadata.encryption?.salt) {
-                    // v4.5 format
-                    salt = fromBase64(kaspaMetadata.encryption.salt);
-                } else if (kaspaMetadata.encryption?.pbkdf2?.salt) {
-                    // Legacy format
-                    salt = fromBase64(kaspaMetadata.encryption.pbkdf2.salt);
-                } else {
+                if (!kaspaMetadata.encryption || !kaspaMetadata.encryption.pbkdf2) {
                     throw new Error('暗号化情報が見つかりません');
                 }
+                const salt = fromBase64(kaspaMetadata.encryption.pbkdf2.salt);
                 const key = await deriveKey(password, salt);
                 
                 const chunks = [];
                 
-                // Get all chunks from metadata
-                let allChunkData;
-                
-                // Check if direct chunk arrays are available (.kaspa file)
-                if (kaspaMetadata.chunks && kaspaMetadata.chunkBlockIds) {
-                    // Direct download from .kaspa file
-                    log('.kaspaファイルから直接チャンク情報を使用', 'info');
-                    allChunkData = [];
-                    for (let i = 0; i < kaspaMetadata.chunks.length; i++) {
-                        allChunkData.push({
-                            txid: kaspaMetadata.chunks[i],
-                            blockId: kaspaMetadata.chunkBlockIds[i]
-                        });
-                    }
-                    log(`総チャンク数: ${allChunkData.length}`, 'info');
-                } else if (kaspaMetadata.version === METADATA_VERSION && kaspaMetadata.content?.chunks) {
-                    // v4.5 format - need to fetch chunks from meta-transactions
-                    log('v4.5形式: メタトランザクションからチャンク情報を取得中...', 'info');
-                    allChunkData = await getAllChunksFromMetadata(kaspaMetadata, key);
-                    log(`総チャンク数: ${allChunkData.length}`, 'info');
-                } else {
-                    // Legacy format or invalid
-                    throw new Error('サポートされていないファイル形式です');
-                }
-                
                 // Check if parallel download should be used
-                const useParallel = parallelDownloadEnabled && allChunkData.length >= 10;
+                const useParallel = parallelDownloadEnabled && kaspaMetadata.chunks.length >= 10;
                 
                 if (useParallel) {
                     // Parallel download
-                    log(`並列ダウンロードモードを使用します (${allChunkData.length}チャンク)`, 'info');
+                    log(`並列ダウンロードモードを使用します (${kaspaMetadata.chunks.length}チャンク)`, 'info');
                     
                     try {
                         const downloader = new ParallelDownloader(rpcClient, 8);
                         
                         const parallelChunks = await downloader.downloadChunks(
-                            allChunkData,
+                            kaspaMetadata.chunks,
                             key,
                             kaspaMetadata,
                             (progress) => {
@@ -6049,11 +5549,11 @@
                         
                         // Fallback to sequential
                         chunks.length = 0;
-                        for (let i = 0; i < allChunkData.length; i++) {
-                    const chunkMeta = allChunkData[i];
+                        for (let i = 0; i < kaspaMetadata.chunks.length; i++) {
+                    const chunkMeta = kaspaMetadata.chunks[i];
                     
                     document.getElementById('downloadStatus').textContent = 
-                        `チャンク ${i + 1}/${allChunkData.length} を取得中...`;
+                        `チャンク ${i + 1}/${kaspaMetadata.chunks.length} を取得中...`;
                     
                     try {
                         log(`チャンク ${i + 1}: BlockID ${chunkMeta.blockId.substring(0, 16)}...`, 'info');
@@ -6141,7 +5641,7 @@
                         chunks.push(original);
                         
                         // Update progress
-                        const progress = ((i + 1) / allChunkData.length * 100).toFixed(0);
+                        const progress = ((i + 1) / kaspaMetadata.chunks.length * 100).toFixed(0);
                         document.getElementById('downloadProgressBar').style.width = progress + '%';
                         document.getElementById('downloadProgressBar').textContent = progress + '%';
                         
@@ -6155,13 +5655,13 @@
                     }
                 } else {
                     // Sequential download (default)
-                    log(`シーケンシャルダウンロードモードを使用します (${allChunkData.length}チャンク)`, 'info');
+                    log(`シーケンシャルダウンロードモードを使用します (${kaspaMetadata.chunks.length}チャンク)`, 'info');
                     
-                    for (let i = 0; i < allChunkData.length; i++) {
-                        const chunkMeta = allChunkData[i];
+                    for (let i = 0; i < kaspaMetadata.chunks.length; i++) {
+                        const chunkMeta = kaspaMetadata.chunks[i];
                         
                         document.getElementById('downloadStatus').textContent = 
-                            `チャンク ${i + 1}/${allChunkData.length} を取得中...`;
+                            `チャンク ${i + 1}/${kaspaMetadata.chunks.length} を取得中...`;
                         
                         try {
                             log(`チャンク ${i + 1}: BlockID ${chunkMeta.blockId.substring(0, 16)}...`, 'info');
@@ -6235,7 +5735,7 @@
                             chunks.push(original);
                             
                             // Update progress
-                            const progress = ((i + 1) / allChunkData.length * 100).toFixed(0);
+                            const progress = ((i + 1) / kaspaMetadata.chunks.length * 100).toFixed(0);
                             document.getElementById('downloadProgressBar').style.width = progress + '%';
                             document.getElementById('downloadProgressBar').textContent = progress + '%';
                             
@@ -6259,22 +5759,20 @@
                 
                 // Verify hash
                 const downloadedHash = await sha256(combined);
-                const expectedHash = kaspaMetadata.content?.sha256 || kaspaMetadata.file?.sha256;
-                if (downloadedHash !== expectedHash) {
+                if (downloadedHash !== kaspaMetadata.file.sha256) {
                     throw new Error('ファイル整合性チェック失敗！');
                 }
                 
                 // Download
-                const mimeType = kaspaMetadata.content?.mimeType || kaspaMetadata.file?.mimeType || 'application/octet-stream';
-                const blob = new Blob([combined], { type: mimeType });
+                const blob = new Blob([combined], { type: kaspaMetadata.file.mimeType });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = fileName;
+                a.download = kaspaMetadata.file.name;
                 a.click();
                 URL.revokeObjectURL(url);
                 
-                log(`ダウンロード完了: ${fileName}`, 'success');
+                log(`ダウンロード完了: ${kaspaMetadata.file.name}`, 'success');
                 
             } catch (error) {
                 log(`ダウンロードエラー: ${error.message}`, 'error');
@@ -6885,40 +6383,14 @@
         };
         
         // Initialize history manager on load
-        console.log('DEBUG: Adding DOMContentLoaded event listener');
+        window.historyManager = new UploadHistoryManager();
+        window.directoryManager = new DirectoryManager();
         
         // Auto-initialize WASM on page load
         window.addEventListener('DOMContentLoaded', async function() {
-            console.log('DEBUG: DOMContentLoaded event fired!');
-            alert('DEBUG: DOMContentLoaded fired');
-            
-            try {
-                console.log('DEBUG: Inside DOMContentLoaded try block');
-                
-                // Initialize managers after log function is available
-                console.log('DEBUG: Creating UploadHistoryManager instance');
-                window.historyManager = new UploadHistoryManager();
-                console.log('DEBUG: UploadHistoryManager created successfully');
-                
-                console.log('DEBUG: Creating DirectoryManager instance');
-                window.directoryManager = new DirectoryManager();
-                console.log('DEBUG: DirectoryManager created successfully');
-                
-                console.log('DEBUG: Calling log function from DOMContentLoaded');
-                log('ページ読み込み完了 - システムを自動初期化します', 'info');
-                
-                console.log('DEBUG: Calling loadParallelSetting');
-                loadParallelSetting(); // Load parallel download setting
-                
-                console.log('DEBUG: Calling initializeSystem');
-                await initializeSystem();
-                console.log('DEBUG: initializeSystem completed');
-                
-            } catch (error) {
-                console.error('DEBUG: 初期化エラー:', error);
-                console.error('DEBUG: Error stack:', error.stack);
-                alert('DEBUG: 初期化エラー: ' + error.message + '\n\nStack: ' + error.stack);
-            }
+            log('ページ読み込み完了 - システムを自動初期化します', 'info');
+            loadParallelSetting(); // Load parallel download setting
+            await initializeSystem();
             
             // Add event listener for directory name input
             const dirNameInput = document.getElementById('directoryName');
@@ -6928,26 +6400,6 @@
                 });
             }
         });
-        
-        console.log('DEBUG: End of script - all event listeners added');
-        
-        })(); // Close the async IIFE
-        
-        console.log('DEBUG: Async IIFE closed');
-        
-        } catch (mainError) {
-            console.error('DEBUG: Main script error:', mainError);
-            console.error('DEBUG: Main error stack:', mainError.stack);
-            alert('DEBUG: Main script error: ' + mainError.message);
-        }
-        
-        // Global error handler
-        window.addEventListener('error', function(event) {
-            console.error('DEBUG: Global error caught:', event.error);
-            alert('DEBUG: Global error: ' + event.message + '\nat: ' + event.filename + ':' + event.lineno);
-        });
-        
-        console.log('DEBUG: Script execution completed');
     </script>
 </body>
-</html><!-- Force GitHub Pages update: Mon Jul  7 01:00:00 JST 2025 - v4.5.6 Module to Classic -->
+</html><!-- Force GitHub Pages update: Sat Jul  5 09:53:35 JST 2025 -->

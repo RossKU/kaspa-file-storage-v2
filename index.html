@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.6.10 - Debug Enhancement</title>
+    <title>Kaspa P2P File Storage v4.6.12 - Unified WebSocket Monitoring</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -600,9 +600,14 @@
                     <label for="includePasswordInDir">パスワードを.kaspaファイルに含める</label>
                 </div>
                 
-                <button onclick="createDirectoryFromHistory()" style="width: 100%;" disabled id="createDirBtn">
-                    📁 ディレクトリ.kaspaを生成
-                </button>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <button onclick="createDirectoryFromHistory()" disabled id="createDirBtn">
+                        📁 ディレクトリ.kaspaを生成
+                    </button>
+                    <button onclick="uploadDirectoryToBlockchain()" disabled id="uploadDirBtn" style="background: #e94560; color: white; border: none;">
+                        📤 ブロックチェーンにアップロード
+                    </button>
+                </div>
             </div>
             
             <div class="metric-box" style="display: none;">
@@ -747,6 +752,7 @@
         let wsMonitorTimeout = null; // WebSocket monitoring timeout
         let uploadingChunksCount = 0; // Number of chunks being uploaded
         let uploadingMetaTx = false; // Whether meta-tx is being uploaded
+        let uploadingDirMeta = false; // Whether directory meta is being uploaded
         let isUploadingFile = false; // Overall file upload status (v3.6.3 fix)
         
         // Parallel download settings (v3.6.2)
@@ -3696,7 +3702,7 @@
             
             const metadata = {
                 type: 'kaspa-directory',
-                version: '3.0',
+                version: '3.1.1',
                 created: new Date().toISOString(),
                 network: config.network,
                 
@@ -3714,25 +3720,25 @@
                     name: dirName,
                     totalSize: uploadedFiles.reduce((sum, f) => sum + f.size, 0),
                     fileCount: uploadedFiles.length,
-                    dirCount: new Set(uploadedFiles.map(f => f.path.split('/').slice(0, -1).join('/'))).size,
+                    directoryCount: new Set(uploadedFiles.map(f => f.path.split('/').slice(0, -1).join('/'))).size,
                     merkleRoot: merkleRoot
                 },
                 
-                compression: {
-                    algorithm: 'none',
-                    originalSize: 0,
-                    compressedSize: 0
-                },
-                
                 entries: uploadedFiles,
+                
+                // Recovery information (required for v3.1.1)
+                recovery: {
+                    totalFiles: uploadedFiles.length,
+                    totalSize: uploadedFiles.reduce((sum, f) => sum + f.size, 0),
+                    uploadCost: 0, // Will be calculated after upload
+                    uploadDuration: null // Will be set after upload
+                },
                 
                 metadata: {
                     metaTxId: null, // Will be set if uploaded
                     metaTxBlockId: null,
                     uploadDate: new Date().toISOString(),
                     blockTime: null,
-                    createdAt: Date.now(),
-                    parentTxId: null
                 },
                 
                 auth: {
@@ -3751,6 +3757,27 @@
                 // Serialize metadata
                 const metadataJson = JSON.stringify(metadata);
                 const metadataBytes = new TextEncoder().encode(metadataJson);
+                
+                // Size check (20KB safety margin)
+                const sizeKB = metadataBytes.length / 1024;
+                if (metadataBytes.length > 20 * 1024) {
+                    log(`⚠️ ディレクトリメタデータが大きすぎます（${sizeKB.toFixed(1)}KB）`, 'warning');
+                    log('💡 ヒント: ファイル数を減らすか、サブディレクトリに分割してください', 'info');
+                    log('📝 将来のバージョンでチャンク化をサポート予定です', 'info');
+                    
+                    // Calculate approximate file limit
+                    const approxFilesLimit = Math.floor((20 * 1024) / 150); // ~150 bytes per entry
+                    log(`📊 現在の制限: 約${approxFilesLimit}ファイルまで`, 'info');
+                    
+                    throw new Error(`ディレクトリメタデータが20KBを超えています（${sizeKB.toFixed(1)}KB）`);
+                }
+                
+                log(`ディレクトリメタデータサイズ: ${sizeKB.toFixed(2)}KB`, 'info');
+                
+                // TODO: Future v4.7.0 - Implement directory chunking for large metadata
+                // if (metadataBytes.length > 20 * 1024) {
+                //     return await uploadChunkedDirectoryMetadata(metadata, password);
+                // }
                 
                 // Derive encryption key
                 const salt = fromBase64(metadata.encryption.pbkdf2.salt);
@@ -3776,8 +3803,23 @@
                 // Send transaction
                 const txid = await sendTransaction(transaction);
                 
+                // Add to monitoring list
+                uploadingDirMeta = true;
+                monitoredTransactions.set(txid, {
+                    type: 'directory-meta',
+                    timestamp: Date.now(),
+                    blockId: null
+                });
+                log(`[DEBUG] WebSocket監視リストに追加: TxID: ${txid.substring(0, 16)}... (ディレクトリメタデータ)`, 'debug');
+                
                 // Wait for confirmation
                 const blockId = await waitForConfirmation(txid);
+                
+                // Remove from monitoring list
+                monitoredTransactions.delete(txid);
+                uploadingDirMeta = false;
+                log(`[DEBUG] WebSocket監視リストから削除: TxID: ${txid.substring(0, 16)}... (BlockID取得済み)`, 'debug');
+                checkMonitoringStop();
                 
                 return {
                     success: true,
@@ -3788,6 +3830,9 @@
                 
             } catch (error) {
                 log(`ディレクトリメタデータアップロードエラー: ${error.message}`, 'error');
+                // Clean up on error
+                uploadingDirMeta = false;
+                checkMonitoringStop();
                 return {
                     success: false,
                     error: error.message
@@ -5838,7 +5883,7 @@
         // Check if monitoring should stop
         async function checkMonitoringStop() {
             // v3.6.3 fix: Check overall upload status
-            if (uploadingChunksCount === 0 && !uploadingMetaTx && !isUploadingFile) {
+            if (uploadingChunksCount === 0 && !uploadingMetaTx && !uploadingDirMeta && !isUploadingFile) {
                 log(`[DEBUG] WebSocket監視: 残り0件 - 自動停止します`, 'debug');
                 await stopMonitoring();
             }
@@ -6402,6 +6447,12 @@
             );
             const password = firstFileWithPassword ? firstFileWithPassword.password : generateRandomCID();
             
+            // Check file count warning
+            if (selectedFiles.length > 100) {
+                log(`⚠️ 注意: ${selectedFiles.length}個のファイルが選択されています`, 'warning');
+                log('📝 推奨: 100ファイル以下にすることを推奨します', 'info');
+            }
+            
             // Create directory metadata
             const dirMetadata = await createDirectoryMetadata(dirName, selectedFiles, password);
             
@@ -6434,11 +6485,90 @@
             
             log(`ディレクトリ.kaspaファイルを生成しました: ${filename}`, 'success');
             
+            // Store directory metadata for upload
+            window.currentDirectoryMetadata = dirMetadata;
+            window.currentDirectoryPassword = password;
+            
+            // Enable upload button
+            document.getElementById('uploadDirBtn').disabled = false;
+            
             // Reset UI
             document.getElementById('directoryName').value = '';
             document.getElementById('historyFileSelector').style.display = 'none';
             window.selectedHistoryFiles.clear();
             updateSelectedFilesInfo();
+        };
+        
+        // Upload directory metadata to blockchain
+        window.uploadDirectoryToBlockchain = async function() {
+            if (!window.currentDirectoryMetadata) {
+                alert('先にディレクトリ.kaspaファイルを生成してください');
+                return;
+            }
+            
+            const dirMetadata = window.currentDirectoryMetadata;
+            const password = window.currentDirectoryPassword;
+            
+            try {
+                // Start WebSocket monitoring if not already active
+                if (!wsMonitorActive) {
+                    log('WebSocket監視を開始します...', 'info');
+                    await startMonitoring();
+                }
+                
+                // Show progress
+                log('ディレクトリメタデータをブロックチェーンにアップロード中...', 'info');
+                
+                // Upload directory metadata
+                const result = await uploadDirectoryMetadata(dirMetadata, password);
+                
+                if (result.success) {
+                    // Update metadata with blockchain info
+                    dirMetadata.metadata.metaTxId = result.txid;
+                    dirMetadata.metadata.metaTxBlockId = result.blockId;
+                    dirMetadata.metadata.blockTime = new Date().toISOString();
+                    
+                    // Update recovery info
+                    dirMetadata.recovery.uploadCost = result.cost;
+                    dirMetadata.recovery.uploadDuration = Date.now() - Date.parse(dirMetadata.created);
+                    
+                    log(`✅ ディレクトリメタデータのアップロード完了`, 'success');
+                    log(`MetaTxID: ${result.txid}`, 'success');
+                    log(`BlockID: ${result.blockId}`, 'info');
+                    log(`コスト: ${result.cost} KAS`, 'info');
+                    
+                    // Copy MetaTxID to clipboard
+                    await copyToClipboard(`${result.txid}:${result.blockId}`);
+                    log('MetaTxID:BlockIDをクリップボードにコピーしました', 'info');
+                    
+                    // Add to history
+                    window.historyManager.addItem({
+                        id: 'dir_' + Date.now(),
+                        type: 'directory',
+                        fileName: dirMetadata.directory.name,
+                        fileSize: dirMetadata.directory.totalSize,
+                        metaTxId: result.txid,
+                        metaTxBlockId: result.blockId,
+                        password: password,
+                        timestamp: Date.now(),
+                        blockTime: dirMetadata.metadata.blockTime,
+                        totalKAS: result.cost
+                    });
+                    
+                    // Disable upload button after success
+                    document.getElementById('uploadDirBtn').disabled = true;
+                    
+                    // Clear stored metadata
+                    window.currentDirectoryMetadata = null;
+                    window.currentDirectoryPassword = null;
+                    
+                } else {
+                    log(`❌ アップロードエラー: ${result.error}`, 'error');
+                }
+                
+            } catch (error) {
+                log(`❌ アップロードエラー: ${error.message}`, 'error');
+            }
         };
         
         // Initialize history manager on load

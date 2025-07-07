@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.6.12 - Unified WebSocket Monitoring</title>
+    <title>Kaspa P2P File Storage v4.6.13 - Directory Upload Fix</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -3464,6 +3464,10 @@
             // Show directory upload options
             document.getElementById('uploadDirMetadataOption').style.display = 'block';
             
+            // Enable upload button after directory selection
+            document.getElementById('uploadBtn').disabled = false;
+            console.log('✅ アップロードボタンを有効化しました (ディレクトリモード)');
+            
             // Create directory tree preview
             const treeHtml = createDirectoryTreeHTML(files);
             if (document.getElementById('directoryTree')) {
@@ -6070,7 +6074,7 @@
             }
             
             log(`🚀 Kaspa P2P v${getAppVersion()} 準備完了！`, 'info');
-            log(`📋 v${getAppVersion()}: 統一構造 + 並列ダウンロード + ツリー表示`, 'info');
+            log(`📋 v${getAppVersion()}: ディレクトリアップロードボタン修正 + 並列ダウンロード + ツリー表示`, 'info');
             log('✨ 並列ダウンロード: ' + (parallelDownloadEnabled ? '有効' : '無効'), 'info');
             log('システムを初期化してください', 'info');
             

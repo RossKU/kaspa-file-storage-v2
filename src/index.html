@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.3.2 - Download Script Fix</title>
+    <title>Kaspa P2P File Storage v4.6.11 - Format v3.1.1 Implementation</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -600,9 +600,14 @@
                     <label for="includePasswordInDir">パスワードを.kaspaファイルに含める</label>
                 </div>
                 
-                <button onclick="createDirectoryFromHistory()" style="width: 100%;" disabled id="createDirBtn">
-                    📁 ディレクトリ.kaspaを生成
-                </button>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <button onclick="createDirectoryFromHistory()" disabled id="createDirBtn">
+                        📁 ディレクトリ.kaspaを生成
+                    </button>
+                    <button onclick="uploadDirectoryToBlockchain()" disabled id="uploadDirBtn" style="background: #e94560; color: white; border: none;">
+                        📤 ブロックチェーンにアップロード
+                    </button>
+                </div>
             </div>
             
             <div class="metric-box" style="display: none;">
@@ -717,6 +722,13 @@
     </div>
 
     <script type="module">
+        // Debug logging - Safe version
+        try {
+            console.log('[DEBUG v4.6.3] Script started at:', new Date().toISOString());
+            console.log('[DEBUG] User Agent:', navigator.userAgent);
+        } catch (e) {
+            // Ignore errors in debug logging
+        }
         // Global state
         let kaspa = null;
         let rpcClient = null;
@@ -1272,7 +1284,7 @@
                 // Create .kaspa metadata from history for files with unified structure
                 const kaspaMetadata = {
                     type: 'kaspa-file',
-                    version: "3.0",
+                    version: "3.1",
                     created: item.uploadDate,
                     network: item.network || 'testnet-10',
                     
@@ -1323,9 +1335,9 @@
                 
                 // Include password if requested and available
                 if (includePassword && item.password) {
-                    kaspaMetadata.password = item.password;
                     kaspaMetadata.auth = {
                         passwordIncluded: true,
+                        password: item.password,
                         warning: "パスワードは平文で保存されています。信頼できる相手とのみ共有してください。"
                     };
                     log('パスワードを.kaspaファイルに含めます', 'info');
@@ -1336,7 +1348,7 @@
                 // Create and download .kaspa file with CID
                 const cid = item.cid || generateRandomCID();
                 const filename = generateSafeFilename(item.fileName, cid);
-                const blob = new Blob([JSON.stringify(kaspaMetadata, null, 2)], { type: 'application/json' });
+                const blob = new Blob([JSON.stringify(kaspaMetadata, null, 2)], { type: 'application/octet-stream' });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
@@ -1919,7 +1931,7 @@
             async downloadFile(kaspaData, dirHandle) {
                 // Generate .kaspa file content
                 const kaspaContent = JSON.stringify(kaspaData, null, 2);
-                const blob = new Blob([kaspaContent], { type: 'application/json' });
+                const blob = new Blob([kaspaContent], { type: 'application/octet-stream' });
                 
                 if (dirHandle) {
                     // Save to selected directory
@@ -2434,10 +2446,11 @@
                 this.maxRetries = 3;
             }
             
-            async downloadChunks(chunksMetadata, key, kaspaMetadata, progressCallback) {
+            async downloadChunks(txIds, blockIds, key, kaspaMetadata, progressCallback) {
                 this.startTime = Date.now();
-                this.queue = chunksMetadata.map((chunk, index) => ({ 
-                    chunk, 
+                this.queue = txIds.map((txId, index) => ({ 
+                    txId, 
+                    blockId: blockIds[index],
                     index, 
                     retries: 0 
                 }));
@@ -2445,9 +2458,9 @@
                 this.errors = new Map();
                 this.completedCount = 0;
                 this.totalBytes = 0;
-                this.totalChunks = chunksMetadata.length;
+                this.totalChunks = txIds.length;
                 
-                log(`並列ダウンロード開始: ${chunksMetadata.length}チャンク, ${this.concurrency}並列`, 'info');
+                log(`並列ダウンロード開始: ${txIds.length}チャンク, ${this.concurrency}並列`, 'info');
                 
                 try {
                     const workers = [];
@@ -2545,13 +2558,13 @@
                         
                         const block = response?.block?.block || response?.block;
                         if (!block) {
-                            throw new Error(`ブロックが見つかりません: ${chunkMeta.blockId}`);
+                            throw new Error(`ブロックが見つかりません: ${blockId}`);
                         }
                         
                         let payload = null;
                         for (const tx of block.transactions || []) {
-                            const txId = tx.verboseData?.transactionId || tx.id || tx.transactionId;
-                            if (txId === chunkMeta.txid) {
+                            const txHash = tx.verboseData?.transactionId || tx.id || tx.transactionId;
+                            if (txHash === txId) {
                                 if (tx.payload && tx.payload !== '') {
                                     payload = safeHexDecode(tx.payload, 'chunk payload');
                                     break;
@@ -3688,7 +3701,7 @@
             
             const metadata = {
                 type: 'kaspa-directory',
-                version: '3.0',
+                version: '3.1.1',
                 created: new Date().toISOString(),
                 network: config.network,
                 
@@ -3706,25 +3719,25 @@
                     name: dirName,
                     totalSize: uploadedFiles.reduce((sum, f) => sum + f.size, 0),
                     fileCount: uploadedFiles.length,
-                    dirCount: new Set(uploadedFiles.map(f => f.path.split('/').slice(0, -1).join('/'))).size,
+                    directoryCount: new Set(uploadedFiles.map(f => f.path.split('/').slice(0, -1).join('/'))).size,
                     merkleRoot: merkleRoot
                 },
                 
-                compression: {
-                    algorithm: 'none',
-                    originalSize: 0,
-                    compressedSize: 0
-                },
-                
                 entries: uploadedFiles,
+                
+                // Recovery information (required for v3.1.1)
+                recovery: {
+                    totalFiles: uploadedFiles.length,
+                    totalSize: uploadedFiles.reduce((sum, f) => sum + f.size, 0),
+                    uploadCost: 0, // Will be calculated after upload
+                    uploadDuration: null // Will be set after upload
+                },
                 
                 metadata: {
                     metaTxId: null, // Will be set if uploaded
                     metaTxBlockId: null,
                     uploadDate: new Date().toISOString(),
                     blockTime: null,
-                    createdAt: Date.now(),
-                    parentTxId: null
                 },
                 
                 auth: {
@@ -3990,7 +4003,7 @@
         
         async function waitForConfirmation(txid) {
             // Try WebSocket monitoring first
-            if (window.monitorClient && window.monitorClient.isConnected) {
+            if (window.monitorClient && wsMonitorActive) {
                 return new Promise((resolve) => {
                     const timeout = setTimeout(() => {
                         // Fallback to Explorer API
@@ -4095,7 +4108,7 @@
         }
 
         // Encryption
-        async function deriveKey(password, salt) {
+        async function deriveKey(password, salt, iterations = 100000) {
             const encoder = new TextEncoder();
             const keyMaterial = await crypto.subtle.importKey(
                 'raw',
@@ -4109,7 +4122,7 @@
                 {
                     name: 'PBKDF2',
                     salt: salt,
-                    iterations: 10000,
+                    iterations: iterations,
                     hash: 'SHA-256'
                 },
                 keyMaterial,
@@ -4148,31 +4161,40 @@
         }
 
         async function decryptChunk(data, key, chunkIndex) {
-            const iv = new Uint8Array(12);
-            
-            // Special handling for meta-tx (chunkIndex = -1)
-            if (chunkIndex === -1) {
-                // Use a special pattern for meta-tx
-                iv[0] = 0xFF;
-                iv[1] = 0xFF;
-                for (let i = 2; i < 12; i++) {
-                    iv[i] = 0xFF - i;
+            try {
+                const iv = new Uint8Array(12);
+                
+                // Special handling for meta-tx (chunkIndex = -1)
+                if (chunkIndex === -1) {
+                    // Use a special pattern for meta-tx
+                    iv[0] = 0xFF;
+                    iv[1] = 0xFF;
+                    for (let i = 2; i < 12; i++) {
+                        iv[i] = 0xFF - i;
+                    }
+                } else {
+                    iv[0] = (chunkIndex >> 8) & 0xFF;
+                    iv[1] = chunkIndex & 0xFF;
+                    for (let i = 2; i < 12; i++) {
+                        iv[i] = i * 17;
+                    }
                 }
-            } else {
-                iv[0] = (chunkIndex >> 8) & 0xFF;
-                iv[1] = chunkIndex & 0xFF;
-                for (let i = 2; i < 12; i++) {
-                    iv[i] = i * 17;
-                }
+                
+                log(`Decrypting chunk ${chunkIndex}: data length=${data.length}, IV=${Array.from(iv).map(b => b.toString(16).padStart(2, '0')).join(' ')}`, 'debug');
+                
+                const decrypted = await crypto.subtle.decrypt(
+                    { name: 'AES-GCM', iv: iv },
+                    key,
+                    data
+                );
+                
+                return new Uint8Array(decrypted);
+            } catch (error) {
+                log(`復号化エラー (チャンク ${chunkIndex}): ${error.message || error}`, 'error');
+                log(`データサイズ: ${data.length} bytes`, 'error');
+                console.error('復号化エラーの詳細:', error);
+                throw error;
             }
-            
-            const decrypted = await crypto.subtle.decrypt(
-                { name: 'AES-GCM', iv: iv },
-                key,
-                data
-            );
-            
-            return new Uint8Array(decrypted);
         }
 
         // Base64
@@ -4702,7 +4724,7 @@
                 // Prepare metadata with unified structure
                 kaspaMetadata = {
                     type: 'kaspa-file',
-                    version: "3.0",
+                    version: "3.1",
                     created: new Date().toISOString(),
                     network: config.network,
                     
@@ -4711,7 +4733,7 @@
                         algorithm: "AES-256-GCM",
                         pbkdf2: {
                             salt: toBase64(salt),
-                            iterations: 10000
+                            iterations: 100000
                         }
                     },
                     
@@ -4866,7 +4888,7 @@
                 }
                 
                 const kaspaFileContent = JSON.stringify(kaspaData, null, 2);
-                const blob = new Blob([kaspaFileContent], { type: 'application/json' });
+                const blob = new Blob([kaspaFileContent], { type: 'application/octet-stream' });
                 const url = URL.createObjectURL(blob);
                 
                 const a = document.createElement('a');
@@ -4911,6 +4933,7 @@
                     encryption: kaspaMetadata.encryption,
                     compression: kaspaMetadata.compression,
                     chunks: kaspaMetadata.chunks,
+                    chunkBlockIds: kaspaMetadata.chunkBlockIds,  // v3.1フォーマット準拠
                     metadata: kaspaMetadata.metadata
                 };
                 
@@ -5127,6 +5150,7 @@
                 log('JSON parse成功', 'info');
                 log(`kaspaMetadata.version: ${kaspaMetadata.version}`, 'info');
                 log(`kaspaMetadata.chunks: ${kaspaMetadata.chunks?.length || 0} chunks`, 'info');
+                log(`kaspaMetadata.auth: ${JSON.stringify(kaspaMetadata.auth)}`, 'info');
                 
                 if (!kaspaMetadata.version || !kaspaMetadata.chunks) {
                     throw new Error('無効な.kaspaファイル形式');
@@ -5433,6 +5457,7 @@
                     // Verify this is a meta-tx
                     if (metaData.version === "2.1" && metaData.type === "kaspa-meta-tx") {
                         log('メタトランザクションを正常に復号化しました', 'success');
+                        log(`メタデータ内容: ${JSON.stringify(metaData, null, 2)}`, 'info');
                         
                         // Set kaspaMetadata from meta-tx data
                         kaspaMetadata = {
@@ -5442,6 +5467,7 @@
                             encryption: metaData.encryption,
                             compression: metaData.compression,
                             chunks: metaData.chunks,
+                            chunkBlockIds: metaData.chunkBlockIds,  // v3.1フォーマット準拠
                             metadata: metaData.metadata,
                             metaTx: {
                                 txid: metaTxId,
@@ -5455,7 +5481,7 @@
                             `サイズ: ${(kaspaMetadata.file.size / 1024).toFixed(1)} KB\n` +
                             `チャンク数: ${kaspaMetadata.chunks.length}\n` +
                             `暗号化: ${kaspaMetadata.encryption.algorithm}\n` +
-                            `圧縮: ${kaspaMetadata.compression?.enabled ? kaspaMetadata.compression.algorithm : 'なし'}\n` +
+                            `圧縮: ${kaspaMetadata.file?.compression?.enabled ? kaspaMetadata.file.compression.algorithm : 'なし'}\n` +
                             `作成日時: ${new Date(kaspaMetadata.metadata.createdAt).toLocaleString()}\n` +
                             `メタTxID: ${metaTxId.substring(0, 16)}...`;
                         
@@ -5485,15 +5511,19 @@
         // Download file
         window.downloadFile = async function() {
             let password = document.getElementById('downloadPassword').value;
+            log(`パスワードフィールドの値: ${password ? '入力あり' : '空'}`, 'debug');
             
             if (kaspaMetadata.auth?.passwordIncluded && kaspaMetadata.auth?.password) {
                 password = kaspaMetadata.auth.password;
+                log(`パスワードを.kaspaファイルから取得しました (長さ: ${password.length})`, 'info');
             }
             
             if (!password) {
                 log('パスワードを入力してください', 'error');
                 return;
             }
+            
+            log(`使用するパスワード: ${password.substring(0, 3)}... (長さ: ${password.length})`, 'debug');
             
             if (!kaspaMetadata) {
                 log('.kaspaファイルが読み込まれていません', 'error');
@@ -5515,7 +5545,21 @@
                     throw new Error('暗号化情報が見つかりません');
                 }
                 const salt = fromBase64(kaspaMetadata.encryption.pbkdf2.salt);
-                const key = await deriveKey(password, salt);
+                log(`Salt (base64): ${kaspaMetadata.encryption.pbkdf2.salt}`, 'debug');
+                log(`Salt (bytes): ${salt.length} bytes`, 'debug');
+                
+                // v3.0とv3.1の互換性対応
+                let iterations = kaspaMetadata.encryption.pbkdf2.iterations || 100000;
+                if (kaspaMetadata.version === "3.0") {
+                    // v3.0の場合は10000回を使用
+                    iterations = 10000;
+                    log(`v3.0フォーマット検出: PBKDF2 ${iterations}回を使用`, 'info');
+                } else {
+                    log(`v3.1フォーマット: PBKDF2 ${iterations}回を使用`, 'info');
+                }
+                
+                const key = await deriveKey(password, salt, iterations);
+                log(`キー生成完了 (iterations: ${iterations})`, 'debug');
                 
                 const chunks = [];
                 
@@ -5531,6 +5575,7 @@
                         
                         const parallelChunks = await downloader.downloadChunks(
                             kaspaMetadata.chunks,
+                            kaspaMetadata.chunkBlockIds,
                             key,
                             kaspaMetadata,
                             (progress) => {
@@ -5550,17 +5595,18 @@
                         // Fallback to sequential
                         chunks.length = 0;
                         for (let i = 0; i < kaspaMetadata.chunks.length; i++) {
-                    const chunkMeta = kaspaMetadata.chunks[i];
+                    const txId = kaspaMetadata.chunks[i];
+                    const blockId = kaspaMetadata.chunkBlockIds[i];
                     
                     document.getElementById('downloadStatus').textContent = 
                         `チャンク ${i + 1}/${kaspaMetadata.chunks.length} を取得中...`;
                     
                     try {
-                        log(`チャンク ${i + 1}: BlockID ${chunkMeta.blockId.substring(0, 16)}...`, 'info');
+                        log(`チャンク ${i + 1}: TxID ${txId.substring(0, 16)}... BlockID ${blockId.substring(0, 16)}...`, 'info');
                         
                         // Get block data
                         const request = { 
-                            hash: chunkMeta.blockId, 
+                            hash: blockId, 
                             includeTransactions: true 
                         };
                         log(`RPC getBlock request: ${JSON.stringify(request)}`, 'info');
@@ -5582,7 +5628,7 @@
                         
                         if (!block) {
                             log(`Block not found in response structure`, 'error');
-                            throw new Error(`ブロックが見つかりません: ${chunkMeta.blockId}`);
+                            throw new Error(`ブロックが見つかりません: ${blockId}`);
                         }
                         
                         // Find transaction with matching TxID
@@ -5599,10 +5645,10 @@
                         for (const tx of block.transactions || []) {
                             // BigIntを含む可能性があるのでJSON.stringifyは避ける
                             log(`Checking transaction...`, 'info');
-                            const txId = tx.verboseData?.transactionId || tx.id || tx.transactionId;
+                            const txHash = tx.verboseData?.transactionId || tx.id || tx.transactionId;
                             log(`Transaction ID variants: verboseData.transactionId=${tx.verboseData?.transactionId}, tx.id=${tx.id}, tx.transactionId=${tx.transactionId}`, 'info');
                             
-                            if (txId === chunkMeta.txid) {
+                            if (txHash === txId) {
                                 log(`TxID一致: ${txId.substring(0, 16)}...`, 'info');
                                 log(`tx.payload exists: ${!!tx.payload}, length: ${tx.payload?.length || 0}`, 'info');
                                 
@@ -5625,7 +5671,7 @@
                                     log(`警告: ペイロードが空です (TxID: ${txId})`, 'warning');
                                 }
                             } else {
-                                log(`TxID不一致: ${txId} !== ${chunkMeta.txid}`, 'info');
+                                log(`TxID不一致: ${txHash} !== ${txId}`, 'info');
                             }
                         }
                         
@@ -5636,7 +5682,7 @@
                         // Decrypt and decompress
                         const encrypted = payload; // Already binary Uint8Array
                         const compressed = await decryptChunk(encrypted, key, i);
-                        const original = kaspaMetadata.compression?.enabled ? lzDecompress(compressed) : compressed;
+                        const original = kaspaMetadata.file?.compression?.enabled ? lzDecompress(compressed) : compressed;
                         
                         chunks.push(original);
                         
@@ -5656,19 +5702,21 @@
                 } else {
                     // Sequential download (default)
                     log(`シーケンシャルダウンロードモードを使用します (${kaspaMetadata.chunks.length}チャンク)`, 'info');
+                    log(`圧縮設定: ${JSON.stringify(kaspaMetadata.file?.compression)}`, 'info');
                     
                     for (let i = 0; i < kaspaMetadata.chunks.length; i++) {
-                        const chunkMeta = kaspaMetadata.chunks[i];
+                        const txId = kaspaMetadata.chunks[i];
+                        const blockId = kaspaMetadata.chunkBlockIds[i];
                         
                         document.getElementById('downloadStatus').textContent = 
                             `チャンク ${i + 1}/${kaspaMetadata.chunks.length} を取得中...`;
                         
                         try {
-                            log(`チャンク ${i + 1}: BlockID ${chunkMeta.blockId.substring(0, 16)}...`, 'info');
+                            log(`チャンク ${i + 1}: TxID ${txId.substring(0, 16)}... BlockID ${blockId.substring(0, 16)}...`, 'info');
                             
                             // Get block data
                             const request = { 
-                                hash: chunkMeta.blockId, 
+                                hash: blockId, 
                                 includeTransactions: true 
                             };
                             log(`RPC getBlock request: ${JSON.stringify(request)}`, 'info');
@@ -5690,7 +5738,7 @@
                             
                             if (!block) {
                                 log(`Block not found in response structure`, 'error');
-                                throw new Error(`ブロックが見つかりません: ${chunkMeta.blockId}`);
+                                throw new Error(`ブロックが見つかりません: ${blockId}`);
                             }
                             
                             // Find transaction with matching TxID
@@ -5707,10 +5755,10 @@
                             for (const tx of block.transactions || []) {
                                 // BigIntを含む可能性があるのでJSON.stringifyは避ける
                                 log(`Checking transaction...`, 'info');
-                                const txId = tx.verboseData?.transactionId || tx.id || tx.transactionId;
+                                const txHash = tx.verboseData?.transactionId || tx.id || tx.transactionId;
                                 log(`Transaction ID variants: verboseData.transactionId=${tx.verboseData?.transactionId}, tx.id=${tx.id}, tx.transactionId=${tx.transactionId}`, 'info');
                                 
-                                if (txId === chunkMeta.txid) {
+                                if (txHash === txId) {
                                     log(`TxID一致: ${txId.substring(0, 16)}...`, 'info');
                                     log(`tx.payload exists: ${!!tx.payload}, length: ${tx.payload?.length || 0}`, 'info');
                                     
@@ -5729,10 +5777,17 @@
                             
                             // Decrypt and decompress
                             const encrypted = payload; // Already binary Uint8Array
+                            log(`チャンク ${i + 1}: 暗号化データ ${encrypted.length} bytes`, 'info');
+                            // Log first few bytes for debugging
+                            const preview = Array.from(encrypted.slice(0, 16)).map(b => b.toString(16).padStart(2, '0')).join(' ');
+                            log(`チャンク ${i + 1}: データプレビュー: ${preview}...`, 'debug');
                             const compressed = await decryptChunk(encrypted, key, i);
-                            const original = kaspaMetadata.compression?.enabled ? lzDecompress(compressed) : compressed;
+                            log(`チャンク ${i + 1}: 復号化後 ${compressed.length} bytes`, 'info');
+                            log(`圧縮が有効か: ${kaspaMetadata.file?.compression?.enabled}`, 'info');
+                            const original = kaspaMetadata.file?.compression?.enabled ? lzDecompress(compressed) : compressed;
                             
                             chunks.push(original);
+                            log(`チャンク ${i + 1}: 最終サイズ ${original.length} bytes`, 'info');
                             
                             // Update progress
                             const progress = ((i + 1) / kaspaMetadata.chunks.length * 100).toFixed(0);
@@ -5742,7 +5797,8 @@
                             log(`チャンク ${i + 1} 取得成功`);
                             
                         } catch (error) {
-                            log(`チャンク ${i + 1} エラー: ${error.message}`, 'error');
+                            log(`チャンク ${i + 1} エラー: ${error.message || error}`, 'error');
+                            console.error(`チャンク ${i + 1} 詳細エラー:`, error);
                             throw error;
                         }
                     }
@@ -5759,6 +5815,11 @@
                 
                 // Verify hash
                 const downloadedHash = await sha256(combined);
+                log(`ダウンロードしたファイルのハッシュ: ${downloadedHash}`, 'info');
+                log(`期待されるハッシュ: ${kaspaMetadata.file.sha256}`, 'info');
+                log(`ダウンロードしたファイルサイズ: ${combined.length} bytes`, 'info');
+                log(`期待されるファイルサイズ: ${kaspaMetadata.file.size} bytes`, 'info');
+                
                 if (downloadedHash !== kaspaMetadata.file.sha256) {
                     throw new Error('ファイル整合性チェック失敗！');
                 }
@@ -6110,13 +6171,16 @@
             }
             
             // Check connection status and reconnect if needed
-            if (!rpcClient.isConnected()) {
+            try {
+                // Test connection with a simple RPC call
+                await rpcClient.getServerInfo();
+            } catch (error) {
                 try {
                     log('RPC再接続中...', 'info');
                     await rpcClient.connect();
                     log('RPC再接続成功', 'success');
-                } catch (error) {
-                    log(`RPC再接続エラー: ${error.message}`, 'error');
+                } catch (reconnectError) {
+                    log(`RPC再接続エラー: ${reconnectError.message}`, 'error');
                     return;
                 }
             }
@@ -6375,6 +6439,13 @@
             
             log(`ディレクトリ.kaspaファイルを生成しました: ${filename}`, 'success');
             
+            // Store directory metadata for upload
+            window.currentDirectoryMetadata = dirMetadata;
+            window.currentDirectoryPassword = password;
+            
+            // Enable upload button
+            document.getElementById('uploadDirBtn').disabled = false;
+            
             // Reset UI
             document.getElementById('directoryName').value = '';
             document.getElementById('historyFileSelector').style.display = 'none';
@@ -6382,15 +6453,187 @@
             updateSelectedFilesInfo();
         };
         
+        // Upload directory metadata to blockchain
+        window.uploadDirectoryToBlockchain = async function() {
+            if (!window.currentDirectoryMetadata) {
+                alert('先にディレクトリ.kaspaファイルを生成してください');
+                return;
+            }
+            
+            const dirMetadata = window.currentDirectoryMetadata;
+            const password = window.currentDirectoryPassword;
+            
+            try {
+                // Show progress
+                log('ディレクトリメタデータをブロックチェーンにアップロード中...', 'info');
+                
+                // Upload directory metadata
+                const result = await uploadDirectoryMetadata(dirMetadata, password);
+                
+                if (result.success) {
+                    // Update metadata with blockchain info
+                    dirMetadata.metadata.metaTxId = result.txid;
+                    dirMetadata.metadata.metaTxBlockId = result.blockId;
+                    dirMetadata.metadata.blockTime = new Date().toISOString();
+                    
+                    // Update recovery info
+                    dirMetadata.recovery.uploadCost = result.cost;
+                    dirMetadata.recovery.uploadDuration = Date.now() - Date.parse(dirMetadata.created);
+                    
+                    log(`✅ ディレクトリメタデータのアップロード完了`, 'success');
+                    log(`MetaTxID: ${result.txid}`, 'success');
+                    log(`BlockID: ${result.blockId}`, 'info');
+                    log(`コスト: ${result.cost} KAS`, 'info');
+                    
+                    // Copy MetaTxID to clipboard
+                    await copyToClipboard(`${result.txid}:${result.blockId}`);
+                    log('MetaTxID:BlockIDをクリップボードにコピーしました', 'info');
+                    
+                    // Add to history
+                    window.historyManager.addItem({
+                        id: 'dir_' + Date.now(),
+                        type: 'directory',
+                        fileName: dirMetadata.directory.name,
+                        fileSize: dirMetadata.directory.totalSize,
+                        metaTxId: result.txid,
+                        metaTxBlockId: result.blockId,
+                        password: password,
+                        timestamp: Date.now(),
+                        blockTime: dirMetadata.metadata.blockTime,
+                        totalKAS: result.cost
+                    });
+                    
+                    // Disable upload button after success
+                    document.getElementById('uploadDirBtn').disabled = true;
+                    
+                    // Clear stored metadata
+                    window.currentDirectoryMetadata = null;
+                    window.currentDirectoryPassword = null;
+                    
+                } else {
+                    log(`❌ アップロードエラー: ${result.error}`, 'error');
+                }
+                
+            } catch (error) {
+                log(`❌ アップロードエラー: ${error.message}`, 'error');
+            }
+        };
+        
         // Initialize history manager on load
         window.historyManager = new UploadHistoryManager();
         window.directoryManager = new DirectoryManager();
         
+        // Debug information collection
+        function collectDebugInfo() {
+            const info = {
+                userAgent: navigator.userAgent,
+                platform: navigator.platform,
+                memory: performance.memory ? {
+                    used: Math.round(performance.memory.usedJSHeapSize / 1048576) + ' MB',
+                    total: Math.round(performance.memory.totalJSHeapSize / 1048576) + ' MB',
+                    limit: Math.round(performance.memory.jsHeapSizeLimit / 1048576) + ' MB'
+                } : 'N/A',
+                localStorage: {
+                    size: new Blob(Object.values(localStorage)).size,
+                    keys: Object.keys(localStorage).length
+                },
+                windowSize: `${window.innerWidth}x${window.innerHeight}`,
+                devicePixelRatio: window.devicePixelRatio,
+                online: navigator.onLine,
+                language: navigator.language,
+                cookieEnabled: navigator.cookieEnabled,
+                webGL: (() => {
+                    const canvas = document.createElement('canvas');
+                    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+                    return gl ? 'Supported' : 'Not supported';
+                })()
+            };
+            return info;
+        }
+
+        // Global error handler
+        window.addEventListener('error', (event) => {
+            console.error('Global error caught:', {
+                message: event.message,
+                filename: event.filename,
+                lineno: event.lineno,
+                colno: event.colno,
+                error: event.error,
+                stack: event.error?.stack
+            });
+            log(`エラー: ${event.message} (${event.filename}:${event.lineno})`, 'error');
+        });
+
+        window.addEventListener('unhandledrejection', (event) => {
+            console.error('Unhandled promise rejection:', event.reason);
+            log(`未処理のPromiseエラー: ${event.reason}`, 'error');
+        });
+
+        // Memory monitoring
+        let memoryMonitorInterval;
+        function startMemoryMonitoring() {
+            if (!performance.memory) return;
+            
+            memoryMonitorInterval = setInterval(() => {
+                const used = Math.round(performance.memory.usedJSHeapSize / 1048576);
+                const total = Math.round(performance.memory.totalJSHeapSize / 1048576);
+                const percent = Math.round((used / total) * 100);
+                
+                if (percent > 90) {
+                    log(`⚠️ メモリ使用率警告: ${percent}% (${used}MB/${total}MB)`, 'warning');
+                } else if (percent > 95) {
+                    log(`🚨 メモリ使用率危険: ${percent}% (${used}MB/${total}MB)`, 'error');
+                }
+            }, 30000); // Check every 30 seconds
+        }
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', (event) => {
+            console.log('Page unloading - cleaning up resources');
+            
+            // Stop memory monitoring
+            if (memoryMonitorInterval) {
+                clearInterval(memoryMonitorInterval);
+            }
+            
+            // Close WebSocket connections
+            if (window.ws && window.ws.readyState === WebSocket.OPEN) {
+                console.log('Closing WebSocket connection');
+                window.ws.close();
+            }
+            
+            // Save any pending data
+            if (window.historyManager) {
+                try {
+                    window.historyManager.saveHistory();
+                } catch (e) {
+                    console.error('Failed to save history on unload:', e);
+                }
+            }
+            
+            // Log final debug info
+            const finalDebugInfo = collectDebugInfo();
+            console.log('=== FINAL DEBUG INFO ===', finalDebugInfo);
+        });
+
         // Auto-initialize WASM on page load
         window.addEventListener('DOMContentLoaded', async function() {
+            // Log debug info at startup
+            const debugInfo = collectDebugInfo();
+            console.log('=== DEBUG INFO ===', debugInfo);
+            log(`デバッグ情報: ${JSON.stringify(debugInfo, null, 2)}`, 'debug');
+            
             log('ページ読み込み完了 - システムを自動初期化します', 'info');
             loadParallelSetting(); // Load parallel download setting
-            await initializeSystem();
+            
+            try {
+                await initializeSystem();
+                // Start memory monitoring after successful initialization
+                startMemoryMonitoring();
+            } catch (error) {
+                console.error('Initialization error:', error);
+                log(`初期化エラー: ${error.message}`, 'error');
+            }
             
             // Add event listener for directory name input
             const dirNameInput = document.getElementById('directoryName');

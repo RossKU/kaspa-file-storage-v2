@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.6.28 - Debug & Escape Fix</title>
+    <title>Kaspa P2P File Storage v4.6.29 - DOM-based Button Generation</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -5223,22 +5223,35 @@
                         const hasMetaTx = entry.metaTxId ? '✅' : '❌';
                         
                         const borderStyle = index === dirMetadata.entries.length - 1 ? 'border-bottom: none;' : '';
-                        let buttons = '';
+                        // v4.6.29: DOM操作による安全なボタン生成
+                        const buttonsContainer = document.createElement('span');
+                        
                         if (entry.metaTxId) {
-                            // v4.6.28: より安全なエスケープ処理
-                            const escapedName = (entry.name || '')
-                                .replace(/\\/g, '\\\\')
-                                .replace(/'/g, "\\'")
-                                .replace(/"/g, '&quot;')
-                                .replace(/</g, '&lt;')
-                                .replace(/>/g, '&gt;');
                             const txId = entry.metaTxId || '';
                             const blkId = entry.blockId || '';
                             const pwd = dirMetadata.auth?.password || '';
-                            buttons = '<button onclick="copyToClipboard(\'' + txId + ':' + blkId + '\')" class="small-button" style="margin-left: 10px;">📋</button>';
-                            buttons += '<button onclick="downloadFileFromDirectory(\'' + txId + '\', \'' + blkId + '\', \'' + escapedName + '\', \'' + pwd + '\')" class="small-button" style="margin-left: 5px;">📥</button>';
-                            log(`[DEBUG] ボタンHTML生成: ${buttons}`, 'debug');
-                            log(`[DEBUG] escapedName: ${escapedName}`, 'debug');
+                            const fileName = entry.name || '';
+                            
+                            // コピーボタン
+                            const copyBtn = document.createElement('button');
+                            copyBtn.className = 'small-button';
+                            copyBtn.style.marginLeft = '10px';
+                            copyBtn.textContent = '📋';
+                            copyBtn.onclick = () => copyToClipboard(`${txId}:${blkId}`);
+                            buttonsContainer.appendChild(copyBtn);
+                            
+                            // ダウンロードボタン
+                            const dlBtn = document.createElement('button');
+                            dlBtn.className = 'small-button';
+                            dlBtn.style.marginLeft = '5px';
+                            dlBtn.textContent = '📥';
+                            dlBtn.onclick = () => {
+                                log(`[DEBUG] Download button clicked for: ${fileName}`, 'debug');
+                                downloadFileFromDirectory(txId, blkId, fileName, pwd);
+                            };
+                            buttonsContainer.appendChild(dlBtn);
+                            
+                            log(`[DEBUG] DOM操作でボタンを生成: ${fileName}`, 'debug');
                             // エスケープチェック
                             if (buttons.includes('&apos;')) {
                                 log('[DEBUG] ⚠️ ボタンHTMLに&apos;が含まれています！', 'error');
@@ -5251,9 +5264,14 @@
                         fileListHtml += '<div style="padding: 5px; border-bottom: 1px solid #444; ' + borderStyle + '">';
                         fileListHtml += '<div style="display: flex; justify-content: space-between; align-items: center;">';
                         fileListHtml += '<span>' + icon + ' ' + (entry.path || entry.name) + '</span>';
-                        const rightSpan = '<span style="font-size: 12px; color: #999;">' + size + ' | MetaTx: ' + hasMetaTx + ' ' + buttons + '</span>';
-                        log(`[DEBUG] 右側span内容: ${rightSpan}`, 'debug');
+                        // v4.6.29: rightSpanをプレースホルダーIDで一時的に置き換え
+                        const placeholderId = `buttons_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+                        const rightSpan = `<span style="font-size: 12px; color: #999;">${size} | MetaTx: ${hasMetaTx} <span id="${placeholderId}"></span></span>`;
                         fileListHtml += rightSpan;
+                        
+                        // ボタンコンテナを後で挿入するために保存
+                        if (!window.pendingButtons) window.pendingButtons = [];
+                        window.pendingButtons.push({ id: placeholderId, container: buttonsContainer });
                         fileListHtml += '</div></div>';
                     });
                     
@@ -5278,6 +5296,18 @@
                         fileInfoElement.innerHTML += fileListHtml;
                         const afterLength = fileInfoElement.innerHTML.length;
                         log(`[DEBUG] innerHTML更新: ${beforeLength}文字 → ${afterLength}文字`, 'debug');
+                        
+                        // v4.6.29: DOM操作でボタンを挿入
+                        if (window.pendingButtons && window.pendingButtons.length > 0) {
+                            window.pendingButtons.forEach(({ id, container }) => {
+                                const placeholder = document.getElementById(id);
+                                if (placeholder) {
+                                    placeholder.appendChild(container);
+                                    log(`[DEBUG] ボタンをDOM操作で挿入: ${id}`, 'debug');
+                                }
+                            });
+                            window.pendingButtons = [];
+                        }
                         
                         // innerHTML設定後のチェック
                         if (fileInfoElement.innerHTML.includes('&apos;')) {

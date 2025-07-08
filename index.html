@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.6.13 - Directory Upload Fix</title>
+    <title>Kaspa P2P File Storage v4.6.14 - WebSocket Debug</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -4046,10 +4046,14 @@
         }
         
         async function waitForConfirmation(txid) {
+            log(`[DEBUG] waitForConfirmation開始 - TxID: ${txid.substring(0, 16)}...`, 'debug');
+            
             // Try WebSocket monitoring first
             if (window.monitorClient && wsMonitorActive) {
+                log(`[DEBUG] WebSocket監視を使用してBlockIDを待機`, 'debug');
                 return new Promise((resolve) => {
                     const timeout = setTimeout(() => {
+                        log(`[DEBUG] WebSocketタイムアウト (60秒) - Explorer APIにフォールバック`, 'warning');
                         // Fallback to Explorer API
                         fetchBlockIdFromExplorer(txid).then(resolve);
                     }, 60000); // 60 second timeout
@@ -4059,12 +4063,15 @@
                         window.pendingBlockIds = new Map();
                     }
                     window.pendingBlockIds.set(txid, (blockId) => {
+                        log(`[DEBUG] WebSocketコールバック実行 - BlockID: ${blockId.substring(0, 16)}...`, 'success');
                         clearTimeout(timeout);
                         resolve(blockId);
                     });
+                    log(`[DEBUG] pendingBlockIdsにコールバック登録完了`, 'debug');
                 });
             }
             
+            log(`[DEBUG] WebSocket未使用 - 直接Explorer APIを使用`, 'debug');
             // Fallback to Explorer API
             return await fetchBlockIdFromExplorer(txid);
         }
@@ -6074,7 +6081,7 @@
             }
             
             log(`🚀 Kaspa P2P v${getAppVersion()} 準備完了！`, 'info');
-            log(`📋 v${getAppVersion()}: ディレクトリアップロードボタン修正 + 並列ダウンロード + ツリー表示`, 'info');
+            log(`📋 v${getAppVersion()}: WebSocketデバッグ + pendingBlockIds修正`, 'info');
             log('✨ 並列ダウンロード: ' + (parallelDownloadEnabled ? '有効' : '無効'), 'info');
             log('システムを初期化してください', 'info');
             
@@ -6283,6 +6290,16 @@
                                     log(`[DEBUG] WebSocket: ブロック時刻を保存 - Time: ${blockTime.toISOString()}`, 'debug');
                                     myTransactionFound = true;
                                     
+                                    // Check if there's a pending callback for this transaction
+                                    if (window.pendingBlockIds && window.pendingBlockIds.has(txId)) {
+                                        log(`[DEBUG] WebSocket: pendingBlockIds コールバックを実行 - TxID: ${txId.substring(0, 16)}...`, 'debug');
+                                        const callback = window.pendingBlockIds.get(txId);
+                                        window.pendingBlockIds.delete(txId);
+                                        callback(blockId);
+                                    } else {
+                                        log(`[DEBUG] WebSocket: pendingBlockIds にコールバックが見つかりません - TxID: ${txId.substring(0, 16)}...`, 'debug');
+                                    }
+                                    
                                     // Check if upload is complete after finding this transaction
                                     setTimeout(checkMonitoringStop, 100);
                                 } else {
@@ -6315,6 +6332,11 @@
                 }
             }
         };
+
+        // Monitor log function
+        function monitorLog(message, type = 'info') {
+            log(`[Monitor] ${message}`, type);
+        }
 
         window.stopMonitoring = async function() {
             if (!wsMonitorActive) {

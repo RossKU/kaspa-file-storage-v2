@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.7.10 - Fix download button ID for directory</title>
+    <title>Kaspa P2P File Storage v4.7.12 - Fix bulk download folder selection</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -5771,9 +5771,9 @@
                         
                         const folderStructureOption = {
                             enabled: true,
-                            basePath: null, // Already in the correct directory
-                            filePath: entry.path || entry.name,
-                            targetHandle: currentTargetHandle // Pass the handle directly
+                            basePath: baseDirName, // Use directory name instead of handle
+                            filePath: entry.path || entry.name
+                            // v4.7.12: Remove targetHandle to force folder picker each time
                         };
                         
                         await window.downloadManager.executeDownload(metadata, password, {
@@ -6847,7 +6847,7 @@
             }
             
             log(`🚀 Kaspa P2P v${getAppVersion()} 準備完了！`, 'info');
-            log(`📋 v${getAppVersion()}: ディレクトリ表示修正 + デバッグログ追加`, 'info');
+            log(`📋 v${getAppVersion()}: 一括ダウンロードフォルダ選択修正`, 'info');
             log('✨ 並列ダウンロード: ' + (parallelDownloadEnabled ? '有効' : '無効'), 'info');
             log('システムを初期化してください', 'info');
             

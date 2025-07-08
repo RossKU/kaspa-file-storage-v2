@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.6.24 - Debug Directory Display</title>
+    <title>Kaspa P2P File Storage v4.6.25 - Debug HTML Escaping</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -5232,6 +5232,13 @@
                             buttons = '<button onclick="copyToClipboard(\'' + txId + ':' + blkId + '\')" class="small-button" style="margin-left: 10px;">📋</button>';
                             buttons += '<button onclick="downloadFileFromDirectory(\'' + txId + '\', \'' + blkId + '\', \'' + escapedName + '\', \'' + pwd + '\')" class="small-button" style="margin-left: 5px;">📥</button>';
                             log(`[DEBUG] ボタンHTML生成: ${buttons}`, 'debug');
+                            // エスケープチェック
+                            if (buttons.includes('&apos;')) {
+                                log('[DEBUG] ⚠️ ボタンHTMLに&apos;が含まれています！', 'error');
+                            }
+                            if (buttons.includes('&#39;')) {
+                                log('[DEBUG] ⚠️ ボタンHTMLに&#39;が含まれています！', 'error');
+                            }
                         }
                         
                         fileListHtml += '<div style="padding: 5px; border-bottom: 1px solid #444; ' + borderStyle + '">';
@@ -5249,6 +5256,13 @@
                     log(`[DEBUG] 最終的なfileListHtml長さ: ${fileListHtml.length}文字`, 'debug');
                     log(`[DEBUG] fileListHtmlの一部: ${fileListHtml.substring(0, 200)}...`, 'debug');
                     
+                    // innerHTML設定直前のエスケープチェック
+                    if (fileListHtml.includes('&apos;')) {
+                        log('[DEBUG] ⚠️ fileListHtmlに&apos;が含まれています！', 'error');
+                        const count = (fileListHtml.match(/&apos;/g) || []).length;
+                        log(`[DEBUG] &apos;の数: ${count}個`, 'error');
+                    }
+                    
                     const fileInfoElement = document.getElementById('fileInfo');
                     log(`[DEBUG] fileInfo要素: ${fileInfoElement ? '存在' : '存在しない'}`, 'debug');
                     
@@ -5257,6 +5271,17 @@
                         fileInfoElement.innerHTML += fileListHtml;
                         const afterLength = fileInfoElement.innerHTML.length;
                         log(`[DEBUG] innerHTML更新: ${beforeLength}文字 → ${afterLength}文字`, 'debug');
+                        
+                        // innerHTML設定後のチェック
+                        if (fileInfoElement.innerHTML.includes('&apos;')) {
+                            log('[DEBUG] ⚠️ innerHTML設定後に&apos;が含まれています！', 'error');
+                            // 実際のHTML要素を確認
+                            const buttons = fileInfoElement.querySelectorAll('button');
+                            log(`[DEBUG] ボタン数: ${buttons.length}個`, 'debug');
+                            buttons.forEach((btn, i) => {
+                                log(`[DEBUG] ボタン${i} onclick: ${btn.getAttribute('onclick')}`, 'debug');
+                            });
+                        }
                     }
                 } else {
                     document.getElementById('fileInfo').innerHTML += '<br><strong>⚠️ ファイル一覧情報がありません</strong>';

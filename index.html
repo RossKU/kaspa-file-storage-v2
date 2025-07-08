@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.6.38 - Enhanced Auto Download</title>
+    <title>Kaspa P2P File Storage v4.7.1 - Minimal Download Manager</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -3217,6 +3217,18 @@
             document.getElementById('resumeInfo').style.display = 'none';
             log('レジュームをキャンセルしました', 'info');
         };
+
+        // Minimal Download Manager Class
+        class DownloadManager {
+            constructor() {
+                this.isDownloading = false;
+            }
+            
+            // Simple method to check if ready
+            isReady() {
+                return !this.isDownloading;
+            }
+        }
 
         // System initialization
         window.initializeSystem = async function() {
@@ -6934,6 +6946,7 @@
         // Initialize history manager on load
         window.historyManager = new UploadHistoryManager();
         window.directoryManager = new DirectoryManager();
+        window.downloadManager = new DownloadManager();
         
         // Debug information collection
         function collectDebugInfo() {

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.6.36 - Simple Directory Handler</title>
+    <title>Kaspa P2P File Storage v4.6.37 - Auto Download Debug</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -5413,11 +5413,14 @@
                 
                 // ダウンロードボタンが表示されたら自動クリック
                 setTimeout(async () => {
+                    log(`[DEBUG] 自動ダウンロードチェック - kaspaMetadata: ${!!window.kaspaMetadata}, file: ${!!window.kaspaMetadata?.file}`, 'debug');
                     if (window.kaspaMetadata && window.kaspaMetadata.file) {
                         log(`${fileName} の自動ダウンロードを実行します`, 'success');
                         await downloadFile();
+                    } else {
+                        log(`[DEBUG] 自動ダウンロードをスキップ - メタデータが見つかりません`, 'warning');
                     }
-                }, 1000);
+                }, 1500); // 1.5秒に延長
                 
             } catch (error) {
                 log(`ファイルダウンロードエラー: ${error.message}`, 'error');

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.6.26 - DOM Safety Fix</title>
+    <title>Kaspa P2P File Storage v4.6.27 - Directory Download Fix</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -5341,7 +5341,14 @@
                 // Load the file
                 await loadFromUnifiedInput();
                 
-                log(`${fileName} のダウンロード処理を開始しました`, 'success');
+                // v4.6.27: メタデータ取得後に実際のダウンロードを実行
+                if (window.kaspaMetadata && window.kaspaMetadata.file) {
+                    log(`${fileName} のダウンロード処理を開始しました`, 'success');
+                    // ダウンロードを実行
+                    await downloadFile();
+                } else {
+                    log(`メタデータの取得は成功しましたが、ファイル情報が見つかりません`, 'error');
+                }
                 
             } catch (error) {
                 log(`ファイルダウンロードエラー: ${error.message}`, 'error');
@@ -5822,7 +5829,11 @@
             document.getElementById('downloadProgress').style.display = 'block';
             
             try {
-                log(`ダウンロード開始: ${kaspaMetadata.file.name}`);
+                // v4.6.27: ディレクトリタイプ対応
+                const fileName = kaspaMetadata.file?.name || 
+                               kaspaMetadata.directory?.name || 
+                               'unknown';
+                log(`ダウンロード開始: ${fileName}`);
                 
                 // Derive key
                 if (!kaspaMetadata.encryption || !kaspaMetadata.encryption.pbkdf2) {

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.7.1 - Minimal Download Manager</title>
+    <title>Kaspa P2P File Storage v4.7.2 - Download Manager with fetchMetadata</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -3227,6 +3227,71 @@
             // Simple method to check if ready
             isReady() {
                 return !this.isDownloading;
+            }
+            
+            // Fetch metadata from blockchain
+            async fetchMetadata(metaTxId, blockId, password) {
+                try {
+                    let payload = null;
+                    
+                    // If we have BlockID, use RPC directly
+                    if (blockId && rpcClient) {
+                        log(`[DownloadManager] BlockID経由でメタデータ取得: ${blockId.substring(0, 16)}...`, 'info');
+                        
+                        const blockResponse = await rpcClient.getBlock({
+                            hash: blockId,
+                            includeTransactions: true
+                        });
+                        
+                        const block = blockResponse?.block?.block || blockResponse?.block;
+                        if (!block) {
+                            throw new Error(`ブロックが見つかりません: ${blockId}`);
+                        }
+                        
+                        // Find the meta transaction in the block
+                        for (const tx of block.transactions || []) {
+                            const txId = tx.verboseData?.transactionId || tx.id || tx.transactionId;
+                            if (txId === metaTxId) {
+                                if (tx.payload && tx.payload !== '') {
+                                    payload = safeHexDecode(tx.payload, 'meta-tx payload');
+                                    log(`[DownloadManager] メタデータ取得成功: ${payload.length} bytes`, 'success');
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Fallback to Explorer API
+                    if (!payload) {
+                        log(`[DownloadManager] Explorer API経由でメタデータ取得`, 'info');
+                        const apiUrl = `https://api-tn10.kaspa.org/transactions/${metaTxId}`;
+                        const response = await fetchWithTimeout(apiUrl, {}, 10000, 2);
+                        
+                        if (!response.ok) {
+                            throw new Error(`メタトランザクションの取得に失敗: ${response.status}`);
+                        }
+                        
+                        const data = await response.json();
+                        if (data.payload) {
+                            payload = safeHexDecode(data.payload, 'meta-tx payload from API');
+                        }
+                    }
+                    
+                    if (!payload) {
+                        throw new Error('メタデータのペイロードが見つかりません');
+                    }
+                    
+                    // Decrypt metadata
+                    const decryptedData = await decryptData(payload, password);
+                    const metadata = JSON.parse(new TextDecoder().decode(decryptedData));
+                    
+                    log(`[DownloadManager] メタデータ復号成功: v${metadata.version}`, 'success');
+                    return metadata;
+                    
+                } catch (error) {
+                    log(`[DownloadManager] メタデータ取得エラー: ${error.message}`, 'error');
+                    throw error;
+                }
             }
         }
 

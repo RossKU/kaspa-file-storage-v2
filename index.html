@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.6.38 - Enhanced Auto Download</title>
+    <title>Kaspa P2P File Storage v4.6.40 - Timing Fix</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -762,6 +762,8 @@
         let processedChunks = [];
         let kaspaMetadata = null;
         let directoryMetadata = null; // ディレクトリ専用変数
+        let isDownloadingFromDirectory = false; // ディレクトリからのダウンロード中フラグ
+        let directoryDownloadFileName = null; // ダウンロード中のファイル名
         let wsMonitorActive = false;
         let monitoredTransactions = new Map();
         let uploadHistory = [];
@@ -5390,11 +5392,17 @@
             try {
                 log(`ディレクトリ内ファイルのダウンロード開始: ${fileName}`, 'info');
                 
+                // v4.6.40: フラグを設定
+                window.isDownloadingFromDirectory = true;
+                window.directoryDownloadFileName = fileName;
+                
                 // Ensure password is at least 8 characters
                 if (!password || password.length < 8) {
                     password = prompt('パスワードを入力してください（8文字以上）:');
                     if (!password || password.length < 8) {
                         log('パスワードは8文字以上必要です', 'error');
+                        window.isDownloadingFromDirectory = false;
+                        window.directoryDownloadFileName = null;
                         return;
                     }
                 }
@@ -5413,32 +5421,13 @@
                 log(`自動的にMetaTxIDダウンロードを開始します`, 'info');
                 await loadFromUnifiedInput();
                 
-                // ダウンロードボタンが表示されたら自動クリック
-                setTimeout(async () => {
-                    log(`[DEBUG] 自動ダウンロードチェック - kaspaMetadata: ${!!window.kaspaMetadata}, file: ${!!window.kaspaMetadata?.file}`, 'debug');
-                    
-                    // ダウンロードセクションが表示されているか確認
-                    const downloadSection = document.getElementById('downloadSection');
-                    const downloadBtn = document.getElementById('downloadBtn');
-                    log(`[DEBUG] downloadSection表示: ${downloadSection?.style.display}, downloadBtn存在: ${!!downloadBtn}`, 'debug');
-                    
-                    if (window.kaspaMetadata && window.kaspaMetadata.file) {
-                        log(`${fileName} の自動ダウンロードを実行します`, 'success');
-                        
-                        // ダウンロードボタンをクリック
-                        if (downloadBtn && !downloadBtn.disabled) {
-                            downloadBtn.click();
-                        } else {
-                            await downloadFile();
-                        }
-                    } else {
-                        log(`[DEBUG] 自動ダウンロードをスキップ - メタデータが見つかりません`, 'warning');
-                        log(`[DEBUG] kaspaMetadata内容: ${JSON.stringify(window.kaspaMetadata)}`, 'debug');
-                    }
-                }, 2000); // 2秒に延長
+                // v4.6.40: setTimeoutは削除 - loadFromMetaTxIdの最後で処理する
                 
             } catch (error) {
                 log(`ファイルダウンロードエラー: ${error.message}`, 'error');
+                // v4.6.40: エラー時にフラグをリセット
+                window.isDownloadingFromDirectory = false;
+                window.directoryDownloadFileName = null;
             }
         };
 
@@ -5874,6 +5863,22 @@
                         document.getElementById('downloadSection').style.display = 'block';
                         
                         log('メタTxIDからの復元準備完了！ダウンロードボタンをクリックしてください。', 'success');
+                        
+                        // v4.6.40: ディレクトリからのダウンロードの場合、自動的にダウンロードを開始
+                        if (window.isDownloadingFromDirectory && window.kaspaMetadata && window.kaspaMetadata.file) {
+                            log(`[DEBUG] ディレクトリからの自動ダウンロードを開始: ${window.directoryDownloadFileName}`, 'info');
+                            
+                            // フラグをリセット
+                            window.isDownloadingFromDirectory = false;
+                            const fileName = window.directoryDownloadFileName;
+                            window.directoryDownloadFileName = null;
+                            
+                            // 少し待ってからダウンロード実行（UIの更新を待つ）
+                            setTimeout(async () => {
+                                log(`${fileName} の自動ダウンロードを実行します`, 'success');
+                                await downloadFile();
+                            }, 100);
+                        }
                         
                     } else {
                         throw new Error('これは有効なメタトランザクションではありません');

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.6.22 - Directory File Download</title>
+    <title>Kaspa P2P File Storage v4.6.24 - Debug Directory Display</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -5212,34 +5212,52 @@
                 
                 // ファイル一覧を表示
                 if (dirMetadata.entries && dirMetadata.entries.length > 0) {
+                    log(`ファイル一覧を生成中: ${dirMetadata.entries.length}件`, 'info');
                     let fileListHtml = '<br><strong>📋 ファイル一覧:</strong><br>';
                     fileListHtml += '<div style="max-height: 300px; overflow-y: auto; border: 1px solid #333; padding: 10px; margin-top: 10px; background: #0a2540;">';
                     
                     dirMetadata.entries.forEach((entry, index) => {
+                        log(`エントリ${index}: ${entry.name}, MetaTxID: ${entry.metaTxId ? '有' : '無'}`, 'debug');
                         const icon = entry.type === 'directory' ? '📁' : '📄';
                         const size = entry.size ? `${(entry.size/1024).toFixed(1)}KB` : '-';
                         const hasMetaTx = entry.metaTxId ? '✅' : '❌';
                         
-                        fileListHtml += `
-                            <div style="padding: 5px; border-bottom: 1px solid #444; ${index === dirMetadata.entries.length - 1 ? 'border-bottom: none;' : ''}">
-                                <div style="display: flex; justify-content: space-between; align-items: center;">
-                                    <span>${icon} ${entry.path || entry.name}</span>
-                                    <span style="font-size: 12px; color: #999;">
-                                        ${size} | MetaTx: ${hasMetaTx}
-                                        ${entry.metaTxId ? `
-                                            <button onclick="copyToClipboard('${entry.metaTxId}:${entry.blockId || ''}')" class="small-button" style="margin-left: 10px;">📋</button>
-                                            <button onclick="downloadFileFromDirectory('${entry.metaTxId}', '${entry.blockId || ''}', '${entry.name}', '${dirMetadata.auth?.password || ''}')" class="small-button" style="margin-left: 5px;">📥</button>
-                                        ` : ''}
-                                    </span>
-                                </div>
-                            </div>
-                        `;
+                        const borderStyle = index === dirMetadata.entries.length - 1 ? 'border-bottom: none;' : '';
+                        let buttons = '';
+                        if (entry.metaTxId) {
+                            const escapedName = (entry.name || '').replace(/'/g, "\\'");
+                            const txId = entry.metaTxId || '';
+                            const blkId = entry.blockId || '';
+                            const pwd = dirMetadata.auth?.password || '';
+                            buttons = '<button onclick="copyToClipboard(\'' + txId + ':' + blkId + '\')" class="small-button" style="margin-left: 10px;">📋</button>';
+                            buttons += '<button onclick="downloadFileFromDirectory(\'' + txId + '\', \'' + blkId + '\', \'' + escapedName + '\', \'' + pwd + '\')" class="small-button" style="margin-left: 5px;">📥</button>';
+                            log(`[DEBUG] ボタンHTML生成: ${buttons}`, 'debug');
+                        }
+                        
+                        fileListHtml += '<div style="padding: 5px; border-bottom: 1px solid #444; ' + borderStyle + '">';
+                        fileListHtml += '<div style="display: flex; justify-content: space-between; align-items: center;">';
+                        fileListHtml += '<span>' + icon + ' ' + (entry.path || entry.name) + '</span>';
+                        const rightSpan = '<span style="font-size: 12px; color: #999;">' + size + ' | MetaTx: ' + hasMetaTx + ' ' + buttons + '</span>';
+                        log(`[DEBUG] 右側span内容: ${rightSpan}`, 'debug');
+                        fileListHtml += rightSpan;
+                        fileListHtml += '</div></div>';
                     });
                     
                     fileListHtml += '</div>';
                     fileListHtml += `<br><div style="font-size: 12px; color: #999;">📥 ボタンをクリックして個別ファイルをダウンロード</div>`;
                     
-                    document.getElementById('fileInfo').innerHTML += fileListHtml;
+                    log(`[DEBUG] 最終的なfileListHtml長さ: ${fileListHtml.length}文字`, 'debug');
+                    log(`[DEBUG] fileListHtmlの一部: ${fileListHtml.substring(0, 200)}...`, 'debug');
+                    
+                    const fileInfoElement = document.getElementById('fileInfo');
+                    log(`[DEBUG] fileInfo要素: ${fileInfoElement ? '存在' : '存在しない'}`, 'debug');
+                    
+                    if (fileInfoElement) {
+                        const beforeLength = fileInfoElement.innerHTML.length;
+                        fileInfoElement.innerHTML += fileListHtml;
+                        const afterLength = fileInfoElement.innerHTML.length;
+                        log(`[DEBUG] innerHTML更新: ${beforeLength}文字 → ${afterLength}文字`, 'debug');
+                    }
                 } else {
                     document.getElementById('fileInfo').innerHTML += '<br><strong>⚠️ ファイル一覧情報がありません</strong>';
                 }
@@ -6263,7 +6281,7 @@
             }
             
             log(`🚀 Kaspa P2P v${getAppVersion()} 準備完了！`, 'info');
-            log(`📋 v${getAppVersion()}: ディレクトリ内ファイル個別ダウンロード対応`, 'info');
+            log(`📋 v${getAppVersion()}: ディレクトリ表示修正 + デバッグログ追加`, 'info');
             log('✨ 並列ダウンロード: ' + (parallelDownloadEnabled ? '有効' : '無効'), 'info');
             log('システムを初期化してください', 'info');
             

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.6.15 - WebSocket Connection Fix</title>
+    <title>Kaspa P2P File Storage v4.6.16 - History Manager Fix</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -6081,7 +6081,7 @@
             }
             
             log(`🚀 Kaspa P2P v${getAppVersion()} 準備完了！`, 'info');
-            log(`📋 v${getAppVersion()}: WebSocket接続修正 - 即座にBlockID取得`, 'info');
+            log(`📋 v${getAppVersion()}: 完全動作版 - WebSocket即座完了 + 履歴保存`, 'info');
             log('✨ 並列ダウンロード: ' + (parallelDownloadEnabled ? '有効' : '無効'), 'info');
             log('システムを初期化してください', 'info');
             
@@ -6568,7 +6568,7 @@
                     log('MetaTxID:BlockIDをクリップボードにコピーしました', 'info');
                     
                     // Add to history
-                    window.historyManager.addItem({
+                    uploadHistory.push({
                         id: 'dir_' + Date.now(),
                         type: 'directory',
                         fileName: dirMetadata.directory.name,

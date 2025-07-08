@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.6.33 - Directory Section Display Fix</title>
+    <title>Kaspa P2P File Storage v4.6.36 - Simple Directory Handler</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -761,6 +761,7 @@
         let currentPassword = null;
         let processedChunks = [];
         let kaspaMetadata = null;
+        let directoryMetadata = null; // ディレクトリ専用変数
         let wsMonitorActive = false;
         let monitoredTransactions = new Map();
         let uploadHistory = [];
@@ -5382,7 +5383,7 @@
 
         // Download individual file from directory
         window.downloadFileFromDirectory = async function(metaTxId, blockId, fileName, password) {
-            // v4.6.28: デバッグログ追加
+            // v4.6.36: シンプルな実装 - 通常のダウンロードタブに切り替えて実行
             log(`[DEBUG] downloadFileFromDirectory called!`, 'warning');
             log(`[DEBUG] Parameters: metaTxId=${metaTxId}, blockId=${blockId}, fileName=${fileName}, password=${password ? '***' : 'null'}`, 'debug');
             
@@ -5398,22 +5399,25 @@
                     }
                 }
                 
-                // Set the unified input fields
-                const txIdInput = blockId ? `${metaTxId}:${blockId}` : metaTxId;
-                document.getElementById('unifiedTxIdInput').value = txIdInput;
-                document.getElementById('unifiedPassword').value = password;
+                // ダウンロードタブに切り替え
+                switchTab('download');
                 
-                // Load the file
+                // 入力フィールドに値を設定
+                const txIdInput = blockId ? `${metaTxId}:${blockId}:${password}` : `${metaTxId}::${password}`;
+                document.getElementById('unifiedTxIdInput').value = txIdInput;
+                document.getElementById('unifiedPassword').value = ''; // パスワードはTxIDに含まれているのでクリア
+                
+                // 自動的に「復元」ボタンをクリック
+                log(`自動的にMetaTxIDダウンロードを開始します`, 'info');
                 await loadFromUnifiedInput();
                 
-                // v4.6.27: メタデータ取得後に実際のダウンロードを実行
-                if (window.kaspaMetadata && window.kaspaMetadata.file) {
-                    log(`${fileName} のダウンロード処理を開始しました`, 'success');
-                    // ダウンロードを実行
-                    await downloadFile();
-                } else {
-                    log(`メタデータの取得は成功しましたが、ファイル情報が見つかりません`, 'error');
-                }
+                // ダウンロードボタンが表示されたら自動クリック
+                setTimeout(async () => {
+                    if (window.kaspaMetadata && window.kaspaMetadata.file) {
+                        log(`${fileName} の自動ダウンロードを実行します`, 'success');
+                        await downloadFile();
+                    }
+                }, 1000);
                 
             } catch (error) {
                 log(`ファイルダウンロードエラー: ${error.message}`, 'error');
@@ -5466,7 +5470,10 @@
                 // ディレクトリタイプの場合
                 if (kaspaMetadata.type === 'kaspa-directory') {
                     log('ディレクトリメタデータを検出しました', 'info');
-                    await loadDirectoryMetadata(kaspaMetadata);
+                    // v4.6.36: ディレクトリ専用変数に保存
+                    window.directoryMetadata = kaspaMetadata;
+                    window.kaspaMetadata = null; // 通常のメタデータをクリア
+                    await loadDirectoryMetadata(window.directoryMetadata);
                     return;
                 }
                 

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.6.19 - Directory Files Display</title>
+    <title>Kaspa P2P File Storage v4.6.20 - Debug Directory Display</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -5170,11 +5170,15 @@
         async function loadDirectoryMetadata(dirMetadata) {
             try {
                 log('ディレクトリメタデータを処理中...', 'info');
+                log(`受信したdirMetadata: ${JSON.stringify(dirMetadata, null, 2)}`, 'debug');
                 
                 // ディレクトリ情報を表示
-                const totalSize = dirMetadata.directory.totalSize || 0;
-                const fileCount = dirMetadata.directory.fileCount || 0;
-                const dirCount = dirMetadata.directory.directoryCount || 0;
+                const totalSize = dirMetadata.directory?.totalSize || 0;
+                const fileCount = dirMetadata.directory?.fileCount || 0;
+                const dirCount = dirMetadata.directory?.directoryCount || 0;
+                
+                log(`ディレクトリ情報: name=${dirMetadata.directory?.name}, fileCount=${fileCount}, totalSize=${totalSize}`, 'debug');
+                log(`entries数: ${dirMetadata.entries?.length || 0}`, 'debug');
                 
                 document.getElementById('fileInfo').innerHTML = 
                     `<strong>📁 ディレクトリ: ${dirMetadata.directory.name}</strong><br>` +
@@ -5187,10 +5191,12 @@
                 
                 // ファイル一覧を表示
                 if (dirMetadata.entries && dirMetadata.entries.length > 0) {
+                    log(`ファイル一覧を表示します: ${dirMetadata.entries.length}件`, 'info');
                     let fileListHtml = '<br><strong>📋 ファイル一覧:</strong><br>';
                     fileListHtml += '<div style="max-height: 300px; overflow-y: auto; border: 1px solid #333; padding: 10px; margin-top: 10px; background: #0a2540;">';
                     
                     dirMetadata.entries.forEach((entry, index) => {
+                        log(`Entry ${index}: ${entry.name || entry.path}, size: ${entry.size}, metaTxId: ${entry.metaTxId?.substring(0,16)}...`, 'debug');
                         const icon = entry.type === 'directory' ? '📁' : '📄';
                         const size = entry.size ? `${(entry.size/1024).toFixed(1)}KB` : '-';
                         const hasMetaTx = entry.metaTxId ? '✅' : '❌';
@@ -6188,7 +6194,7 @@
             }
             
             log(`🚀 Kaspa P2P v${getAppVersion()} 準備完了！`, 'info');
-            log(`📋 v${getAppVersion()}: ディレクトリファイル一覧表示 + MetaTxコピー`, 'info');
+            log(`📋 v${getAppVersion()}: ディレクトリ表示デバッグ版`, 'info');
             log('✨ 並列ダウンロード: ' + (parallelDownloadEnabled ? '有効' : '無効'), 'info');
             log('システムを初期化してください', 'info');
             

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.6.16 - History Manager Fix</title>
+    <title>Kaspa P2P File Storage v4.6.17 - Complete Fix</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -6060,7 +6060,7 @@
                         <div class="metric-box">
                             <strong>${item.filename}</strong><br>
                             ${new Date(item.timestamp).toLocaleString()}<br>
-                            ${item.metadata.chunks.length} チャンク
+                            ${item.metadata?.chunks?.length || item.fileCount || 0} ${item.type === 'directory' ? 'ファイル' : 'チャンク'}
                         </div>
                     `).join('');
                 } else {
@@ -6081,7 +6081,7 @@
             }
             
             log(`🚀 Kaspa P2P v${getAppVersion()} 準備完了！`, 'info');
-            log(`📋 v${getAppVersion()}: 完全動作版 - WebSocket即座完了 + 履歴保存`, 'info');
+            log(`📋 v${getAppVersion()}: 完全修正版 - すべての機能が正常動作`, 'info');
             log('✨ 並列ダウンロード: ' + (parallelDownloadEnabled ? '有効' : '無効'), 'info');
             log('システムを初期化してください', 'info');
             

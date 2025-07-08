@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.6.17 - Complete Fix</title>
+    <title>Kaspa P2P File Storage v4.6.18 - Unified Download</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -5166,6 +5166,51 @@
             }
         };
 
+        // Load directory metadata
+        async function loadDirectoryMetadata(dirMetadata) {
+            try {
+                log('ディレクトリメタデータを処理中...', 'info');
+                
+                // ディレクトリ情報を表示
+                const totalSize = dirMetadata.directory.totalSize || 0;
+                const fileCount = dirMetadata.directory.fileCount || 0;
+                const dirCount = dirMetadata.directory.directoryCount || 0;
+                
+                document.getElementById('fileInfo').innerHTML = 
+                    `<strong>📁 ディレクトリ: ${dirMetadata.directory.name}</strong><br>` +
+                    `タイプ: ${dirMetadata.type}<br>` +
+                    `バージョン: ${dirMetadata.version}<br>` +
+                    `ファイル数: ${fileCount}<br>` +
+                    `ディレクトリ数: ${dirCount}<br>` +
+                    `合計サイズ: ${(totalSize/1024/1024).toFixed(2)}MB<br>` +
+                    `作成日時: ${new Date(dirMetadata.created).toLocaleString()}<br>` +
+                    `<br>` +
+                    `<strong>⚠️ ディレクトリのダウンロードは現在開発中です</strong>`;
+                
+                // パスワード処理
+                const passwordSection = document.getElementById('passwordSection');
+                if (dirMetadata.auth?.passwordIncluded) {
+                    document.getElementById('downloadPassword').style.display = 'none';
+                    document.getElementById('downloadPassword').value = dirMetadata.auth.password;
+                    passwordSection.innerHTML = '<p>✅ パスワードがファイルに含まれています（自動入力）</p>';
+                } else {
+                    passwordSection.innerHTML = '<input type="password" id="downloadPassword" placeholder="パスワードを入力">';
+                }
+                
+                // ダウンロードボタンを無効化（現在未実装）
+                const downloadBtn = document.getElementById('downloadBtn');
+                if (downloadBtn) {
+                    downloadBtn.disabled = true;
+                    downloadBtn.textContent = 'ディレクトリダウンロード（開発中）';
+                }
+                
+                log('ディレクトリ情報の表示完了', 'success');
+                
+            } catch (error) {
+                log(`ディレクトリメタデータ処理エラー: ${error.message}`, 'error');
+            }
+        }
+
         // Load .kaspa file
         window.loadKaspaFile = async function(event) {
             log('=== loadKaspaFile 開始 ===', 'info');
@@ -5200,10 +5245,24 @@
                 kaspaMetadata = JSON.parse(content);
                 log('JSON parse成功', 'info');
                 log(`kaspaMetadata.version: ${kaspaMetadata.version}`, 'info');
+                log(`kaspaMetadata.type: ${kaspaMetadata.type}`, 'info');
                 log(`kaspaMetadata.chunks: ${kaspaMetadata.chunks?.length || 0} chunks`, 'info');
                 log(`kaspaMetadata.auth: ${JSON.stringify(kaspaMetadata.auth)}`, 'info');
                 
-                if (!kaspaMetadata.version || !kaspaMetadata.chunks) {
+                // 統一ダウンロード処理 - タイプ別に処理
+                if (!kaspaMetadata.version) {
+                    throw new Error('無効な.kaspaファイル形式');
+                }
+                
+                // ディレクトリタイプの場合
+                if (kaspaMetadata.type === 'kaspa-directory') {
+                    log('ディレクトリメタデータを検出しました', 'info');
+                    await loadDirectoryMetadata(kaspaMetadata);
+                    return;
+                }
+                
+                // 通常ファイルの場合
+                if (!kaspaMetadata.chunks) {
                     throw new Error('無効な.kaspaファイル形式');
                 }
                 
@@ -5510,6 +5569,25 @@
                         log('メタトランザクションを正常に復号化しました', 'success');
                         log(`メタデータ内容: ${JSON.stringify(metaData, null, 2)}`, 'info');
                         
+                        // ディレクトリタイプの場合
+                        if (metaData.type === 'kaspa-directory') {
+                            log('ディレクトリメタデータを検出しました', 'info');
+                            
+                            // ディレクトリメタデータとして処理
+                            const dirMetadata = {
+                                ...metaData,
+                                auth: {
+                                    passwordIncluded: true,
+                                    password: password
+                                }
+                            };
+                            
+                            await loadDirectoryMetadata(dirMetadata);
+                            document.getElementById('downloadSection').style.display = 'block';
+                            return;
+                        }
+                        
+                        // 通常ファイルの場合
                         // Set kaspaMetadata from meta-tx data
                         kaspaMetadata = {
                             version: "2.0", // Convert back to standard format
@@ -6081,7 +6159,7 @@
             }
             
             log(`🚀 Kaspa P2P v${getAppVersion()} 準備完了！`, 'info');
-            log(`📋 v${getAppVersion()}: 完全修正版 - すべての機能が正常動作`, 'info');
+            log(`📋 v${getAppVersion()}: 統一ダウンロード基盤 - ディレクトリ認識対応`, 'info');
             log('✨ 並列ダウンロード: ' + (parallelDownloadEnabled ? '有効' : '無効'), 'info');
             log('システムを初期化してください', 'info');
             

@@ -761,6 +761,7 @@
         let currentPassword = null;
         let processedChunks = [];
         let kaspaMetadata = null;
+        let currentFileMetadata = null; // 個別ファイル用の別変数
         let wsMonitorActive = false;
         let monitoredTransactions = new Map();
         let uploadHistory = [];
@@ -5406,11 +5407,15 @@
                 // Load the file
                 await loadFromUnifiedInput();
                 
-                // v4.6.27: メタデータ取得後に実際のダウンロードを実行
+                // v4.6.35: 個別ファイル用のメタデータを別変数に保存
                 if (window.kaspaMetadata && window.kaspaMetadata.file) {
                     log(`${fileName} のダウンロード処理を開始しました`, 'success');
+                    // currentFileMetadataに保存して、元のkaspaMetadataを保持
+                    window.currentFileMetadata = window.kaspaMetadata;
                     // ダウンロードを実行
                     await downloadFile();
+                    // ダウンロード後にクリア
+                    window.currentFileMetadata = null;
                 } else {
                     log(`メタデータの取得は成功しましたが、ファイル情報が見つかりません`, 'error');
                 }
@@ -5866,11 +5871,14 @@
 
         // Download file
         window.downloadFile = async function() {
+            // v4.6.35: currentFileMetadataがある場合はそれを優先
+            const activeMetadata = window.currentFileMetadata || window.kaspaMetadata;
+            
             let password = document.getElementById('downloadPassword').value;
             log(`パスワードフィールドの値: ${password ? '入力あり' : '空'}`, 'debug');
             
-            if (kaspaMetadata.auth?.passwordIncluded && kaspaMetadata.auth?.password) {
-                password = kaspaMetadata.auth.password;
+            if (activeMetadata.auth?.passwordIncluded && activeMetadata.auth?.password) {
+                password = activeMetadata.auth.password;
                 log(`パスワードを.kaspaファイルから取得しました (長さ: ${password.length})`, 'info');
             }
             
@@ -5881,7 +5889,7 @@
             
             log(`使用するパスワード: ${password.substring(0, 3)}... (長さ: ${password.length})`, 'debug');
             
-            if (!kaspaMetadata) {
+            if (!activeMetadata) {
                 log('.kaspaファイルが読み込まれていません', 'error');
                 return;
             }
@@ -5895,21 +5903,21 @@
             
             try {
                 // v4.6.27: ディレクトリタイプ対応
-                const fileName = kaspaMetadata.file?.name || 
-                               kaspaMetadata.directory?.name || 
+                const fileName = activeMetadata.file?.name || 
+                               activeMetadata.directory?.name || 
                                'unknown';
                 log(`ダウンロード開始: ${fileName}`);
                 
                 // Derive key
-                if (!kaspaMetadata.encryption || !kaspaMetadata.encryption.pbkdf2) {
+                if (!activeMetadata.encryption || !activeMetadata.encryption.pbkdf2) {
                     throw new Error('暗号化情報が見つかりません');
                 }
-                const salt = fromBase64(kaspaMetadata.encryption.pbkdf2.salt);
-                log(`Salt (base64): ${kaspaMetadata.encryption.pbkdf2.salt}`, 'debug');
+                const salt = fromBase64(activeMetadata.encryption.pbkdf2.salt);
+                log(`Salt (base64): ${activeMetadata.encryption.pbkdf2.salt}`, 'debug');
                 log(`Salt (bytes): ${salt.length} bytes`, 'debug');
                 
                 // v3.0とv3.1の互換性対応
-                let iterations = kaspaMetadata.encryption.pbkdf2.iterations || 100000;
+                let iterations = activeMetadata.encryption.pbkdf2.iterations || 100000;
                 if (kaspaMetadata.version === "3.0") {
                     // v3.0の場合は10000回を使用
                     iterations = 10000;
@@ -5934,10 +5942,10 @@
                         const downloader = new ParallelDownloader(rpcClient, 8);
                         
                         const parallelChunks = await downloader.downloadChunks(
-                            kaspaMetadata.chunks,
-                            kaspaMetadata.chunkBlockIds,
+                            activeMetadata.chunks,
+                            activeMetadata.chunkBlockIds,
                             key,
-                            kaspaMetadata,
+                            activeMetadata,
                             (progress) => {
                                 const percent = ((progress.completed / progress.total) * 100).toFixed(0);
                                 document.getElementById('downloadProgressBar').style.width = percent + '%';
@@ -5954,12 +5962,12 @@
                         
                         // Fallback to sequential
                         chunks.length = 0;
-                        for (let i = 0; i < kaspaMetadata.chunks.length; i++) {
-                    const txId = kaspaMetadata.chunks[i];
-                    const blockId = kaspaMetadata.chunkBlockIds[i];
+                        for (let i = 0; i < activeMetadata.chunks.length; i++) {
+                    const txId = activeMetadata.chunks[i];
+                    const blockId = activeMetadata.chunkBlockIds[i];
                     
                     document.getElementById('downloadStatus').textContent = 
-                        `チャンク ${i + 1}/${kaspaMetadata.chunks.length} を取得中...`;
+                        `チャンク ${i + 1}/${activeMetadata.chunks.length} を取得中...`;
                     
                     try {
                         log(`チャンク ${i + 1}: TxID ${txId.substring(0, 16)}... BlockID ${blockId.substring(0, 16)}...`, 'info');
@@ -6042,12 +6050,12 @@
                         // Decrypt and decompress
                         const encrypted = payload; // Already binary Uint8Array
                         const compressed = await decryptChunk(encrypted, key, i);
-                        const original = kaspaMetadata.file?.compression?.enabled ? lzDecompress(compressed) : compressed;
+                        const original = activeMetadata.file?.compression?.enabled ? lzDecompress(compressed) : compressed;
                         
                         chunks.push(original);
                         
                         // Update progress
-                        const progress = ((i + 1) / kaspaMetadata.chunks.length * 100).toFixed(0);
+                        const progress = ((i + 1) / activeMetadata.chunks.length * 100).toFixed(0);
                         document.getElementById('downloadProgressBar').style.width = progress + '%';
                         document.getElementById('downloadProgressBar').textContent = progress + '%';
                         
@@ -6061,15 +6069,15 @@
                     }
                 } else {
                     // Sequential download (default)
-                    log(`シーケンシャルダウンロードモードを使用します (${kaspaMetadata.chunks.length}チャンク)`, 'info');
-                    log(`圧縮設定: ${JSON.stringify(kaspaMetadata.file?.compression)}`, 'info');
+                    log(`シーケンシャルダウンロードモードを使用します (${activeMetadata.chunks.length}チャンク)`, 'info');
+                    log(`圧縮設定: ${JSON.stringify(activeMetadata.file?.compression)}`, 'info');
                     
-                    for (let i = 0; i < kaspaMetadata.chunks.length; i++) {
-                        const txId = kaspaMetadata.chunks[i];
-                        const blockId = kaspaMetadata.chunkBlockIds[i];
+                    for (let i = 0; i < activeMetadata.chunks.length; i++) {
+                        const txId = activeMetadata.chunks[i];
+                        const blockId = activeMetadata.chunkBlockIds[i];
                         
                         document.getElementById('downloadStatus').textContent = 
-                            `チャンク ${i + 1}/${kaspaMetadata.chunks.length} を取得中...`;
+                            `チャンク ${i + 1}/${activeMetadata.chunks.length} を取得中...`;
                         
                         try {
                             log(`チャンク ${i + 1}: TxID ${txId.substring(0, 16)}... BlockID ${blockId.substring(0, 16)}...`, 'info');
@@ -6143,14 +6151,14 @@
                             log(`チャンク ${i + 1}: データプレビュー: ${preview}...`, 'debug');
                             const compressed = await decryptChunk(encrypted, key, i);
                             log(`チャンク ${i + 1}: 復号化後 ${compressed.length} bytes`, 'info');
-                            log(`圧縮が有効か: ${kaspaMetadata.file?.compression?.enabled}`, 'info');
-                            const original = kaspaMetadata.file?.compression?.enabled ? lzDecompress(compressed) : compressed;
+                            log(`圧縮が有効か: ${activeMetadata.file?.compression?.enabled}`, 'info');
+                            const original = activeMetadata.file?.compression?.enabled ? lzDecompress(compressed) : compressed;
                             
                             chunks.push(original);
                             log(`チャンク ${i + 1}: 最終サイズ ${original.length} bytes`, 'info');
                             
                             // Update progress
-                            const progress = ((i + 1) / kaspaMetadata.chunks.length * 100).toFixed(0);
+                            const progress = ((i + 1) / activeMetadata.chunks.length * 100).toFixed(0);
                             document.getElementById('downloadProgressBar').style.width = progress + '%';
                             document.getElementById('downloadProgressBar').textContent = progress + '%';
                             
@@ -6176,24 +6184,24 @@
                 // Verify hash
                 const downloadedHash = await sha256(combined);
                 log(`ダウンロードしたファイルのハッシュ: ${downloadedHash}`, 'info');
-                log(`期待されるハッシュ: ${kaspaMetadata.file.sha256}`, 'info');
+                log(`期待されるハッシュ: ${activeMetadata.file.sha256}`, 'info');
                 log(`ダウンロードしたファイルサイズ: ${combined.length} bytes`, 'info');
-                log(`期待されるファイルサイズ: ${kaspaMetadata.file.size} bytes`, 'info');
+                log(`期待されるファイルサイズ: ${activeMetadata.file.size} bytes`, 'info');
                 
-                if (downloadedHash !== kaspaMetadata.file.sha256) {
+                if (downloadedHash !== activeMetadata.file.sha256) {
                     throw new Error('ファイル整合性チェック失敗！');
                 }
                 
                 // Download
-                const blob = new Blob([combined], { type: kaspaMetadata.file.mimeType });
+                const blob = new Blob([combined], { type: activeMetadata.file.mimeType });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = kaspaMetadata.file.name;
+                a.download = activeMetadata.file.name;
                 a.click();
                 URL.revokeObjectURL(url);
                 
-                log(`ダウンロード完了: ${kaspaMetadata.file.name}`, 'success');
+                log(`ダウンロード完了: ${activeMetadata.file.name}`, 'success');
                 
             } catch (error) {
                 log(`ダウンロードエラー: ${error.message}`, 'error');

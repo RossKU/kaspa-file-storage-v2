@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.7.11 - File history for uploads and downloads</title>
+    <title>Kaspa P2P File Storage v4.7.10 - Fix download button ID for directory</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -668,7 +668,7 @@
     <!-- History Tab -->
     <div id="history-tab" class="tab-content">
         <div class="container">
-            <h2>📜 履歴</h2>
+            <h2>📜 アップロード履歴</h2>
             
             <div class="metric-box">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
@@ -733,7 +733,7 @@
             </div>
             
             <div class="metric-box">
-                <h3>ファイル履歴</h3>
+                <h3>アップロード履歴</h3>
                 <div id="uploadHistory"></div>
             </div>
         </div>
@@ -797,20 +797,19 @@
         }
         
         // Upload History Manager Class
-        // v4.7.11: Renamed from UploadHistoryManager to support both upload and download
-        class FileHistoryManager {
+        class UploadHistoryManager {
             constructor() {
-                this.dbName = 'kaspa-file-history';  // Changed from upload-history
-                this.fileName = 'kaspa-files.kenv';  // Changed from uploads.kenv
+                this.dbName = 'kaspa-upload-history';
+                this.fileName = 'kaspa-uploads.kenv';
                 this.maxSize = 100 * 1024 * 1024; // 100MB
                 this.archiveSize = 10 * 1024 * 1024; // 10MB chunks
                 this.encryptionKey = null;
                 this.loadedHistory = []; // In-memory history storage
-                log('[FileHistoryManager] インスタンスを初期化しました', 'debug');
+                log('[UploadHistoryManager] インスタンスを初期化しました', 'debug');
             }
             
             async initialize(privateKey) {
-                log('[FileHistoryManager] 初期化を開始します', 'debug');
+                log('[UploadHistoryManager] 初期化を開始します', 'debug');
                 try {
                     // Derive encryption key from private key
                     const keyData = new TextEncoder().encode(privateKey);
@@ -822,43 +821,43 @@
                         false,
                         ['encrypt', 'decrypt']
                     );
-                    log('[FileHistoryManager] 暗号化キーを初期化しました', 'success');
+                    log('[UploadHistoryManager] 暗号化キーを初期化しました', 'success');
                     
                     // Load existing history from workspace
                     if (window.workspaceHandle) {
-                        log('[FileHistoryManager] ワークスペースハンドルが存在します。履歴の読み込みを開始します', 'debug');
+                        log('[UploadHistoryManager] ワークスペースハンドルが存在します。履歴の読み込みを開始します', 'debug');
                         await this.loadFromFile();
                     } else {
-                        log('[FileHistoryManager] ワークスペースハンドルが存在しません', 'info');
+                        log('[UploadHistoryManager] ワークスペースハンドルが存在しません', 'info');
                     }
                 } catch (error) {
-                    log(`[FileHistoryManager] 初期化エラー: ${error.message}`, 'error');
+                    log(`[UploadHistoryManager] 初期化エラー: ${error.message}`, 'error');
                     throw error;
                 }
             }
             
             async loadFromFile() {
-                log(`[FileHistoryManager] .kenvファイル「${this.fileName}」の読み込みを開始します`, 'debug');
+                log(`[UploadHistoryManager] .kenvファイル「${this.fileName}」の読み込みを開始します`, 'debug');
                 try {
                     const fileHandle = await window.workspaceHandle.getFileHandle(this.fileName);
-                    log('[FileHistoryManager] .kenvファイルが見つかりました', 'success');
+                    log('[UploadHistoryManager] .kenvファイルが見つかりました', 'success');
                     
                     const file = await fileHandle.getFile();
                     const fileSize = file.size;
-                    log(`[FileHistoryManager] ファイルサイズ: ${fileSize} bytes`, 'debug');
+                    log(`[UploadHistoryManager] ファイルサイズ: ${fileSize} bytes`, 'debug');
                     
                     const encryptedData = await file.text();
                     const data = JSON.parse(encryptedData);
-                    log(`[FileHistoryManager] ファイルのバージョン: ${data.version}、暗号化: ${data.encrypted}`, 'debug');
+                    log(`[UploadHistoryManager] ファイルのバージョン: ${data.version}、暗号化: ${data.encrypted}`, 'debug');
                     
                     if (data.encrypted) {
                         const decrypted = await this.decrypt(data.data);
                         const kenv = JSON.parse(decrypted);
-                        log(`[FileHistoryManager] 復号化成功。履歴数: ${kenv.uploads?.length || 0}件`, 'debug');
+                        log(`[UploadHistoryManager] 復号化成功。履歴数: ${kenv.uploads?.length || 0}件`, 'debug');
                         
                         // v4.2.8: Migrate to version 2.0 if needed
                         if (kenv.version === "1.0") {
-                            log('[FileHistoryManager] v1.0のデータを検出。v2.0への移行を開始します', 'info');
+                            log('[UploadHistoryManager] v1.0のデータを検出。v2.0への移行を開始します', 'info');
                             kenv = this.migrateV1ToV2(kenv);
                         }
                         
@@ -869,7 +868,7 @@
                                     const parts = item.metaTxId.split(':');
                                     item.metaTxId = parts[0];
                                     item.metaTxBlockId = parts[1];
-                                    log(`[FileHistoryManager] metaTxIdを修正しました: ${item.fileName}`, 'debug');
+                                    log(`[UploadHistoryManager] metaTxIdを修正しました: ${item.fileName}`, 'debug');
                                 }
                                 return item;
                             });
@@ -880,29 +879,29 @@
                         this.updateHistoryUI();
                         log(`履歴を読み込みました: ${this.loadedHistory.length}件`, 'success');
                     } else {
-                        log('[FileHistoryManager] ファイルが暗号化されていません', 'error');
+                        log('[UploadHistoryManager] ファイルが暗号化されていません', 'error');
                     }
                 } catch (error) {
                     // File doesn't exist or error reading
                     if (error.name === 'NotFoundError') {
-                        log(`[FileHistoryManager] .kenvファイル「${this.fileName}」が見つかりません`, 'info');
+                        log(`[UploadHistoryManager] .kenvファイル「${this.fileName}」が見つかりません`, 'info');
                     } else {
-                        log(`[FileHistoryManager] ファイル読み込みエラー: ${error.name} - ${error.message}`, 'error');
+                        log(`[UploadHistoryManager] ファイル読み込みエラー: ${error.name} - ${error.message}`, 'error');
                     }
                 }
             }
             
             async saveToFile() {
                 if (!window.workspaceHandle) {
-                    log('[FileHistoryManager] ワークスペースハンドルがないため保存をスキップします', 'debug');
+                    log('[UploadHistoryManager] ワークスペースハンドルがないため保存をスキップします', 'debug');
                     return;
                 }
                 
-                log('[FileHistoryManager] 履歴の保存を開始します', 'debug');
+                log('[UploadHistoryManager] 履歴の保存を開始します', 'debug');
                 try {
                     const history = this.getHistory();
                     const stats = this.calculateStats();
-                    log(`[FileHistoryManager] 保存する履歴数: ${history.length}件`, 'debug');
+                    log(`[UploadHistoryManager] 保存する履歴数: ${history.length}件`, 'debug');
                     
                     const kenv = {
                         version: "2.0",
@@ -916,14 +915,14 @@
                     
                     // Check size and archive if needed
                     const size = new Blob([JSON.stringify(kenv)]).size;
-                    log(`[FileHistoryManager] ファイルサイズチェック: ${size} bytes (最大: ${this.maxSize} bytes)`, 'debug');
+                    log(`[UploadHistoryManager] ファイルサイズチェック: ${size} bytes (最大: ${this.maxSize} bytes)`, 'debug');
                     if (size > this.maxSize) {
-                        log('[FileHistoryManager] ファイルサイズが上限を超えました。アーカイブを開始します', 'info');
+                        log('[UploadHistoryManager] ファイルサイズが上限を超えました。アーカイブを開始します', 'info');
                         await this.archiveOldEntries();
                     }
                     
                     // Encrypt and save
-                    log('[FileHistoryManager] データの暗号化を開始します', 'debug');
+                    log('[UploadHistoryManager] データの暗号化を開始します', 'debug');
                     const encrypted = await this.encrypt(JSON.stringify(kenv));
                     const data = {
                         encrypted: true,
@@ -933,7 +932,7 @@
                     
                     const fileHandle = await window.workspaceHandle.getFileHandle(this.fileName, { create: true });
                     if (fileHandle) {
-                        log(`[FileHistoryManager] .kenvファイル「${this.fileName}」を作成/更新します`, 'debug');
+                        log(`[UploadHistoryManager] .kenvファイル「${this.fileName}」を作成/更新します`, 'debug');
                     }
                     const writable = await fileHandle.createWritable();
                     await writable.write(JSON.stringify(data, null, 2));
@@ -941,12 +940,12 @@
                     
                     log('.kenvファイルを保存しました', 'success');
                 } catch (error) {
-                    log(`[FileHistoryManager] 履歴保存エラー: ${error.name} - ${error.message}`, 'error');
+                    log(`[UploadHistoryManager] 履歴保存エラー: ${error.name} - ${error.message}`, 'error');
                 }
             }
             
             async encrypt(text) {
-                log(`[FileHistoryManager] 暗号化を開始します (データサイズ: ${text.length} 文字)`, 'debug');
+                log(`[UploadHistoryManager] 暗号化を開始します (データサイズ: ${text.length} 文字)`, 'debug');
                 try {
                     const encoder = new TextEncoder();
                     const data = encoder.encode(text);
@@ -964,16 +963,16 @@
                     combined.set(new Uint8Array(encrypted), iv.length);
                     
                     const result = btoa(String.fromCharCode(...combined));
-                    log(`[FileHistoryManager] 暗号化完了 (結果サイズ: ${result.length} 文字)`, 'debug');
+                    log(`[UploadHistoryManager] 暗号化完了 (結果サイズ: ${result.length} 文字)`, 'debug');
                     return result;
                 } catch (error) {
-                    log(`[FileHistoryManager] 暗号化エラー: ${error.message}`, 'error');
+                    log(`[UploadHistoryManager] 暗号化エラー: ${error.message}`, 'error');
                     throw error;
                 }
             }
             
             async decrypt(base64) {
-                log(`[FileHistoryManager] 復号化を開始します (データサイズ: ${base64.length} 文字)`, 'debug');
+                log(`[UploadHistoryManager] 復号化を開始します (データサイズ: ${base64.length} 文字)`, 'debug');
                 try {
                     const combined = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
                     const iv = combined.slice(0, 12);
@@ -986,70 +985,37 @@
                     );
                     
                     const result = new TextDecoder().decode(decrypted);
-                    log(`[FileHistoryManager] 復号化完了 (結果サイズ: ${result.length} 文字)`, 'debug');
+                    log(`[UploadHistoryManager] 復号化完了 (結果サイズ: ${result.length} 文字)`, 'debug');
                     return result;
                 } catch (error) {
-                    log(`[FileHistoryManager] 復号化エラー: ${error.message}`, 'error');
+                    log(`[UploadHistoryManager] 復号化エラー: ${error.message}`, 'error');
                     throw error;
                 }
             }
             
-            // v4.7.11: Generic method to add both upload and download entries
-            async addEntry(entryData, action = 'upload') {
-                const fileName = entryData.fileName || entryData.name || 'unknown';
-                log(`[FileHistoryManager] 新しい${action}エントリを追加します: ${fileName}`, 'debug');
-                
+            async addUpload(uploadData) {
+                log(`[UploadHistoryManager] 新しいアップロードエントリを追加します: ${uploadData.fileName}`, 'debug');
                 try {
                     const history = this.getHistory();
                     const beforeCount = history.length;
-                    
-                    // Check if entry already exists (same metaTxId)
-                    const existingIndex = history.findIndex(item => 
-                        item.metaTxId === entryData.metaTxId && entryData.metaTxId
-                    );
-                    
-                    if (existingIndex !== -1) {
-                        // Update existing entry
-                        const existing = history[existingIndex];
-                        existing.action = 'both';  // Both upload and download
-                        existing.lastAction = action;
-                        existing[`${action}Date`] = new Date().toISOString();
-                        
-                        // Move to top
-                        history.splice(existingIndex, 1);
-                        history.unshift(existing);
-                        
-                        log(`[FileHistoryManager] 既存エントリを更新: action=both`, 'debug');
-                    } else {
-                        // Add new entry
-                        entryData.action = action;
-                        entryData.lastAction = action;
-                        entryData[`${action}Date`] = entryData.uploadDate || new Date().toISOString();
-                        history.unshift(entryData);
-                    }
-                    
-                    this.loadedHistory = history;
-                    log(`[FileHistoryManager] 履歴に追加/更新しました (${beforeCount} → ${history.length}件)`, 'success');
+                    history.unshift(uploadData); // Add to beginning
+                    this.loadedHistory = history; // Update in-memory history
+                    log(`[UploadHistoryManager] 履歴に追加しました (${beforeCount} → ${history.length}件)`, 'success');
                     
                     await this.saveToFile();
                     this.updateUI();
                 } catch (error) {
-                    log(`[FileHistoryManager] エントリ追加エラー: ${error.message}`, 'error');
+                    log(`[UploadHistoryManager] エントリ追加エラー: ${error.message}`, 'error');
                 }
-            }
-            
-            // Backward compatibility
-            async addUpload(uploadData) {
-                return this.addEntry(uploadData, 'upload');
             }
             
             getHistory() {
                 // v4.3.0: LocalStorageは使用せず、.kenvファイルのみを参照
                 if (!this.loadedHistory) {
                     this.loadedHistory = [];
-                    log('[FileHistoryManager] 履歴未読み込み。作業フォルダを設定して.kenvファイルを読み込んでください', 'debug');
+                    log('[UploadHistoryManager] 履歴未読み込み。作業フォルダを設定して.kenvファイルを読み込んでください', 'debug');
                 }
-                log(`[FileHistoryManager] 履歴を取得しました: ${this.loadedHistory.length}件`, 'debug');
+                log(`[UploadHistoryManager] 履歴を取得しました: ${this.loadedHistory.length}件`, 'debug');
                 return this.loadedHistory;
             }
             
@@ -1060,12 +1026,12 @@
                     totalSize: history.reduce((sum, item) => sum + (item.fileSize || 0), 0),
                     totalCost: history.reduce((sum, item) => sum + (item.totalCost || 0), 0)
                 };
-                log(`[FileHistoryManager] 統計情報: アップロード${stats.totalUploads}件、総サイズ${stats.totalSize}bytes、総コスト${stats.totalCost}KAS`, 'debug');
+                log(`[UploadHistoryManager] 統計情報: アップロード${stats.totalUploads}件、総サイズ${stats.totalSize}bytes、総コスト${stats.totalCost}KAS`, 'debug');
                 return stats;
             }
             
             updateUI() {
-                log('[FileHistoryManager] UIを更新します', 'debug');
+                log('[UploadHistoryManager] UIを更新します', 'debug');
                 const stats = this.calculateStats();
                 
                 // Update stats
@@ -1080,15 +1046,15 @@
                 // Update history list
                 const historyList = document.getElementById('historyList');
                 if (!historyList) {
-                    log('[FileHistoryManager] historyList要素が見つかりません', 'debug');
+                    log('[UploadHistoryManager] historyList要素が見つかりません', 'debug');
                     return;
                 }
                 
                 const history = this.getHistory();
                 historyList.innerHTML = history.length === 0 ? 
-                    '<p style="text-align: center; color: #666;">履歴がありません</p>' :
+                    '<p style="text-align: center; color: #666;">アップロード履歴がありません</p>' :
                     history.map(item => this.createHistoryItem(item)).join('');
-                log(`[FileHistoryManager] 履歴リストを更新しました (${history.length}件)`, 'debug');
+                log(`[UploadHistoryManager] 履歴リストを更新しました (${history.length}件)`, 'debug');
             }
             
             createHistoryItem(item) {
@@ -1102,17 +1068,7 @@
                 const displaySize = isDirectory 
                     ? `${item.fileCount} ファイル (${formatSize(item.totalSize)})`
                     : formatSize(item.fileSize);
-                // v4.7.11: Show action icons
-                let fileIcon = isDirectory ? '📂' : '📄';
-                let actionIcon = '';
-                if (item.action === 'upload') {
-                    actionIcon = '📤';
-                } else if (item.action === 'download') {
-                    actionIcon = '📥';
-                } else if (item.action === 'both') {
-                    actionIcon = '📤📥';
-                }
-                const icon = fileIcon;
+                const icon = isDirectory ? '📂' : '📄';
                 
                 log(`[DEBUG] 履歴アイテム表示 - ${isDirectory ? 'ディレクトリ' : 'ファイル'}: ${displayName}, 日時: ${date} (blockTime: ${item.blockTime ? 'あり' : 'なし'})`, 'debug');
                 
@@ -1156,7 +1112,7 @@
                     <div class="history-item">
                         <div class="history-item-header">
                             <div>
-                                <strong>${icon} ${displayName} ${actionIcon}</strong>
+                                <strong>${icon} ${displayName}</strong>
                                 <span style="color: #666; font-size: 12px; margin-left: 10px;">${displaySize}</span>
                             </div>
                             <div class="history-item-actions">
@@ -1174,11 +1130,11 @@
             }
             
             async generateKaspaWithPassword(uploadId) {
-                log(`[FileHistoryManager] パスワード付き.kaspaファイルの生成を開始します (ID: ${uploadId})`, 'debug');
+                log(`[UploadHistoryManager] パスワード付き.kaspaファイルの生成を開始します (ID: ${uploadId})`, 'debug');
                 const history = this.getHistory();
                 const item = history.find(h => h.id === uploadId);
                 if (!item) {
-                    log(`[FileHistoryManager] 指定されたIDの履歴が見つかりません: ${uploadId}`, 'error');
+                    log(`[UploadHistoryManager] 指定されたIDの履歴が見つかりません: ${uploadId}`, 'error');
                     return;
                 }
                 
@@ -1192,16 +1148,16 @@
             }
             
             async generateKaspaWithoutPassword(uploadId) {
-                log(`[FileHistoryManager] パスワードなし.kaspaファイルの生成を開始します (ID: ${uploadId})`, 'debug');
+                log(`[UploadHistoryManager] パスワードなし.kaspaファイルの生成を開始します (ID: ${uploadId})`, 'debug');
                 await this.generateKaspa(uploadId, false);
             }
             
             async copyMetaTxIdWithPassword(uploadId) {
-                log(`[FileHistoryManager] パスワード付きTxIDのコピーを開始します (ID: ${uploadId})`, 'debug');
+                log(`[UploadHistoryManager] パスワード付きTxIDのコピーを開始します (ID: ${uploadId})`, 'debug');
                 const history = this.getHistory();
                 const item = history.find(h => h.id === uploadId);
                 if (!item) {
-                    log(`[FileHistoryManager] 指定されたIDの履歴が見つかりません: ${uploadId}`, 'error');
+                    log(`[UploadHistoryManager] 指定されたIDの履歴が見つかりません: ${uploadId}`, 'error');
                     return;
                 }
                 
@@ -1245,11 +1201,11 @@
             }
             
             async copyMetaTxIdWithoutPassword(uploadId) {
-                log(`[FileHistoryManager] パスワードなしTxIDのコピーを開始します (ID: ${uploadId})`, 'debug');
+                log(`[UploadHistoryManager] パスワードなしTxIDのコピーを開始します (ID: ${uploadId})`, 'debug');
                 const history = this.getHistory();
                 const item = history.find(h => h.id === uploadId);
                 if (!item) {
-                    log(`[FileHistoryManager] 指定されたIDの履歴が見つかりません: ${uploadId}`, 'error');
+                    log(`[UploadHistoryManager] 指定されたIDの履歴が見つかりません: ${uploadId}`, 'error');
                     return;
                 }
                 
@@ -1287,11 +1243,11 @@
             }
             
             async generateKaspa(uploadId, includePassword) {
-                log(`[FileHistoryManager] .kaspaファイルの生成を開始します (ID: ${uploadId}, パスワード含む: ${includePassword})`, 'debug');
+                log(`[UploadHistoryManager] .kaspaファイルの生成を開始します (ID: ${uploadId}, パスワード含む: ${includePassword})`, 'debug');
                 const history = this.getHistory();
                 const item = history.find(h => h.id === uploadId);
                 if (!item) {
-                    log(`[FileHistoryManager] 指定されたIDの履歴が見つかりません: ${uploadId}`, 'error');
+                    log(`[UploadHistoryManager] 指定されたIDの履歴が見つかりません: ${uploadId}`, 'error');
                     return;
                 }
                 
@@ -1299,7 +1255,7 @@
                 const isDirectory = item.type === 'directory';
                 const displayName = isDirectory ? item.name : item.fileName;
                 
-                log(`[FileHistoryManager] 履歴項目が見つかりました: ${displayName} (タイプ: ${isDirectory ? 'ディレクトリ' : 'ファイル'})`, 'debug');
+                log(`[UploadHistoryManager] 履歴項目が見つかりました: ${displayName} (タイプ: ${isDirectory ? 'ディレクトリ' : 'ファイル'})`, 'debug');
                 
                 if (isDirectory) {
                     // Generate directory .kaspa file
@@ -1433,7 +1389,7 @@
             }
             
             async exportKenv() {
-                log('[FileHistoryManager] .kenvファイルのエクスポートを開始します', 'debug');
+                log('[UploadHistoryManager] .kenvファイルのエクスポートを開始します', 'debug');
                 try {
                     await this.saveToFile();
                     
@@ -1441,7 +1397,7 @@
                     const fileHandle = await window.workspaceHandle.getFileHandle(this.fileName);
                     const file = await fileHandle.getFile();
                     const content = await file.text();
-                    log(`[FileHistoryManager] エクスポートファイルサイズ: ${content.length} 文字`, 'debug');
+                    log(`[UploadHistoryManager] エクスポートファイルサイズ: ${content.length} 文字`, 'debug');
                     
                     const blob = new Blob([content], { type: 'application/json' });
                     const url = URL.createObjectURL(blob);
@@ -1453,12 +1409,12 @@
                     
                     log('.kenvファイルをエクスポートしました', 'success');
                 } catch (error) {
-                    log(`[FileHistoryManager] エクスポートエラー: ${error.name} - ${error.message}`, 'error');
+                    log(`[UploadHistoryManager] エクスポートエラー: ${error.name} - ${error.message}`, 'error');
                 }
             }
             
             async importKenv() {
-                log('[FileHistoryManager] .kenvファイルのインポートを開始します', 'debug');
+                log('[UploadHistoryManager] .kenvファイルのインポートを開始します', 'debug');
                 try {
                     const input = document.createElement('input');
                     input.type = 'file';
@@ -1467,21 +1423,21 @@
                     input.onchange = async (e) => {
                         const file = e.target.files[0];
                         if (!file) {
-                            log('[FileHistoryManager] ファイルが選択されませんでした', 'info');
+                            log('[UploadHistoryManager] ファイルが選択されませんでした', 'info');
                             return;
                         }
                         
-                        log(`[FileHistoryManager] インポートファイル: ${file.name} (${file.size} bytes)`, 'debug');
+                        log(`[UploadHistoryManager] インポートファイル: ${file.name} (${file.size} bytes)`, 'debug');
                         
                         try {
                             const content = await file.text();
                             const data = JSON.parse(content);
-                            log(`[FileHistoryManager] ファイルバージョン: ${data.version}、暗号化: ${data.encrypted}`, 'debug');
+                            log(`[UploadHistoryManager] ファイルバージョン: ${data.version}、暗号化: ${data.encrypted}`, 'debug');
                             
                             if (data.encrypted && data.data) {
                                 const decrypted = await this.decrypt(data.data);
                                 const kenv = JSON.parse(decrypted);
-                                log(`[FileHistoryManager] インポートデータ: ${kenv.uploads?.length || 0}件の履歴`, 'debug');
+                                log(`[UploadHistoryManager] インポートデータ: ${kenv.uploads?.length || 0}件の履歴`, 'debug');
                                 
                                 // Merge with existing history
                                 const existingHistory = this.getHistory();
@@ -1494,7 +1450,7 @@
                                 );
                                 const duplicates = newHistory.length - uniqueHistory.length;
                                 if (duplicates > 0) {
-                                    log(`[FileHistoryManager] ${duplicates}件の重複を除去しました`, 'info');
+                                    log(`[UploadHistoryManager] ${duplicates}件の重複を除去しました`, 'info');
                                 }
                                 
                                 // Update in-memory history only
@@ -1505,38 +1461,38 @@
                                 const addedCount = uniqueHistory.length - beforeCount;
                                 log(`${addedCount}件の履歴をインポートしました (総数: ${uniqueHistory.length}件)`, 'success');
                             } else {
-                                log('[FileHistoryManager] ファイルが暗号化されていないか、データが無効です', 'error');
+                                log('[UploadHistoryManager] ファイルが暗号化されていないか、データが無効です', 'error');
                             }
                         } catch (error) {
-                            log(`[FileHistoryManager] インポート処理エラー: ${error.message}`, 'error');
+                            log(`[UploadHistoryManager] インポート処理エラー: ${error.message}`, 'error');
                         }
                     };
                     
                     input.click();
                 } catch (error) {
-                    log(`[FileHistoryManager] インポートエラー: ${error.message}`, 'error');
+                    log(`[UploadHistoryManager] インポートエラー: ${error.message}`, 'error');
                 }
             }
             
             async archiveOldEntries() {
-                log('[FileHistoryManager] アーカイブ処理を開始します', 'debug');
+                log('[UploadHistoryManager] アーカイブ処理を開始します', 'debug');
                 const history = this.getHistory();
-                log(`[FileHistoryManager] 現在の履歴数: ${history.length}件`, 'debug');
+                log(`[UploadHistoryManager] 現在の履歴数: ${history.length}件`, 'debug');
                 
                 if (history.length <= 100) {
-                    log('[FileHistoryManager] 履歴数が100件以下のためアーカイブは不要です', 'debug');
+                    log('[UploadHistoryManager] 履歴数が100件以下のためアーカイブは不要です', 'debug');
                     return;
                 }
                 
                 // Keep recent 100 entries
                 const recentHistory = history.slice(0, 100);
                 const archiveHistory = history.slice(100);
-                log(`[FileHistoryManager] アーカイブ対象: ${archiveHistory.length}件、保持: ${recentHistory.length}件`, 'info');
+                log(`[UploadHistoryManager] アーカイブ対象: ${archiveHistory.length}件、保持: ${recentHistory.length}件`, 'info');
                 
                 // Save archive
                 const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
                 const archiveName = `kaspa-uploads-archive-${timestamp}.kenv`;
-                log(`[FileHistoryManager] アーカイブファイル名: ${archiveName}`, 'debug');
+                log(`[UploadHistoryManager] アーカイブファイル名: ${archiveName}`, 'debug');
                 
                 try {
                     const archiveData = {
@@ -1556,25 +1512,25 @@
                     const writable = await fileHandle.createWritable();
                     await writable.write(JSON.stringify(data, null, 2));
                     await writable.close();
-                    log(`[FileHistoryManager] アーカイブファイルを作成しました: ${archiveName}`, 'success');
+                    log(`[UploadHistoryManager] アーカイブファイルを作成しました: ${archiveName}`, 'success');
                     
                     // Update in-memory history
                     this.loadedHistory = recentHistory;
                     log(`${archiveHistory.length}件の古い履歴をアーカイブしました`, 'info');
                 } catch (error) {
-                    log(`[FileHistoryManager] アーカイブエラー: ${error.message}`, 'error');
+                    log(`[UploadHistoryManager] アーカイブエラー: ${error.message}`, 'error');
                     throw error;
                 }
             }
             
             updateHistoryUI() {
-                log('[FileHistoryManager] updateHistoryUI が呼び出されました', 'debug');
+                log('[UploadHistoryManager] updateHistoryUI が呼び出されました', 'debug');
                 this.updateUI();
             }
             
             // Migrate v1.0 data to v2.0 format
             migrateV1ToV2(oldKenv) {
-                log('[FileHistoryManager] v1.0からv2.0への移行を実行します', 'info');
+                log('[UploadHistoryManager] v1.0からv2.0への移行を実行します', 'info');
                 return {
                     version: "2.0",
                     schemaVersion: 2,
@@ -5497,7 +5453,7 @@
                         // Save updated history
                         localStorage.setItem(window.historyManager.dbName, JSON.stringify(history));
                         await window.historyManager.saveToFile();
-                        log('[FileHistoryManager] メタTxIDとBlockIDを履歴に追加しました', 'debug');
+                        log('[UploadHistoryManager] メタTxIDとBlockIDを履歴に追加しました', 'debug');
                     }
                 }
                 
@@ -5967,24 +5923,6 @@
                     window.directoryMetadata = kaspaMetadata;
                     window.currentDirectoryMetadata = kaspaMetadata; // v4.7.8: フォルダ構造用に保持
                     window.kaspaMetadata = null; // 通常のメタデータをクリア
-                    
-                    // v4.7.11: Add to download history
-                    if (window.historyManager) {
-                        const historyEntry = {
-                            id: `dir_download_${Date.now()}`,
-                            type: 'directory',
-                            name: kaspaMetadata.directory?.name || 'unknown',
-                            fileName: kaspaMetadata.directory?.name || 'unknown',
-                            fileSize: kaspaMetadata.directory?.totalSize || 0,
-                            metaTxId: kaspaMetadata.metadata?.metaTxId,
-                            metaTxBlockId: kaspaMetadata.metadata?.metaTxBlockId,
-                            network: kaspaMetadata.network || 'testnet-10',
-                            password: kaspaMetadata.auth?.password,
-                            fileCount: kaspaMetadata.directory?.fileCount || 0
-                        };
-                        await window.historyManager.addEntry(historyEntry, 'download');
-                    }
-                    
                     await loadDirectoryMetadata(window.directoryMetadata);
                     return;
                 }
@@ -6026,27 +5964,6 @@
                 
                 document.getElementById('downloadSection').style.display = 'block';
                 log('.kaspaファイルを読み込みました', 'success');
-                
-                // v4.7.11: Add to download history
-                if (window.historyManager) {
-                    const historyEntry = {
-                        id: `file_download_${Date.now()}`,
-                        type: 'file',
-                        fileName: kaspaMetadata.file?.name || 'unknown',
-                        fileSize: kaspaMetadata.file?.size || 0,
-                        fileSha256: kaspaMetadata.file?.sha256,
-                        metaTxId: kaspaMetadata.metadata?.metaTxId || kaspaMetadata.metaTx?.txid,
-                        metaTxBlockId: kaspaMetadata.metadata?.metaTxBlockId || kaspaMetadata.metaTx?.blockId,
-                        firstChunkTxId: kaspaMetadata.chunks?.[0],
-                        network: network,
-                        password: kaspaMetadata.auth?.password || document.getElementById('downloadPassword').value,
-                        chunks: kaspaMetadata.chunks?.length || 0,
-                        chunkTxIds: kaspaMetadata.chunks,
-                        chunkBlockIds: kaspaMetadata.chunkBlockIds,
-                        metadata: kaspaMetadata
-                    };
-                    await window.historyManager.addEntry(historyEntry, 'download');
-                }
                 
             } catch (error) {
                 log(`.kaspaファイル読み込みエラー: ${error.message}`, 'error');
@@ -6389,27 +6306,6 @@
                         document.getElementById('downloadSection').style.display = 'block';
                         
                         log('メタTxIDからの復元準備完了！ダウンロードボタンをクリックしてください。', 'success');
-                        
-                        // v4.7.11: Add to download history
-                        if (window.historyManager) {
-                            const historyEntry = {
-                                id: `meta_download_${Date.now()}`,
-                                type: 'file',
-                                fileName: kaspaMetadata.file?.name || 'unknown',
-                                fileSize: kaspaMetadata.file?.size || 0,
-                                fileSha256: kaspaMetadata.file?.sha256,
-                                metaTxId: metaTxId,
-                                metaTxBlockId: blockId,
-                                firstChunkTxId: kaspaMetadata.chunks?.[0],
-                                network: kaspaMetadata.kaspa?.network || kaspaMetadata.network || 'testnet-10',
-                                password: password,
-                                chunks: kaspaMetadata.chunks?.length || 0,
-                                chunkTxIds: kaspaMetadata.chunks,
-                                chunkBlockIds: kaspaMetadata.chunkBlockIds,
-                                metadata: kaspaMetadata
-                            };
-                            await window.historyManager.addEntry(historyEntry, 'download');
-                        }
                         
                     } else {
                         throw new Error('これは有効なメタトランザクションではありません');
@@ -6755,29 +6651,6 @@
                 URL.revokeObjectURL(url);
                 
                 log(`ダウンロード完了: ${kaspaMetadata.file.name}`, 'success');
-                
-                // v4.7.11: Add to download history
-                if (window.historyManager) {
-                    const historyEntry = {
-                        id: `file_download_${Date.now()}`,
-                        type: 'file',
-                        fileName: kaspaMetadata.file?.name || 'unknown',
-                        fileSize: kaspaMetadata.file?.size || 0,
-                        fileSha256: kaspaMetadata.file?.sha256,
-                        metaTxId: kaspaMetadata.metadata?.metaTxId || kaspaMetadata.metaTx?.txid,
-                        metaTxBlockId: kaspaMetadata.metadata?.metaTxBlockId || kaspaMetadata.metaTx?.blockId,
-                        firstChunkTxId: kaspaMetadata.chunks?.[0],
-                        network: kaspaMetadata.network || 'testnet-10',
-                        password: password,
-                        chunks: kaspaMetadata.chunks?.length || 0,
-                        chunkTxIds: kaspaMetadata.chunks,
-                        chunkBlockIds: kaspaMetadata.chunkBlockIds,
-                        metadata: kaspaMetadata
-                    };
-                    await window.historyManager.addEntry(historyEntry, 'download');
-                    // Switch to history tab to show the new entry
-                    switchTab('history');
-                }
                 
             } catch (error) {
                 log(`ダウンロードエラー: ${error.message}`, 'error');

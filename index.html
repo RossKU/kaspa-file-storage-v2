@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.7.4 - Download Manager with executeDownload</title>
+    <title>Kaspa P2P File Storage v4.7.5 - Directory Download using DownloadManager</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -5581,14 +5581,11 @@
 
         // Download individual file from directory
         window.downloadFileFromDirectory = async function(metaTxId, blockId, fileName, password) {
-            // v4.6.36: シンプルな実装 - 通常のダウンロードタブに切り替えて実行
-            log(`[DEBUG] downloadFileFromDirectory called!`, 'warning');
-            log(`[DEBUG] Parameters: metaTxId=${metaTxId}, blockId=${blockId}, fileName=${fileName}, password=${password ? '***' : 'null'}`, 'debug');
+            // v4.7.5: DownloadManagerを使用したシンプルな実装
+            log(`[DownloadManager] ディレクトリ内ファイルのダウンロード開始: ${fileName}`, 'info');
             
             try {
-                log(`ディレクトリ内ファイルのダウンロード開始: ${fileName}`, 'info');
-                
-                // Ensure password is at least 8 characters
+                // パスワード確認
                 if (!password || password.length < 8) {
                     password = prompt('パスワードを入力してください（8文字以上）:');
                     if (!password || password.length < 8) {
@@ -5597,46 +5594,49 @@
                     }
                 }
                 
-                // ダウンロードタブに切り替え
-                switchTab('download');
+                // DownloadManagerを使用
+                if (!window.downloadManager) {
+                    log('[DownloadManager] 初期化されていません', 'error');
+                    return;
+                }
                 
-                // 入力フィールドに値を設定
-                const txIdInput = blockId ? `${metaTxId}:${blockId}:${password}` : `${metaTxId}::${password}`;
-                document.getElementById('unifiedTxIdInput').value = txIdInput;
-                document.getElementById('unifiedPassword').value = ''; // パスワードはTxIDに含まれているのでクリア
+                if (!window.downloadManager.isReady()) {
+                    log('[DownloadManager] 現在ダウンロード中です', 'warning');
+                    return;
+                }
                 
-                log(`[DEBUG] 設定した入力値: ${txIdInput.substring(0, 50)}...`, 'debug');
+                // 進捗表示
+                document.getElementById('downloadProgress').style.display = 'block';
+                document.getElementById('downloadStatus').textContent = 'メタデータを取得中...';
                 
-                // 自動的に「復元」ボタンをクリック
-                log(`自動的にMetaTxIDダウンロードを開始します`, 'info');
-                await loadFromUnifiedInput();
+                // メタデータ取得
+                const metadata = await window.downloadManager.fetchMetadata(metaTxId, blockId, password);
                 
-                // ダウンロードボタンが表示されたら自動クリック
-                setTimeout(async () => {
-                    log(`[DEBUG] 自動ダウンロードチェック - kaspaMetadata: ${!!window.kaspaMetadata}, file: ${!!window.kaspaMetadata?.file}`, 'debug');
-                    
-                    // ダウンロードセクションが表示されているか確認
-                    const downloadSection = document.getElementById('downloadSection');
-                    const downloadBtn = document.getElementById('downloadBtn');
-                    log(`[DEBUG] downloadSection表示: ${downloadSection?.style.display}, downloadBtn存在: ${!!downloadBtn}`, 'debug');
-                    
-                    if (window.kaspaMetadata && window.kaspaMetadata.file) {
-                        log(`${fileName} の自動ダウンロードを実行します`, 'success');
+                // ダウンロード実行
+                await window.downloadManager.executeDownload(metadata, password, {
+                    onProgress: (progress) => {
+                        document.getElementById('downloadProgressBar').style.width = progress.percent + '%';
+                        document.getElementById('downloadProgressBar').textContent = progress.percent + '%';
+                        document.getElementById('downloadStatus').textContent = 
+                            `チャンク ${progress.current}/${progress.total} をダウンロード中...`;
+                    },
+                    onComplete: (blob, filename) => {
+                        // ダウンロード完了
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = filename;
+                        a.click();
+                        URL.revokeObjectURL(url);
                         
-                        // ダウンロードボタンをクリック
-                        if (downloadBtn && !downloadBtn.disabled) {
-                            downloadBtn.click();
-                        } else {
-                            await downloadFile();
-                        }
-                    } else {
-                        log(`[DEBUG] 自動ダウンロードをスキップ - メタデータが見つかりません`, 'warning');
-                        log(`[DEBUG] kaspaMetadata内容: ${JSON.stringify(window.kaspaMetadata)}`, 'debug');
+                        log(`[DownloadManager] ${filename} のダウンロードが完了しました`, 'success');
+                        document.getElementById('downloadProgress').style.display = 'none';
                     }
-                }, 2000); // 2秒に延長
+                });
                 
             } catch (error) {
-                log(`ファイルダウンロードエラー: ${error.message}`, 'error');
+                log(`[DownloadManager] エラー: ${error.message}`, 'error');
+                document.getElementById('downloadProgress').style.display = 'none';
             }
         };
 

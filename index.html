@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.7.7 - Directory download with folder structure</title>
+    <title>Kaspa P2P File Storage v4.7.6 - Fix DownloadManager decrypt error</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -3358,9 +3358,6 @@
                     
                     log(`[DownloadManager] ダウンロード開始: ${metadata.file?.name || 'unknown'}`, 'info');
                     
-                    // v4.7.7: グローバルにメタデータを設定して、downloadFile関数で使用できるようにする
-                    window.kaspaMetadata = metadata;
-                    
                     // Derive encryption key
                     const salt = fromBase64(metadata.encryption.pbkdf2.salt);
                     const iterations = metadata.encryption.pbkdf2.iterations || 
@@ -5459,8 +5456,7 @@
                             dlBtn.textContent = '📥';
                             dlBtn.onclick = () => {
                                 log(`[DEBUG] Download button clicked for: ${fileName}`, 'debug');
-                                // v4.7.7: pathも渡す
-                                downloadFileFromDirectory(txId, blkId, fileName, pwd, entry.path || null);
+                                downloadFileFromDirectory(txId, blkId, fileName, pwd);
                             };
                             buttonsContainer.appendChild(dlBtn);
                             
@@ -5593,12 +5589,9 @@
         }
 
         // Download individual file from directory
-        window.downloadFileFromDirectory = async function(metaTxId, blockId, fileName, password, filePath) {
-            // v4.7.7: メタデータを取得してからdownloadFileを呼び出す
-            log(`ディレクトリ内ファイルのダウンロード開始: ${fileName}`, 'info');
-            if (filePath) {
-                log(`ファイルパス: ${filePath}`, 'info');
-            }
+        window.downloadFileFromDirectory = async function(metaTxId, blockId, fileName, password) {
+            // v4.7.5: DownloadManagerを使用したシンプルな実装
+            log(`[DownloadManager] ディレクトリ内ファイルのダウンロード開始: ${fileName}`, 'info');
             
             try {
                 // パスワード確認
@@ -5610,35 +5603,48 @@
                     }
                 }
                 
-                // DownloadManagerを使用してメタデータのみ取得
+                // DownloadManagerを使用
                 if (!window.downloadManager) {
-                    window.downloadManager = new DownloadManager();
+                    log('[DownloadManager] 初期化されていません', 'error');
+                    return;
                 }
                 
-                log('メタデータを取得中...', 'info');
+                if (!window.downloadManager.isReady()) {
+                    log('[DownloadManager] 現在ダウンロード中です', 'warning');
+                    return;
+                }
+                
+                // 進捗表示
+                document.getElementById('downloadProgress').style.display = 'block';
+                document.getElementById('downloadStatus').textContent = 'メタデータを取得中...';
+                
+                // メタデータ取得
                 const metadata = await window.downloadManager.fetchMetadata(metaTxId, blockId, password);
                 
-                // v4.7.7: ディレクトリからのダウンロードの場合、path情報を追加
-                if (filePath && metadata.file) {
-                    metadata.file.path = filePath;
-                }
-                
-                // グローバルにメタデータを設定
-                window.kaspaMetadata = metadata;
-                window.currentFileEntry = {
-                    path: filePath,
-                    name: fileName
-                };
-                
-                // パスワードを設定
-                document.getElementById('downloadPassword').value = password;
-                document.getElementById('downloadPassword').style.display = 'none';
-                
-                // 通常のダウンロード関数を呼び出す
-                await window.downloadFile();
+                // ダウンロード実行
+                await window.downloadManager.executeDownload(metadata, password, {
+                    onProgress: (progress) => {
+                        document.getElementById('downloadProgressBar').style.width = progress.percent + '%';
+                        document.getElementById('downloadProgressBar').textContent = progress.percent + '%';
+                        document.getElementById('downloadStatus').textContent = 
+                            `チャンク ${progress.current}/${progress.total} をダウンロード中...`;
+                    },
+                    onComplete: (blob, filename) => {
+                        // ダウンロード完了
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = filename;
+                        a.click();
+                        URL.revokeObjectURL(url);
+                        
+                        log(`[DownloadManager] ${filename} のダウンロードが完了しました`, 'success');
+                        document.getElementById('downloadProgress').style.display = 'none';
+                    }
+                });
                 
             } catch (error) {
-                log(`ダウンロードエラー: ${error.message}`, 'error');
+                log(`[DownloadManager] エラー: ${error.message}`, 'error');
                 document.getElementById('downloadProgress').style.display = 'none';
             }
         };
@@ -5691,7 +5697,6 @@
                     log('ディレクトリメタデータを検出しました', 'info');
                     // v4.6.36: ディレクトリ専用変数に保存
                     window.directoryMetadata = kaspaMetadata;
-                    window.currentDirectoryMetadata = kaspaMetadata; // v4.7.7: ディレクトリメタデータを保持
                     window.kaspaMetadata = null; // 通常のメタデータをクリア
                     await loadDirectoryMetadata(window.directoryMetadata);
                     return;
@@ -6411,98 +6416,14 @@
                     throw new Error('ファイル整合性チェック失敗！');
                 }
                 
-                // v4.7.7: Check if this file is from directory metadata
-                if (window.currentDirectoryMetadata && (kaspaMetadata.file?.path || window.currentFileEntry?.path)) {
-                    // Use File System Access API to preserve folder structure
-                    log(`ディレクトリメタデータからのダウンロード検出: ${kaspaMetadata.file.path}`, 'info');
-                    
-                    if ('showDirectoryPicker' in window) {
-                        try {
-                            // Show directory picker
-                            const dirHandle = await window.showDirectoryPicker({
-                                suggestedName: window.currentDirectoryMetadata.directory?.name || 'download',
-                                mode: 'readwrite'
-                            });
-                            
-                            // Create base directory
-                            const baseDir = window.currentDirectoryMetadata.directory?.name;
-                            let targetHandle = dirHandle;
-                            
-                            if (baseDir) {
-                                try {
-                                    targetHandle = await dirHandle.getDirectoryHandle(baseDir, { create: true });
-                                    log(`ベースディレクトリ作成: ${baseDir}`, 'info');
-                                } catch (e) {
-                                    log(`ベースディレクトリ作成エラー: ${e.message}`, 'error');
-                                }
-                            }
-                            
-                            // Create subdirectories based on path
-                            if (kaspaMetadata.file.path) {
-                                const pathParts = kaspaMetadata.file.path.split('/');
-                                // Remove the filename from path
-                                pathParts.pop();
-                                
-                                for (const part of pathParts) {
-                                    if (part) {
-                                        try {
-                                            targetHandle = await targetHandle.getDirectoryHandle(part, { create: true });
-                                            log(`サブディレクトリ作成: ${part}`, 'info');
-                                        } catch (e) {
-                                            log(`サブディレクトリ作成エラー: ${part} - ${e.message}`, 'error');
-                                        }
-                                    }
-                                }
-                            }
-                            
-                            // Save file in the correct directory
-                            try {
-                                const fileHandle = await targetHandle.getFileHandle(kaspaMetadata.file.name, { create: true });
-                                const writable = await fileHandle.createWritable();
-                                await writable.write(combined);
-                                await writable.close();
-                                log(`ファイル保存完了: ${kaspaMetadata.file.path || kaspaMetadata.file.name}`, 'success');
-                            } catch (e) {
-                                log(`ファイル保存エラー: ${e.message}`, 'error');
-                                throw e;
-                            }
-                            
-                        } catch (error) {
-                            if (error.name === 'AbortError') {
-                                log('フォルダ選択がキャンセルされました', 'warning');
-                            } else {
-                                log(`File System Access APIエラー: ${error.message}`, 'error');
-                            }
-                            // Fallback to regular download
-                            const blob = new Blob([combined], { type: kaspaMetadata.file.mimeType });
-                            const url = URL.createObjectURL(blob);
-                            const a = document.createElement('a');
-                            a.href = url;
-                            a.download = kaspaMetadata.file.name;
-                            a.click();
-                            URL.revokeObjectURL(url);
-                        }
-                    } else {
-                        log('File System Access APIは利用できません。通常のダウンロードを実行します。', 'warning');
-                        // Fallback to regular download
-                        const blob = new Blob([combined], { type: kaspaMetadata.file.mimeType });
-                        const url = URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = kaspaMetadata.file.name;
-                        a.click();
-                        URL.revokeObjectURL(url);
-                    }
-                } else {
-                    // Regular download for non-directory files
-                    const blob = new Blob([combined], { type: kaspaMetadata.file.mimeType });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = kaspaMetadata.file.name;
-                    a.click();
-                    URL.revokeObjectURL(url);
-                }
+                // Download
+                const blob = new Blob([combined], { type: kaspaMetadata.file.mimeType });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = kaspaMetadata.file.name;
+                a.click();
+                URL.revokeObjectURL(url);
                 
                 log(`ダウンロード完了: ${kaspaMetadata.file.name}`, 'success');
                 

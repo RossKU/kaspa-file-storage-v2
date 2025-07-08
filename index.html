@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.6.31 - Enhanced Debug Logging</title>
+    <title>Kaspa P2P File Storage v4.6.32 - Button Display Debug</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -5313,6 +5313,8 @@
                                     log(`[DEBUG]   [${index}] appendChild前のplaceHolder内容: "${placeholder.innerHTML}"`, 'debug');
                                     placeholder.appendChild(container);
                                     log(`[DEBUG]   [${index}] appendChild後のplaceHolder内容: "${placeholder.innerHTML}"`, 'debug');
+                                    log(`[DEBUG]   [${index}] appendChild後のplaceHolder.textContent: "${placeholder.textContent}"`, 'debug');
+                                    log(`[DEBUG]   [${index}] appendChild後のplaceHolder.children.length: ${placeholder.children.length}`, 'debug');
                                     log(`[DEBUG] ボタンをDOM操作で挿入: ${id}`, 'debug');
                                 } else {
                                     log(`[ERROR] Placeholder ID "${id}" が見つかりません`, 'error');
@@ -5323,16 +5325,21 @@
                             log(`[DEBUG] pendingButtonsが空または未定義のため、ボタン挿入をスキップ`, 'debug');
                         }
                         
-                        // innerHTML設定後のチェック
-                        if (fileInfoElement.innerHTML.includes('&apos;')) {
-                            log('[DEBUG] ⚠️ innerHTML設定後に&apos;が含まれています！', 'error');
-                            // 実際のHTML要素を確認
-                            const buttons = fileInfoElement.querySelectorAll('button');
-                            log(`[DEBUG] ボタン数: ${buttons.length}個`, 'debug');
-                            buttons.forEach((btn, i) => {
-                                log(`[DEBUG] ボタン${i} onclick: ${btn.getAttribute('onclick')}`, 'debug');
+                        // v4.6.32: ボタン表示確認のデバッグ
+                        setTimeout(() => {
+                            const allButtons = fileInfoElement.querySelectorAll('button');
+                            log(`[DEBUG] 最終的なボタン数: ${allButtons.length}個`, 'warning');
+                            allButtons.forEach((btn, i) => {
+                                log(`[DEBUG] ボタン${i}: ${btn.textContent}, display: ${window.getComputedStyle(btn).display}, visibility: ${window.getComputedStyle(btn).visibility}`, 'debug');
                             });
-                        }
+                            
+                            // プレースホルダーの確認
+                            const placeholders = fileInfoElement.querySelectorAll('span[id^="buttons_"]');
+                            log(`[DEBUG] プレースホルダー数: ${placeholders.length}個`, 'debug');
+                            placeholders.forEach((ph, i) => {
+                                log(`[DEBUG] プレースホルダー${i}: ID=${ph.id}, 子要素数=${ph.children.length}`, 'debug');
+                            });
+                        }, 500);
                     }
                 } else {
                     document.getElementById('fileInfo').innerHTML += '<br><strong>⚠️ ファイル一覧情報がありません</strong>';

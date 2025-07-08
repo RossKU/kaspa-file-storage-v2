@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.6.21 - Unified Input UI</title>
+    <title>Kaspa P2P File Storage v4.6.22 - Directory File Download</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -5226,7 +5226,10 @@
                                     <span>${icon} ${entry.path || entry.name}</span>
                                     <span style="font-size: 12px; color: #999;">
                                         ${size} | MetaTx: ${hasMetaTx}
-                                        ${entry.metaTxId ? `<button onclick="copyToClipboard('${entry.metaTxId}:${entry.blockId || ''}')" class="small-button" style="margin-left: 10px;">📋</button>` : ''}
+                                        ${entry.metaTxId ? `
+                                            <button onclick="copyToClipboard('${entry.metaTxId}:${entry.blockId || ''}')" class="small-button" style="margin-left: 10px;">📋</button>
+                                            <button onclick="downloadFileFromDirectory('${entry.metaTxId}', '${entry.blockId || ''}', '${entry.name}', '${dirMetadata.auth?.password || ''}')" class="small-button" style="margin-left: 5px;">📥</button>
+                                        ` : ''}
                                     </span>
                                 </div>
                             </div>
@@ -5234,7 +5237,7 @@
                     });
                     
                     fileListHtml += '</div>';
-                    fileListHtml += `<br><strong>⚠️ 個別ファイルのダウンロードは現在開発中です</strong>`;
+                    fileListHtml += `<br><div style="font-size: 12px; color: #999;">📥 ボタンをクリックして個別ファイルをダウンロード</div>`;
                     
                     document.getElementById('fileInfo').innerHTML += fileListHtml;
                 } else {
@@ -5264,6 +5267,35 @@
                 log(`ディレクトリメタデータ処理エラー: ${error.message}`, 'error');
             }
         }
+
+        // Download individual file from directory
+        window.downloadFileFromDirectory = async function(metaTxId, blockId, fileName, password) {
+            try {
+                log(`ディレクトリ内ファイルのダウンロード開始: ${fileName}`, 'info');
+                
+                // Ensure password is at least 8 characters
+                if (!password || password.length < 8) {
+                    password = prompt('パスワードを入力してください（8文字以上）:');
+                    if (!password || password.length < 8) {
+                        log('パスワードは8文字以上必要です', 'error');
+                        return;
+                    }
+                }
+                
+                // Set the unified input fields
+                const txIdInput = blockId ? `${metaTxId}:${blockId}` : metaTxId;
+                document.getElementById('unifiedTxIdInput').value = txIdInput;
+                document.getElementById('unifiedPassword').value = password;
+                
+                // Load the file
+                await loadFromUnifiedInput();
+                
+                log(`${fileName} のダウンロード処理を開始しました`, 'success');
+                
+            } catch (error) {
+                log(`ファイルダウンロードエラー: ${error.message}`, 'error');
+            }
+        };
 
         // Load .kaspa file
         window.loadKaspaFile = async function(event) {
@@ -6231,7 +6263,7 @@
             }
             
             log(`🚀 Kaspa P2P v${getAppVersion()} 準備完了！`, 'info');
-            log(`📋 v${getAppVersion()}: 統一入力UI - すべてのTxIDタイプ自動判別`, 'info');
+            log(`📋 v${getAppVersion()}: ディレクトリ内ファイル個別ダウンロード対応`, 'info');
             log('✨ 並列ダウンロード: ' + (parallelDownloadEnabled ? '有効' : '無効'), 'info');
             log('システムを初期化してください', 'info');
             

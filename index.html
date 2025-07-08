@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.6.30 - Fixed Button Variable Error</title>
+    <title>Kaspa P2P File Storage v4.6.31 - Enhanced Debug Logging</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -5253,6 +5253,8 @@
                             buttonsContainer.appendChild(dlBtn);
                             
                             log(`[DEBUG] DOM操作でボタンを生成: ${fileName}`, 'debug');
+                            log(`[DEBUG] buttonsContainer子要素数: ${buttonsContainer.children.length}`, 'debug');
+                            log(`[DEBUG] buttonsContainer HTML: ${buttonsContainer.innerHTML}`, 'debug');
                             // v4.6.30: エスケープチェックは不要（DOM操作なので）
                         }
                         
@@ -5294,16 +5296,31 @@
                         const afterLength = fileInfoElement.innerHTML.length;
                         log(`[DEBUG] innerHTML更新: ${beforeLength}文字 → ${afterLength}文字`, 'debug');
                         
-                        // v4.6.29: DOM操作でボタンを挿入
+                        // v4.6.31: DOM操作でボタンを挿入（詳細デバッグ追加）
+                        log(`[DEBUG] pendingButtons確認: ${window.pendingButtons ? window.pendingButtons.length + '件' : '未定義'}`, 'debug');
+                        
                         if (window.pendingButtons && window.pendingButtons.length > 0) {
-                            window.pendingButtons.forEach(({ id, container }) => {
+                            log(`[DEBUG] pendingButtons詳細:`, 'debug');
+                            window.pendingButtons.forEach(({ id, container }, index) => {
+                                log(`[DEBUG]   [${index}] ID: ${id}`, 'debug');
+                                log(`[DEBUG]   [${index}] Container: ${container ? container.tagName : 'null'}`, 'debug');
+                                log(`[DEBUG]   [${index}] Container子要素数: ${container ? container.children.length : 0}`, 'debug');
+                                
                                 const placeholder = document.getElementById(id);
+                                log(`[DEBUG]   [${index}] Placeholder検索結果: ${placeholder ? '存在' : '存在しない'}`, 'debug');
+                                
                                 if (placeholder) {
+                                    log(`[DEBUG]   [${index}] appendChild前のplaceHolder内容: "${placeholder.innerHTML}"`, 'debug');
                                     placeholder.appendChild(container);
+                                    log(`[DEBUG]   [${index}] appendChild後のplaceHolder内容: "${placeholder.innerHTML}"`, 'debug');
                                     log(`[DEBUG] ボタンをDOM操作で挿入: ${id}`, 'debug');
+                                } else {
+                                    log(`[ERROR] Placeholder ID "${id}" が見つかりません`, 'error');
                                 }
                             });
                             window.pendingButtons = [];
+                        } else {
+                            log(`[DEBUG] pendingButtonsが空または未定義のため、ボタン挿入をスキップ`, 'debug');
                         }
                         
                         // innerHTML設定後のチェック

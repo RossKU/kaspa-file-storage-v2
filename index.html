@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.6.38 - Enhanced Auto Download</title>
+    <title>Kaspa P2P File Storage v4.6.39 - Fix Directory Download Button</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -5371,8 +5371,15 @@
                     downloadBtn.textContent = 'ディレクトリダウンロード（開発中）';
                 }
                 
-                // v4.6.33: ディレクトリタイプでもダウンロードセクションを表示
+                // v4.6.39: ディレクトリタイプの場合、パスワードセクションのみ表示
+                // ダウンロードセクション全体は表示するが、ボタンは非表示にする
                 document.getElementById('downloadSection').style.display = 'block';
+                
+                // ダウンロードボタンの親要素を非表示にする
+                const downloadBtnContainer = downloadBtn?.parentElement;
+                if (downloadBtnContainer) {
+                    downloadBtnContainer.style.display = 'none';
+                }
                 
                 log('ディレクトリ情報の表示完了', 'success');
                 
@@ -5531,6 +5538,18 @@
                 }
                 
                 document.getElementById('downloadSection').style.display = 'block';
+                
+                // v4.6.39: 通常ファイルの場合、ダウンロードボタンを確実に表示
+                const downloadBtn = document.getElementById('downloadBtn');
+                if (downloadBtn) {
+                    downloadBtn.disabled = false;
+                    downloadBtn.textContent = 'ダウンロード';
+                    const downloadBtnContainer = downloadBtn.parentElement;
+                    if (downloadBtnContainer) {
+                        downloadBtnContainer.style.display = 'block';
+                    }
+                }
+                
                 log('.kaspaファイルを読み込みました', 'success');
                 
             } catch (error) {

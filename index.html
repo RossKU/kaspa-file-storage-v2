@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.7.11 - Add download history tracking</title>
+    <title>Kaspa P2P File Storage v4.7.10 - Fix download button ID for directory</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -1009,39 +1009,6 @@
                 }
             }
             
-            // v4.7.11: Add download history tracking
-            async addDownload(downloadData) {
-                log(`[UploadHistoryManager] 新しいダウンロードエントリを追加します: ${downloadData.fileName || downloadData.name}`, 'debug');
-                try {
-                    const history = this.getHistory();
-                    
-                    // Check if this file was already uploaded (same metaTxId)
-                    const existingIndex = history.findIndex(item => 
-                        item.metaTxId && downloadData.metaTxId && 
-                        item.metaTxId === downloadData.metaTxId
-                    );
-                    
-                    if (existingIndex !== -1) {
-                        // Update existing entry to show both actions
-                        const existing = history[existingIndex];
-                        existing.action = 'both';
-                        existing.downloadDate = new Date().toISOString();
-                        log(`[UploadHistoryManager] 既存エントリを更新: action=both`, 'debug');
-                    } else {
-                        // Add new download entry
-                        downloadData.action = 'download';
-                        history.unshift(downloadData);
-                        log(`[UploadHistoryManager] 新規ダウンロードエントリを追加`, 'debug');
-                    }
-                    
-                    this.loadedHistory = history;
-                    await this.saveToFile();
-                    this.updateUI();
-                } catch (error) {
-                    log(`[UploadHistoryManager] ダウンロードエントリ追加エラー: ${error.message}`, 'error');
-                }
-            }
-            
             getHistory() {
                 // v4.3.0: LocalStorageは使用せず、.kenvファイルのみを参照
                 if (!this.loadedHistory) {
@@ -1145,7 +1112,7 @@
                     <div class="history-item">
                         <div class="history-item-header">
                             <div>
-                                <strong>${icon} ${displayName} ${item.action === 'download' ? '📥' : item.action === 'both' ? '📤📥' : item.action === 'upload' ? '📤' : ''}</strong>
+                                <strong>${icon} ${displayName}</strong>
                                 <span style="color: #666; font-size: 12px; margin-left: 10px;">${displaySize}</span>
                             </div>
                             <div class="history-item-actions">
@@ -3999,7 +3966,6 @@
                 const uploadData = {
                     id: `dir_${Date.now()}`,
                     type: 'directory',
-                    action: 'upload',  // v4.7.11: Track action type
                     name: dirName,
                     uploadDate: new Date().toISOString(),
                     fileCount: uploadedFiles.length,
@@ -5198,7 +5164,6 @@
                     const uploadData = {
                         id: `upload_${Date.now()}`,
                         type: 'file',
-                        action: 'upload',  // v4.7.11: Track action type
                         fileName: currentFile.name,
                         fileSize: currentFile.size,
                         fileSha256: fileHash,
@@ -6686,30 +6651,6 @@
                 URL.revokeObjectURL(url);
                 
                 log(`ダウンロード完了: ${kaspaMetadata.file.name}`, 'success');
-                
-                // v4.7.11: Add to download history after successful download
-                if (window.historyManager) {
-                    const downloadData = {
-                        id: `download_${Date.now()}`,
-                        fileName: kaspaMetadata.file?.name || 'unknown',
-                        fileSize: kaspaMetadata.file?.size || 0,
-                        fileSha256: kaspaMetadata.file?.sha256,
-                        metaTxId: kaspaMetadata.metadata?.metaTxId || kaspaMetadata.metaTx?.txid,
-                        metaTxBlockId: kaspaMetadata.metadata?.metaTxBlockId || kaspaMetadata.metaTx?.blockId,
-                        firstChunkTxId: kaspaMetadata.chunks?.[0],
-                        network: kaspaMetadata.network || 'testnet-10',
-                        password: password,
-                        chunks: kaspaMetadata.chunks?.length || 0,
-                        chunkTxIds: kaspaMetadata.chunks,
-                        chunkBlockIds: kaspaMetadata.chunkBlockIds,
-                        metadata: kaspaMetadata,
-                        downloadDate: new Date().toISOString()
-                    };
-                    await window.historyManager.addDownload(downloadData);
-                    
-                    // Switch to history tab to show the update
-                    switchTab('history');
-                }
                 
             } catch (error) {
                 log(`ダウンロードエラー: ${error.message}`, 'error');

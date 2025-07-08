@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.7.3 - Download Manager with downloadChunk</title>
+    <title>Kaspa P2P File Storage v4.7.4 - Download Manager with executeDownload</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -3337,6 +3337,80 @@
                     
                 } catch (error) {
                     log(`[DownloadManager] チャンクダウンロードエラー: ${error.message}`, 'error');
+                    throw error;
+                }
+            }
+            
+            // Execute download with all chunks
+            async executeDownload(metadata, password, options = {}) {
+                try {
+                    this.isDownloading = true;
+                    const { onProgress, onComplete } = options;
+                    
+                    log(`[DownloadManager] ダウンロード開始: ${metadata.file?.name || 'unknown'}`, 'info');
+                    
+                    // Derive encryption key
+                    const salt = fromBase64(metadata.encryption.pbkdf2.salt);
+                    const iterations = metadata.encryption.pbkdf2.iterations || 
+                        (metadata.version === "3.0" ? 10000 : 100000);
+                    const key = await deriveKey(password, salt, iterations);
+                    
+                    // Download all chunks
+                    const chunks = [];
+                    const totalChunks = metadata.chunks.length;
+                    
+                    for (let i = 0; i < totalChunks; i++) {
+                        const txId = metadata.chunks[i];
+                        const blockId = metadata.chunkBlockIds[i];
+                        
+                        // Progress callback
+                        if (onProgress) {
+                            onProgress({
+                                current: i + 1,
+                                total: totalChunks,
+                                percent: ((i + 1) / totalChunks * 100).toFixed(0)
+                            });
+                        }
+                        
+                        const chunk = await this.downloadChunk(txId, blockId, key, i, metadata);
+                        chunks.push(chunk);
+                    }
+                    
+                    // Combine chunks
+                    const totalSize = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+                    const combined = new Uint8Array(totalSize);
+                    let offset = 0;
+                    
+                    for (const chunk of chunks) {
+                        combined.set(chunk, offset);
+                        offset += chunk.length;
+                    }
+                    
+                    log(`[DownloadManager] ダウンロード完了: ${totalSize} bytes`, 'success');
+                    
+                    // Create blob and download
+                    const blob = new Blob([combined], { 
+                        type: metadata.file?.mimeType || 'application/octet-stream' 
+                    });
+                    
+                    if (onComplete) {
+                        onComplete(blob, metadata.file?.name);
+                    } else {
+                        // Default download behavior
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = metadata.file?.name || 'download';
+                        a.click();
+                        URL.revokeObjectURL(url);
+                    }
+                    
+                    this.isDownloading = false;
+                    return blob;
+                    
+                } catch (error) {
+                    this.isDownloading = false;
+                    log(`[DownloadManager] ダウンロードエラー: ${error.message}`, 'error');
                     throw error;
                 }
             }

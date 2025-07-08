@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.6.18 - Unified Download</title>
+    <title>Kaspa P2P File Storage v4.6.19 - Directory Files Display</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -5183,9 +5183,38 @@
                     `ファイル数: ${fileCount}<br>` +
                     `ディレクトリ数: ${dirCount}<br>` +
                     `合計サイズ: ${(totalSize/1024/1024).toFixed(2)}MB<br>` +
-                    `作成日時: ${new Date(dirMetadata.created).toLocaleString()}<br>` +
-                    `<br>` +
-                    `<strong>⚠️ ディレクトリのダウンロードは現在開発中です</strong>`;
+                    `作成日時: ${new Date(dirMetadata.created).toLocaleString()}<br>`;
+                
+                // ファイル一覧を表示
+                if (dirMetadata.entries && dirMetadata.entries.length > 0) {
+                    let fileListHtml = '<br><strong>📋 ファイル一覧:</strong><br>';
+                    fileListHtml += '<div style="max-height: 300px; overflow-y: auto; border: 1px solid #333; padding: 10px; margin-top: 10px; background: #0a2540;">';
+                    
+                    dirMetadata.entries.forEach((entry, index) => {
+                        const icon = entry.type === 'directory' ? '📁' : '📄';
+                        const size = entry.size ? `${(entry.size/1024).toFixed(1)}KB` : '-';
+                        const hasMetaTx = entry.metaTxId ? '✅' : '❌';
+                        
+                        fileListHtml += `
+                            <div style="padding: 5px; border-bottom: 1px solid #444; ${index === dirMetadata.entries.length - 1 ? 'border-bottom: none;' : ''}">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <span>${icon} ${entry.path || entry.name}</span>
+                                    <span style="font-size: 12px; color: #999;">
+                                        ${size} | MetaTx: ${hasMetaTx}
+                                        ${entry.metaTxId ? `<button onclick="copyToClipboard('${entry.metaTxId}:${entry.blockId || ''}')" class="small-button" style="margin-left: 10px;">📋</button>` : ''}
+                                    </span>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    
+                    fileListHtml += '</div>';
+                    fileListHtml += `<br><strong>⚠️ 個別ファイルのダウンロードは現在開発中です</strong>`;
+                    
+                    document.getElementById('fileInfo').innerHTML += fileListHtml;
+                } else {
+                    document.getElementById('fileInfo').innerHTML += '<br><strong>⚠️ ファイル一覧情報がありません</strong>';
+                }
                 
                 // パスワード処理
                 const passwordSection = document.getElementById('passwordSection');
@@ -6159,7 +6188,7 @@
             }
             
             log(`🚀 Kaspa P2P v${getAppVersion()} 準備完了！`, 'info');
-            log(`📋 v${getAppVersion()}: 統一ダウンロード基盤 - ディレクトリ認識対応`, 'info');
+            log(`📋 v${getAppVersion()}: ディレクトリファイル一覧表示 + MetaTxコピー`, 'info');
             log('✨ 並列ダウンロード: ' + (parallelDownloadEnabled ? '有効' : '無効'), 'info');
             log('システムを初期化してください', 'info');
             

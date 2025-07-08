@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.6.27 - Directory Download Fix</title>
+    <title>Kaspa P2P File Storage v4.6.28 - Debug & Escape Fix</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -5225,13 +5225,20 @@
                         const borderStyle = index === dirMetadata.entries.length - 1 ? 'border-bottom: none;' : '';
                         let buttons = '';
                         if (entry.metaTxId) {
-                            const escapedName = (entry.name || '').replace(/'/g, "\\'");
+                            // v4.6.28: より安全なエスケープ処理
+                            const escapedName = (entry.name || '')
+                                .replace(/\\/g, '\\\\')
+                                .replace(/'/g, "\\'")
+                                .replace(/"/g, '&quot;')
+                                .replace(/</g, '&lt;')
+                                .replace(/>/g, '&gt;');
                             const txId = entry.metaTxId || '';
                             const blkId = entry.blockId || '';
                             const pwd = dirMetadata.auth?.password || '';
                             buttons = '<button onclick="copyToClipboard(\'' + txId + ':' + blkId + '\')" class="small-button" style="margin-left: 10px;">📋</button>';
                             buttons += '<button onclick="downloadFileFromDirectory(\'' + txId + '\', \'' + blkId + '\', \'' + escapedName + '\', \'' + pwd + '\')" class="small-button" style="margin-left: 5px;">📥</button>';
                             log(`[DEBUG] ボタンHTML生成: ${buttons}`, 'debug');
+                            log(`[DEBUG] escapedName: ${escapedName}`, 'debug');
                             // エスケープチェック
                             if (buttons.includes('&apos;')) {
                                 log('[DEBUG] ⚠️ ボタンHTMLに&apos;が含まれています！', 'error');
@@ -5321,6 +5328,10 @@
 
         // Download individual file from directory
         window.downloadFileFromDirectory = async function(metaTxId, blockId, fileName, password) {
+            // v4.6.28: デバッグログ追加
+            log(`[DEBUG] downloadFileFromDirectory called!`, 'warning');
+            log(`[DEBUG] Parameters: metaTxId=${metaTxId}, blockId=${blockId}, fileName=${fileName}, password=${password ? '***' : 'null'}`, 'debug');
+            
             try {
                 log(`ディレクトリ内ファイルのダウンロード開始: ${fileName}`, 'info');
                 

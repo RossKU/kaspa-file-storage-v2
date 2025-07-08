@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.7.6 - Fix DownloadManager decrypt error</title>
+    <title>Kaspa P2P File Storage v4.7.8 - Directory download with folder structure (DownloadManager)</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -3354,7 +3354,7 @@
             async executeDownload(metadata, password, options = {}) {
                 try {
                     this.isDownloading = true;
-                    const { onProgress, onComplete } = options;
+                    const { onProgress, onComplete, folderStructure } = options;
                     
                     log(`[DownloadManager] ダウンロード開始: ${metadata.file?.name || 'unknown'}`, 'info');
                     
@@ -3402,6 +3402,80 @@
                         type: metadata.file?.mimeType || 'application/octet-stream' 
                     });
                     
+                    // v4.7.8: Handle folder structure if specified
+                    if (folderStructure && folderStructure.enabled && 'showDirectoryPicker' in window) {
+                        try {
+                            log('[DownloadManager] フォルダ構造を使用したダウンロードを開始', 'info');
+                            
+                            // Show directory picker
+                            const dirHandle = await window.showDirectoryPicker({
+                                suggestedName: folderStructure.basePath || 'download',
+                                mode: 'readwrite'
+                            });
+                            
+                            let targetHandle = dirHandle;
+                            
+                            // Create or navigate to base directory
+                            if (folderStructure.basePath) {
+                                try {
+                                    targetHandle = await dirHandle.getDirectoryHandle(folderStructure.basePath, { create: true });
+                                    log(`[DownloadManager] ベースディレクトリ: ${folderStructure.basePath}`, 'info');
+                                } catch (e) {
+                                    log(`[DownloadManager] ベースディレクトリ作成エラー: ${e.message}`, 'error');
+                                }
+                            }
+                            
+                            // Create subdirectories based on file path
+                            if (folderStructure.filePath) {
+                                const pathParts = folderStructure.filePath.split('/');
+                                // Remove the filename from path
+                                pathParts.pop();
+                                
+                                for (const part of pathParts) {
+                                    if (part) {
+                                        try {
+                                            targetHandle = await targetHandle.getDirectoryHandle(part, { create: true });
+                                            log(`[DownloadManager] サブディレクトリ作成: ${part}`, 'info');
+                                        } catch (e) {
+                                            log(`[DownloadManager] サブディレクトリ作成エラー: ${part} - ${e.message}`, 'error');
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            // Save file
+                            try {
+                                const fileName = metadata.file?.name || 'download';
+                                const fileHandle = await targetHandle.getFileHandle(fileName, { create: true });
+                                const writable = await fileHandle.createWritable();
+                                await writable.write(blob);
+                                await writable.close();
+                                log(`[DownloadManager] ファイル保存完了: ${folderStructure.filePath || fileName}`, 'success');
+                                
+                                // Call onComplete if provided
+                                if (onComplete) {
+                                    onComplete(blob, fileName);
+                                }
+                                
+                                // Skip default download since we saved to folder
+                                this.isDownloading = false;
+                                return blob;
+                            } catch (e) {
+                                log(`[DownloadManager] ファイル保存エラー: ${e.message}`, 'error');
+                                throw e;
+                            }
+                            
+                        } catch (error) {
+                            if (error.name === 'AbortError') {
+                                log('[DownloadManager] フォルダ選択がキャンセルされました', 'warning');
+                            } else {
+                                log(`[DownloadManager] File System Access APIエラー: ${error.message}`, 'error');
+                            }
+                            // Fall through to default download
+                        }
+                    }
+                    
+                    // Default behavior or fallback
                     if (onComplete) {
                         onComplete(blob, metadata.file?.name);
                     } else {
@@ -5456,7 +5530,8 @@
                             dlBtn.textContent = '📥';
                             dlBtn.onclick = () => {
                                 log(`[DEBUG] Download button clicked for: ${fileName}`, 'debug');
-                                downloadFileFromDirectory(txId, blkId, fileName, pwd);
+                                // v4.7.8: pathも渡す
+                                downloadFileFromDirectory(txId, blkId, fileName, pwd, entry.path || null);
                             };
                             buttonsContainer.appendChild(dlBtn);
                             
@@ -5589,9 +5664,12 @@
         }
 
         // Download individual file from directory
-        window.downloadFileFromDirectory = async function(metaTxId, blockId, fileName, password) {
-            // v4.7.5: DownloadManagerを使用したシンプルな実装
+        window.downloadFileFromDirectory = async function(metaTxId, blockId, fileName, password, filePath) {
+            // v4.7.8: DownloadManagerを使用したフォルダ構造対応実装
             log(`[DownloadManager] ディレクトリ内ファイルのダウンロード開始: ${fileName}`, 'info');
+            if (filePath) {
+                log(`[DownloadManager] ファイルパス: ${filePath}`, 'info');
+            }
             
             try {
                 // パスワード確認
@@ -5621,6 +5699,13 @@
                 // メタデータ取得
                 const metadata = await window.downloadManager.fetchMetadata(metaTxId, blockId, password);
                 
+                // v4.7.8: フォルダ構造オプションを追加
+                const folderStructureOption = (filePath && window.currentDirectoryMetadata) ? {
+                    enabled: true,
+                    basePath: window.currentDirectoryMetadata.directory?.name || null,
+                    filePath: filePath
+                } : null;
+                
                 // ダウンロード実行
                 await window.downloadManager.executeDownload(metadata, password, {
                     onProgress: (progress) => {
@@ -5630,17 +5715,11 @@
                             `チャンク ${progress.current}/${progress.total} をダウンロード中...`;
                     },
                     onComplete: (blob, filename) => {
-                        // ダウンロード完了
-                        const url = URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = filename;
-                        a.click();
-                        URL.revokeObjectURL(url);
-                        
+                        // ダウンロード完了（フォルダ構造を使用した場合はここは呼ばれない）
                         log(`[DownloadManager] ${filename} のダウンロードが完了しました`, 'success');
                         document.getElementById('downloadProgress').style.display = 'none';
-                    }
+                    },
+                    folderStructure: folderStructureOption
                 });
                 
             } catch (error) {
@@ -5697,6 +5776,7 @@
                     log('ディレクトリメタデータを検出しました', 'info');
                     // v4.6.36: ディレクトリ専用変数に保存
                     window.directoryMetadata = kaspaMetadata;
+                    window.currentDirectoryMetadata = kaspaMetadata; // v4.7.8: フォルダ構造用に保持
                     window.kaspaMetadata = null; // 通常のメタデータをクリア
                     await loadDirectoryMetadata(window.directoryMetadata);
                     return;

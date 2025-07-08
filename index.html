@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.6.25 - Debug HTML Escaping</title>
+    <title>Kaspa P2P File Storage v4.6.26 - DOM Safety Fix</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -5287,12 +5287,20 @@
                     document.getElementById('fileInfo').innerHTML += '<br><strong>⚠️ ファイル一覧情報がありません</strong>';
                 }
                 
-                // パスワード処理
+                // パスワード処理（v4.6.26: DOM操作の安全性を改善）
                 const passwordSection = document.getElementById('passwordSection');
                 if (dirMetadata.auth?.passwordIncluded) {
-                    document.getElementById('downloadPassword').style.display = 'none';
-                    document.getElementById('downloadPassword').value = dirMetadata.auth.password;
-                    passwordSection.innerHTML = '<p>✅ パスワードがファイルに含まれています（自動入力）</p>';
+                    // 既存の要素を安全に操作
+                    const passwordInput = document.getElementById('downloadPassword');
+                    if (passwordInput) {
+                        passwordInput.style.display = 'none';
+                        passwordInput.value = dirMetadata.auth.password;
+                    }
+                    
+                    // パスワード値を保持しながらUIを更新
+                    const savedPassword = dirMetadata.auth.password;
+                    passwordSection.innerHTML = '<p>✅ パスワードがファイルに含まれています（自動入力）</p>' +
+                        `<input type="hidden" id="downloadPassword" value="${savedPassword}">`;
                 } else {
                     passwordSection.innerHTML = '<input type="password" id="downloadPassword" placeholder="パスワードを入力">';
                 }

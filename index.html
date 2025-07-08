@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.7.12 - Fix bulk download folder selection</title>
+    <title>Kaspa P2P File Storage v4.7.13 - Fix ProgressManager reset after upload</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -5228,6 +5228,10 @@
                 // v3.6.3 fix: Clear upload flag
                 isUploadingFile = false;
                 document.getElementById('uploadBtn').disabled = false;
+                
+                // v4.7.13: Reset ProgressManager to prevent reuse
+                progressManager = null;
+                log('ProgressManagerをリセットしました', 'debug');
             }
         };
 
@@ -6847,7 +6851,7 @@
             }
             
             log(`🚀 Kaspa P2P v${getAppVersion()} 準備完了！`, 'info');
-            log(`📋 v${getAppVersion()}: 一括ダウンロードフォルダ選択修正`, 'info');
+            log(`📋 v${getAppVersion()}: ProgressManagerリセット修正`, 'info');
             log('✨ 並列ダウンロード: ' + (parallelDownloadEnabled ? '有効' : '無効'), 'info');
             log('システムを初期化してください', 'info');
             

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.7.2 - Download Manager with fetchMetadata</title>
+    <title>Kaspa P2P File Storage v4.7.3 - Download Manager with downloadChunk</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -3290,6 +3290,53 @@
                     
                 } catch (error) {
                     log(`[DownloadManager] メタデータ取得エラー: ${error.message}`, 'error');
+                    throw error;
+                }
+            }
+            
+            // Download single chunk from blockchain
+            async downloadChunk(txId, blockId, key, index, metadata) {
+                try {
+                    log(`[DownloadManager] チャンク ${index + 1} ダウンロード開始: ${txId.substring(0, 16)}...`, 'info');
+                    
+                    // Get block data
+                    const blockResponse = await rpcClient.getBlock({
+                        hash: blockId,
+                        includeTransactions: true
+                    });
+                    
+                    const block = blockResponse?.block?.block || blockResponse?.block;
+                    if (!block) {
+                        throw new Error(`ブロックが見つかりません: ${blockId}`);
+                    }
+                    
+                    // Find transaction
+                    let payload = null;
+                    for (const tx of block.transactions || []) {
+                        const txHash = tx.verboseData?.transactionId || tx.id || tx.transactionId;
+                        if (txHash === txId) {
+                            if (tx.payload && tx.payload !== '') {
+                                payload = safeHexDecode(tx.payload, 'chunk payload');
+                                log(`[DownloadManager] チャンクペイロード取得: ${payload.length} bytes`, 'success');
+                                break;
+                            }
+                        }
+                    }
+                    
+                    if (!payload) {
+                        throw new Error(`チャンク ${index + 1} のペイロードが見つかりません`);
+                    }
+                    
+                    // Decrypt and decompress
+                    const decrypted = await decryptChunk(payload, key, index);
+                    const decompressed = metadata.file?.compression?.enabled ? 
+                        lzDecompress(decrypted) : decrypted;
+                    
+                    log(`[DownloadManager] チャンク ${index + 1} 処理完了: ${decompressed.length} bytes`, 'success');
+                    return decompressed;
+                    
+                } catch (error) {
+                    log(`[DownloadManager] チャンクダウンロードエラー: ${error.message}`, 'error');
                     throw error;
                 }
             }

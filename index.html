@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.6.20 - Debug Directory Display</title>
+    <title>Kaspa P2P File Storage v4.6.21 - Unified Input UI</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -516,11 +516,36 @@
     <!-- Download Tab -->
     <div id="download-tab" class="tab-content">
         <div class="container">
-            <h2>📥 ファイルダウンロード</h2>
+            <h2>📥 ダウンロード</h2>
             
-            <!-- Meta-TxID input option -->
+            <!-- Unified input option -->
             <div class="section-divider">
-                <h3>🔗 メタTxIDから復元</h3>
+                <h3>🔗 TxID / MetaTxID / ディレクトリTxIDから復元</h3>
+                <div style="background: #0a2540; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                    <input type="text" id="unifiedTxIdInput" placeholder="任意のTxIDを入力（自動判別）" style="width: 100%; font-size: 16px;">
+                    <input type="password" id="unifiedPassword" placeholder="パスワード（必要な場合）" style="width: 100%; margin-top: 10px;">
+                    <button onclick="loadFromUnifiedInput()" style="margin-top: 10px; width: 100%; padding: 12px; font-size: 16px;">
+                        🔍 自動判別して復元
+                    </button>
+                </div>
+                <div class="info" style="font-size: 12px; color: #999;">
+                    <p>✨ すべてのタイプを自動判別:</p>
+                    <ul style="margin: 5px 0; padding-left: 20px;">
+                        <li>📄 通常ファイルのMetaTxID</li>
+                        <li>📁 ディレクトリのMetaTxID</li>
+                        <li>📚 大容量ファイルのSuperMetaTxID</li>
+                        <li>🔗 TxID:BlockID形式も対応</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div style="text-align: center; margin: 20px 0; color: #666;">
+                ─── または ───
+            </div>
+            
+            <!-- Legacy Meta-TxID input (hidden by default) -->
+            <div class="section-divider" style="display: none;">
+                <h3>🔗 メタTxIDから復元（旧）</h3>
                 <input type="text" id="metaTxIdInput" placeholder="メタTxID または TxID:BlockID を入力" style="width: 100%;">
                 <input type="password" id="metaTxPassword" placeholder="パスワード" style="width: 100%; margin-top: 10px;">
                 <button onclick="loadFromMetaTxId()" style="margin-top: 10px;">メタTxIDから復元</button>
@@ -5170,15 +5195,11 @@
         async function loadDirectoryMetadata(dirMetadata) {
             try {
                 log('ディレクトリメタデータを処理中...', 'info');
-                log(`受信したdirMetadata: ${JSON.stringify(dirMetadata, null, 2)}`, 'debug');
                 
                 // ディレクトリ情報を表示
                 const totalSize = dirMetadata.directory?.totalSize || 0;
                 const fileCount = dirMetadata.directory?.fileCount || 0;
                 const dirCount = dirMetadata.directory?.directoryCount || 0;
-                
-                log(`ディレクトリ情報: name=${dirMetadata.directory?.name}, fileCount=${fileCount}, totalSize=${totalSize}`, 'debug');
-                log(`entries数: ${dirMetadata.entries?.length || 0}`, 'debug');
                 
                 document.getElementById('fileInfo').innerHTML = 
                     `<strong>📁 ディレクトリ: ${dirMetadata.directory.name}</strong><br>` +
@@ -5191,12 +5212,10 @@
                 
                 // ファイル一覧を表示
                 if (dirMetadata.entries && dirMetadata.entries.length > 0) {
-                    log(`ファイル一覧を表示します: ${dirMetadata.entries.length}件`, 'info');
                     let fileListHtml = '<br><strong>📋 ファイル一覧:</strong><br>';
                     fileListHtml += '<div style="max-height: 300px; overflow-y: auto; border: 1px solid #333; padding: 10px; margin-top: 10px; background: #0a2540;">';
                     
                     dirMetadata.entries.forEach((entry, index) => {
-                        log(`Entry ${index}: ${entry.name || entry.path}, size: ${entry.size}, metaTxId: ${entry.metaTxId?.substring(0,16)}...`, 'debug');
                         const icon = entry.type === 'directory' ? '📁' : '📄';
                         const size = entry.size ? `${(entry.size/1024).toFixed(1)}KB` : '-';
                         const hasMetaTx = entry.metaTxId ? '✅' : '❌';
@@ -5340,6 +5359,24 @@
         };
 
         // Load from Meta-TxID
+        // Unified input handler
+        window.loadFromUnifiedInput = async function() {
+            const txIdInput = document.getElementById('unifiedTxIdInput').value.trim();
+            const password = document.getElementById('unifiedPassword').value;
+            
+            if (!txIdInput) {
+                log('TxIDを入力してください', 'error');
+                return;
+            }
+            
+            log(`統一入力から復元開始: ${txIdInput.substring(0, 20)}...`, 'info');
+            
+            // Use existing loadFromMetaTxId logic
+            document.getElementById('metaTxIdInput').value = txIdInput;
+            document.getElementById('metaTxPassword').value = password;
+            await loadFromMetaTxId();
+        };
+
         window.loadFromMetaTxId = async function() {
             const metaTxIdInput = document.getElementById('metaTxIdInput').value.trim();
             let passwordFromField = document.getElementById('metaTxPassword').value;
@@ -6194,7 +6231,7 @@
             }
             
             log(`🚀 Kaspa P2P v${getAppVersion()} 準備完了！`, 'info');
-            log(`📋 v${getAppVersion()}: ディレクトリ表示デバッグ版`, 'info');
+            log(`📋 v${getAppVersion()}: 統一入力UI - すべてのTxIDタイプ自動判別`, 'info');
             log('✨ 並列ダウンロード: ' + (parallelDownloadEnabled ? '有効' : '無効'), 'info');
             log('システムを初期化してください', 'info');
             

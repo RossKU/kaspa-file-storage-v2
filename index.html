@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.7.0 - Download Manager</title>
+    <title>Kaspa P2P File Storage v4.6.38 - Enhanced Auto Download</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -784,16 +784,6 @@
         // Parallel download settings (v3.6.2)
         let parallelDownloadEnabled = false; // Default OFF for v3.5.0 compatibility
         
-        // v4.7.0: Download Manager instance
-        let downloadManager = null;
-        
-        // Get application version
-        function getAppVersion() {
-            // Extract version from document title
-            const titleMatch = document.title.match(/v([\d.]+)/);
-            return titleMatch ? titleMatch[1] : '4.7.0';
-        }
-        
         // Load parallel download setting from localStorage
         function loadParallelSetting() {
             const saved = localStorage.getItem('kaspaParallelDownload');
@@ -803,219 +793,6 @@
                 if (toggle) {
                     toggle.checked = parallelDownloadEnabled;
                 }
-            }
-        }
-        
-        // Download Manager Class - v4.7.0
-        class DownloadManager {
-            constructor() {
-                this.queue = [];
-                this.currentDownload = null;
-                this.isProcessing = false;
-                log('[DownloadManager] インスタンスを初期化しました', 'debug');
-            }
-            
-            // メタデータを取得
-            async fetchMetadata(metaTxId, blockId, password) {
-                try {
-                    log(`[DownloadManager] メタデータ取得開始: ${metaTxId.substring(0, 16)}...`, 'info');
-                    
-                    // RPCクライアントチェック
-                    if (!window.rpcClient) {
-                        throw new Error('RPCクライアントが初期化されていません');
-                    }
-                    
-                    // ブロックデータを取得
-                    const request = { 
-                        hash: blockId, 
-                        includeTransactions: true 
-                    };
-                    
-                    const response = await window.rpcClient.getBlock(request);
-                    const block = response?.block?.block || response?.block;
-                    
-                    if (!block) {
-                        throw new Error(`ブロックが見つかりません: ${blockId}`);
-                    }
-                    
-                    // トランザクションを探す
-                    let payload = null;
-                    for (const tx of block.transactions || []) {
-                        const txHash = tx.verboseData?.transactionId || tx.id || tx.transactionId;
-                        if (txHash === metaTxId) {
-                            if (tx.payload && tx.payload !== '') {
-                                payload = safeHexDecode(tx.payload, 'meta-tx payload');
-                                break;
-                            }
-                        }
-                    }
-                    
-                    if (!payload) {
-                        throw new Error('メタトランザクションのペイロードが見つかりません');
-                    }
-                    
-                    // 復号化
-                    const salt = payload.slice(0, 16);
-                    const encrypted = payload.slice(16);
-                    const key = await deriveKey(password, salt, 100000);
-                    const decrypted = await decryptChunk(encrypted, key, -1);
-                    const metaData = JSON.parse(new TextDecoder().decode(decrypted));
-                    
-                    // kaspaMetadata形式に変換
-                    const metadata = {
-                        version: "2.0",
-                        kaspa: metaData.kaspa,
-                        file: metaData.file,
-                        encryption: metaData.encryption,
-                        compression: metaData.compression,
-                        chunks: metaData.chunks,
-                        chunkBlockIds: metaData.chunkBlockIds,
-                        metadata: metaData.metadata,
-                        metaTx: {
-                            txid: metaTxId,
-                            blockId: blockId,
-                            loadedAt: Date.now()
-                        }
-                    };
-                    
-                    log('[DownloadManager] メタデータ取得成功', 'success');
-                    return metadata;
-                    
-                } catch (error) {
-                    log(`[DownloadManager] メタデータ取得エラー: ${error.message}`, 'error');
-                    throw error;
-                }
-            }
-            
-            // ファイルをダウンロード実行
-            async executeDownload(metadata, password, options = {}) {
-                try {
-                    const fileName = metadata.file?.name || 'unknown';
-                    log(`[DownloadManager] ダウンロード開始: ${fileName}`, 'info');
-                    
-                    // 暗号化キーを導出
-                    const salt = fromBase64(metadata.encryption.pbkdf2.salt);
-                    const iterations = metadata.encryption.pbkdf2.iterations || 100000;
-                    const key = await deriveKey(password, salt, iterations);
-                    
-                    // チャンクをダウンロード
-                    const chunks = [];
-                    for (let i = 0; i < metadata.chunks.length; i++) {
-                        const txId = metadata.chunks[i];
-                        const blockId = metadata.chunkBlockIds[i];
-                        
-                        // 進捗更新
-                        if (options.onProgress) {
-                            options.onProgress({
-                                current: i + 1,
-                                total: metadata.chunks.length,
-                                fileName: fileName
-                            });
-                        }
-                        
-                        // チャンクデータ取得
-                        const chunkData = await this.downloadChunk(txId, blockId, key, i, metadata);
-                        chunks.push(chunkData);
-                    }
-                    
-                    // チャンクを結合
-                    const totalSize = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
-                    const combined = new Uint8Array(totalSize);
-                    let offset = 0;
-                    for (const chunk of chunks) {
-                        combined.set(chunk, offset);
-                        offset += chunk.length;
-                    }
-                    
-                    // ハッシュ検証
-                    const downloadedHash = await sha256(combined);
-                    if (downloadedHash !== metadata.file.sha256) {
-                        throw new Error('ファイル整合性チェック失敗');
-                    }
-                    
-                    // ダウンロード実行
-                    const blob = new Blob([combined], { type: metadata.file.mimeType });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = fileName;
-                    a.click();
-                    URL.revokeObjectURL(url);
-                    
-                    log(`[DownloadManager] ダウンロード完了: ${fileName}`, 'success');
-                    return true;
-                    
-                } catch (error) {
-                    log(`[DownloadManager] ダウンロードエラー: ${error.message}`, 'error');
-                    throw error;
-                }
-            }
-            
-            // 単一チャンクをダウンロード
-            async downloadChunk(txId, blockId, key, index, metadata) {
-                const request = { 
-                    hash: blockId, 
-                    includeTransactions: true 
-                };
-                
-                const response = await window.rpcClient.getBlock(request);
-                const block = response?.block?.block || response?.block;
-                
-                if (!block) {
-                    throw new Error(`ブロックが見つかりません: ${blockId}`);
-                }
-                
-                // トランザクションを探す
-                let payload = null;
-                for (const tx of block.transactions || []) {
-                    const txHash = tx.verboseData?.transactionId || tx.id || tx.transactionId;
-                    if (txHash === txId) {
-                        if (tx.payload && tx.payload !== '') {
-                            payload = safeHexDecode(tx.payload, 'chunk payload');
-                            break;
-                        }
-                    }
-                }
-                
-                if (!payload) {
-                    throw new Error(`チャンク ${index + 1} のペイロードが見つかりません`);
-                }
-                
-                // 復号化と解凍
-                const decrypted = await decryptChunk(payload, key, index);
-                const decompressed = metadata.file?.compression?.enabled ? 
-                    lzDecompress(decrypted) : decrypted;
-                
-                return decompressed;
-            }
-            
-            // 単一ファイルダウンロード（公開API）
-            async downloadSingleFile(metaTxId, blockId, password, options = {}) {
-                try {
-                    log(`[DownloadManager] 単一ファイルダウンロード: ${options.fileName || 'unknown'}`, 'info');
-                    
-                    // メタデータ取得
-                    const metadata = await this.fetchMetadata(metaTxId, blockId, password);
-                    
-                    // ダウンロード実行
-                    return await this.executeDownload(metadata, password, options);
-                    
-                } catch (error) {
-                    log(`[DownloadManager] エラー: ${error.message}`, 'error');
-                    throw error;
-                }
-            }
-            
-            // 複数ファイルダウンロード（将来の実装用）
-            async downloadMultipleFiles(fileList, options = {}) {
-                log('[DownloadManager] 複数ファイルダウンロード（未実装）', 'warning');
-                // TODO: 実装予定
-            }
-            
-            // ディレクトリ全体ダウンロード（将来の実装用）
-            async downloadDirectory(directoryMetadata, options = {}) {
-                log('[DownloadManager] ディレクトリダウンロード（未実装）', 'warning');
-                // TODO: 実装予定
             }
         }
         
@@ -3507,10 +3284,6 @@
                     window.historyManager.updateHistoryUI();
                 }
                 
-                // v4.7.0: Initialize Download Manager
-                window.downloadManager = new DownloadManager();
-                log('[v4.7.0] Download Manager初期化完了', 'info');
-                
                 updateNetworkStatus('online', 'オンライン');
                 
             } catch (error) {
@@ -5610,10 +5383,13 @@
 
         // Download individual file from directory
         window.downloadFileFromDirectory = async function(metaTxId, blockId, fileName, password) {
-            // v4.7.0: Download Managerを使用したエレガントな実装
-            log(`[v4.7.0] ディレクトリからファイルをダウンロード: ${fileName}`, 'info');
+            // v4.6.36: シンプルな実装 - 通常のダウンロードタブに切り替えて実行
+            log(`[DEBUG] downloadFileFromDirectory called!`, 'warning');
+            log(`[DEBUG] Parameters: metaTxId=${metaTxId}, blockId=${blockId}, fileName=${fileName}, password=${password ? '***' : 'null'}`, 'debug');
             
             try {
+                log(`ディレクトリ内ファイルのダウンロード開始: ${fileName}`, 'info');
+                
                 // Ensure password is at least 8 characters
                 if (!password || password.length < 8) {
                     password = prompt('パスワードを入力してください（8文字以上）:');
@@ -5623,39 +5399,46 @@
                     }
                 }
                 
-                // Download Managerがない場合は初期化
-                if (!window.downloadManager) {
-                    log('[v4.7.0] Download Managerを初期化します', 'warning');
-                    window.downloadManager = new DownloadManager();
-                }
+                // ダウンロードタブに切り替え
+                switchTab('download');
                 
-                // 進捗表示の準備
-                document.getElementById('downloadProgress').style.display = 'block';
-                document.getElementById('downloadStatus').textContent = `${fileName} をダウンロード準備中...`;
+                // 入力フィールドに値を設定
+                const txIdInput = blockId ? `${metaTxId}:${blockId}:${password}` : `${metaTxId}::${password}`;
+                document.getElementById('unifiedTxIdInput').value = txIdInput;
+                document.getElementById('unifiedPassword').value = ''; // パスワードはTxIDに含まれているのでクリア
                 
-                // Download Managerで直接ダウンロード
-                await window.downloadManager.downloadSingleFile(metaTxId, blockId, password, {
-                    fileName: fileName,
-                    source: 'directory',
-                    onProgress: (progress) => {
-                        const percent = ((progress.current / progress.total) * 100).toFixed(0);
-                        document.getElementById('downloadProgressBar').style.width = percent + '%';
-                        document.getElementById('downloadProgressBar').textContent = percent + '%';
-                        document.getElementById('downloadStatus').textContent = 
-                            `${fileName}: ${progress.current}/${progress.total} チャンク`;
+                log(`[DEBUG] 設定した入力値: ${txIdInput.substring(0, 50)}...`, 'debug');
+                
+                // 自動的に「復元」ボタンをクリック
+                log(`自動的にMetaTxIDダウンロードを開始します`, 'info');
+                await loadFromUnifiedInput();
+                
+                // ダウンロードボタンが表示されたら自動クリック
+                setTimeout(async () => {
+                    log(`[DEBUG] 自動ダウンロードチェック - kaspaMetadata: ${!!window.kaspaMetadata}, file: ${!!window.kaspaMetadata?.file}`, 'debug');
+                    
+                    // ダウンロードセクションが表示されているか確認
+                    const downloadSection = document.getElementById('downloadSection');
+                    const downloadBtn = document.getElementById('downloadBtn');
+                    log(`[DEBUG] downloadSection表示: ${downloadSection?.style.display}, downloadBtn存在: ${!!downloadBtn}`, 'debug');
+                    
+                    if (window.kaspaMetadata && window.kaspaMetadata.file) {
+                        log(`${fileName} の自動ダウンロードを実行します`, 'success');
+                        
+                        // ダウンロードボタンをクリック
+                        if (downloadBtn && !downloadBtn.disabled) {
+                            downloadBtn.click();
+                        } else {
+                            await downloadFile();
+                        }
+                    } else {
+                        log(`[DEBUG] 自動ダウンロードをスキップ - メタデータが見つかりません`, 'warning');
+                        log(`[DEBUG] kaspaMetadata内容: ${JSON.stringify(window.kaspaMetadata)}`, 'debug');
                     }
-                });
-                
-                log(`[v4.7.0] ${fileName} のダウンロードが完了しました`, 'success');
-                
-                // 進捗表示をクリア
-                setTimeout(() => {
-                    document.getElementById('downloadProgress').style.display = 'none';
-                }, 3000);
+                }, 2000); // 2秒に延長
                 
             } catch (error) {
-                log(`[v4.7.0] ダウンロードエラー: ${error.message}`, 'error');
-                document.getElementById('downloadProgress').style.display = 'none';
+                log(`ファイルダウンロードエラー: ${error.message}`, 'error');
             }
         };
 
@@ -6091,24 +5874,6 @@
                         document.getElementById('downloadSection').style.display = 'block';
                         
                         log('メタTxIDからの復元準備完了！ダウンロードボタンをクリックしてください。', 'success');
-                        
-                        // v4.6.40: ディレクトリからのダウンロードの場合、自動的にダウンロードを開始
-                        log(`[DEBUG] 自動ダウンロードチェック - isDownloadingFromDirectory: ${window.isDownloadingFromDirectory}, kaspaMetadata: ${!!window.kaspaMetadata}, file: ${!!window.kaspaMetadata?.file}, fileName: ${window.directoryDownloadFileName}`, 'debug');
-                        
-                        if (window.isDownloadingFromDirectory && window.kaspaMetadata && window.kaspaMetadata.file) {
-                            log(`[DEBUG] ディレクトリからの自動ダウンロードを開始: ${window.directoryDownloadFileName}`, 'info');
-                            
-                            // フラグをリセット
-                            window.isDownloadingFromDirectory = false;
-                            const fileName = window.directoryDownloadFileName;
-                            window.directoryDownloadFileName = null;
-                            
-                            // 少し待ってからダウンロード実行（UIの更新を待つ）
-                            setTimeout(async () => {
-                                log(`${fileName} の自動ダウンロードを実行します`, 'success');
-                                await downloadFile();
-                            }, 100);
-                        }
                         
                     } else {
                         throw new Error('これは有効なメタトランザクションではありません');

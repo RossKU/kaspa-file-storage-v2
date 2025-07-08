@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.6.29 - DOM-based Button Generation</title>
+    <title>Kaspa P2P File Storage v4.6.30 - Fixed Button Variable Error</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -5223,10 +5223,11 @@
                         const hasMetaTx = entry.metaTxId ? '✅' : '❌';
                         
                         const borderStyle = index === dirMetadata.entries.length - 1 ? 'border-bottom: none;' : '';
-                        // v4.6.29: DOM操作による安全なボタン生成
-                        const buttonsContainer = document.createElement('span');
+                        // v4.6.30: DOM操作による安全なボタン生成（スコープ修正）
+                        let buttonsContainer = null;
                         
                         if (entry.metaTxId) {
+                            buttonsContainer = document.createElement('span');
                             const txId = entry.metaTxId || '';
                             const blkId = entry.blockId || '';
                             const pwd = dirMetadata.auth?.password || '';
@@ -5252,13 +5253,7 @@
                             buttonsContainer.appendChild(dlBtn);
                             
                             log(`[DEBUG] DOM操作でボタンを生成: ${fileName}`, 'debug');
-                            // エスケープチェック
-                            if (buttons.includes('&apos;')) {
-                                log('[DEBUG] ⚠️ ボタンHTMLに&apos;が含まれています！', 'error');
-                            }
-                            if (buttons.includes('&#39;')) {
-                                log('[DEBUG] ⚠️ ボタンHTMLに&#39;が含まれています！', 'error');
-                            }
+                            // v4.6.30: エスケープチェックは不要（DOM操作なので）
                         }
                         
                         fileListHtml += '<div style="padding: 5px; border-bottom: 1px solid #444; ' + borderStyle + '">';
@@ -5269,9 +5264,11 @@
                         const rightSpan = `<span style="font-size: 12px; color: #999;">${size} | MetaTx: ${hasMetaTx} <span id="${placeholderId}"></span></span>`;
                         fileListHtml += rightSpan;
                         
-                        // ボタンコンテナを後で挿入するために保存
-                        if (!window.pendingButtons) window.pendingButtons = [];
-                        window.pendingButtons.push({ id: placeholderId, container: buttonsContainer });
+                        // ボタンコンテナを後で挿入するために保存（buttonsContainerが存在する場合のみ）
+                        if (buttonsContainer) {
+                            if (!window.pendingButtons) window.pendingButtons = [];
+                            window.pendingButtons.push({ id: placeholderId, container: buttonsContainer });
+                        }
                         fileListHtml += '</div></div>';
                     });
                     

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.7.5 - Directory Download using DownloadManager</title>
+    <title>Kaspa P2P File Storage v4.7.6 - Fix DownloadManager decrypt error</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -3282,11 +3282,20 @@
                     }
                     
                     // Decrypt metadata
-                    const decryptedData = await decryptData(payload, password);
-                    const metadata = JSON.parse(new TextDecoder().decode(decryptedData));
-                    
-                    log(`[DownloadManager] メタデータ復号成功: v${metadata.version}`, 'success');
-                    return metadata;
+                    if (payload.length > 16) {
+                        const salt = payload.slice(0, 16);
+                        const encryptedData = payload.slice(16);
+                        const key = await deriveKey(password, salt);
+                        
+                        const decrypted = await decryptChunk(encryptedData, key, -1);
+                        const metaDataString = new TextDecoder().decode(decrypted);
+                        const metadata = JSON.parse(metaDataString);
+                        
+                        log(`[DownloadManager] メタデータ復号成功: v${metadata.version}`, 'success');
+                        return metadata;
+                    } else {
+                        throw new Error('ペイロードが短すぎます');
+                    }
                     
                 } catch (error) {
                     log(`[DownloadManager] メタデータ取得エラー: ${error.message}`, 'error');

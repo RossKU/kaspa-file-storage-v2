@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.6.42 - Fix Window Scope</title>
+    <title>Kaspa P2P File Storage v4.6.41 - Debug Auto Download</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -5830,7 +5830,7 @@
                         
                         // 通常ファイルの場合
                         // Set kaspaMetadata from meta-tx data
-                        window.kaspaMetadata = {
+                        kaspaMetadata = {
                             version: "2.0", // Convert back to standard format
                             kaspa: metaData.kaspa,
                             file: metaData.file,
@@ -5847,12 +5847,12 @@
                         
                         // Show file info
                         document.getElementById('fileInfo').textContent = 
-                            `ファイル名: ${window.kaspaMetadata.file.name}\n` +
-                            `サイズ: ${(window.kaspaMetadata.file.size / 1024).toFixed(1)} KB\n` +
-                            `チャンク数: ${window.kaspaMetadata.chunks.length}\n` +
-                            `暗号化: ${window.kaspaMetadata.encryption.algorithm}\n` +
-                            `圧縮: ${window.kaspaMetadata.file?.compression?.enabled ? window.kaspaMetadata.file.compression.algorithm : 'なし'}\n` +
-                            `作成日時: ${new Date(window.kaspaMetadata.metadata.createdAt).toLocaleString()}\n` +
+                            `ファイル名: ${kaspaMetadata.file.name}\n` +
+                            `サイズ: ${(kaspaMetadata.file.size / 1024).toFixed(1)} KB\n` +
+                            `チャンク数: ${kaspaMetadata.chunks.length}\n` +
+                            `暗号化: ${kaspaMetadata.encryption.algorithm}\n` +
+                            `圧縮: ${kaspaMetadata.file?.compression?.enabled ? kaspaMetadata.file.compression.algorithm : 'なし'}\n` +
+                            `作成日時: ${new Date(kaspaMetadata.metadata.createdAt).toLocaleString()}\n` +
                             `メタTxID: ${metaTxId.substring(0, 16)}...`;
                         
                         // Set password for download

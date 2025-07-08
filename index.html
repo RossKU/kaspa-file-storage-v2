@@ -6000,24 +6000,6 @@
                 document.getElementById('downloadSection').style.display = 'block';
                 log('.kaspaファイルを読み込みました', 'success');
                 
-                // v4.7.11: Add to download history
-                if (window.historyManager) {
-                    const downloadData = {
-                        id: `download_${Date.now()}`,
-                        fileName: kaspaMetadata.file?.name || 'unknown',
-                        fileSize: kaspaMetadata.file?.size || 0,
-                        fileSha256: kaspaMetadata.file?.sha256,
-                        metaTxId: kaspaMetadata.metadata?.metaTxId || kaspaMetadata.metaTx?.txid,
-                        metaTxBlockId: kaspaMetadata.metadata?.metaTxBlockId || kaspaMetadata.metaTx?.blockId,
-                        firstChunkTxId: kaspaMetadata.chunks?.[0],
-                        network: network,
-                        password: kaspaMetadata.auth?.password || document.getElementById('downloadPassword').value,
-                        chunks: kaspaMetadata.chunks?.length || 0,
-                        metadata: kaspaMetadata
-                    };
-                    await window.historyManager.addDownload(downloadData);
-                }
-                
             } catch (error) {
                 log(`.kaspaファイル読み込みエラー: ${error.message}`, 'error');
             }
@@ -6704,6 +6686,30 @@
                 URL.revokeObjectURL(url);
                 
                 log(`ダウンロード完了: ${kaspaMetadata.file.name}`, 'success');
+                
+                // v4.7.11: Add to download history after successful download
+                if (window.historyManager) {
+                    const downloadData = {
+                        id: `download_${Date.now()}`,
+                        fileName: kaspaMetadata.file?.name || 'unknown',
+                        fileSize: kaspaMetadata.file?.size || 0,
+                        fileSha256: kaspaMetadata.file?.sha256,
+                        metaTxId: kaspaMetadata.metadata?.metaTxId || kaspaMetadata.metaTx?.txid,
+                        metaTxBlockId: kaspaMetadata.metadata?.metaTxBlockId || kaspaMetadata.metaTx?.blockId,
+                        firstChunkTxId: kaspaMetadata.chunks?.[0],
+                        network: kaspaMetadata.network || 'testnet-10',
+                        password: password,
+                        chunks: kaspaMetadata.chunks?.length || 0,
+                        chunkTxIds: kaspaMetadata.chunks,
+                        chunkBlockIds: kaspaMetadata.chunkBlockIds,
+                        metadata: kaspaMetadata,
+                        downloadDate: new Date().toISOString()
+                    };
+                    await window.historyManager.addDownload(downloadData);
+                    
+                    // Switch to history tab to show the update
+                    switchTab('history');
+                }
                 
             } catch (error) {
                 log(`ダウンロードエラー: ${error.message}`, 'error');

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.6.14 - WebSocket Debug</title>
+    <title>Kaspa P2P File Storage v4.6.15 - WebSocket Connection Fix</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -4049,7 +4049,7 @@
             log(`[DEBUG] waitForConfirmation開始 - TxID: ${txid.substring(0, 16)}...`, 'debug');
             
             // Try WebSocket monitoring first
-            if (window.monitorClient && wsMonitorActive) {
+            if (rpcClient && wsMonitorActive) {
                 log(`[DEBUG] WebSocket監視を使用してBlockIDを待機`, 'debug');
                 return new Promise((resolve) => {
                     const timeout = setTimeout(() => {
@@ -6081,7 +6081,7 @@
             }
             
             log(`🚀 Kaspa P2P v${getAppVersion()} 準備完了！`, 'info');
-            log(`📋 v${getAppVersion()}: WebSocketデバッグ + pendingBlockIds修正`, 'info');
+            log(`📋 v${getAppVersion()}: WebSocket接続修正 - 即座にBlockID取得`, 'info');
             log('✨ 並列ダウンロード: ' + (parallelDownloadEnabled ? '有効' : '無効'), 'info');
             log('システムを初期化してください', 'info');
             

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.7.8 - Directory download with folder structure (DownloadManager)</title>
+    <title>Kaspa P2P File Storage v4.7.9 - Bulk directory download with skip existing</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -3407,18 +3407,25 @@
                         try {
                             log('[DownloadManager] フォルダ構造を使用したダウンロードを開始', 'info');
                             
-                            // Show directory picker
-                            const dirHandle = await window.showDirectoryPicker({
-                                suggestedName: folderStructure.basePath || 'download',
-                                mode: 'readwrite'
-                            });
+                            let targetHandle;
                             
-                            let targetHandle = dirHandle;
+                            // v4.7.9: Use provided targetHandle or show picker
+                            if (folderStructure.targetHandle) {
+                                targetHandle = folderStructure.targetHandle;
+                                log('[DownloadManager] 提供されたtargetHandleを使用', 'info');
+                            } else {
+                                // Show directory picker
+                                const dirHandle = await window.showDirectoryPicker({
+                                    suggestedName: folderStructure.basePath || 'download',
+                                    mode: 'readwrite'
+                                });
+                                targetHandle = dirHandle;
+                            }
                             
                             // Create or navigate to base directory
-                            if (folderStructure.basePath) {
+                            if (folderStructure.basePath && !folderStructure.targetHandle) {
                                 try {
-                                    targetHandle = await dirHandle.getDirectoryHandle(folderStructure.basePath, { create: true });
+                                    targetHandle = await targetHandle.getDirectoryHandle(folderStructure.basePath, { create: true });
                                     log(`[DownloadManager] ベースディレクトリ: ${folderStructure.basePath}`, 'info');
                                 } catch (e) {
                                     log(`[DownloadManager] ベースディレクトリ作成エラー: ${e.message}`, 'error');
@@ -5646,11 +5653,14 @@
                     passwordSection.innerHTML = '<input type="password" id="downloadPassword" placeholder="パスワードを入力">';
                 }
                 
-                // ダウンロードボタンを無効化（現在未実装）
+                // v4.7.9: ダウンロードボタンをフォルダ一括ダウンロード用に設定
                 const downloadBtn = document.getElementById('downloadBtn');
                 if (downloadBtn) {
-                    downloadBtn.disabled = true;
-                    downloadBtn.textContent = 'ディレクトリダウンロード（開発中）';
+                    downloadBtn.disabled = false;
+                    downloadBtn.textContent = 'フォルダ一括ダウンロード';
+                    downloadBtn.onclick = async () => {
+                        await downloadAllFilesFromDirectory(dirMetadata);
+                    };
                 }
                 
                 // v4.6.33: ディレクトリタイプでもダウンロードセクションを表示
@@ -5662,6 +5672,141 @@
                 log(`ディレクトリメタデータ処理エラー: ${error.message}`, 'error');
             }
         }
+
+        // v4.7.9: Download all files from directory
+        window.downloadAllFilesFromDirectory = async function(dirMetadata) {
+            log('[一括ダウンロード] ディレクトリ内の全ファイルをダウンロード開始', 'info');
+            
+            // Check workspace handle
+            if (!window.workspaceHandle) {
+                log('作業フォルダが設定されていません。先に設定してください。', 'error');
+                alert('作業フォルダが設定されていません。\n画面上部の「設定」ボタンから作業フォルダを選択してください。');
+                await setupWorkspace();
+                return;
+            }
+            
+            try {
+                // Get password
+                let password = document.getElementById('downloadPassword').value;
+                if (!password && dirMetadata.auth?.password) {
+                    password = dirMetadata.auth.password;
+                }
+                
+                if (!password || password.length < 8) {
+                    log('パスワードが必要です', 'error');
+                    return;
+                }
+                
+                // Create base directory
+                const baseDirName = dirMetadata.directory?.name || 'download';
+                let targetHandle = window.workspaceHandle;
+                
+                try {
+                    targetHandle = await window.workspaceHandle.getDirectoryHandle(baseDirName, { create: true });
+                    log(`[一括ダウンロード] ベースディレクトリ作成/取得: ${baseDirName}`, 'info');
+                } catch (e) {
+                    log(`[一括ダウンロード] ベースディレクトリ作成エラー: ${e.message}`, 'error');
+                }
+                
+                // Process each entry
+                const entries = dirMetadata.entries || [];
+                const totalFiles = entries.filter(e => e.type === 'file').length;
+                let completedFiles = 0;
+                let skippedFiles = 0;
+                let errorFiles = 0;
+                
+                document.getElementById('downloadProgress').style.display = 'block';
+                
+                for (const entry of entries) {
+                    if (entry.type !== 'file') continue;
+                    
+                    try {
+                        // Check if file already exists
+                        let fileExists = false;
+                        let currentTargetHandle = targetHandle;
+                        
+                        // Create subdirectories if path exists
+                        if (entry.path) {
+                            const pathParts = entry.path.split('/');
+                            pathParts.pop(); // Remove filename
+                            
+                            for (const part of pathParts) {
+                                if (part) {
+                                    try {
+                                        currentTargetHandle = await currentTargetHandle.getDirectoryHandle(part, { create: true });
+                                    } catch (e) {
+                                        log(`[一括ダウンロード] サブディレクトリ作成エラー: ${part}`, 'error');
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // Check if file exists
+                        try {
+                            await currentTargetHandle.getFileHandle(entry.name);
+                            fileExists = true;
+                        } catch (e) {
+                            // File doesn't exist, which is what we want
+                        }
+                        
+                        if (fileExists) {
+                            skippedFiles++;
+                            log(`[一括ダウンロード] スキップ（既存）: ${entry.path || entry.name}`, 'info');
+                            document.getElementById('downloadStatus').textContent = 
+                                `${completedFiles + skippedFiles}/${totalFiles} ファイル (${skippedFiles}個スキップ)`;
+                            continue;
+                        }
+                        
+                        // Download file
+                        log(`[一括ダウンロード] ダウンロード中: ${entry.path || entry.name}`, 'info');
+                        document.getElementById('downloadStatus').textContent = 
+                            `ダウンロード中: ${entry.name} (${completedFiles + skippedFiles + 1}/${totalFiles})`;
+                        
+                        // Use DownloadManager
+                        if (!window.downloadManager) {
+                            window.downloadManager = new DownloadManager();
+                        }
+                        
+                        const metadata = await window.downloadManager.fetchMetadata(entry.metaTxId, entry.blockId, password);
+                        
+                        const folderStructureOption = {
+                            enabled: true,
+                            basePath: null, // Already in the correct directory
+                            filePath: entry.path || entry.name,
+                            targetHandle: currentTargetHandle // Pass the handle directly
+                        };
+                        
+                        await window.downloadManager.executeDownload(metadata, password, {
+                            onProgress: (progress) => {
+                                const percent = ((completedFiles + progress.current/progress.total) / totalFiles * 100).toFixed(0);
+                                document.getElementById('downloadProgressBar').style.width = percent + '%';
+                                document.getElementById('downloadProgressBar').textContent = percent + '%';
+                            },
+                            folderStructure: folderStructureOption
+                        });
+                        
+                        completedFiles++;
+                        
+                    } catch (error) {
+                        errorFiles++;
+                        log(`[一括ダウンロード] エラー: ${entry.name} - ${error.message}`, 'error');
+                    }
+                }
+                
+                // Summary
+                const summary = `完了: ${completedFiles}個, スキップ: ${skippedFiles}個, エラー: ${errorFiles}個`;
+                log(`[一括ダウンロード] 完了 - ${summary}`, 'success');
+                document.getElementById('downloadStatus').textContent = summary;
+                
+                setTimeout(() => {
+                    document.getElementById('downloadProgress').style.display = 'none';
+                }, 3000);
+                
+            } catch (error) {
+                log(`[一括ダウンロード] エラー: ${error.message}`, 'error');
+                document.getElementById('downloadProgress').style.display = 'none';
+            }
+        };
 
         // Download individual file from directory
         window.downloadFileFromDirectory = async function(metaTxId, blockId, fileName, password, filePath) {

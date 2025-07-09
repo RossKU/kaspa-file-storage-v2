@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.7.38 - Fix progress display DOM preservation</title>
+    <title>Kaspa P2P File Storage v4.7.39 - Fix nextChunkIndex scope and add upload timing</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -5209,6 +5209,9 @@
                 // Check if we need to use new approach
                 const useNewApproach = actualChunkSize >= 22528; // Use new approach for 22KB chunks
                 
+                // Declare nextChunkIndex outside of if/else blocks
+                let nextChunkIndex = -1;
+                
                 if (useNewApproach) {
                     log('🚀 新方式: 暗号化後ペイロード分割を使用', 'info');
                     
@@ -5255,6 +5258,8 @@
                         
                         const payloadBytes = payloads[i];
                         log(`Payload ${i + 1} size: ${payloadBytes.length} bytes`);
+                        
+                        const uploadStartTime = Date.now();
                         
                         // Upload payload to blockchain
                         let txid = null;
@@ -5356,7 +5361,8 @@
                                 } else {
                                     log(`[ERROR] chunk-status-${i} 要素が見つかりません`, 'error');
                                 }
-                                log(`ペイロード ${i + 1} アップロード完了`);
+                                const uploadTime = Date.now() - uploadStartTime;
+                                log(`ペイロード ${i + 1} アップロード完了 (${(uploadTime/1000).toFixed(1)}秒)`);
                                 
                                 // Store chunk info
                                 processedChunks.push({
@@ -5396,14 +5402,6 @@
                         const totalPayloads = payloads.length;
                         const percentage = (completedChunks / totalPayloads * 100).toFixed(1);
                         
-                        log(`[DEBUG] 進捗更新: ${completedChunks}/${totalPayloads} (${percentage}%)`, 'debug');
-                        
-                        // Check if elements exist
-                        const uploadProgressElement = document.getElementById('uploadProgress');
-                        log(`[DEBUG] uploadProgress要素: ${uploadProgressElement ? '存在' : 'NULL'}`, 'debug');
-                        
-                        const uploadProgressBar = document.getElementById('uploadProgressBar');
-                        log(`[DEBUG] uploadProgressBar要素: ${uploadProgressBar ? '存在' : 'NULL'}`, 'debug');
                         
                         // Update only the progress bar, not the entire container
                         const progressBar = document.getElementById('uploadProgressBar');
@@ -5442,7 +5440,7 @@
                     log('従来方式: チャンク単位の処理を使用', 'info');
                     
                     // Continue from next incomplete chunk
-                    let nextChunkIndex = progressManager.getNextChunkIndex();
+                    nextChunkIndex = progressManager.getNextChunkIndex();
                     while (nextChunkIndex >= 0) {
                     // Get fresh UTXOs for each chunk
                     log(`チャンク ${nextChunkIndex + 1}/${totalChunks} の処理を開始...`);

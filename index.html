@@ -5066,7 +5066,13 @@
             processedChunks = [];
             
             document.getElementById('uploadBtn').disabled = true;
-            document.getElementById('uploadProgress').style.display = 'block';
+            const uploadProgressInit = document.getElementById('uploadProgress');
+            if (uploadProgressInit) {
+                uploadProgressInit.style.display = 'block';
+                log('[DEBUG] uploadProgress要素を表示しました', 'debug');
+            } else {
+                log('[ERROR] uploadProgress要素が初期化時に見つかりません！', 'error');
+            }
             
             try {
                 // v3.6.3 fix: Set upload flag
@@ -5375,14 +5381,27 @@
                         const totalPayloads = payloads.length;
                         const percentage = (completedChunks / totalPayloads * 100).toFixed(1);
                         
-                        document.getElementById('uploadProgress').innerHTML = `
-                            <div class="progress-bar">
-                                <div class="progress-fill" style="width: ${percentage}%">
-                                    ${percentage}%
+                        log(`[DEBUG] 進捗更新: ${completedChunks}/${totalPayloads} (${percentage}%)`, 'debug');
+                        
+                        // Check if elements exist
+                        const uploadProgressElement = document.getElementById('uploadProgress');
+                        log(`[DEBUG] uploadProgress要素: ${uploadProgressElement ? '存在' : 'NULL'}`, 'debug');
+                        
+                        const uploadProgressBar = document.getElementById('uploadProgressBar');
+                        log(`[DEBUG] uploadProgressBar要素: ${uploadProgressBar ? '存在' : 'NULL'}`, 'debug');
+                        
+                        if (uploadProgressElement) {
+                            uploadProgressElement.innerHTML = `
+                                <div class="progress-bar">
+                                    <div class="progress-fill" style="width: ${percentage}%">
+                                        ${percentage}%
+                                    </div>
                                 </div>
-                            </div>
-                            <div>進捗: ${completedChunks}/${totalPayloads} ペイロード</div>
-                        `;
+                                <div>進捗: ${completedChunks}/${totalPayloads} ペイロード</div>
+                            `;
+                        } else {
+                            log('[ERROR] uploadProgress要素が見つかりません！', 'error');
+                        }
                     }
                     
                     // Skip old chunk processing

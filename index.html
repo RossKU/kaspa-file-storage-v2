@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.7.21 - Remove directory upload and unused checkbox</title>
+    <title>Kaspa P2P File Storage v4.7.22 - Implement directory metadata generation with history</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -610,18 +610,28 @@
                     <strong>選択されたファイル:</strong> <span id="selectedCount">0</span>個
                 </div>
                 
-                <div class="checkbox-label" style="margin-bottom: 10px;">
-                    <input type="checkbox" id="includePasswordInDir">
-                    <label for="includePasswordInDir">パスワードを.kaspaファイルに含める</label>
+                <div style="margin-bottom: 10px;">
+                    <label>パスワード (8文字以上)</label>
+                    <input type="password" id="directoryPassword" placeholder="強力なパスワードを入力" style="width: 100%; padding: 10px; margin-top: 5px; background: #0a2540; color: #eee; border: 1px solid #49EACB; border-radius: 5px;">
                 </div>
                 
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                    <button onclick="createDirectoryFromHistory()" disabled id="createDirBtn">
-                        📁 ディレクトリ.kaspaを生成
-                    </button>
-                    <button onclick="uploadDirectoryToBlockchain()" disabled id="uploadDirBtn" style="background: #e94560; color: white; border: none;">
-                        📤 ブロックチェーンにアップロード
-                    </button>
+                <button onclick="prepareDirectoryMetadata()" disabled id="prepareDirBtn" style="width: 100%; margin-bottom: 10px;">
+                    🔧 ディレクトリメタデータを生成
+                </button>
+                
+                <div id="directoryActions" style="display: none;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <button onclick="downloadDirectoryKaspa()" id="downloadKaspaBtn">
+                            📥 .kaspaファイルをダウンロード
+                        </button>
+                        <button onclick="uploadDirectoryToBlockchain()" id="uploadDirBtn" style="background: #e94560; color: white; border: none;">
+                            📤 ブロックチェーンに記録
+                        </button>
+                    </div>
+                    <div id="dirMetaTxInfo" style="margin-top: 10px; padding: 10px; background: #16213e; border-radius: 5px; display: none;">
+                        <strong>MetaTxID:</strong> <span id="dirMetaTxId"></span>
+                        <button onclick="copyDirMetaTxId()" class="small-button" style="margin-left: 10px;">📋 コピー</button>
+                    </div>
                 </div>
             </div>
             
@@ -7266,7 +7276,13 @@
             const count = window.selectedHistoryFiles.size;
             document.getElementById('selectedCount').textContent = count;
             document.getElementById('selectedFilesInfo').style.display = count > 0 ? 'block' : 'none';
-            document.getElementById('createDirBtn').disabled = count === 0 || !document.getElementById('directoryName').value;
+            
+            // v4.7.22: Check all conditions for prepare button
+            const dirName = document.getElementById('directoryName').value.trim();
+            const password = document.getElementById('directoryPassword').value;
+            const hasFiles = count > 0;
+            
+            document.getElementById('prepareDirBtn').disabled = !hasFiles || !dirName || password.length < 8;
         }
         
         window.createDirectoryFromHistory = async function() {
@@ -7373,15 +7389,146 @@
             updateSelectedFilesInfo();
         };
         
-        // Upload directory metadata to blockchain
-        window.uploadDirectoryToBlockchain = async function() {
-            if (!window.currentDirectoryMetadata) {
-                alert('先にディレクトリ.kaspaファイルを生成してください');
+        // Prepare directory metadata (v4.7.22)
+        window.prepareDirectoryMetadata = async function() {
+            const dirName = document.getElementById('directoryName').value.trim();
+            if (!dirName) {
+                alert('ディレクトリ名を入力してください');
                 return;
             }
             
-            const dirMetadata = window.currentDirectoryMetadata;
-            const password = window.currentDirectoryPassword;
+            const password = document.getElementById('directoryPassword').value;
+            if (password.length < 8) {
+                alert('パスワードは8文字以上必要です');
+                return;
+            }
+            
+            if (window.selectedHistoryFiles.size === 0) {
+                alert('ファイルを選択してください');
+                return;
+            }
+            
+            const history = window.historyManager.getHistory();
+            const selectedFiles = [];
+            
+            // Collect selected files
+            for (const fileId of window.selectedHistoryFiles) {
+                const item = history.find(h => h.id === fileId);
+                if (item) {
+                    // Extract metaTxId properly if it's in old format
+                    let metaTxId = item.metaTxId;
+                    let blockId = item.metaTxBlockId;
+                    
+                    // Check if metaTxId contains old format (TxID:BlockID)
+                    if (metaTxId && metaTxId.includes(':')) {
+                        const parts = metaTxId.split(':');
+                        metaTxId = parts[0];
+                        blockId = parts[1] || blockId;
+                    }
+                    
+                    // If no metaTxId, use first chunk TxID
+                    if (!metaTxId) {
+                        metaTxId = item.firstChunkTxId || (item.chunkTxIds && item.chunkTxIds[0]);
+                    }
+                    
+                    selectedFiles.push({
+                        name: item.fileName || item.name,
+                        path: item.fileName || item.name,
+                        type: 'file',
+                        metaTxId: metaTxId || '',
+                        blockId: blockId || (item.chunkBlockIds && item.chunkBlockIds[0]) || '',
+                        size: item.fileSize || item.totalSize || 0
+                    });
+                }
+            }
+            
+            // Check file count warning
+            if (selectedFiles.length > 100) {
+                log(`⚠️ 注意: ${selectedFiles.length}個のファイルが選択されています`, 'warning');
+                log('📝 推奨: 100ファイル以下にすることを推奨します', 'info');
+            }
+            
+            // Create directory metadata
+            const dirMetadata = await createDirectoryMetadata(dirName, selectedFiles, password);
+            
+            // Store metadata temporarily in memory
+            window.tempDirectoryMetadata = {
+                metadata: dirMetadata,
+                password: password,
+                dirName: dirName
+            };
+            
+            // Add entry to history WITHOUT TxID (only in memory for now)
+            const uploadData = {
+                id: `dir_temp_${Date.now()}`,
+                type: 'directory',
+                fileName: dirName, // Use fileName for consistency
+                name: dirName,
+                uploadDate: new Date().toISOString(),
+                fileCount: selectedFiles.length,
+                totalSize: selectedFiles.reduce((sum, f) => sum + f.size, 0),
+                totalCost: 0, // Will be updated after blockchain upload
+                metaTxId: null, // Will be filled after blockchain upload
+                metaTxBlockId: null,
+                password: password,
+                metadata: dirMetadata,
+                entries: selectedFiles,
+                network: config.network,
+                isTemporary: true // Mark as temporary until blockchain upload
+            };
+            
+            // Add to history manager
+            await window.historyManager.addUpload(uploadData);
+            window.historyManager.updateHistoryUI();
+            
+            log(`📁 ディレクトリメタデータを生成しました: ${dirName}`, 'success');
+            log(`含まれるファイル数: ${selectedFiles.length}`, 'info');
+            
+            // Show action buttons
+            document.getElementById('directoryActions').style.display = 'block';
+            
+            // Reset UI but keep the metadata
+            document.getElementById('directoryName').value = '';
+            document.getElementById('directoryPassword').value = '';
+            document.getElementById('historyFileSelector').style.display = 'none';
+            window.selectedHistoryFiles.clear();
+            updateSelectedFilesInfo();
+            
+            // Disable prepare button to prevent duplicate preparation
+            document.getElementById('prepareDirBtn').disabled = true;
+        };
+        
+        // Download directory .kaspa file
+        window.downloadDirectoryKaspa = async function() {
+            if (!window.tempDirectoryMetadata) {
+                alert('先にディレクトリメタデータを生成してください');
+                return;
+            }
+            
+            const { metadata, dirName } = window.tempDirectoryMetadata;
+            
+            // Generate .kaspa file
+            const cid = generateRandomCID();
+            const filename = `${dirName}.${cid}.kaspa`;
+            const blob = new Blob([JSON.stringify(metadata, null, 2)], { type: 'application/octet-stream' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+            
+            log(`📥 ディレクトリ.kaspaファイルをダウンロードしました: ${filename}`, 'success');
+        };
+        
+        // Upload directory metadata to blockchain
+        window.uploadDirectoryToBlockchain = async function() {
+            if (!window.tempDirectoryMetadata) {
+                alert('先にディレクトリメタデータを生成してください');
+                return;
+            }
+            
+            const { metadata: dirMetadata, password, dirName } = window.tempDirectoryMetadata;
             
             try {
                 // Start WebSocket monitoring if not already active
@@ -7415,26 +7562,40 @@
                     await copyToClipboard(`${result.txid}:${result.blockId}`);
                     log('MetaTxID:BlockIDをクリップボードにコピーしました', 'info');
                     
-                    // Add to history
-                    uploadHistory.push({
-                        id: 'dir_' + Date.now(),
-                        type: 'directory',
-                        fileName: dirMetadata.directory.name,
-                        fileSize: dirMetadata.directory.totalSize,
-                        metaTxId: result.txid,
-                        metaTxBlockId: result.blockId,
-                        password: password,
-                        timestamp: Date.now(),
-                        blockTime: dirMetadata.metadata.blockTime,
-                        totalKAS: result.cost
-                    });
+                    // Update the temporary history entry with blockchain info
+                    const history = window.historyManager.getHistory();
+                    const tempEntry = history.find(h => h.isTemporary && h.name === dirName);
+                    
+                    if (tempEntry) {
+                        // Update existing entry
+                        tempEntry.metaTxId = result.txid;
+                        tempEntry.metaTxBlockId = result.blockId;
+                        tempEntry.totalCost = result.cost;
+                        tempEntry.blockTime = dirMetadata.metadata.blockTime;
+                        tempEntry.isTemporary = false; // Remove temporary flag
+                        
+                        // Save updated history
+                        await window.historyManager.saveToFile();
+                        window.historyManager.updateHistoryUI();
+                        
+                        log('履歴のTxIDを更新しました', 'success');
+                    }
+                    
+                    // Show TxID info
+                    document.getElementById('dirMetaTxId').textContent = `${result.txid.substring(0, 16)}...`;
+                    document.getElementById('dirMetaTxInfo').style.display = 'block';
                     
                     // Disable upload button after success
                     document.getElementById('uploadDirBtn').disabled = true;
                     
                     // Clear stored metadata
-                    window.currentDirectoryMetadata = null;
-                    window.currentDirectoryPassword = null;
+                    window.tempDirectoryMetadata = null;
+                    
+                    // Hide action buttons after successful upload
+                    setTimeout(() => {
+                        document.getElementById('directoryActions').style.display = 'none';
+                        document.getElementById('prepareDirBtn').disabled = false;
+                    }, 3000);
                     
                 } else {
                     log(`❌ アップロードエラー: ${result.error}`, 'error');
@@ -7442,6 +7603,30 @@
                 
             } catch (error) {
                 log(`❌ アップロードエラー: ${error.message}`, 'error');
+            }
+        };
+        
+        // Copy directory meta TxID
+        window.copyDirMetaTxId = async function() {
+            const txIdSpan = document.getElementById('dirMetaTxId');
+            if (!txIdSpan || !txIdSpan.textContent) {
+                alert('MetaTxIDが存在しません');
+                return;
+            }
+            
+            // Get the full TxID from history
+            const history = window.historyManager.getHistory();
+            const latestDir = history.find(h => h.type === 'directory' && h.metaTxId);
+            
+            if (latestDir && latestDir.metaTxId) {
+                const textToCopy = latestDir.metaTxBlockId ? 
+                    `${latestDir.metaTxId}:${latestDir.metaTxBlockId}` : 
+                    latestDir.metaTxId;
+                    
+                await window.copyToClipboard(textToCopy);
+                log('MetaTxIDをコピーしました', 'success');
+            } else {
+                alert('MetaTxIDが見つかりません');
             }
         };
         
@@ -7562,10 +7747,17 @@
                 log(`初期化エラー: ${error.message}`, 'error');
             }
             
-            // Add event listener for directory name input
+            // Add event listeners for directory inputs
             const dirNameInput = document.getElementById('directoryName');
             if (dirNameInput) {
                 dirNameInput.addEventListener('input', function() {
+                    updateSelectedFilesInfo();
+                });
+            }
+            
+            const dirPasswordInput = document.getElementById('directoryPassword');
+            if (dirPasswordInput) {
+                dirPasswordInput.addEventListener('input', function() {
                     updateSelectedFilesInfo();
                 });
             }

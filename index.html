@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.7.25b - Fix parallel download worker bug</title>
+    <title>Kaspa P2P File Storage v4.7.27 - Experimental chunk size optimization (up to 20KB)</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -485,6 +485,11 @@
             <div class="checkbox-label">
                 <input type="checkbox" id="useRandomCid">
                 <label for="useRandomCid">ランダムCIDを使用（検閲回避）</label>
+            </div>
+            
+            <div class="checkbox-label">
+                <input type="checkbox" id="experimentalOptimization">
+                <label for="experimentalOptimization">🧪 実験的: チャンクサイズ最適化（最大20KB）</label>
             </div>
             
             <button onclick="processAndUpload()" id="uploadBtn" disabled>
@@ -4816,10 +4821,22 @@
                 
                 // Get chunk size and apply safety limit
                 const requestedChunkSize = parseInt(document.getElementById('chunkSize').value) * 1024;
-                const actualChunkSize = calculateSafePayloadSize(requestedChunkSize);
+                let actualChunkSize;
                 
-                if (actualChunkSize < requestedChunkSize) {
-                    log(`チャンクサイズを安全な値に調整: ${(actualChunkSize/1024).toFixed(1)}KB`, 'warning');
+                // 実験的機能のチェック
+                const useExperimentalOptimization = document.getElementById('experimentalOptimization').checked;
+                
+                if (useExperimentalOptimization) {
+                    // 実験的: より大きなチャンクサイズを許可（最大20KB）
+                    actualChunkSize = Math.min(requestedChunkSize, 20480); // 20KB max
+                    log(`🧪 実験的機能: 最適化されたチャンクサイズ ${(actualChunkSize/1024).toFixed(1)}KB を使用`, 'warning');
+                    log('⚠️ この機能は実験的です。問題が発生した場合は無効にしてください', 'warning');
+                } else {
+                    // 通常: 安全なサイズに制限
+                    actualChunkSize = calculateSafePayloadSize(requestedChunkSize);
+                    if (actualChunkSize < requestedChunkSize) {
+                        log(`チャンクサイズを安全な値に調整: ${(actualChunkSize/1024).toFixed(1)}KB`, 'warning');
+                    }
                 }
                 
                 const totalChunks = progressManager.progress.metadata.totalChunks;

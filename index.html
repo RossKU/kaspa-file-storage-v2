@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.7.23 - Simplify directory UI with two action buttons</title>
+    <title>Kaspa P2P File Storage v4.7.24 - Filter directory file selection to prevent crashes</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -7226,11 +7226,25 @@
             // Get history from localStorage
             const history = window.historyManager.getHistory();
             
-            // Filter only file uploads (not directories)
-            const fileHistory = history.filter(item => item.type !== 'directory');
+            // v4.7.24: Filter only file uploads with password AND metaTxId to prevent crashes
+            const fileHistory = history.filter(item => {
+                if (item.type === 'directory') return false;
+                
+                // Check if item has password
+                const hasPassword = item.password && item.password !== 'なし';
+                
+                // Check if item has metaTxId
+                const hasMetaTxId = item.metaTxId || 
+                    (item.metaTxReference && item.metaTxReference.includes(':')) ||
+                    item.firstChunkTxId ||
+                    (item.chunkTxIds && item.chunkTxIds.length > 0);
+                
+                // Only show items with both password and TxID
+                return hasPassword && hasMetaTxId;
+            });
             
             if (fileHistory.length === 0) {
-                historyFileList.innerHTML = '<p style="text-align: center; color: #999;">アップロード済みファイルがありません</p>';
+                historyFileList.innerHTML = '<p style="text-align: center; color: #999;">パスワード付きでTxIDがあるファイルがありません</p>';
             } else {
                 historyFileList.innerHTML = fileHistory.map(item => `
                     <div style="padding: 8px; margin-bottom: 5px; background: #0f3460; border-radius: 5px; cursor: pointer;">
@@ -7240,7 +7254,8 @@
                                 📄 ${item.fileName || item.name}<br>
                                 <small style="color: #999;">
                                     ${formatSize(item.fileSize || item.totalSize)} | 
-                                    ${new Date(item.uploadDate).toLocaleDateString('ja-JP')}
+                                    ${new Date(item.uploadDate).toLocaleDateString('ja-JP')} | 
+                                    🔐 Pass付き
                                 </small>
                             </span>
                         </label>

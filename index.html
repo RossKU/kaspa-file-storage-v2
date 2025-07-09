@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.7.43 - Use DownloadManager internally</title>
+    <title>Kaspa P2P File Storage v4.7.44 - Enable parallel download for 2+ chunks</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -7171,7 +7171,8 @@
                 const chunks = [];
                 
                 // Check if parallel download should be used
-                const useParallel = parallelDownloadEnabled && kaspaMetadata.chunks.length >= 10;
+                // v4.7.44: Enable parallel download for 2+ chunks
+                const useParallel = parallelDownloadEnabled && kaspaMetadata.chunks.length >= 2;
                 
                 if (useParallel) {
                     // Parallel download

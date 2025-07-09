@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.7.34 - Dynamic chunk size iteration</title>
+    <title>Kaspa P2P File Storage v4.7.35 - Fix iteration and compression bugs</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -2609,8 +2609,11 @@
                         }
                         
                         const decrypted = await decryptChunk(payload, key, index);
-                        const original = kaspaMetadata.compression?.enabled ? 
+                        log(`[DEBUG Download] チャンク${index} 復号化: ${payload.length} → ${decrypted.length} バイト`, 'debug');
+                        
+                        const original = kaspaMetadata.file?.compression?.enabled ? 
                             lzDecompress(decrypted) : decrypted;
+                        log(`[DEBUG Download] チャンク${index} 解凍: ${decrypted.length} → ${original.length} バイト (圧縮${kaspaMetadata.file?.compression?.enabled ? '有効' : '無効'})`, 'debug');
                         
                         this.results.set(index, original);
                         this.completedCount++;
@@ -4724,9 +4727,11 @@
                     
                     // Compress
                     const compressed = lzCompress(chunk);
+                    log(`[DEBUG Iteration] チャンク圧縮: ${chunk.length} → ${compressed.length} バイト`, 'debug');
                     
                     // Encrypt
-                    const { data: encrypted } = await encryptChunk(compressed, key, chunkIndex);
+                    const encrypted = await encryptChunk(compressed, key, chunkIndex);
+                    log(`[DEBUG Iteration] チャンク暗号化: ${compressed.length} → ${encrypted.length} バイト`, 'debug');
                     
                     const payloadSize = encrypted.length;
                     
@@ -5090,7 +5095,9 @@
                     
                     // Process chunk
                     const compressed = useCompression ? lzCompress(chunk) : chunk;
+                    log(`[DEBUG Main] チャンク${i + 1} 圧縮: ${chunk.length} → ${compressed.length} バイト (圧縮${useCompression ? '有効' : '無効'})`, 'debug');
                     const encrypted = await encryptChunk(compressed, key, i);
+                    log(`[DEBUG Main] チャンク${i + 1} 暗号化: ${compressed.length} → ${encrypted.length} バイト`, 'debug');
                     // No Base64 encoding - use raw binary
                     const payloadBytes = encrypted; // Direct binary payload
                     

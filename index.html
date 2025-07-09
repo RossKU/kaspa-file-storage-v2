@@ -5246,7 +5246,12 @@
                         chunksList.appendChild(chunkDiv);
                         
                         // Update status
-                        document.getElementById(`chunk-status-${i}`).innerHTML = '<span class="uploading">アップロード中...</span>';
+                        const uploadingStatusElement = document.getElementById(`chunk-status-${i}`);
+                        if (uploadingStatusElement) {
+                            uploadingStatusElement.innerHTML = '<span class="uploading">アップロード中...</span>';
+                        } else {
+                            log(`[ERROR] chunk-status-${i} 要素が見つかりません（アップロード開始時）`, 'error');
+                        }
                         
                         const payloadBytes = payloads[i];
                         log(`Payload ${i + 1} size: ${payloadBytes.length} bytes`);
@@ -5345,7 +5350,12 @@
                                 }
                                 
                                 // Update status
-                                document.getElementById(`chunk-status-${i}`).innerHTML = '<span class="success">✅ 完了</span>';
+                                const chunkStatusElement = document.getElementById(`chunk-status-${i}`);
+                                if (chunkStatusElement) {
+                                    chunkStatusElement.innerHTML = '<span class="success">✅ 完了</span>';
+                                } else {
+                                    log(`[ERROR] chunk-status-${i} 要素が見つかりません`, 'error');
+                                }
                                 log(`ペイロード ${i + 1} アップロード完了`);
                                 
                                 // Store chunk info
@@ -5367,7 +5377,12 @@
                                 log(`ペイロード ${i + 1} エラー (試行 ${retries}/${config.retryCount}): ${error.message}`, 'error');
                                 
                                 if (retries >= config.retryCount) {
-                                    document.getElementById(`chunk-status-${i}`).innerHTML = '<span class="error">❌ 失敗</span>';
+                                    const chunkStatusElement = document.getElementById(`chunk-status-${i}`);
+                                    if (chunkStatusElement) {
+                                        chunkStatusElement.innerHTML = '<span class="error">❌ 失敗</span>';
+                                    } else {
+                                        log(`[ERROR] chunk-status-${i} 要素が見つかりません（エラー時）`, 'error');
+                                    }
                                     progressManager.markChunkFailed(i);
                                     await progressManager.saveProgress();
                                     throw error;
@@ -5840,6 +5855,8 @@
                 
             } catch (error) {
                 log(`アップロードエラー: ${error.message}`, 'error');
+                console.error('Upload error stack:', error.stack);
+                log(`[DEBUG] エラースタック: ${error.stack}`, 'debug');
             } finally {
                 // v3.6.3 fix: Clear upload flag
                 isUploadingFile = false;

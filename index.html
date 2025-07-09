@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.7.15 - Fix upload checkboxes UI</title>
+    <title>Kaspa P2P File Storage v4.7.16 - Debug logs for meta-tx creation</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -5218,9 +5218,14 @@
                 
                 // Check if meta-tx option is enabled
                 const useMetaTx = document.getElementById('useMetaTx').checked;
+                log(`[DEBUG] メタTx使用設定: ${useMetaTx}`, 'debug');
+                log(`[DEBUG] ワークスペース設定: ${window.workspaceHandle ? 'あり' : 'なし'}`, 'debug');
+                
                 if (useMetaTx) {
+                    log('[DEBUG] メタTx作成を開始します', 'debug');
                     await createAndUploadMetaTx();
                 } else {
+                    log('[DEBUG] メタTxは作成しません（チェックボックスがOFF）', 'debug');
                     // Auto-stop monitoring for non-meta-tx uploads
                     if (window.wsMonitorActive) {
                         log('アップロード完了 - WebSocket監視を自動停止します', 'info');
@@ -5456,18 +5461,26 @@
                 
                 // Update history with metaTxId
                 if (window.historyManager && window.currentFileCID) {
+                    log(`[DEBUG] 履歴更新開始 - CID: ${window.currentFileCID}`, 'debug');
                     const history = window.historyManager.getHistory();
                     const latestUpload = history.find(h => h.cid === window.currentFileCID);
                     if (latestUpload) {
+                        log(`[DEBUG] 履歴エントリー発見 - ID: ${latestUpload.id}`, 'debug');
                         // 両方のプロパティを正しく設定
                         latestUpload.metaTxId = metaTxId;
                         latestUpload.metaTxBlockId = metaBlockId;
                         latestUpload.metaTxReference = metaTxReference; // 後方互換性のため
+                        log(`[DEBUG] メタTxID設定: ${metaTxId}`, 'debug');
+                        log(`[DEBUG] メタBlockID設定: ${metaBlockId || 'null'}`, 'debug');
                         // Save updated history
                         localStorage.setItem(window.historyManager.dbName, JSON.stringify(history));
                         await window.historyManager.saveToFile();
                         log('[UploadHistoryManager] メタTxIDとBlockIDを履歴に追加しました', 'debug');
+                    } else {
+                        log(`[DEBUG] CID ${window.currentFileCID} の履歴エントリーが見つかりません`, 'error');
                     }
+                } else {
+                    log(`[DEBUG] 履歴更新スキップ - historyManager: ${!!window.historyManager}, CID: ${window.currentFileCID || 'なし'}`, 'warning');
                 }
                 
                 // Auto-stop WebSocket monitoring after meta-tx creation

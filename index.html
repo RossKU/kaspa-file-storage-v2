@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.7.40 - Fix variable chunk compression decryption</title>
+    <title>Kaspa P2P File Storage v4.7.41 - Enhanced debug logging for variable chunk compression</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -3390,7 +3390,18 @@
                         throw new Error(`チャンク ${index + 1} のペイロードが見つかりません`);
                     }
                     
-                    // Decrypt and decompress
+                    // v4.7.41: Enhanced debugging for variable chunk compression
+                    if (metadata.file?.compression?.enabled && metadata.metadata?.chunkBoundaries) {
+                        log(`[DownloadManager] 可変チャンク圧縮ファイル検出 - 暗号化データをそのまま返す`, 'info');
+                        log(`[DownloadManager] チャンク ${index}: payload size=${payload.length} bytes`, 'debug');
+                        log(`[DownloadManager] Encrypted data preview: ${Array.from(payload.slice(0, 16)).map(b => b.toString(16).padStart(2, '0')).join(' ')}...`, 'debug');
+                        if (metadata.metadata.chunkBoundaries[index]) {
+                            log(`[DownloadManager] Boundary info: ${JSON.stringify(metadata.metadata.chunkBoundaries[index])}`, 'debug');
+                        }
+                        return payload; // Return encrypted data as-is for later processing
+                    }
+                    
+                    // Standard processing for non-variable chunk files
                     const decrypted = await decryptChunk(payload, key, index);
                     const decompressed = metadata.file?.compression?.enabled ? 
                         lzDecompress(decrypted) : decrypted;
@@ -3544,34 +3555,114 @@
                         // Old approach: download and decrypt chunks individually
                         log('[DownloadManager] 従来方式: チャンク単位のダウンロードを使用', 'info');
                         
-                        const chunks = [];
-                        const totalChunks = metadata.chunks.length;
-                        
-                        for (let i = 0; i < totalChunks; i++) {
-                            const txId = metadata.chunks[i];
-                            const blockId = metadata.chunkBlockIds[i];
+                        // v4.7.41: Enhanced debugging for variable chunk compression
+                        if (metadata.file?.compression?.enabled && metadata.metadata?.chunkBoundaries) {
+                            log('[DownloadManager] 可変チャンク圧縮ファイルのシーケンシャルダウンロード', 'info');
+                            log(`[DownloadManager] Total boundaries: ${metadata.metadata.chunkBoundaries.length}`, 'debug');
+                            log(`[DownloadManager] Total chunks: ${metadata.chunks.length}`, 'debug');
                             
-                            // Progress callback
-                            if (onProgress) {
-                                onProgress({
-                                    current: i + 1,
-                                    total: totalChunks,
-                                    percent: ((i + 1) / totalChunks * 100).toFixed(0)
-                                });
+                            // Download all encrypted chunks
+                            const encryptedChunks = [];
+                            const totalChunks = metadata.chunks.length;
+                            
+                            for (let i = 0; i < totalChunks; i++) {
+                                const txId = metadata.chunks[i];
+                                const blockId = metadata.chunkBlockIds[i];
+                                
+                                // Progress callback
+                                if (onProgress) {
+                                    onProgress({
+                                        current: i + 1,
+                                        total: totalChunks,
+                                        percent: ((i + 1) / totalChunks * 100).toFixed(0)
+                                    });
+                                }
+                                
+                                log(`[DownloadManager] Downloading chunk ${i}: ${txId.substring(0, 16)}...`, 'debug');
+                                const encryptedChunk = await this.downloadChunk(txId, blockId, key, i, metadata);
+                                encryptedChunks.push(encryptedChunk);
                             }
                             
-                            const chunk = await this.downloadChunk(txId, blockId, key, i, metadata);
-                            chunks.push(chunk);
-                        }
-                        
-                        // Combine chunks
-                        const totalSize = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
-                        combined = new Uint8Array(totalSize);
-                        let offset = 0;
-                        
-                        for (const chunk of chunks) {
-                            combined.set(chunk, offset);
-                            offset += chunk.length;
+                            // Combine encrypted chunks
+                            const totalEncryptedSize = encryptedChunks.reduce((sum, chunk) => sum + chunk.length, 0);
+                            const encryptedData = new Uint8Array(totalEncryptedSize);
+                            let encryptOffset = 0;
+                            
+                            for (const chunk of encryptedChunks) {
+                                encryptedData.set(chunk, encryptOffset);
+                                encryptOffset += chunk.length;
+                            }
+                            
+                            log(`[DownloadManager] 全暗号化データ結合完了: ${totalEncryptedSize} bytes`, 'info');
+                            
+                            // Decrypt using chunk boundaries
+                            const decryptedChunks = [];
+                            const boundaries = metadata.metadata.chunkBoundaries;
+                            
+                            log(`[DownloadManager] Starting decryption with boundaries...`, 'info');
+                            for (const boundary of boundaries) {
+                                const start = boundary.offset;
+                                const end = start + boundary.size;
+                                
+                                if (start < encryptedData.length) {
+                                    const encryptedChunk = encryptedData.slice(start, Math.min(end, encryptedData.length));
+                                    try {
+                                        log(`[DownloadManager] チャンク ${boundary.index} 復号化: offset=${start}, size=${encryptedChunk.length}`, 'info');
+                                        log(`[DownloadManager] Encrypted chunk preview: ${Array.from(encryptedChunk.slice(0, 16)).map(b => b.toString(16).padStart(2, '0')).join(' ')}...`, 'debug');
+                                        const decryptedChunk = await decryptChunk(encryptedChunk, key, boundary.index);
+                                        log(`[DownloadManager] チャンク ${boundary.index} 復号化成功: ${decryptedChunk.length} bytes`, 'success');
+                                        decryptedChunks.push(decryptedChunk);
+                                    } catch (e) {
+                                        log(`[DownloadManager] チャンク ${boundary.index} の復号化エラー: ${e.message}`, 'error');
+                                        throw new Error(`チャンク ${boundary.index} の復号化に失敗しました`);
+                                    }
+                                }
+                            }
+                            
+                            // Combine and decompress
+                            const totalDecryptedSize = decryptedChunks.reduce((sum, chunk) => sum + chunk.length, 0);
+                            const decrypted = new Uint8Array(totalDecryptedSize);
+                            let decryptOffset = 0;
+                            for (const chunk of decryptedChunks) {
+                                decrypted.set(chunk, decryptOffset);
+                                decryptOffset += chunk.length;
+                            }
+                            
+                            log(`[DownloadManager] Decompressing ${decrypted.length} bytes...`, 'info');
+                            combined = lzDecompress(decrypted);
+                            log(`[DownloadManager] Decompressed to ${combined.length} bytes`, 'success');
+                            
+                        } else {
+                            // Standard non-variable chunk processing
+                            const chunks = [];
+                            const totalChunks = metadata.chunks.length;
+                            
+                            for (let i = 0; i < totalChunks; i++) {
+                                const txId = metadata.chunks[i];
+                                const blockId = metadata.chunkBlockIds[i];
+                                
+                                // Progress callback
+                                if (onProgress) {
+                                    onProgress({
+                                        current: i + 1,
+                                        total: totalChunks,
+                                        percent: ((i + 1) / totalChunks * 100).toFixed(0)
+                                    });
+                                }
+                                
+                                const chunk = await this.downloadChunk(txId, blockId, key, i, metadata);
+                                chunks.push(chunk);
+                            }
+                            
+                            // Combine chunks
+                            const totalSize = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+                            combined = new Uint8Array(totalSize);
+                            let offset = 0;
+                            
+                            for (const chunk of chunks) {
+                                combined.set(chunk, offset);
+                                offset += chunk.length;
+                            }
                         }
                     }
                     

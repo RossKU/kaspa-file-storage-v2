@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.7.17 - Fix TxID button logic</title>
+    <title>Kaspa P2P File Storage v4.7.19 - Implement event delegation for history buttons</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -1055,6 +1055,50 @@
                     '<p style="text-align: center; color: #666;">アップロード履歴がありません</p>' :
                     history.map(item => this.createHistoryItem(item)).join('');
                 log(`[UploadHistoryManager] 履歴リストを更新しました (${history.length}件)`, 'debug');
+                
+                // Attach event listeners to the newly created buttons
+                this.attachEventListeners();
+            }
+            
+            attachEventListeners() {
+                // Remove any existing listeners first
+                const existingButtons = document.querySelectorAll('.history-action-btn');
+                existingButtons.forEach(btn => {
+                    const newBtn = btn.cloneNode(true);
+                    btn.parentNode.replaceChild(newBtn, btn);
+                });
+                
+                // Add event listeners to all history action buttons
+                document.querySelectorAll('.history-action-btn').forEach(button => {
+                    button.addEventListener('click', async (e) => {
+                        const action = e.target.dataset.action;
+                        const itemId = e.target.dataset.itemId;
+                        
+                        // Handle the action
+                        switch(action) {
+                            case 'generateKaspaWithPassword':
+                                await this.generateKaspaWithPassword(itemId);
+                                break;
+                            case 'generateKaspaWithoutPassword':
+                                await this.generateKaspaWithoutPassword(itemId);
+                                break;
+                            case 'copyMetaTxIdWithPassword':
+                                await this.copyMetaTxIdWithPassword(itemId);
+                                break;
+                            case 'copyMetaTxIdWithoutPassword':
+                                await this.copyMetaTxIdWithoutPassword(itemId);
+                                break;
+                            case 'copyPassword':
+                                const password = e.target.dataset.password;
+                                await window.copyToClipboard(password);
+                                break;
+                            default:
+                                log(`[UploadHistoryManager] 不明なアクション: ${action}`, 'error');
+                        }
+                    });
+                });
+                
+                log(`[UploadHistoryManager] イベントリスナーを設定しました`, 'debug');
             }
             
             createHistoryItem(item) {
@@ -1082,30 +1126,30 @@
                 
                 // .kaspa buttons
                 if (hasPassword) {
-                    buttons.push(`<button onclick="window.historyManager.generateKaspaWithPassword('${item.id}')" class="small-button" title="パスワード付き.kaspaファイル">🔐.kaspa</button>`);
+                    buttons.push(`<button class="small-button history-action-btn" data-action="generateKaspaWithPassword" data-item-id="${item.id}" title="パスワード付き.kaspaファイル">🔐.kaspa</button>`);
                 } else {
-                    buttons.push(`<button class="small-button disabled" title="パスワードが保存されていません" style="opacity: 0.5; cursor: not-allowed;">🔐.kaspa</button>`);
+                    buttons.push(`<button class="small-button disabled" disabled title="パスワードが保存されていません" style="opacity: 0.5; cursor: not-allowed;">🔐.kaspa</button>`);
                 }
-                buttons.push(`<button onclick="window.historyManager.generateKaspaWithoutPassword('${item.id}')" class="small-button" title="パスワードなし.kaspaファイル">🔓.kaspa</button>`);
+                buttons.push(`<button class="small-button history-action-btn" data-action="generateKaspaWithoutPassword" data-item-id="${item.id}" title="パスワードなし.kaspaファイル">🔓.kaspa</button>`);
                 
                 // TxID buttons
                 if (hasMetaTxId) {
                     if (hasPassword) {
-                        buttons.push(`<button onclick="if(window.historyManager) window.historyManager.copyMetaTxIdWithPassword('${item.id}'); else console.error('historyManager not initialized');" class="small-button" title="TxID:BlockID:Password形式でコピー">🔐TxID</button>`);
+                        buttons.push(`<button class="small-button history-action-btn" data-action="copyMetaTxIdWithPassword" data-item-id="${item.id}" title="TxID:BlockID:Password形式でコピー">🔐TxID</button>`);
                     } else {
-                        buttons.push(`<button class="small-button disabled" title="パスワードが保存されていません" style="opacity: 0.5; cursor: not-allowed;">🔐TxID</button>`);
+                        buttons.push(`<button class="small-button disabled" disabled title="パスワードが保存されていません" style="opacity: 0.5; cursor: not-allowed;">🔐TxID</button>`);
                     }
-                    buttons.push(`<button onclick="if(window.historyManager) window.historyManager.copyMetaTxIdWithoutPassword('${item.id}'); else console.error('historyManager not initialized');" class="small-button" title="TxID:BlockID形式でコピー">🔓TxID</button>`);
+                    buttons.push(`<button class="small-button history-action-btn" data-action="copyMetaTxIdWithoutPassword" data-item-id="${item.id}" title="TxID:BlockID形式でコピー">🔓TxID</button>`);
                 } else {
-                    buttons.push(`<button class="small-button disabled" title="メタトランザクションIDが存在しません" style="opacity: 0.5; cursor: not-allowed;">🔐TxID</button>`);
-                    buttons.push(`<button class="small-button disabled" title="メタトランザクションIDが存在しません" style="opacity: 0.5; cursor: not-allowed;">🔓TxID</button>`);
+                    buttons.push(`<button class="small-button disabled" disabled title="メタトランザクションIDが存在しません" style="opacity: 0.5; cursor: not-allowed;">🔐TxID</button>`);
+                    buttons.push(`<button class="small-button disabled" disabled title="メタトランザクションIDが存在しません" style="opacity: 0.5; cursor: not-allowed;">🔓TxID</button>`);
                 }
                 
                 // Password button
                 if (hasPassword) {
-                    buttons.push(`<button onclick="window.copyToClipboard('${item.password}')" class="small-button" title="パスワードをコピー">🔑Pass</button>`);
+                    buttons.push(`<button class="small-button history-action-btn" data-action="copyPassword" data-item-id="${item.id}" data-password="${item.password}" title="パスワードをコピー">🔑Pass</button>`);
                 } else {
-                    buttons.push(`<button class="small-button disabled" title="パスワードが保存されていません" style="opacity: 0.5; cursor: not-allowed;">🔑Pass</button>`);
+                    buttons.push(`<button class="small-button disabled" disabled title="パスワードが保存されていません" style="opacity: 0.5; cursor: not-allowed;">🔑Pass</button>`);
                 }
                 
                 return `

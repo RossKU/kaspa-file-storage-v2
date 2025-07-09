@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.7.36 - Payload splitting after encryption for 22KB chunks</title>
+    <title>Kaspa P2P File Storage v4.7.38 - Fix progress display DOM preservation</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -5405,17 +5405,32 @@
                         const uploadProgressBar = document.getElementById('uploadProgressBar');
                         log(`[DEBUG] uploadProgressBar要素: ${uploadProgressBar ? '存在' : 'NULL'}`, 'debug');
                         
-                        if (uploadProgressElement) {
-                            uploadProgressElement.innerHTML = `
-                                <div class="progress-bar">
-                                    <div class="progress-fill" style="width: ${percentage}%">
-                                        ${percentage}%
-                                    </div>
-                                </div>
-                                <div>進捗: ${completedChunks}/${totalPayloads} ペイロード</div>
-                            `;
+                        // Update only the progress bar, not the entire container
+                        const progressBar = document.getElementById('uploadProgressBar');
+                        if (progressBar) {
+                            progressBar.style.width = percentage + '%';
+                            progressBar.textContent = percentage + '%';
                         } else {
-                            log('[ERROR] uploadProgress要素が見つかりません！', 'error');
+                            log('[ERROR] uploadProgressBar要素が見つかりません！', 'error');
+                        }
+                        
+                        // Add or update payload info
+                        let payloadInfo = document.getElementById('payloadInfo');
+                        if (!payloadInfo) {
+                            // Create payload info element if it doesn't exist
+                            payloadInfo = document.createElement('div');
+                            payloadInfo.id = 'payloadInfo';
+                            payloadInfo.style.marginTop = '10px';
+                            
+                            // Append after chunksList
+                            const chunksList = document.getElementById('chunksList');
+                            if (chunksList && chunksList.parentNode) {
+                                chunksList.parentNode.appendChild(payloadInfo);
+                            }
+                        }
+                        
+                        if (payloadInfo) {
+                            payloadInfo.innerHTML = `<strong>進捗: ${completedChunks}/${totalPayloads} ペイロード</strong>`;
                         }
                     }
                     

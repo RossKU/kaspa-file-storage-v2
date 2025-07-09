@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.7.41 - Enhanced debug logging for variable chunk compression</title>
+    <title>Kaspa P2P File Storage v4.7.43 - Use DownloadManager internally</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -7138,6 +7138,33 @@
                     log(`v3.1フォーマット: PBKDF2 ${iterations}回を使用`, 'info');
                 }
                 
+                // v4.7.43: Use DownloadManager internally
+                log('[v4.7.43] DownloadManagerを使用してダウンロード処理を実行', 'info');
+                
+                const onProgress = (progress) => {
+                    const percent = progress.percent || 0;
+                    document.getElementById('downloadProgressBar').style.width = percent + '%';
+                    document.getElementById('downloadProgressBar').textContent = percent + '%';
+                    if (progress.current && progress.total) {
+                        document.getElementById('downloadStatus').textContent = 
+                            `チャンク ${progress.current}/${progress.total} を取得中...`;
+                    }
+                };
+                
+                await window.downloadManager.executeDownload(
+                    kaspaMetadata,
+                    password,
+                    {
+                        onProgress: onProgress
+                    }
+                );
+                
+                log('ダウンロード処理完了', 'success');
+                document.getElementById('downloadProgress').style.display = 'none';
+                
+                return; // 新しい処理はここで終了
+                
+                // 以下は旧処理（到達しない）
                 const key = await deriveKey(password, salt, iterations);
                 log(`キー生成完了 (iterations: ${iterations})`, 'debug');
                 

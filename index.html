@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.7.28 - Integrate experimental chunk size into dropdown</title>
+    <title>Kaspa P2P File Storage v4.7.29 - Dynamic chunk size optimization (22KB target)</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -474,6 +474,7 @@
                         <option value="12" selected>12KB chunks (推奨)</option>
                         <option value="15">15KB chunks (リスクあり)</option>
                         <option value="20">🧪 20KB chunks (実験的)</option>
+                    <option value="22">🚀 22KB chunks (最適化・実験的)</option>
                     </select>
                 </div>
             </div>
@@ -4598,10 +4599,20 @@
 
         // Calculate safe payload size based on storage mass limit
         function calculateSafePayloadSize(rawChunkSize) {
-            // v4.7.28: 制限ロジックを非活性化
-            // 以前は12KB制限があったが、実験的により大きなサイズを許可
-            // return Math.min(rawChunkSize, 12288); // 12KB max
-            return rawChunkSize; // 制限なし
+            // v4.7.29: 動的チャンクサイズ最適化（段階的実装）
+            const KASPA_MAX_PAYLOAD = 24000; // Kaspaペイロード上限
+            const AES_GCM_OVERHEAD = 16;     // AES-256-GCM認証タグ
+            const SAFETY_MARGIN = 1000;      // 安全マージン（約1KB）
+            
+            // 最大安全ペイロード = 24000 - 16 - 1000 = 22984バイト ≈ 22.4KB
+            const MAX_SAFE_CHUNK_SIZE = KASPA_MAX_PAYLOAD - AES_GCM_OVERHEAD - SAFETY_MARGIN;
+            
+            // v4.7.29: 第1段階 - 22KB固定値での検証
+            if (rawChunkSize >= 22528) { // 22KB = 22 * 1024
+                return 22528; // 22KBに制限
+            }
+            
+            return rawChunkSize; // それ以下はそのまま
         }
         
         // Check if transaction exists on blockchain
@@ -4818,12 +4829,19 @@
                 
                 // 20KB以上は実験的機能として扱う
                 if (requestedChunkSize >= 20480) {
-                    // 実験的: 大きなチャンクサイズをそのまま使用
-                    actualChunkSize = requestedChunkSize;
-                    log(`🧪 実験的機能: ${(actualChunkSize/1024).toFixed(1)}KB チャンクを使用`, 'warning');
-                    log('⚠️ この機能は実験的です。問題が発生した場合は12KB以下を選択してください', 'warning');
+                    // 実験的: 動的チャンクサイズ最適化を適用
+                    actualChunkSize = calculateSafePayloadSize(requestedChunkSize);
+                    
+                    if (requestedChunkSize >= 22528) {
+                        log(`🚀 動的最適化: ${(actualChunkSize/1024).toFixed(1)}KB チャンクを使用`, 'warning');
+                        log('📊 ペイロード効率: ' + ((actualChunkSize / 23984) * 100).toFixed(1) + '% (理論最大値に対して)', 'info');
+                        log('⚠️ この機能は実験的です。問題が発生した場合は12KB以下を選択してください', 'warning');
+                    } else {
+                        log(`🧪 実験的機能: ${(actualChunkSize/1024).toFixed(1)}KB チャンクを使用`, 'warning');
+                        log('⚠️ この機能は実験的です。問題が発生した場合は12KB以下を選択してください', 'warning');
+                    }
                 } else {
-                    // 通常: 安全なサイズに制限
+                    // 通常: 安全なサイズ（変更なし）
                     actualChunkSize = calculateSafePayloadSize(requestedChunkSize);
                     if (actualChunkSize < requestedChunkSize) {
                         log(`チャンクサイズを安全な値に調整: ${(actualChunkSize/1024).toFixed(1)}KB`, 'warning');
@@ -4889,6 +4907,15 @@
                     const encrypted = await encryptChunk(compressed, key, i);
                     // No Base64 encoding - use raw binary
                     const payloadBytes = encrypted; // Direct binary payload
+                    
+                    // v4.7.29: ペイロードサイズの詳細分析
+                    if (actualChunkSize >= 22528) {
+                        log(`📊 チャンク ${i + 1} 詳細:`);
+                        log(`  - 元のサイズ: ${chunk.length.toLocaleString()} バイト`);
+                        log(`  - 圧縮後: ${compressed.length.toLocaleString()} バイト (${((compressed.length/chunk.length)*100).toFixed(1)}%)`);
+                        log(`  - 暗号化後: ${encrypted.length.toLocaleString()} バイト (+${encrypted.length - compressed.length} バイト)`);
+                        log(`  - ペイロード効率: ${((encrypted.length/24000)*100).toFixed(1)}% / 24KB制限`);
+                    }
                     
                     // Update status
                     document.getElementById(`chunk-status-${i}`).innerHTML = '<span class="uploading">アップロード中...</span>';

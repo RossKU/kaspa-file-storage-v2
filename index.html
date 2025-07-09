@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.7.22 - Implement directory metadata generation with history</title>
+    <title>Kaspa P2P File Storage v4.7.23 - Simplify directory UI with two action buttons</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -615,23 +615,13 @@
                     <input type="password" id="directoryPassword" placeholder="強力なパスワードを入力" style="width: 100%; padding: 10px; margin-top: 5px; background: #0a2540; color: #eee; border: 1px solid #49EACB; border-radius: 5px;">
                 </div>
                 
-                <button onclick="prepareDirectoryMetadata()" disabled id="prepareDirBtn" style="width: 100%; margin-bottom: 10px;">
-                    🔧 ディレクトリメタデータを生成
-                </button>
-                
-                <div id="directoryActions" style="display: none;">
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                        <button onclick="downloadDirectoryKaspa()" id="downloadKaspaBtn">
-                            📥 .kaspaファイルをダウンロード
-                        </button>
-                        <button onclick="uploadDirectoryToBlockchain()" id="uploadDirBtn" style="background: #e94560; color: white; border: none;">
-                            📤 ブロックチェーンに記録
-                        </button>
-                    </div>
-                    <div id="dirMetaTxInfo" style="margin-top: 10px; padding: 10px; background: #16213e; border-radius: 5px; display: none;">
-                        <strong>MetaTxID:</strong> <span id="dirMetaTxId"></span>
-                        <button onclick="copyDirMetaTxId()" class="small-button" style="margin-left: 10px;">📋 コピー</button>
-                    </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <button onclick="prepareDirectoryMetadata()" disabled id="prepareDirBtn">
+                        🔧 ディレクトリメタデータを生成のみ
+                    </button>
+                    <button onclick="prepareAndUploadDirectory()" disabled id="prepareAndUploadBtn" style="background: #e94560; color: white; border: none;">
+                        📤 生成してアップロード
+                    </button>
                 </div>
             </div>
             
@@ -7283,6 +7273,7 @@
             const hasFiles = count > 0;
             
             document.getElementById('prepareDirBtn').disabled = !hasFiles || !dirName || password.length < 8;
+            document.getElementById('prepareAndUploadBtn').disabled = !hasFiles || !dirName || password.length < 8;
         }
         
         window.createDirectoryFromHistory = async function() {
@@ -7484,41 +7475,26 @@
             log(`📁 ディレクトリメタデータを生成しました: ${dirName}`, 'success');
             log(`含まれるファイル数: ${selectedFiles.length}`, 'info');
             
-            // Show action buttons
-            document.getElementById('directoryActions').style.display = 'block';
-            
-            // Reset UI but keep the metadata
+            // Reset UI
             document.getElementById('directoryName').value = '';
             document.getElementById('directoryPassword').value = '';
             document.getElementById('historyFileSelector').style.display = 'none';
             window.selectedHistoryFiles.clear();
             updateSelectedFilesInfo();
             
-            // Disable prepare button to prevent duplicate preparation
-            document.getElementById('prepareDirBtn').disabled = true;
+            // Clear temporary metadata after adding to history
+            window.tempDirectoryMetadata = null;
         };
         
-        // Download directory .kaspa file
-        window.downloadDirectoryKaspa = async function() {
-            if (!window.tempDirectoryMetadata) {
-                alert('先にディレクトリメタデータを生成してください');
-                return;
+        // Prepare and upload directory metadata in one step
+        window.prepareAndUploadDirectory = async function() {
+            // First, prepare the metadata
+            await prepareDirectoryMetadata();
+            
+            // If metadata was successfully prepared, upload it
+            if (window.tempDirectoryMetadata) {
+                await uploadDirectoryToBlockchain();
             }
-            
-            const { metadata, dirName } = window.tempDirectoryMetadata;
-            
-            // Generate .kaspa file
-            const cid = generateRandomCID();
-            const filename = `${dirName}.${cid}.kaspa`;
-            const blob = new Blob([JSON.stringify(metadata, null, 2)], { type: 'application/octet-stream' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = filename;
-            a.click();
-            URL.revokeObjectURL(url);
-            
-            log(`📥 ディレクトリ.kaspaファイルをダウンロードしました: ${filename}`, 'success');
         };
         
         // Upload directory metadata to blockchain
@@ -7581,21 +7557,8 @@
                         log('履歴のTxIDを更新しました', 'success');
                     }
                     
-                    // Show TxID info
-                    document.getElementById('dirMetaTxId').textContent = `${result.txid.substring(0, 16)}...`;
-                    document.getElementById('dirMetaTxInfo').style.display = 'block';
-                    
-                    // Disable upload button after success
-                    document.getElementById('uploadDirBtn').disabled = true;
-                    
                     // Clear stored metadata
                     window.tempDirectoryMetadata = null;
-                    
-                    // Hide action buttons after successful upload
-                    setTimeout(() => {
-                        document.getElementById('directoryActions').style.display = 'none';
-                        document.getElementById('prepareDirBtn').disabled = false;
-                    }, 3000);
                     
                 } else {
                     log(`❌ アップロードエラー: ${result.error}`, 'error');
@@ -7603,30 +7566,6 @@
                 
             } catch (error) {
                 log(`❌ アップロードエラー: ${error.message}`, 'error');
-            }
-        };
-        
-        // Copy directory meta TxID
-        window.copyDirMetaTxId = async function() {
-            const txIdSpan = document.getElementById('dirMetaTxId');
-            if (!txIdSpan || !txIdSpan.textContent) {
-                alert('MetaTxIDが存在しません');
-                return;
-            }
-            
-            // Get the full TxID from history
-            const history = window.historyManager.getHistory();
-            const latestDir = history.find(h => h.type === 'directory' && h.metaTxId);
-            
-            if (latestDir && latestDir.metaTxId) {
-                const textToCopy = latestDir.metaTxBlockId ? 
-                    `${latestDir.metaTxId}:${latestDir.metaTxBlockId}` : 
-                    latestDir.metaTxId;
-                    
-                await window.copyToClipboard(textToCopy);
-                log('MetaTxIDをコピーしました', 'success');
-            } else {
-                alert('MetaTxIDが見つかりません');
             }
         };
         

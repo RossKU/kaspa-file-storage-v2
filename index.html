@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.7.35 - Fix iteration and compression bugs</title>
+    <title>Kaspa P2P File Storage v4.7.36 - Payload splitting after encryption for 22KB chunks</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -484,10 +484,6 @@
                 <label for="useMetaTx">メタTxIDを使用（推奨：履歴から簡単に共有可能）</label>
             </div>
             
-            <div class="checkbox-label">
-                <input type="checkbox" id="useChunkIteration">
-                <label for="useChunkIteration">🚀 動的チャンクサイズ最適化を使用（22KB選択時のみ有効）</label>
-            </div>
             
             <div class="checkbox-label">
                 <input type="checkbox" id="useRandomCid">
@@ -3320,6 +3316,47 @@
                 }
             }
             
+            // Download raw payload without decryption (for new approach)
+            async downloadPayload(txId, blockId, index) {
+                try {
+                    log(`[DownloadManager] ペイロード ${index + 1} ダウンロード開始: ${txId.substring(0, 16)}...`, 'info');
+                    
+                    // Get block data
+                    const blockResponse = await rpcClient.getBlock({
+                        hash: blockId,
+                        includeTransactions: true
+                    });
+                    
+                    const block = blockResponse?.block?.block || blockResponse?.block;
+                    if (!block) {
+                        throw new Error(`ブロックが見つかりません: ${blockId}`);
+                    }
+                    
+                    // Find transaction
+                    let payload = null;
+                    for (const tx of block.transactions || []) {
+                        const txHash = tx.verboseData?.transactionId || tx.id || tx.transactionId;
+                        if (txHash === txId) {
+                            if (tx.payload && tx.payload !== '') {
+                                payload = safeHexDecode(tx.payload, 'payload');
+                                log(`[DownloadManager] ペイロード取得: ${payload.length} bytes`, 'success');
+                                break;
+                            }
+                        }
+                    }
+                    
+                    if (!payload) {
+                        throw new Error(`ペイロード ${index + 1} が見つかりません`);
+                    }
+                    
+                    return payload;
+                    
+                } catch (error) {
+                    log(`[DownloadManager] ペイロードダウンロードエラー: ${error.message}`, 'error');
+                    throw error;
+                }
+            }
+            
             // Download single chunk from blockchain
             async downloadChunk(txId, blockId, key, index, metadata) {
                 try {
@@ -3381,38 +3418,164 @@
                         (metadata.version === "3.0" ? 10000 : 100000);
                     const key = await deriveKey(password, salt, iterations);
                     
-                    // Download all chunks
-                    const chunks = [];
-                    const totalChunks = metadata.chunks.length;
+                    // Check if using new payload split approach
+                    let combined;
                     
-                    for (let i = 0; i < totalChunks; i++) {
-                        const txId = metadata.chunks[i];
-                        const blockId = metadata.chunkBlockIds[i];
+                    if (metadata.metadata?.payloadSplit) {
+                        // New approach: download payloads and reconstruct
+                        log('[DownloadManager] 新方式: ペイロード分割ダウンロードを使用', 'info');
                         
-                        // Progress callback
-                        if (onProgress) {
-                            onProgress({
-                                current: i + 1,
-                                total: totalChunks,
-                                percent: ((i + 1) / totalChunks * 100).toFixed(0)
-                            });
+                        const payloads = [];
+                        const totalPayloads = metadata.chunks.length;
+                        
+                        // Download all payloads
+                        for (let i = 0; i < totalPayloads; i++) {
+                            const txId = metadata.chunks[i];
+                            const blockId = metadata.chunkBlockIds[i];
+                            
+                            // Progress callback
+                            if (onProgress) {
+                                onProgress({
+                                    current: i + 1,
+                                    total: totalPayloads,
+                                    percent: ((i + 1) / totalPayloads * 100).toFixed(0)
+                                });
+                            }
+                            
+                            // Download raw payload (no decryption yet)
+                            const payload = await this.downloadPayload(txId, blockId, i);
+                            payloads.push(payload);
                         }
                         
-                        const chunk = await this.downloadChunk(txId, blockId, key, i, metadata);
-                        chunks.push(chunk);
+                        // Combine all payloads
+                        const totalPayloadSize = payloads.reduce((sum, p) => sum + p.length, 0);
+                        const encryptedData = new Uint8Array(totalPayloadSize);
+                        let payloadOffset = 0;
+                        
+                        for (const payload of payloads) {
+                            encryptedData.set(payload, payloadOffset);
+                            payloadOffset += payload.length;
+                        }
+                        
+                        log(`[DownloadManager] 全ペイロード結合完了: ${totalPayloadSize} bytes`, 'info');
+                        
+                        // Decrypt entire data stream using chunk boundaries
+                        const decryptedChunks = [];
+                        
+                        if (metadata.metadata?.chunkBoundaries) {
+                            // Use chunk boundary information for precise decryption
+                            log('[DownloadManager] チャンクバウンダリ情報を使用して復号化', 'info');
+                            const boundaries = metadata.metadata.chunkBoundaries;
+                            
+                            for (const boundary of boundaries) {
+                                const start = boundary.offset;
+                                const end = start + boundary.size;
+                                
+                                if (start < encryptedData.length) {
+                                    const encryptedChunk = encryptedData.slice(start, Math.min(end, encryptedData.length));
+                                    try {
+                                        const decryptedChunk = await decryptChunk(encryptedChunk, key, boundary.index);
+                                        decryptedChunks.push(decryptedChunk);
+                                    } catch (e) {
+                                        log(`[DownloadManager] チャンク ${boundary.index} の復号化エラー: ${e.message}`, 'error');
+                                        throw new Error(`チャンク ${boundary.index} の復号化に失敗しました`);
+                                    }
+                                }
+                            }
+                        } else {
+                            // Fallback: try to find chunk boundaries by trial and error
+                            log('[DownloadManager] チャンクバウンダリ情報なし - 試行錯誤で復号化', 'warning');
+                            let encryptOffset = 0;
+                            let chunkIndex = 0;
+                            const PROCESS_CHUNK_SIZE = 128 * 1024;
+                            
+                            while (encryptOffset < encryptedData.length) {
+                                let foundChunk = false;
+                                
+                                // Try standard chunk size first
+                                const standardSize = PROCESS_CHUNK_SIZE + 16;
+                                if (encryptOffset + standardSize <= encryptedData.length) {
+                                    try {
+                                        const encryptedChunk = encryptedData.slice(encryptOffset, encryptOffset + standardSize);
+                                        const decryptedChunk = await decryptChunk(encryptedChunk, key, chunkIndex);
+                                        decryptedChunks.push(decryptedChunk);
+                                        encryptOffset += standardSize;
+                                        chunkIndex++;
+                                        foundChunk = true;
+                                    } catch (e) {
+                                        // Standard size failed
+                                    }
+                                }
+                                
+                                // If standard size failed, try remaining data as final chunk
+                                if (!foundChunk && encryptOffset < encryptedData.length) {
+                                    const remainingData = encryptedData.slice(encryptOffset);
+                                    try {
+                                        const decryptedChunk = await decryptChunk(remainingData, key, chunkIndex);
+                                        decryptedChunks.push(decryptedChunk);
+                                        break;
+                                    } catch (e) {
+                                        log(`[DownloadManager] 復号化エラー at offset ${encryptOffset}: ${e.message}`, 'error');
+                                        throw new Error('データの復号化に失敗しました');
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // Combine decrypted chunks
+                        const totalDecryptedSize = decryptedChunks.reduce((sum, chunk) => sum + chunk.length, 0);
+                        const decrypted = new Uint8Array(totalDecryptedSize);
+                        let offset = 0;
+                        for (const chunk of decryptedChunks) {
+                            decrypted.set(chunk, offset);
+                            offset += chunk.length;
+                        }
+                        
+                        // Decompress if needed
+                        combined = metadata.file?.compression?.enabled ? 
+                            lzDecompress(decrypted) : decrypted;
+                        
+                        // Verify final size
+                        if (combined.length !== metadata.file.size) {
+                            log(`[DownloadManager] サイズ不一致警告: 期待値 ${metadata.file.size}, 実際 ${combined.length}`, 'warning');
+                        }
+                        
+                    } else {
+                        // Old approach: download and decrypt chunks individually
+                        log('[DownloadManager] 従来方式: チャンク単位のダウンロードを使用', 'info');
+                        
+                        const chunks = [];
+                        const totalChunks = metadata.chunks.length;
+                        
+                        for (let i = 0; i < totalChunks; i++) {
+                            const txId = metadata.chunks[i];
+                            const blockId = metadata.chunkBlockIds[i];
+                            
+                            // Progress callback
+                            if (onProgress) {
+                                onProgress({
+                                    current: i + 1,
+                                    total: totalChunks,
+                                    percent: ((i + 1) / totalChunks * 100).toFixed(0)
+                                });
+                            }
+                            
+                            const chunk = await this.downloadChunk(txId, blockId, key, i, metadata);
+                            chunks.push(chunk);
+                        }
+                        
+                        // Combine chunks
+                        const totalSize = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+                        combined = new Uint8Array(totalSize);
+                        let offset = 0;
+                        
+                        for (const chunk of chunks) {
+                            combined.set(chunk, offset);
+                            offset += chunk.length;
+                        }
                     }
                     
-                    // Combine chunks
-                    const totalSize = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
-                    const combined = new Uint8Array(totalSize);
-                    let offset = 0;
-                    
-                    for (const chunk of chunks) {
-                        combined.set(chunk, offset);
-                        offset += chunk.length;
-                    }
-                    
-                    log(`[DownloadManager] ダウンロード完了: ${totalSize} bytes`, 'success');
+                    log(`[DownloadManager] ダウンロード完了: ${combined.length} bytes`, 'success');
                     
                     // Create blob and download
                     const blob = new Blob([combined], { 
@@ -4688,88 +4851,95 @@
             return calculateSafePayloadSize(optimalSize);
         }
         
-        // Dynamic chunk size iteration for optimal compression
-        async function findOptimalChunkSizeByIteration(file, startOffset, baseChunkSize, key, chunkIndex, useCompression) {
-            // Only iterate for compressible files
-            if (!useCompression || !shouldCompress(file.name)) {
-                return {
-                    optimalSize: baseChunkSize,
-                    iterations: 0
-                };
+        // New approach: Process file in streaming fashion and split after encryption
+        async function processFileWithPayloadSplit(file, password, progressManager, useCompression) {
+            const PROCESS_CHUNK_SIZE = 128 * 1024; // 128KB processing chunks
+            const PAYLOAD_SIZE = 22 * 1024; // 22KB payloads
+            
+            // Generate proper salt using file hash
+            let fileHash;
+            if (file.size < 10 * 1024 * 1024) {
+                const data = new Uint8Array(await file.arrayBuffer());
+                fileHash = await sha256(data);
+            } else {
+                const firstChunk = await file.slice(0, 1024 * 1024).arrayBuffer();
+                const lastChunk = await file.slice(-1024 * 1024).arrayBuffer();
+                const combined = new Uint8Array(firstChunk.byteLength + lastChunk.byteLength);
+                combined.set(new Uint8Array(firstChunk), 0);
+                combined.set(new Uint8Array(lastChunk), firstChunk.byteLength);
+                fileHash = await sha256(combined);
             }
             
-            const MAX_PAYLOAD_SIZE = 24000; // Kaspa limit
-            const TARGET_PAYLOAD_SIZE = 22000; // Target size with safety margin
-            const ITERATION_SIZES = [61440, 51200, 40960, 30720, 22528]; // 60KB, 50KB, 40KB, 30KB, 22KB
+            const saltBase = fileHash + file.name;
+            const saltHash = await sha256(new TextEncoder().encode(saltBase));
+            const salt = safeHexDecode(saltHash.substring(0, 32), 'salt generation');
+            const key = await deriveKey(password, salt);
             
-            let bestSize = baseChunkSize;
-            let bestPayloadSize = 0;
-            let iterations = 0;
+            // Update progress manager with encryption info
+            progressManager.progress.encryption.salt = toBase64(salt);
+            progressManager.progress.encryption.compressed = useCompression;
+            progressManager.progress.metadata.payloadSplit = true; // New flag
             
-            // Start with the largest size that's greater than baseChunkSize
-            const startIndex = ITERATION_SIZES.findIndex(size => size <= baseChunkSize * 3);
-            const sizesToTry = startIndex >= 0 ? ITERATION_SIZES.slice(startIndex) : ITERATION_SIZES;
+            const payloads = [];
+            const chunkBoundaries = []; // Track encrypted chunk boundaries
+            let processedBytes = 0;
+            let encryptedBuffer = new Uint8Array(0);
+            let totalEncryptedBytes = 0;
             
-            for (const trySize of sizesToTry) {
-                iterations++;
+            // Process file in chunks
+            while (processedBytes < file.size) {
+                const end = Math.min(processedBytes + PROCESS_CHUNK_SIZE, file.size);
+                const blob = file.slice(processedBytes, end);
+                const chunk = new Uint8Array(await blob.arrayBuffer());
                 
-                // Don't exceed file boundaries
-                const actualSize = Math.min(trySize, file.size - startOffset);
-                if (actualSize <= baseChunkSize) {
-                    // No point trying smaller than base chunk size
-                    break;
+                // Compress if needed
+                const compressed = useCompression && shouldCompress(file.name) ? 
+                    lzCompress(chunk) : chunk;
+                
+                // Encrypt (continuous stream)
+                const chunkIndex = Math.floor(processedBytes / PROCESS_CHUNK_SIZE);
+                const encrypted = await encryptChunk(compressed, key, chunkIndex);
+                
+                // Record chunk boundary
+                chunkBoundaries.push({
+                    index: chunkIndex,
+                    offset: totalEncryptedBytes,
+                    size: encrypted.length,
+                    originalSize: chunk.length,
+                    compressedSize: compressed.length
+                });
+                totalEncryptedBytes += encrypted.length;
+                
+                // Append to buffer
+                const newBuffer = new Uint8Array(encryptedBuffer.length + encrypted.length);
+                newBuffer.set(encryptedBuffer);
+                newBuffer.set(encrypted, encryptedBuffer.length);
+                encryptedBuffer = newBuffer;
+                
+                // Split into payloads if buffer is large enough
+                while (encryptedBuffer.length >= PAYLOAD_SIZE) {
+                    const payload = encryptedBuffer.slice(0, PAYLOAD_SIZE);
+                    payloads.push(payload);
+                    encryptedBuffer = encryptedBuffer.slice(PAYLOAD_SIZE);
                 }
                 
-                try {
-                    // Read chunk at this size
-                    const chunkBlob = file.slice(startOffset, startOffset + actualSize);
-                    const chunk = new Uint8Array(await chunkBlob.arrayBuffer());
-                    
-                    // Compress
-                    const compressed = lzCompress(chunk);
-                    log(`[DEBUG Iteration] チャンク圧縮: ${chunk.length} → ${compressed.length} バイト`, 'debug');
-                    
-                    // Encrypt
-                    const encrypted = await encryptChunk(compressed, key, chunkIndex);
-                    log(`[DEBUG Iteration] チャンク暗号化: ${compressed.length} → ${encrypted.length} バイト`, 'debug');
-                    
-                    const payloadSize = encrypted.length;
-                    
-                    // Check if it fits
-                    if (payloadSize <= TARGET_PAYLOAD_SIZE) {
-                        // This size works! Check if it's better than our current best
-                        if (actualSize > bestSize) {
-                            bestSize = actualSize;
-                            bestPayloadSize = payloadSize;
-                            log(`✅ イタレーション ${iterations}: ${(actualSize/1024).toFixed(1)}KB → ${payloadSize}バイト (成功)`);
-                        }
-                        // Try the next larger size
-                    } else if (payloadSize > MAX_PAYLOAD_SIZE) {
-                        // Too large, try smaller
-                        log(`❌ イタレーション ${iterations}: ${(actualSize/1024).toFixed(1)}KB → ${payloadSize}バイト (大きすぎ)`);
-                    } else {
-                        // Between TARGET and MAX, acceptable but not ideal
-                        if (actualSize > bestSize) {
-                            bestSize = actualSize;
-                            bestPayloadSize = payloadSize;
-                            log(`⚠️ イタレーション ${iterations}: ${(actualSize/1024).toFixed(1)}KB → ${payloadSize}バイト (許容範囲)`);
-                        }
-                    }
-                } catch (error) {
-                    log(`エラー: イタレーション ${iterations} 失敗: ${error.message}`, 'error');
-                    break;
-                }
+                processedBytes = end;
+                log(`処理進捗: ${(processedBytes / file.size * 100).toFixed(1)}%`);
             }
             
-            if (iterations > 0 && bestSize > baseChunkSize) {
-                log(`🎯 最適サイズ: ${(bestSize/1024).toFixed(1)}KB (ペイロード: ${bestPayloadSize}バイト)`, 'success');
+            // Add remaining data as final payload
+            if (encryptedBuffer.length > 0) {
+                payloads.push(encryptedBuffer);
             }
             
-            return {
-                optimalSize: bestSize,
-                iterations: iterations,
-                payloadSize: bestPayloadSize
-            };
+            log(`ペイロード分割完了: ${payloads.length}個 (各${PAYLOAD_SIZE/1024}KB以下)`);
+            
+            // Update totalChunks to match payload count
+            progressManager.progress.metadata.totalChunks = payloads.length;
+            progressManager.progress.metadata.chunkBoundaries = chunkBoundaries; // Save boundaries
+            await progressManager.saveProgress();
+            
+            return { payloads, key, salt, chunkBoundaries };
         }
         
         // Check if transaction exists on blockchain
@@ -5026,13 +5196,205 @@
                 }
                 
                 
-                // Process chunks with resume support
+                // NEW: Process file with payload split approach
                 const chunksList = document.getElementById('chunksList');
                 chunksList.innerHTML = '';
                 
-                // Continue from next incomplete chunk
-                let nextChunkIndex = progressManager.getNextChunkIndex();
-                while (nextChunkIndex >= 0) {
+                // Check if we need to use new approach
+                const useNewApproach = actualChunkSize >= 22528; // Use new approach for 22KB chunks
+                
+                if (useNewApproach) {
+                    log('🚀 新方式: 暗号化後ペイロード分割を使用', 'info');
+                    
+                    // Process entire file and split into payloads
+                    const { payloads, key: encKey, salt: encSalt, chunkBoundaries } = await processFileWithPayloadSplit(
+                        currentFile, 
+                        password, 
+                        progressManager, 
+                        useCompression
+                    );
+                    
+                    // Upload each payload
+                    for (let i = 0; i < payloads.length; i++) {
+                        // Check if already uploaded
+                        if (progressManager.isChunkCompleted(i)) {
+                            log(`ペイロード ${i + 1}/${payloads.length} は既にアップロード済み`);
+                            continue;
+                        }
+                        
+                        // Get fresh UTXOs
+                        const { entries } = await rpcClient.getUtxosByAddresses([address.toString()]);
+                        if (!entries || entries.length === 0) {
+                            throw new Error('利用可能なUTXOがありません');
+                        }
+                        
+                        // Create UI element
+                        const chunkDiv = document.createElement('div');
+                        chunkDiv.className = 'chunk-item';
+                        chunkDiv.innerHTML = `
+                            <div>Payload ${i + 1}/${payloads.length} (${(payloads[i].length/1024).toFixed(1)}KB)</div>
+                            <div class="chunk-status pending" id="chunk-status-${i}">
+                                <span>待機中</span>
+                            </div>
+                        `;
+                        chunksList.appendChild(chunkDiv);
+                        
+                        // Update status
+                        document.getElementById(`chunk-status-${i}`).innerHTML = '<span class="uploading">アップロード中...</span>';
+                        
+                        const payloadBytes = payloads[i];
+                        log(`Payload ${i + 1} size: ${payloadBytes.length} bytes`);
+                        
+                        // Upload payload to blockchain
+                        let txid = null;
+                        let blockId = null;
+                        let retries = 0;
+                        
+                        while (retries < config.retryCount && !txid) {
+                            try {
+                                // Check payload size
+                                if (payloadBytes.length > 24000) {
+                                    throw new Error(`Payload too large: ${payloadBytes.length} bytes (max 24000)`);
+                                }
+                                
+                                // Create transaction
+                                const formattedUtxos = entries.map(utxo => ({
+                                    address: address.toString(),
+                                    outpoint: {
+                                        transactionId: utxo.outpoint.transactionId,
+                                        index: utxo.outpoint.index
+                                    },
+                                    scriptPublicKey: utxo.scriptPublicKey,
+                                    amount: BigInt(utxo.amount),
+                                    isCoinbase: utxo.isCoinbase || false,
+                                    blockDaaScore: BigInt(utxo.blockDaaScore)
+                                }));
+                                
+                                const result = await kaspa.createTransactions({
+                                    entries: formattedUtxos,
+                                    outputs: [{
+                                        address: address.toString(),
+                                        amount: 100000000n // 1 KAS
+                                    }],
+                                    changeAddress: address.toString(),
+                                    priorityFee: 10000n,
+                                    networkId: config.network,
+                                    payload: payloadBytes
+                                });
+                                
+                                // Sign and submit
+                                if (!result.transactions || result.transactions.length === 0) {
+                                    throw new Error('No transactions generated');
+                                }
+                                
+                                const pendingTx = result.transactions[0];
+                                await pendingTx.sign([privateKey]);
+                                txid = await pendingTx.submit(rpcClient);
+                                
+                                log(`ペイロード ${i + 1} TxID: ${txid.substring(0, 16)}...`, 'success');
+                                
+                                // Add to monitoring
+                                uploadingChunksCount++;
+                                monitoredTransactions.set(txid, {
+                                    type: 'chunk',
+                                    chunkIndex: i,
+                                    timestamp: Date.now(),
+                                    blockId: null
+                                });
+                                
+                                // Wait for confirmation
+                                await new Promise(resolve => setTimeout(resolve, 2000));
+                                
+                                // Get BlockID (existing logic)
+                                let waitTime = 0;
+                                const maxWaitTime = 30000;
+                                
+                                while (!blockId && waitTime < maxWaitTime) {
+                                    if (wsMonitorActive && monitoredTransactions.has(txid)) {
+                                        const monitorData = monitoredTransactions.get(txid);
+                                        if (monitorData.blockId) {
+                                            blockId = monitorData.blockId;
+                                            monitoredTransactions.delete(txid);
+                                            uploadingChunksCount--;
+                                            break;
+                                        }
+                                    }
+                                    
+                                    await new Promise(resolve => setTimeout(resolve, 500));
+                                    waitTime += 500;
+                                }
+                                
+                                // Fallback to Explorer API
+                                if (!blockId) {
+                                    const apiUrl = `https://api-tn10.kaspa.org/transactions/${txid}`;
+                                    const response = await fetchWithTimeout(apiUrl, {}, 15000, 3);
+                                    if (response.ok) {
+                                        const data = await response.json();
+                                        blockId = data.block_hash?.[0] || data.accepting_block_hash;
+                                    }
+                                }
+                                
+                                if (!blockId) {
+                                    throw new Error('BlockID取得失敗');
+                                }
+                                
+                                // Update status
+                                document.getElementById(`chunk-status-${i}`).innerHTML = '<span class="success">✅ 完了</span>';
+                                log(`ペイロード ${i + 1} アップロード完了`);
+                                
+                                // Store chunk info
+                                processedChunks.push({
+                                    index: i,
+                                    txid: txid,
+                                    blockId: blockId,
+                                    payloadSize: payloadBytes.length,
+                                    uploadedAt: Date.now()
+                                });
+                                
+                                // Update progress
+                                await progressManager.markChunkComplete(i, txid, blockId, payloadBytes.length);
+                                
+                                break;
+                                
+                            } catch (error) {
+                                retries++;
+                                log(`ペイロード ${i + 1} エラー (試行 ${retries}/${config.retryCount}): ${error.message}`, 'error');
+                                
+                                if (retries >= config.retryCount) {
+                                    document.getElementById(`chunk-status-${i}`).innerHTML = '<span class="error">❌ 失敗</span>';
+                                    progressManager.markChunkFailed(i);
+                                    await progressManager.saveProgress();
+                                    throw error;
+                                }
+                                await new Promise(resolve => setTimeout(resolve, 2000));
+                            }
+                        }
+                        
+                        // Update progress display
+                        const completedChunks = progressManager.progress.metadata.completedChunks;
+                        const totalPayloads = payloads.length;
+                        const percentage = (completedChunks / totalPayloads * 100).toFixed(1);
+                        
+                        document.getElementById('uploadProgress').innerHTML = `
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: ${percentage}%">
+                                    ${percentage}%
+                                </div>
+                            </div>
+                            <div>進捗: ${completedChunks}/${totalPayloads} ペイロード</div>
+                        `;
+                    }
+                    
+                    // Skip old chunk processing
+                    nextChunkIndex = -1;
+                    
+                } else {
+                    // Use old approach for smaller chunks
+                    log('従来方式: チャンク単位の処理を使用', 'info');
+                    
+                    // Continue from next incomplete chunk
+                    let nextChunkIndex = progressManager.getNextChunkIndex();
+                    while (nextChunkIndex >= 0) {
                     // Get fresh UTXOs for each chunk
                     log(`チャンク ${nextChunkIndex + 1}/${totalChunks} の処理を開始...`);
                     const { entries } = await rpcClient.getUtxosByAddresses([address.toString()]);
@@ -5043,31 +5405,8 @@
                     const i = nextChunkIndex;
                     log(`チャンク ${i + 1}: ${entries.length} UTXOs 利用可能`);
                     
-                    // v4.7.34: Dynamic chunk size iteration
-                    let optimalChunkSize = actualChunkSize;
-                    let iterationResult = null;
-                    
-                    // Only use iteration for 22KB chunks with compression enabled and iteration checkbox checked
-                    const useIteration = document.getElementById('useChunkIteration').checked;
-                    if (actualChunkSize >= 22528 && useCompression && shouldCompress(currentFile.name) && useIteration) {
-                        const start = i * actualChunkSize;
-                        log(`🔄 動的チャンクサイズ最適化を開始 (チャンク ${i + 1})`);
-                        
-                        iterationResult = await findOptimalChunkSizeByIteration(
-                            currentFile,
-                            start,
-                            actualChunkSize,
-                            key,
-                            i,
-                            useCompression
-                        );
-                        
-                        optimalChunkSize = iterationResult.optimalSize;
-                        
-                        if (iterationResult.iterations > 0) {
-                            log(`📈 最適化結果: ${(actualChunkSize/1024).toFixed(1)}KB → ${(optimalChunkSize/1024).toFixed(1)}KB (${iterationResult.iterations}回のイタレーション)`, 'success');
-                        }
-                    }
+                    // No iteration for old approach - use fixed chunk size
+                    const optimalChunkSize = actualChunkSize;
                     
                     // Read chunk from file with optimal size
                     const start = i * actualChunkSize;
@@ -5082,9 +5421,7 @@
                     // Create chunk UI
                     const chunkDiv = document.createElement('div');
                     chunkDiv.className = 'chunk-item';
-                    const sizeInfo = optimalChunkSize !== actualChunkSize 
-                        ? `(${(chunk.length/1024).toFixed(1)}KB 🚀 最適化済み)` 
-                        : `(${(chunk.length/1024).toFixed(1)}KB)`;
+                    const sizeInfo = `(${(chunk.length/1024).toFixed(1)}KB)`;
                     chunkDiv.innerHTML = `
                         <div>Chunk ${i + 1}/${totalChunks} ${sizeInfo}</div>
                         <div class="chunk-status pending" id="chunk-status-${i}">
@@ -5328,6 +5665,7 @@
                     // Get next chunk
                     nextChunkIndex = progressManager.getNextChunkIndex();
                 }
+                } // End of old approach
                 
                 // Calculate cost
                 const totalPayloadKB = processedChunks.reduce((sum, c) => sum + c.payloadSize, 0) / 1024;
@@ -5371,6 +5709,7 @@
                     // Chunk information
                     chunks: processedChunks.map(c => c.txid),
                     chunkBlockIds: processedChunks.map(c => c.blockId),
+                    chunkSizes: processedChunks.map(c => c.originalSize), // v4.7.36: 各チャンクの実際のサイズ
                     
                     // Recovery information
                     recovery: {
@@ -5386,7 +5725,9 @@
                         metaTxBlockId: null,
                         uploadDate: new Date().toISOString(),
                         blockTime: null,
-                        uploadedBy: address.toString()
+                        uploadedBy: address.toString(),
+                        payloadSplit: useNewApproach, // Flag for new approach
+                        chunkBoundaries: useNewApproach ? progressManager.progress.metadata.chunkBoundaries : undefined
                     }
                 };
                 

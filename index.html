@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.7.25a - Fix null element error on file selection</title>
+    <title>Kaspa P2P File Storage v4.7.25b - Fix parallel download worker bug</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -2496,7 +2496,7 @@
                     await Promise.all(workers);
                     
                     if (this.errors.size > 0) {
-                        const errorRate = (this.errors.size / chunksMetadata.length) * 100;
+                        const errorRate = (this.errors.size / txIds.length) * 100;
                         if (errorRate > 10) {
                             const errorMsg = Array.from(this.errors.entries())
                                 .map(([idx, err]) => `チャンク${idx}: ${err}`)
@@ -2506,7 +2506,7 @@
                     }
                     
                     const sortedChunks = [];
-                    for (let i = 0; i < chunksMetadata.length; i++) {
+                    for (let i = 0; i < txIds.length; i++) {
                         if (!this.results.has(i)) {
                             if (this.errors.has(i)) {
                                 throw new Error(`チャンク${i}のダウンロードに失敗: ${this.errors.get(i)}`);
@@ -2556,7 +2556,7 @@
                     }
                     
                     try {
-                        const { chunk: chunkMeta, index } = work;
+                        const { txId, blockId, index } = work;
                         
                         let response = null;
                         let lastError = null;
@@ -2564,14 +2564,14 @@
                         for (let retry = 0; retry <= this.maxRetries; retry++) {
                             try {
                                 response = await this.rpcClient.getBlock({
-                                    hash: chunkMeta.blockId,
+                                    hash: blockId,
                                     includeTransactions: true
                                 });
                                 break;
                             } catch (error) {
                                 lastError = error;
                                 if (retry < this.maxRetries) {
-                                    log(`チャンク${index}の取得に失敗 (リトライ ${retry + 1}/${this.maxRetries})`, 'warning');
+                                    log(`チャンク${index}の取得に失敗 (リトライ ${retry + 1}/${this.maxRetries}): ${error.message}`, 'warning');
                                     await new Promise(resolve => setTimeout(resolve, 1000 * (retry + 1)));
                                 }
                             }

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.7.29 - Dynamic chunk size optimization (22KB target)</title>
+    <title>Kaspa P2P File Storage v4.7.30 - Dynamic chunk size with compression awareness</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -4599,7 +4599,7 @@
 
         // Calculate safe payload size based on storage mass limit
         function calculateSafePayloadSize(rawChunkSize) {
-            // v4.7.29: 動的チャンクサイズ最適化（段階的実装）
+            // v4.7.30: 動的チャンクサイズ最適化（第2段階）
             const KASPA_MAX_PAYLOAD = 24000; // Kaspaペイロード上限
             const AES_GCM_OVERHEAD = 16;     // AES-256-GCM認証タグ
             const SAFETY_MARGIN = 1000;      // 安全マージン（約1KB）
@@ -4607,12 +4607,77 @@
             // 最大安全ペイロード = 24000 - 16 - 1000 = 22984バイト ≈ 22.4KB
             const MAX_SAFE_CHUNK_SIZE = KASPA_MAX_PAYLOAD - AES_GCM_OVERHEAD - SAFETY_MARGIN;
             
-            // v4.7.29: 第1段階 - 22KB固定値での検証
+            // v4.7.30: 第2段階 - 22KB固定値での検証（変更なし）
             if (rawChunkSize >= 22528) { // 22KB = 22 * 1024
                 return 22528; // 22KBに制限
             }
             
             return rawChunkSize; // それ以下はそのまま
+        }
+        
+        // v4.7.30: ファイルタイプ別の圧縮率予測
+        function estimateCompressionRatio(fileName, mimeType) {
+            // ファイル拡張子とMIMEタイプから圧縮率を予測
+            const ext = fileName.toLowerCase().split('.').pop();
+            
+            // 既に圧縮されているファイル（圧縮効果なし: 100%）
+            const compressedFormats = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'mp3', 'mp4', 'avi', 'mov', 'zip', 'rar', '7z', 'gz', 'bz2'];
+            if (compressedFormats.includes(ext)) {
+                return 1.0; // 圧縮効果なし
+            }
+            
+            // テキストベースファイル（高圧縮率: 30-50%）
+            const textFormats = ['txt', 'log', 'csv', 'json', 'xml', 'html', 'css', 'js', 'md', 'yml', 'yaml'];
+            if (textFormats.includes(ext)) {
+                return 0.4; // 60%圧縮
+            }
+            
+            // ソースコード（中圧縮率: 40-60%）
+            const codeFormats = ['py', 'java', 'c', 'cpp', 'h', 'cs', 'php', 'rb', 'go', 'rs', 'swift'];
+            if (codeFormats.includes(ext)) {
+                return 0.5; // 50%圧縮
+            }
+            
+            // バイナリファイル（低圧縮率: 80-90%）
+            const binaryFormats = ['exe', 'dll', 'so', 'bin', 'dat'];
+            if (binaryFormats.includes(ext)) {
+                return 0.85; // 15%圧縮
+            }
+            
+            // デフォルト（中程度の圧縮を想定）
+            return 0.7; // 30%圧縮
+        }
+        
+        // v4.7.30: 動的チャンクサイズ計算（圧縮率考慮）
+        function calculateOptimalChunkSize(baseChunkSize, fileName, mimeType, useCompression) {
+            if (!useCompression) {
+                // 圧縮なしの場合は通常の計算
+                return calculateSafePayloadSize(baseChunkSize);
+            }
+            
+            // 圧縮率を予測
+            const compressionRatio = estimateCompressionRatio(fileName, mimeType);
+            
+            // 暗号化後のペイロード上限（22984バイト）から逆算
+            const MAX_ENCRYPTED_SIZE = 22984; // 24000 - 16 - 1000
+            const MAX_COMPRESSED_SIZE = MAX_ENCRYPTED_SIZE - 16; // AES-GCM overhead
+            
+            // 圧縮前の最大サイズを計算
+            const maxOriginalSize = Math.floor(MAX_COMPRESSED_SIZE / compressionRatio);
+            
+            // 要求されたサイズと計算された最大サイズの小さい方を選択
+            const optimalSize = Math.min(baseChunkSize, maxOriginalSize);
+            
+            // ログ出力（22KB以上の場合のみ）
+            if (baseChunkSize >= 22528) {
+                log(`📊 動的チャンクサイズ最適化:`);
+                log(`  - ファイルタイプ: ${fileName} (${mimeType || 'unknown'})`);
+                log(`  - 予測圧縮率: ${(compressionRatio * 100).toFixed(1)}%`);
+                log(`  - 最大可能サイズ: ${(maxOriginalSize / 1024).toFixed(1)}KB`);
+                log(`  - 最適化後サイズ: ${(optimalSize / 1024).toFixed(1)}KB`);
+            }
+            
+            return calculateSafePayloadSize(optimalSize);
         }
         
         // Check if transaction exists on blockchain
@@ -4825,12 +4890,17 @@
                 
                 // Get chunk size and apply safety limit
                 const requestedChunkSize = parseInt(document.getElementById('chunkSize').value) * 1024;
-                let actualChunkSize;
                 
-                // 20KB以上は実験的機能として扱う
+                // v4.7.30: 動的チャンクサイズ最適化を適用
+                let actualChunkSize;
                 if (requestedChunkSize >= 20480) {
-                    // 実験的: 動的チャンクサイズ最適化を適用
-                    actualChunkSize = calculateSafePayloadSize(requestedChunkSize);
+                    // 実験的: 圧縮率を考慮した動的最適化
+                    actualChunkSize = calculateOptimalChunkSize(
+                        requestedChunkSize, 
+                        currentFile.name, 
+                        currentFile.type,
+                        useCompression
+                    );
                     
                     if (requestedChunkSize >= 22528) {
                         log(`🚀 動的最適化: ${(actualChunkSize/1024).toFixed(1)}KB チャンクを使用`, 'warning');
@@ -4908,13 +4978,20 @@
                     // No Base64 encoding - use raw binary
                     const payloadBytes = encrypted; // Direct binary payload
                     
-                    // v4.7.29: ペイロードサイズの詳細分析
-                    if (actualChunkSize >= 22528) {
-                        log(`📊 チャンク ${i + 1} 詳細:`);
+                    // v4.7.30: ペイロードサイズの詳細分析
+                    if (actualChunkSize >= 22528 && i === 0) { // 最初のチャンクのみ詳細表示
+                        log(`📊 チャンク詳細分析:`);
                         log(`  - 元のサイズ: ${chunk.length.toLocaleString()} バイト`);
                         log(`  - 圧縮後: ${compressed.length.toLocaleString()} バイト (${((compressed.length/chunk.length)*100).toFixed(1)}%)`);
                         log(`  - 暗号化後: ${encrypted.length.toLocaleString()} バイト (+${encrypted.length - compressed.length} バイト)`);
                         log(`  - ペイロード効率: ${((encrypted.length/24000)*100).toFixed(1)}% / 24KB制限`);
+                        
+                        // 圧縮率が予測と大きく異なる場合の警告
+                        const expectedRatio = estimateCompressionRatio(currentFile.name, currentFile.type);
+                        const actualRatio = useCompression ? (compressed.length / chunk.length) : 1.0;
+                        if (Math.abs(expectedRatio - actualRatio) > 0.2) {
+                            log(`⚠️ 圧縮率の乖離: 予測${(expectedRatio*100).toFixed(1)}% vs 実際${(actualRatio*100).toFixed(1)}%`, 'warning');
+                        }
                     }
                     
                     // Update status

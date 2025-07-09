@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.7.19 - Implement event delegation for history buttons</title>
+    <title>Kaspa P2P File Storage v4.7.20 - Fix disabled button event handling</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -97,6 +97,13 @@
         .small-button:hover {
             background: #49EACB;
             color: #16213e;
+        }
+        .small-button.disabled,
+        .small-button:disabled {
+            pointer-events: none !important;
+            opacity: 0.5;
+            background: #666 !important;
+            cursor: not-allowed !important;
         }
         .history-item {
             background: #16213e;
@@ -1071,6 +1078,14 @@
                 // Add event listeners to all history action buttons
                 document.querySelectorAll('.history-action-btn').forEach(button => {
                     button.addEventListener('click', async (e) => {
+                        // Skip if button is disabled
+                        if (e.target.disabled || e.target.classList.contains('disabled')) {
+                            log('[UploadHistoryManager] 無効化されたボタンがクリックされました', 'warning');
+                            e.preventDefault();
+                            e.stopPropagation();
+                            return;
+                        }
+                        
                         const action = e.target.dataset.action;
                         const itemId = e.target.dataset.itemId;
                         

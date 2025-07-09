@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.7.30 - Dynamic chunk size with compression awareness</title>
+    <title>Kaspa P2P File Storage v4.7.34 - Dynamic chunk size iteration</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -482,6 +482,11 @@
             <div class="checkbox-label">
                 <input type="checkbox" id="useMetaTx" checked>
                 <label for="useMetaTx">メタTxIDを使用（推奨：履歴から簡単に共有可能）</label>
+            </div>
+            
+            <div class="checkbox-label">
+                <input type="checkbox" id="useChunkIteration">
+                <label for="useChunkIteration">🚀 動的チャンクサイズ最適化を使用（22KB選択時のみ有効）</label>
             </div>
             
             <div class="checkbox-label">
@@ -4680,6 +4685,88 @@
             return calculateSafePayloadSize(optimalSize);
         }
         
+        // Dynamic chunk size iteration for optimal compression
+        async function findOptimalChunkSizeByIteration(file, startOffset, baseChunkSize, key, chunkIndex, useCompression) {
+            // Only iterate for compressible files
+            if (!useCompression || !shouldCompress(file.name)) {
+                return {
+                    optimalSize: baseChunkSize,
+                    iterations: 0
+                };
+            }
+            
+            const MAX_PAYLOAD_SIZE = 24000; // Kaspa limit
+            const TARGET_PAYLOAD_SIZE = 22000; // Target size with safety margin
+            const ITERATION_SIZES = [61440, 51200, 40960, 30720, 22528]; // 60KB, 50KB, 40KB, 30KB, 22KB
+            
+            let bestSize = baseChunkSize;
+            let bestPayloadSize = 0;
+            let iterations = 0;
+            
+            // Start with the largest size that's greater than baseChunkSize
+            const startIndex = ITERATION_SIZES.findIndex(size => size <= baseChunkSize * 3);
+            const sizesToTry = startIndex >= 0 ? ITERATION_SIZES.slice(startIndex) : ITERATION_SIZES;
+            
+            for (const trySize of sizesToTry) {
+                iterations++;
+                
+                // Don't exceed file boundaries
+                const actualSize = Math.min(trySize, file.size - startOffset);
+                if (actualSize <= baseChunkSize) {
+                    // No point trying smaller than base chunk size
+                    break;
+                }
+                
+                try {
+                    // Read chunk at this size
+                    const chunkBlob = file.slice(startOffset, startOffset + actualSize);
+                    const chunk = new Uint8Array(await chunkBlob.arrayBuffer());
+                    
+                    // Compress
+                    const compressed = lzCompress(chunk);
+                    
+                    // Encrypt
+                    const { data: encrypted } = await encryptChunk(compressed, key, chunkIndex);
+                    
+                    const payloadSize = encrypted.length;
+                    
+                    // Check if it fits
+                    if (payloadSize <= TARGET_PAYLOAD_SIZE) {
+                        // This size works! Check if it's better than our current best
+                        if (actualSize > bestSize) {
+                            bestSize = actualSize;
+                            bestPayloadSize = payloadSize;
+                            log(`✅ イタレーション ${iterations}: ${(actualSize/1024).toFixed(1)}KB → ${payloadSize}バイト (成功)`);
+                        }
+                        // Try the next larger size
+                    } else if (payloadSize > MAX_PAYLOAD_SIZE) {
+                        // Too large, try smaller
+                        log(`❌ イタレーション ${iterations}: ${(actualSize/1024).toFixed(1)}KB → ${payloadSize}バイト (大きすぎ)`);
+                    } else {
+                        // Between TARGET and MAX, acceptable but not ideal
+                        if (actualSize > bestSize) {
+                            bestSize = actualSize;
+                            bestPayloadSize = payloadSize;
+                            log(`⚠️ イタレーション ${iterations}: ${(actualSize/1024).toFixed(1)}KB → ${payloadSize}バイト (許容範囲)`);
+                        }
+                    }
+                } catch (error) {
+                    log(`エラー: イタレーション ${iterations} 失敗: ${error.message}`, 'error');
+                    break;
+                }
+            }
+            
+            if (iterations > 0 && bestSize > baseChunkSize) {
+                log(`🎯 最適サイズ: ${(bestSize/1024).toFixed(1)}KB (ペイロード: ${bestPayloadSize}バイト)`, 'success');
+            }
+            
+            return {
+                optimalSize: bestSize,
+                iterations: iterations,
+                payloadSize: bestPayloadSize
+            };
+        }
+        
         // Check if transaction exists on blockchain
         async function verifyTransactionExists(txid, blockId = null) {
             try {
@@ -4951,9 +5038,35 @@
                     const i = nextChunkIndex;
                     log(`チャンク ${i + 1}: ${entries.length} UTXOs 利用可能`);
                     
-                    // Read chunk from file
+                    // v4.7.34: Dynamic chunk size iteration
+                    let optimalChunkSize = actualChunkSize;
+                    let iterationResult = null;
+                    
+                    // Only use iteration for 22KB chunks with compression enabled and iteration checkbox checked
+                    const useIteration = document.getElementById('useChunkIteration').checked;
+                    if (actualChunkSize >= 22528 && useCompression && shouldCompress(currentFile.name) && useIteration) {
+                        const start = i * actualChunkSize;
+                        log(`🔄 動的チャンクサイズ最適化を開始 (チャンク ${i + 1})`);
+                        
+                        iterationResult = await findOptimalChunkSizeByIteration(
+                            currentFile,
+                            start,
+                            actualChunkSize,
+                            key,
+                            i,
+                            useCompression
+                        );
+                        
+                        optimalChunkSize = iterationResult.optimalSize;
+                        
+                        if (iterationResult.iterations > 0) {
+                            log(`📈 最適化結果: ${(actualChunkSize/1024).toFixed(1)}KB → ${(optimalChunkSize/1024).toFixed(1)}KB (${iterationResult.iterations}回のイタレーション)`, 'success');
+                        }
+                    }
+                    
+                    // Read chunk from file with optimal size
                     const start = i * actualChunkSize;
-                    const end = Math.min(start + actualChunkSize, currentFile.size);
+                    const end = Math.min(start + optimalChunkSize, currentFile.size);
                     log(`ファイルから読み込み: オフセット ${start} - ${end} (${end - start} バイト)`);
                     
                     const chunkBlob = currentFile.slice(start, end);
@@ -4964,8 +5077,11 @@
                     // Create chunk UI
                     const chunkDiv = document.createElement('div');
                     chunkDiv.className = 'chunk-item';
+                    const sizeInfo = optimalChunkSize !== actualChunkSize 
+                        ? `(${(chunk.length/1024).toFixed(1)}KB 🚀 最適化済み)` 
+                        : `(${(chunk.length/1024).toFixed(1)}KB)`;
                     chunkDiv.innerHTML = `
-                        <div>Chunk ${i + 1}/${totalChunks} (${(chunk.length/1024).toFixed(1)}KB)</div>
+                        <div>Chunk ${i + 1}/${totalChunks} ${sizeInfo}</div>
                         <div class="chunk-status pending" id="chunk-status-${i}">
                             <span>待機中</span>
                         </div>

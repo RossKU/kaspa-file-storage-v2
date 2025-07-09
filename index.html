@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.7.25 - Save progress every chunk without notifications</title>
+    <title>Kaspa P2P File Storage v4.7.25a - Fix null element error on file selection</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -3651,7 +3651,10 @@
         window.handleFileSelect = async function(event) {
             // Clear directory mode
             window.isDirectoryMode = false;
-            document.getElementById('uploadDirMetadataOption').style.display = 'none';
+            const uploadDirOption = document.getElementById('uploadDirMetadataOption');
+            if (uploadDirOption) {
+                uploadDirOption.style.display = 'none';
+            }
             const file = event.target.files[0];
             if (!file) return;
             
@@ -3751,7 +3754,10 @@
                 `;
                 
                 // Show normal file upload UI
-                document.getElementById('uploadDirMetadataOption').style.display = 'none';
+                const uploadDirOption2 = document.getElementById('uploadDirMetadataOption');
+                if (uploadDirOption2) {
+                    uploadDirOption2.style.display = 'none';
+                }
             }
         };
         
@@ -3783,7 +3789,10 @@
             `;
             
             // Show directory upload options
-            document.getElementById('uploadDirMetadataOption').style.display = 'block';
+            const uploadDirOption3 = document.getElementById('uploadDirMetadataOption');
+            if (uploadDirOption3) {
+                uploadDirOption3.style.display = 'block';
+            }
             
             // Enable upload button after directory selection
             document.getElementById('uploadBtn').disabled = false;

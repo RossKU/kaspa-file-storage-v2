@@ -4598,13 +4598,10 @@
 
         // Calculate safe payload size based on storage mass limit
         function calculateSafePayloadSize(rawChunkSize) {
-            // Storage mass limit is 100,000
-            // After compression, encryption, and Base64 encoding:
-            // - Base64 expands by ~33%
-            // - Encryption adds ~16 bytes
-            // - UTF-8 encoding of Base64 string
-            // Safe limit is around 12KB for raw data
-            return Math.min(rawChunkSize, 12288); // 12KB max
+            // v4.7.28: 制限ロジックを非活性化
+            // 以前は12KB制限があったが、実験的により大きなサイズを許可
+            // return Math.min(rawChunkSize, 12288); // 12KB max
+            return rawChunkSize; // 制限なし
         }
         
         // Check if transaction exists on blockchain

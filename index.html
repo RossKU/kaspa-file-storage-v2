@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.7.44 - Enable parallel download for 2+ chunks</title>
+    <title>Kaspa P2P File Storage v4.7.45 - Add parallel download to DownloadManager</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -2650,6 +2650,134 @@
                     }
                 }
             }
+            
+            // v4.7.45: Add downloadPayloads method for DownloadManager
+            async downloadPayloads(txIds, blockIds, progressCallback) {
+                this.startTime = Date.now();
+                this.queue = txIds.map((txId, index) => ({ 
+                    txId, 
+                    blockId: blockIds[index],
+                    index, 
+                    retries: 0 
+                }));
+                this.results = new Map();
+                this.errors = new Map();
+                this.completedCount = 0;
+                this.totalBytes = 0;
+                this.totalChunks = txIds.length;
+                
+                log(`[ParallelDownloader] ペイロード並列ダウンロード開始: ${txIds.length}個`, 'info');
+                
+                try {
+                    const workers = [];
+                    for (let i = 0; i < this.concurrency; i++) {
+                        workers.push(this.payloadWorker(progressCallback));
+                    }
+                    
+                    await Promise.all(workers);
+                    
+                    if (this.errors.size > 0) {
+                        const errorMsg = Array.from(this.errors.entries())
+                            .map(([idx, err]) => `ペイロード${idx}: ${err}`)
+                            .join(', ');
+                        throw new Error(`ダウンロードエラー: ${errorMsg}`);
+                    }
+                    
+                    const sortedPayloads = [];
+                    for (let i = 0; i < txIds.length; i++) {
+                        if (!this.results.has(i)) {
+                            throw new Error(`ペイロード${i}が見つかりません`);
+                        }
+                        sortedPayloads.push(this.results.get(i));
+                    }
+                    
+                    return sortedPayloads;
+                } catch (error) {
+                    log(`[ParallelDownloader] エラー: ${error.message}`, 'error');
+                    throw error;
+                }
+            }
+            
+            async payloadWorker(progressCallback) {
+                while (true) {
+                    let work = null;
+                    
+                    while (this.queueLock) {
+                        await new Promise(resolve => setTimeout(resolve, 10));
+                    }
+                    
+                    this.queueLock = true;
+                    try {
+                        if (this.queue.length > 0) {
+                            work = this.queue.shift();
+                            this.active++;
+                        }
+                    } finally {
+                        this.queueLock = false;
+                    }
+                    
+                    if (!work && this.active === 0) {
+                        break;
+                    }
+                    
+                    if (!work) {
+                        await new Promise(resolve => setTimeout(resolve, 50));
+                        continue;
+                    }
+                    
+                    try {
+                        const { txId, blockId, index } = work;
+                        
+                        const response = await this.rpcClient.getBlock({
+                            hash: blockId,
+                            includeTransactions: true
+                        });
+                        
+                        const block = response?.block?.block || response?.block;
+                        if (!block) {
+                            throw new Error(`ブロックが見つかりません: ${blockId}`);
+                        }
+                        
+                        let payload = null;
+                        for (const tx of block.transactions || []) {
+                            const txHash = tx.verboseData?.transactionId || tx.id || tx.transactionId;
+                            if (txHash === txId) {
+                                if (tx.payload && tx.payload !== '') {
+                                    payload = safeHexDecode(tx.payload, 'payload');
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        if (!payload) {
+                            throw new Error(`ペイロードが見つかりません`);
+                        }
+                        
+                        this.results.set(index, payload);
+                        this.completedCount++;
+                        this.totalBytes += payload.length;
+                        
+                        const elapsed = (Date.now() - this.startTime) / 1000;
+                        const speed = this.completedCount / elapsed;
+                        const throughput = (this.totalBytes / 1024 / 1024) / elapsed;
+                        
+                        if (progressCallback) {
+                            progressCallback({
+                                completed: this.completedCount,
+                                total: this.totalChunks,
+                                speed: speed,
+                                throughput: throughput
+                            });
+                        }
+                        
+                    } catch (error) {
+                        log(`[ParallelDownloader] ペイロード${work.index}エラー: ${error.message}`, 'error');
+                        this.errors.set(work.index, error.message);
+                    } finally {
+                        this.active--;
+                    }
+                }
+            }
         }
         
         // Get version from title
@@ -3439,23 +3567,49 @@
                         const payloads = [];
                         const totalPayloads = metadata.chunks.length;
                         
-                        // Download all payloads
-                        for (let i = 0; i < totalPayloads; i++) {
-                            const txId = metadata.chunks[i];
-                            const blockId = metadata.chunkBlockIds[i];
+                        // v4.7.45: Check if parallel download should be used
+                        const useParallel = window.parallelDownloadEnabled && totalPayloads >= 2;
+                        
+                        if (useParallel) {
+                            // Parallel download for payload split
+                            log(`[DownloadManager] 並列ダウンロードモードを使用 (${totalPayloads}ペイロード)`, 'info');
                             
-                            // Progress callback
-                            if (onProgress) {
-                                onProgress({
-                                    current: i + 1,
-                                    total: totalPayloads,
-                                    percent: ((i + 1) / totalPayloads * 100).toFixed(0)
-                                });
+                            const downloader = new ParallelDownloader(rpcClient, 8);
+                            const parallelPayloads = await downloader.downloadPayloads(
+                                metadata.chunks,
+                                metadata.chunkBlockIds,
+                                (progress) => {
+                                    if (onProgress) {
+                                        onProgress({
+                                            current: progress.completed,
+                                            total: progress.total,
+                                            percent: ((progress.completed / progress.total) * 100).toFixed(0),
+                                            speed: progress.speed,
+                                            throughput: progress.throughput
+                                        });
+                                    }
+                                }
+                            );
+                            payloads.push(...parallelPayloads);
+                        } else {
+                            // Sequential download
+                            for (let i = 0; i < totalPayloads; i++) {
+                                const txId = metadata.chunks[i];
+                                const blockId = metadata.chunkBlockIds[i];
+                                
+                                // Progress callback
+                                if (onProgress) {
+                                    onProgress({
+                                        current: i + 1,
+                                        total: totalPayloads,
+                                        percent: ((i + 1) / totalPayloads * 100).toFixed(0)
+                                    });
+                                }
+                                
+                                // Download raw payload (no decryption yet)
+                                const payload = await this.downloadPayload(txId, blockId, i);
+                                payloads.push(payload);
                             }
-                            
-                            // Download raw payload (no decryption yet)
-                            const payload = await this.downloadPayload(txId, blockId, i);
-                            payloads.push(payload);
                         }
                         
                         // Combine all payloads

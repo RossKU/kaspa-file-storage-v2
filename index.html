@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.7.24 - Filter directory file selection to prevent crashes</title>
+    <title>Kaspa P2P File Storage v4.7.25 - Save progress every chunk without notifications</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -2225,9 +2225,7 @@
                 this.progressFileName = cid ? `${baseName}.${cid}.kprogress` : `${baseName}.kprogress`;
                 this.progress = null;
                 this.saveHandle = null;
-                this.autoSaveInterval = 10; // chunks
-                this.lastSaveTime = 0;
-                this.saveThrottle = 5000; // Save at most once every 5 seconds
+                // v4.7.25: Remove auto-save interval settings (save every chunk)
                 this.fileHandle = null; // For File System Access API
             }
             
@@ -2236,10 +2234,7 @@
                     this.progress = existingProgress;
                     log(`既存の進捗から再開: ${this.progress.metadata.completedChunks}/${this.progress.metadata.totalChunks} チャンク完了`, 'info');
                     
-                    // Optimize save frequency for resume - more frequent saves
-                    this.autoSaveInterval = 5; // Save every 5 chunks for resumed uploads
-                    this.saveThrottle = 3000; // Save at most once every 3 seconds
-                    log('レジューム時の進捗保存頻度を最適化しました', 'info');
+                    // v4.7.25: Remove save frequency optimization log
                     
                     return true;
                 }
@@ -2323,28 +2318,14 @@
                 this.progress.metadata.lastUpdateAt = Date.now();
                 this.progress.resume.nextChunkIndex = this.getNextChunkIndex();
                 
-                // Dynamically adjust save frequency based on progress
-                const progressPercentage = (this.progress.metadata.completedChunks / this.progress.metadata.totalChunks) * 100;
-                if (progressPercentage > 90) {
-                    // Near completion: save every 2 chunks
-                    this.autoSaveInterval = 2;
-                    this.saveThrottle = 2000;
-                } else if (progressPercentage > 75) {
-                    // Final stretch: save every 3 chunks
-                    this.autoSaveInterval = 3;
-                    this.saveThrottle = 2500;
-                }
-                
                 // Calculate estimated completion
                 const elapsed = Date.now() - this.progress.metadata.startedAt;
                 const rate = this.progress.metadata.completedChunks / elapsed;
                 const remaining = this.progress.metadata.totalChunks - this.progress.metadata.completedChunks;
                 this.progress.metadata.estimatedCompletion = Date.now() + (remaining / rate);
                 
-                // Auto-save check
-                if (this.progress.metadata.completedChunks % this.autoSaveInterval === 0) {
-                    await this.saveProgress();
-                }
+                // v4.7.25: Save progress after every chunk
+                await this.saveProgress();
             }
             
             markChunkFailed(index) {
@@ -2385,13 +2366,10 @@
                             lastUpdate: Date.now()
                         };
                         localStorage.setItem('kaspa-upload-metadata', JSON.stringify(metadata));
-                        // Show local save status occasionally
-                        if (!this.lastLocalSaveLog || Date.now() - this.lastLocalSaveLog > 10000) {
-                            log(`進捗をローカルに保存中`, 'success');
-                            this.lastLocalSaveLog = Date.now();
-                        }
+                        // v4.7.25: Remove save notifications
                     } catch (err) {
-                        log(`localStorage保存エラー: ${err.message}`, 'warning');
+                        // v4.7.25: Remove error log for localStorage
+                        console.error(`localStorage保存エラー: ${err.message}`);
                     }
                     
                     // Save to file if workspace is available
@@ -2405,45 +2383,23 @@
                             await writable.write(progressData);
                             await writable.close();
                             
-                            // Show status only occasionally
-                            if (!this.lastSaveLog || Date.now() - this.lastSaveLog > 10000) {
-                                log(`進捗を作業フォルダに保存中`, 'success');
-                                this.lastSaveLog = Date.now();
-                            }
-                            this.updateSaveStatus();
+                            // v4.7.25: Remove save notifications and status update
                         } catch (err) {
-                            log(`ファイル保存エラー: ${err.message}`, 'warning');
+                            // v4.7.25: Remove error log for file save
+                        console.error(`ファイル保存エラー: ${err.message}`);
                         }
                     } else {
                         // No workspace - localStorage only, no automatic downloads
-                        this.updateSaveStatus();
                     }
                 } catch (error) {
-                    log(`進捗保存エラー: ${error.message}`, 'error');
+                    // v4.7.25: Remove error log for progress save
+                    console.error(`進捗保存エラー: ${error.message}`);
                 }
             }
             
+            // v4.7.25: Remove updateSaveStatus function (no notifications)
             updateSaveStatus() {
-                const statusEl = document.getElementById('saveStatus');
-                if (!statusEl) {
-                    const div = document.createElement('div');
-                    div.id = 'saveStatus';
-                    div.style.cssText = 'position: fixed; top: 10px; right: 10px; background: #4CAF50; color: white; padding: 10px; border-radius: 5px; display: none; z-index: 10000;';
-                    document.body.appendChild(div);
-                }
-                
-                const el = document.getElementById('saveStatus');
-                if (window.workspaceHandle) {
-                    el.textContent = '✓ ファイル保存中';
-                } else {
-                    el.textContent = '✓ ローカル保存中';
-                }
-                el.style.display = 'block';
-                
-                clearTimeout(this.saveStatusTimeout);
-                this.saveStatusTimeout = setTimeout(() => {
-                    el.style.display = 'none';
-                }, 2000);
+                // No-op
             }
             
             async exportProgress() {

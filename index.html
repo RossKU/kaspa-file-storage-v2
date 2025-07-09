@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.7.27 - Experimental chunk size optimization (up to 20KB)</title>
+    <title>Kaspa P2P File Storage v4.7.28 - Integrate experimental chunk size into dropdown</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -473,6 +473,7 @@
                         <option value="10">10KB chunks (安全)</option>
                         <option value="12" selected>12KB chunks (推奨)</option>
                         <option value="15">15KB chunks (リスクあり)</option>
+                        <option value="20">🧪 20KB chunks (実験的)</option>
                     </select>
                 </div>
             </div>
@@ -485,11 +486,6 @@
             <div class="checkbox-label">
                 <input type="checkbox" id="useRandomCid">
                 <label for="useRandomCid">ランダムCIDを使用（検閲回避）</label>
-            </div>
-            
-            <div class="checkbox-label">
-                <input type="checkbox" id="experimentalOptimization">
-                <label for="experimentalOptimization">🧪 実験的: チャンクサイズ最適化（最大20KB）</label>
             </div>
             
             <button onclick="processAndUpload()" id="uploadBtn" disabled>
@@ -4823,14 +4819,12 @@
                 const requestedChunkSize = parseInt(document.getElementById('chunkSize').value) * 1024;
                 let actualChunkSize;
                 
-                // 実験的機能のチェック
-                const useExperimentalOptimization = document.getElementById('experimentalOptimization').checked;
-                
-                if (useExperimentalOptimization) {
-                    // 実験的: より大きなチャンクサイズを許可（最大20KB）
-                    actualChunkSize = Math.min(requestedChunkSize, 20480); // 20KB max
-                    log(`🧪 実験的機能: 最適化されたチャンクサイズ ${(actualChunkSize/1024).toFixed(1)}KB を使用`, 'warning');
-                    log('⚠️ この機能は実験的です。問題が発生した場合は無効にしてください', 'warning');
+                // 20KB以上は実験的機能として扱う
+                if (requestedChunkSize >= 20480) {
+                    // 実験的: 大きなチャンクサイズをそのまま使用
+                    actualChunkSize = requestedChunkSize;
+                    log(`🧪 実験的機能: ${(actualChunkSize/1024).toFixed(1)}KB チャンクを使用`, 'warning');
+                    log('⚠️ この機能は実験的です。問題が発生した場合は12KB以下を選択してください', 'warning');
                 } else {
                     // 通常: 安全なサイズに制限
                     actualChunkSize = calculateSafePayloadSize(requestedChunkSize);

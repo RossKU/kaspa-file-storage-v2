@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.7.41 - Enhanced debug logging for variable chunk compression</title>
+    <title>Kaspa P2P File Storage v4.7.42 - Use DownloadManager for all downloads</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -7114,315 +7114,36 @@
             document.getElementById('downloadProgress').style.display = 'block';
             
             try {
-                // v4.6.27: ディレクトリタイプ対応
-                const fileName = kaspaMetadata.file?.name || 
-                               kaspaMetadata.directory?.name || 
-                               'unknown';
-                log(`ダウンロード開始: ${fileName}`);
+                // v4.7.42: Use DownloadManager for all downloads
+                log('[v4.7.42] DownloadManagerを使用してダウンロードします', 'info');
                 
-                // Derive key
-                if (!kaspaMetadata.encryption || !kaspaMetadata.encryption.pbkdf2) {
-                    throw new Error('暗号化情報が見つかりません');
-                }
-                const salt = fromBase64(kaspaMetadata.encryption.pbkdf2.salt);
-                log(`Salt (base64): ${kaspaMetadata.encryption.pbkdf2.salt}`, 'debug');
-                log(`Salt (bytes): ${salt.length} bytes`, 'debug');
+                const onProgress = (progress) => {
+                    const percent = progress.percent || 0;
+                    document.getElementById('downloadProgressBar').style.width = percent + '%';
+                    document.getElementById('downloadProgressBar').textContent = percent + '%';
+                };
                 
-                // v3.0とv3.1の互換性対応
-                let iterations = kaspaMetadata.encryption.pbkdf2.iterations || 100000;
-                if (kaspaMetadata.version === "3.0") {
-                    // v3.0の場合は10000回を使用
-                    iterations = 10000;
-                    log(`v3.0フォーマット検出: PBKDF2 ${iterations}回を使用`, 'info');
-                } else {
-                    log(`v3.1フォーマット: PBKDF2 ${iterations}回を使用`, 'info');
-                }
+                const onComplete = (blob) => {
+                    log('ダウンロード完了 - ファイルを保存中...', 'success');
+                };
                 
-                const key = await deriveKey(password, salt, iterations);
-                log(`キー生成完了 (iterations: ${iterations})`, 'debug');
-                
-                const chunks = [];
-                
-                // Check if parallel download should be used
-                const useParallel = parallelDownloadEnabled && kaspaMetadata.chunks.length >= 10;
-                
-                if (useParallel) {
-                    // Parallel download
-                    log(`並列ダウンロードモードを使用します (${kaspaMetadata.chunks.length}チャンク)`, 'info');
-                    
-                    try {
-                        const downloader = new ParallelDownloader(rpcClient, 8);
-                        
-                        const parallelChunks = await downloader.downloadChunks(
-                            kaspaMetadata.chunks,
-                            kaspaMetadata.chunkBlockIds,
-                            key,
-                            kaspaMetadata,
-                            (progress) => {
-                                const percent = ((progress.completed / progress.total) * 100).toFixed(0);
-                                document.getElementById('downloadProgressBar').style.width = percent + '%';
-                                document.getElementById('downloadProgressBar').textContent = percent + '%';
-                                document.getElementById('downloadStatus').textContent = 
-                                    `${progress.completed}/${progress.total} チャンク (${progress.speed.toFixed(1)} チャンク/秒, ${progress.throughput.toFixed(1)} MB/秒)`;
-                            }
-                        );
-                        
-                        chunks.push(...parallelChunks);
-                    } catch (parallelError) {
-                        log(`並列ダウンロードエラー: ${parallelError.message}`, 'error');
-                        log('シーケンシャルダウンロードにフォールバックします', 'warning');
-                        
-                        // Fallback to sequential
-                        chunks.length = 0;
-                        for (let i = 0; i < kaspaMetadata.chunks.length; i++) {
-                    const txId = kaspaMetadata.chunks[i];
-                    const blockId = kaspaMetadata.chunkBlockIds[i];
-                    
-                    document.getElementById('downloadStatus').textContent = 
-                        `チャンク ${i + 1}/${kaspaMetadata.chunks.length} を取得中...`;
-                    
-                    try {
-                        log(`チャンク ${i + 1}: TxID ${txId.substring(0, 16)}... BlockID ${blockId.substring(0, 16)}...`, 'info');
-                        
-                        // Get block data
-                        const request = { 
-                            hash: blockId, 
-                            includeTransactions: true 
-                        };
-                        log(`RPC getBlock request: ${JSON.stringify(request)}`, 'info');
-                        
-                        let response;
-                        try {
-                            response = await rpcClient.getBlock(request);
-                            log(`RPC getBlock response received`, 'info');
-                            log(`Response type: ${typeof response}`, 'info');
-                            log(`Response keys: ${Object.keys(response || {}).join(', ')}`, 'info');
-                        } catch (rpcError) {
-                            log(`RPC getBlock error: ${rpcError.message || rpcError}`, 'error');
-                            log(`Error type: ${rpcError.constructor.name}`, 'error');
-                            throw rpcError;
-                        }
-                        
-                        const block = response?.block?.block || response?.block;
-                        log(`Block extracted: ${!!block}`, 'info');
-                        
-                        if (!block) {
-                            log(`Block not found in response structure`, 'error');
-                            throw new Error(`ブロックが見つかりません: ${blockId}`);
-                        }
-                        
-                        // Find transaction with matching TxID
-                        let payload = null;
-                        const txCount = block.transactions?.length || 0;
-                        log(`ブロック内のトランザクション数: ${txCount}`, 'info');
-                        
-                        if (txCount === 0) {
-                            log(`警告: トランザクションが含まれていません`, 'warning');
-                            // BigIntを含む可能性があるのでJSON.stringifyは避ける
-                            log(`Block has header.hash: ${block.header?.hash}`, 'warning');
-                        }
-                        
-                        for (const tx of block.transactions || []) {
-                            // BigIntを含む可能性があるのでJSON.stringifyは避ける
-                            log(`Checking transaction...`, 'info');
-                            const txHash = tx.verboseData?.transactionId || tx.id || tx.transactionId;
-                            log(`Transaction ID variants: verboseData.transactionId=${tx.verboseData?.transactionId}, tx.id=${tx.id}, tx.transactionId=${tx.transactionId}`, 'info');
-                            
-                            if (txHash === txId) {
-                                log(`TxID一致: ${txId.substring(0, 16)}...`, 'info');
-                                log(`tx.payload exists: ${!!tx.payload}, length: ${tx.payload?.length || 0}`, 'info');
-                                
-                                if (tx.payload && tx.payload !== '') {
-                                    // Get raw binary payload from hex (blockchain stores as hex)
-                                    const hexPayload = tx.payload;
-                                    log(`ペイロード長: ${hexPayload.length} 文字 (hex)`, 'info');
-                                    log(`最初の100文字: ${hexPayload.substring(0, 100)}...`, 'info');
-                                    
-                                    // Blockchain stores binary payloads as hex strings
-                                    try {
-                                        payload = safeHexDecode(hexPayload, 'chunk payload');
-                                        log(`Hex decode成功: ${payload.length} バイト (生バイナリ)`, 'info');
-                                    } catch (e) {
-                                        log(`Hex decode error details: ${e.stack || e}`, 'error');
-                                        throw new Error(`ペイロードのデコードに失敗: ${e.message}`);
-                                    }
-                                    break;
-                                } else {
-                                    log(`警告: ペイロードが空です (TxID: ${txId})`, 'warning');
-                                }
-                            } else {
-                                log(`TxID不一致: ${txHash} !== ${txId}`, 'info');
-                            }
-                        }
-                        
-                        if (!payload) {
-                            throw new Error(`チャンク ${i + 1} のペイロードが見つかりません`);
-                        }
-                        
-                        // Decrypt and decompress
-                        const encrypted = payload; // Already binary Uint8Array
-                        const compressed = await decryptChunk(encrypted, key, i);
-                        const original = kaspaMetadata.file?.compression?.enabled ? lzDecompress(compressed) : compressed;
-                        
-                        chunks.push(original);
-                        
-                        // Update progress
-                        const progress = ((i + 1) / kaspaMetadata.chunks.length * 100).toFixed(0);
-                        document.getElementById('downloadProgressBar').style.width = progress + '%';
-                        document.getElementById('downloadProgressBar').textContent = progress + '%';
-                        
-                        log(`チャンク ${i + 1} 取得成功`);
-                        
-                    } catch (error) {
-                        log(`チャンク ${i + 1} エラー: ${error.message}`, 'error');
-                        throw error;
+                await window.downloadManager.executeDownload(
+                    kaspaMetadata,
+                    password,
+                    {
+                        onProgress: onProgress,
+                        onComplete: onComplete
                     }
-                }
-                    }
-                } else {
-                    // Sequential download (default)
-                    log(`シーケンシャルダウンロードモードを使用します (${kaspaMetadata.chunks.length}チャンク)`, 'info');
-                    log(`圧縮設定: ${JSON.stringify(kaspaMetadata.file?.compression)}`, 'info');
-                    
-                    for (let i = 0; i < kaspaMetadata.chunks.length; i++) {
-                        const txId = kaspaMetadata.chunks[i];
-                        const blockId = kaspaMetadata.chunkBlockIds[i];
-                        
-                        document.getElementById('downloadStatus').textContent = 
-                            `チャンク ${i + 1}/${kaspaMetadata.chunks.length} を取得中...`;
-                        
-                        try {
-                            log(`チャンク ${i + 1}: TxID ${txId.substring(0, 16)}... BlockID ${blockId.substring(0, 16)}...`, 'info');
-                            
-                            // Get block data
-                            const request = { 
-                                hash: blockId, 
-                                includeTransactions: true 
-                            };
-                            log(`RPC getBlock request: ${JSON.stringify(request)}`, 'info');
-                            
-                            let response;
-                            try {
-                                response = await rpcClient.getBlock(request);
-                                log(`RPC getBlock response received`, 'info');
-                                log(`Response type: ${typeof response}`, 'info');
-                                log(`Response keys: ${Object.keys(response || {}).join(', ')}`, 'info');
-                            } catch (rpcError) {
-                                log(`RPC getBlock error: ${rpcError.message || rpcError}`, 'error');
-                                log(`Error type: ${rpcError.constructor.name}`, 'error');
-                                throw rpcError;
-                            }
-                            
-                            const block = response?.block?.block || response?.block;
-                            log(`Block extracted: ${!!block}`, 'info');
-                            
-                            if (!block) {
-                                log(`Block not found in response structure`, 'error');
-                                throw new Error(`ブロックが見つかりません: ${blockId}`);
-                            }
-                            
-                            // Find transaction with matching TxID
-                            let payload = null;
-                            const txCount = block.transactions?.length || 0;
-                            log(`ブロック内のトランザクション数: ${txCount}`, 'info');
-                            
-                            if (txCount === 0) {
-                                log(`警告: トランザクションが含まれていません`, 'warning');
-                                // BigIntを含む可能性があるのでJSON.stringifyは避ける
-                                log(`Block has header.hash: ${block.header?.hash}`, 'warning');
-                            }
-                            
-                            for (const tx of block.transactions || []) {
-                                // BigIntを含む可能性があるのでJSON.stringifyは避ける
-                                log(`Checking transaction...`, 'info');
-                                const txHash = tx.verboseData?.transactionId || tx.id || tx.transactionId;
-                                log(`Transaction ID variants: verboseData.transactionId=${tx.verboseData?.transactionId}, tx.id=${tx.id}, tx.transactionId=${tx.transactionId}`, 'info');
-                                
-                                if (txHash === txId) {
-                                    log(`TxID一致: ${txId.substring(0, 16)}...`, 'info');
-                                    log(`tx.payload exists: ${!!tx.payload}, length: ${tx.payload?.length || 0}`, 'info');
-                                    
-                                    if (tx.payload && tx.payload !== '') {
-                                        // Get raw binary payload from hex (blockchain stores as hex)
-                                        payload = safeHexDecode(tx.payload, 'chunk payload');
-                                        log(`ペイロード取得成功: ${payload.length} bytes`, 'info');
-                                        break;
-                                    }
-                                }
-                            }
-                            
-                            if (!payload) {
-                                throw new Error(`チャンク ${i + 1} のペイロードが見つかりません`);
-                            }
-                            
-                            // Decrypt and decompress
-                            const encrypted = payload; // Already binary Uint8Array
-                            log(`チャンク ${i + 1}: 暗号化データ ${encrypted.length} bytes`, 'info');
-                            // Log first few bytes for debugging
-                            const preview = Array.from(encrypted.slice(0, 16)).map(b => b.toString(16).padStart(2, '0')).join(' ');
-                            log(`チャンク ${i + 1}: データプレビュー: ${preview}...`, 'debug');
-                            const compressed = await decryptChunk(encrypted, key, i);
-                            log(`チャンク ${i + 1}: 復号化後 ${compressed.length} bytes`, 'info');
-                            log(`圧縮が有効か: ${kaspaMetadata.file?.compression?.enabled}`, 'info');
-                            const original = kaspaMetadata.file?.compression?.enabled ? lzDecompress(compressed) : compressed;
-                            
-                            chunks.push(original);
-                            log(`チャンク ${i + 1}: 最終サイズ ${original.length} bytes`, 'info');
-                            
-                            // Update progress
-                            const progress = ((i + 1) / kaspaMetadata.chunks.length * 100).toFixed(0);
-                            document.getElementById('downloadProgressBar').style.width = progress + '%';
-                            document.getElementById('downloadProgressBar').textContent = progress + '%';
-                            
-                            log(`チャンク ${i + 1} 取得成功`);
-                            
-                        } catch (error) {
-                            log(`チャンク ${i + 1} エラー: ${error.message || error}`, 'error');
-                            console.error(`チャンク ${i + 1} 詳細エラー:`, error);
-                            throw error;
-                        }
-                    }
-                }
+                );
                 
-                // Combine chunks
-                const totalSize = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
-                const combined = new Uint8Array(totalSize);
-                let offset = 0;
-                for (const chunk of chunks) {
-                    combined.set(chunk, offset);
-                    offset += chunk.length;
-                }
-                
-                // Verify hash
-                const downloadedHash = await sha256(combined);
-                log(`ダウンロードしたファイルのハッシュ: ${downloadedHash}`, 'info');
-                log(`期待されるハッシュ: ${kaspaMetadata.file.sha256}`, 'info');
-                log(`ダウンロードしたファイルサイズ: ${combined.length} bytes`, 'info');
-                log(`期待されるファイルサイズ: ${kaspaMetadata.file.size} bytes`, 'info');
-                
-                if (downloadedHash !== kaspaMetadata.file.sha256) {
-                    throw new Error('ファイル整合性チェック失敗！');
-                }
-                
-                // Download
-                const blob = new Blob([combined], { type: kaspaMetadata.file.mimeType });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = kaspaMetadata.file.name;
-                a.click();
-                URL.revokeObjectURL(url);
-                
-                log(`ダウンロード完了: ${kaspaMetadata.file.name}`, 'success');
+                log('ダウンロード完了！', 'success');
+                document.getElementById('downloadProgress').style.display = 'none';
                 
             } catch (error) {
                 log(`ダウンロードエラー: ${error.message}`, 'error');
+                document.getElementById('downloadProgress').style.display = 'none';
             }
         };
-
-        // Check if monitoring should stop
-        async function checkMonitoringStop() {
-            // v3.6.3 fix: Check overall upload status
             if (uploadingChunksCount === 0 && !uploadingMetaTx && !uploadingDirMeta && !isUploadingFile) {
                 log(`[DEBUG] WebSocket監視: 残り0件 - 自動停止します`, 'debug');
                 await stopMonitoring();

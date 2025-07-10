@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.7.59 - Fix chunkBoundaries in upload history</title>
+    <title>Kaspa P2P File Storage v4.7.58 - Include chunkBoundaries in .kaspa file</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -5491,13 +5491,6 @@
                             progressManager, 
                             useCompression
                         );
-                        
-                    // v4.7.59: 新方式の場合、kaspaMetadataにchunkBoundariesを追加
-                    if (kaspaMetadata && kaspaMetadata.metadata) {
-                        kaspaMetadata.metadata.chunkBoundaries = chunkBoundaries;
-                        kaspaMetadata.metadata.payloadSplit = true;
-                        log('[新方式] kaspaMetadataにchunkBoundariesを追加しました', 'debug');
-                    }
                     
                     // Upload each payload
                     for (let i = 0; i < payloads.length; i++) {
@@ -7827,7 +7820,7 @@
             }
             
             log(`🚀 Kaspa P2P v${getAppVersion()} 準備完了！`, 'info');
-            log(`📋 v${getAppVersion()}: 新方式アップロード時の履歴にchunkBoundariesを保存`, 'info');
+            log(`📋 v${getAppVersion()}: .kaspaファイルにchunkBoundariesを含める`, 'info');
             log('✨ 並列ダウンロード: ' + (parallelDownloadEnabled ? '有効' : '無効'), 'info');
             log('システムを初期化してください', 'info');
             

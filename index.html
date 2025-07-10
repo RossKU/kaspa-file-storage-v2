@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.7.57 - Add error handling for new approach</title>
+    <title>Kaspa P2P File Storage v4.7.58 - Include chunkBoundaries in .kaspa file</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -1380,7 +1380,9 @@
                             algorithm: "none",
                             enabled: false,
                             originalSize: item.fileSize,
-                            compressedSize: item.fileSize
+                            compressedSize: item.fileSize,
+                            // v4.7.58: variableChunkフラグを追加
+                            variableChunk: item.metadata?.file?.compression?.variableChunk || false
                         }
                     },
                     
@@ -1401,7 +1403,10 @@
                         metaTxId: metaTxId,
                         metaTxBlockId: metaTxBlockId,
                         uploadDate: item.uploadDate,
-                        blockTime: item.blockTime || item.uploadDate
+                        blockTime: item.blockTime || item.uploadDate,
+                        // v4.7.58: chunkBoundariesとpayloadSplitフラグを追加
+                        payloadSplit: item.metadata?.payloadSplit || false,
+                        chunkBoundaries: item.metadata?.chunkBoundaries || undefined
                     }
                 };
                 
@@ -7815,7 +7820,7 @@
             }
             
             log(`🚀 Kaspa P2P v${getAppVersion()} 準備完了！`, 'info');
-            log(`📋 v${getAppVersion()}: 新方式のエラーハンドリングを追加`, 'info');
+            log(`📋 v${getAppVersion()}: .kaspaファイルにchunkBoundariesを含める`, 'info');
             log('✨ 並列ダウンロード: ' + (parallelDownloadEnabled ? '有効' : '無効'), 'info');
             log('システムを初期化してください', 'info');
             

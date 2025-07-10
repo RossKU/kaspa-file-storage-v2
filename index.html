@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.7.60 - Fix metadata hierarchy</title>
+    <title>Kaspa P2P File Storage v4.7.61 - Fix directory upload</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -622,7 +622,7 @@
                     <button onclick="prepareDirectoryMetadata()" disabled id="prepareDirBtn">
                         🔧 ディレクトリメタデータを生成のみ
                     </button>
-                    <button onclick="prepareAndUploadDirectory()" disabled id="prepareAndUploadBtn" style="background: #e94560; color: white; border: none;">
+                    <button onclick="prepareAndUploadDirectory()" disabled id="prepareAndUploadBtn">
                         📤 生成してアップロード
                     </button>
                 </div>
@@ -7820,7 +7820,7 @@
             }
             
             log(`🚀 Kaspa P2P v${getAppVersion()} 準備完了！`, 'info');
-            log(`📋 v${getAppVersion()}: メタデータ階層の問題を修正`, 'info');
+            log(`📋 v${getAppVersion()}: ディレクトリアップロードの問題を修正`, 'info');
             log('✨ 並列ダウンロード: ' + (parallelDownloadEnabled ? '有効' : '無効'), 'info');
             log('システムを初期化してください', 'info');
             
@@ -8387,19 +8387,26 @@
             document.getElementById('historyFileSelector').style.display = 'none';
             window.selectedHistoryFiles.clear();
             updateSelectedFilesInfo();
-            
-            // Clear temporary metadata after adding to history
-            window.tempDirectoryMetadata = null;
         };
         
         // Prepare and upload directory metadata in one step
         window.prepareAndUploadDirectory = async function() {
-            // First, prepare the metadata
-            await prepareDirectoryMetadata();
-            
-            // If metadata was successfully prepared, upload it
-            if (window.tempDirectoryMetadata) {
-                await uploadDirectoryToBlockchain();
+            try {
+                log('ディレクトリメタデータの生成とアップロードを開始します', 'info');
+                
+                // First, prepare the metadata
+                await prepareDirectoryMetadata();
+                
+                // If metadata was successfully prepared, upload it
+                if (window.tempDirectoryMetadata) {
+                    log('メタデータ生成成功。ブロックチェーンへのアップロードを開始します', 'info');
+                    await uploadDirectoryToBlockchain();
+                } else {
+                    log('エラー: メタデータが生成されませんでした', 'error');
+                }
+            } catch (error) {
+                log(`エラー: ${error.message}`, 'error');
+                console.error('prepareAndUploadDirectory error:', error);
             }
         };
         

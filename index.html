@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.7.50 - Implement Format v3.3 with minimal changes</title>
+    <title>Kaspa P2P File Storage v4.7.50 - Update to Format v3.3</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -1380,8 +1380,7 @@
                             algorithm: "none",
                             enabled: false,
                             originalSize: item.fileSize,
-                            compressedSize: item.fileSize,
-                            variableChunk: false  // v3.3: Default to false for old data
+                            compressedSize: item.fileSize
                         }
                     },
                     
@@ -3633,41 +3632,18 @@
                             log('[DownloadManager] チャンクバウンダリ情報を使用して復号化', 'info');
                             const boundaries = metadata.metadata.chunkBoundaries;
                             
-                            // v3.3: Support column array format
-                            if (Array.isArray(boundaries.offsets)) {
-                                // v3.3 column array format
-                                log('[DownloadManager] v3.3カラム配列形式のチャンクバウンダリを検出', 'info');
-                                for (let i = 0; i < boundaries.offsets.length; i++) {
-                                    const start = boundaries.offsets[i];
-                                    const size = boundaries.encryptedSizes[i];
-                                    const end = start + size;
-                                    
-                                    if (start < encryptedData.length) {
-                                        const encryptedChunk = encryptedData.slice(start, Math.min(end, encryptedData.length));
-                                        try {
-                                            const decryptedChunk = await decryptChunk(encryptedChunk, key, i);
-                                            decryptedChunks.push(decryptedChunk);
-                                        } catch (e) {
-                                            log(`[DownloadManager] チャンク ${i} の復号化エラー: ${e.message}`, 'error');
-                                            throw new Error(`チャンク ${i} の復号化に失敗しました`);
-                                        }
-                                    }
-                                }
-                            } else {
-                                // Old format (array of objects)
-                                for (const boundary of boundaries) {
-                                    const start = boundary.offset;
-                                    const end = start + boundary.size;
-                                    
-                                    if (start < encryptedData.length) {
-                                        const encryptedChunk = encryptedData.slice(start, Math.min(end, encryptedData.length));
-                                        try {
-                                            const decryptedChunk = await decryptChunk(encryptedChunk, key, boundary.index);
-                                            decryptedChunks.push(decryptedChunk);
-                                        } catch (e) {
-                                            log(`[DownloadManager] チャンク ${boundary.index} の復号化エラー: ${e.message}`, 'error');
-                                            throw new Error(`チャンク ${boundary.index} の復号化に失敗しました`);
-                                        }
+                            for (const boundary of boundaries) {
+                                const start = boundary.offset;
+                                const end = start + boundary.size;
+                                
+                                if (start < encryptedData.length) {
+                                    const encryptedChunk = encryptedData.slice(start, Math.min(end, encryptedData.length));
+                                    try {
+                                        const decryptedChunk = await decryptChunk(encryptedChunk, key, boundary.index);
+                                        decryptedChunks.push(decryptedChunk);
+                                    } catch (e) {
+                                        log(`[DownloadManager] チャンク ${boundary.index} の復号化エラー: ${e.message}`, 'error');
+                                        throw new Error(`チャンク ${boundary.index} の復号化に失敗しました`);
                                     }
                                 }
                             }
@@ -6018,9 +5994,7 @@
                             algorithm: useCompression ? "LZ77" : "none",
                             enabled: useCompression,
                             originalSize: currentFile.size,
-                            compressedSize: processedChunks.reduce((sum, c) => sum + c.compressedSize, 0),
-                            // v3.3: Variable chunk flag
-                            variableChunk: useNewApproach
+                            compressedSize: processedChunks.reduce((sum, c) => sum + c.compressedSize, 0)
                         }
                     },
                     
@@ -6043,27 +6017,9 @@
                         metaTxBlockId: null,
                         uploadDate: new Date().toISOString(),
                         blockTime: null,
-                        uploadedBy: address.toString()
-                    }
-                };
-                
-                // v3.3: Add chunkBoundaries in column array format if using variable chunks
-                if (useNewApproach && progressManager.progress.metadata.chunkBoundaries) {
-                    const boundaries = progressManager.progress.metadata.chunkBoundaries;
-                    kaspaMetadata.metadata.chunkBoundaries = {
-                        offsets: [],
-                        originalSizes: [],
-                        compressedSizes: [],
-                        encryptedSizes: []
-                    };
-                    
-                    // Convert to column arrays
-                    boundaries.forEach(boundary => {
-                        kaspaMetadata.metadata.chunkBoundaries.offsets.push(boundary.offset);
-                        kaspaMetadata.metadata.chunkBoundaries.originalSizes.push(boundary.originalSize);
-                        kaspaMetadata.metadata.chunkBoundaries.compressedSizes.push(boundary.compressedSize || boundary.originalSize);
-                        kaspaMetadata.metadata.chunkBoundaries.encryptedSizes.push(boundary.size || boundary.originalSize);
-                    });
+                        uploadedBy: address.toString(),
+                        payloadSplit: useNewApproach, // Flag for new approach
+                        chunkBoundaries: useNewApproach ? progressManager.progress.metadata.chunkBoundaries : undefined
                     }
                 };
                 
@@ -6237,13 +6193,9 @@
                     encryption: kaspaMetadata.encryption,
                     file: kaspaMetadata.file,
                     chunks: kaspaMetadata.chunks,
-                    chunkBlockIds: kaspaMetadata.chunkBlockIds,  // v3.3: Keep flat structure
+                    chunkBlockIds: kaspaMetadata.chunkBlockIds,  // v3.3フォーマット準拠
                     recovery: kaspaMetadata.recovery,
-                    metadata: {
-                        ...kaspaMetadata.metadata,
-                        metaTxId: null,  // Avoid self-reference
-                        metaTxBlockId: null
-                    }
+                    metadata: kaspaMetadata.metadata
                 };
                 
                 // Encrypt meta-tx data with the same password
@@ -7240,8 +7192,7 @@
                         // 通常ファイルの場合
                         // Set kaspaMetadata from meta-tx data
                         kaspaMetadata = {
-                            // Keep original version from meta-tx (v3.3 or v2.1)
-                            ...metaData,
+                            ...metaData,  // Keep all fields from meta-tx
                             metaTx: {
                                 txid: metaTxId,
                                 blockId: blockId,
@@ -7326,14 +7277,14 @@
                 log(`Salt (base64): ${kaspaMetadata.encryption.pbkdf2.salt}`, 'debug');
                 log(`Salt (bytes): ${salt.length} bytes`, 'debug');
                 
-                // v3.0, v3.1, v3.3の互換性対応
+                // v3.0とv3.1の互換性対応
                 let iterations = kaspaMetadata.encryption.pbkdf2.iterations || 100000;
                 if (kaspaMetadata.version === "3.0") {
                     // v3.0の場合は10000回を使用
                     iterations = 10000;
                     log(`v3.0フォーマット検出: PBKDF2 ${iterations}回を使用`, 'info');
                 } else if (kaspaMetadata.version === "3.3") {
-                    log(`v3.3フォーマット: PBKDF2 ${iterations}回を使用`, 'info');
+                    log(`v3.3フォーマット検出: PBKDF2 ${iterations}回を使用`, 'info');
                 } else {
                     log(`v${kaspaMetadata.version}フォーマット: PBKDF2 ${iterations}回を使用`, 'info');
                 }

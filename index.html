@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.7.61 - Fix directory upload</title>
+    <title>Kaspa P2P File Storage v4.7.63 - Complete directory encryption fix</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -4452,8 +4452,8 @@
             })));
             const merkleRoot = await sha256(new TextEncoder().encode(entriesData));
             
-            // Generate salt from directory name + timestamp
-            const saltData = new TextEncoder().encode(dirName + Date.now());
+            // Generate salt from directory name + merkleRoot (deterministic and beautiful)
+            const saltData = new TextEncoder().encode(dirName + merkleRoot);
             const saltHash = await sha256(saltData);
             const salt = new Uint8Array(saltHash.match(/.{2}/g).map(byte => parseInt(byte, 16))).slice(0, 16);
             
@@ -4543,13 +4543,18 @@
                 // Encrypt metadata
                 const encryptedData = await encryptChunk(metadataBytes, key, -1); // Use -1 for directory metadata
                 
+                // Prepend salt to encrypted data (critical for decryption)
+                const payloadWithSalt = new Uint8Array(salt.length + encryptedData.length);
+                payloadWithSalt.set(salt);
+                payloadWithSalt.set(encryptedData, salt.length);
+                
                 // Compress if beneficial
-                let finalData = encryptedData;
-                const compressed = lzCompress(encryptedData);
-                if (compressed.length < encryptedData.length) {
+                let finalData = payloadWithSalt;
+                const compressed = lzCompress(payloadWithSalt);
+                if (compressed.length < payloadWithSalt.length) {
                     finalData = compressed;
                     metadata.compression.algorithm = 'lz';
-                    metadata.compression.originalSize = encryptedData.length;
+                    metadata.compression.originalSize = payloadWithSalt.length;
                     metadata.compression.compressedSize = compressed.length;
                 }
                 
@@ -7820,7 +7825,7 @@
             }
             
             log(`🚀 Kaspa P2P v${getAppVersion()} 準備完了！`, 'info');
-            log(`📋 v${getAppVersion()}: ディレクトリアップロードの問題を修正`, 'info');
+            log(`📋 v${getAppVersion()}: ディレクトリ暗号化を完全修正`, 'info');
             log('✨ 並列ダウンロード: ' + (parallelDownloadEnabled ? '有効' : '無効'), 'info');
             log('システムを初期化してください', 'info');
             

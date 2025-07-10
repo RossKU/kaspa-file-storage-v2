@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.7.63 - Complete directory encryption fix</title>
+    <title>Kaspa P2P File Storage v4.7.64 - Fix directory metadata type validation</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -7202,9 +7202,10 @@
                         throw new Error('ペイロードが短すぎます');
                     }
                     
-                    // Verify this is a meta-tx (v2.1 or v3.3)
-                    if ((metaData.version === "2.1" || metaData.version === "3.3") && metaData.type === "kaspa-meta-tx") {
-                        log(`メタトランザクションを正常に復号化しました (v${metaData.version})`, 'success');
+                    // Verify this is a valid metadata (meta-tx or directory)
+                    if ((metaData.version === "2.1" || metaData.version === "3.3" || metaData.version === "3.1.1") && 
+                        (metaData.type === "kaspa-meta-tx" || metaData.type === "kaspa-directory")) {
+                        log(`メタデータを正常に復号化しました (v${metaData.version}, type: ${metaData.type})`, 'success');
                         log(`メタデータ内容: ${JSON.stringify(metaData, null, 2)}`, 'info');
                         
                         // ディレクトリタイプの場合
@@ -7825,7 +7826,7 @@
             }
             
             log(`🚀 Kaspa P2P v${getAppVersion()} 準備完了！`, 'info');
-            log(`📋 v${getAppVersion()}: ディレクトリ暗号化を完全修正`, 'info');
+            log(`📋 v${getAppVersion()}: ディレクトリメタデータ型検証を修正`, 'info');
             log('✨ 並列ダウンロード: ' + (parallelDownloadEnabled ? '有効' : '無効'), 'info');
             log('システムを初期化してください', 'info');
             

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.7.55 - Add minimal debug logging</title>
+    <title>Kaspa P2P File Storage v4.7.56 - Add function start/end logging</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -5098,6 +5098,9 @@
         
         // New approach: Process file in streaming fashion and split after encryption
         async function processFileWithPayloadSplit(file, password, progressManager, useCompression) {
+            // v4.7.56: 関数開始ログを追加
+            log('[processFileWithPayloadSplit] 開始', 'info');
+            
             const PROCESS_CHUNK_SIZE = 128 * 1024; // 128KB processing chunks
             const PAYLOAD_SIZE = 22 * 1024; // 22KB payloads
             
@@ -5183,6 +5186,9 @@
             progressManager.progress.metadata.totalChunks = payloads.length;
             progressManager.progress.metadata.chunkBoundaries = chunkBoundaries; // Save boundaries
             await progressManager.saveProgress();
+            
+            // v4.7.56: 関数完了ログを追加
+            log(`[processFileWithPayloadSplit] 完了 - ${payloads.length}個のペイロード生成`, 'info');
             
             return { payloads, key, salt, chunkBoundaries };
         }
@@ -7794,7 +7800,7 @@
             }
             
             log(`🚀 Kaspa P2P v${getAppVersion()} 準備完了！`, 'info');
-            log(`📋 v${getAppVersion()}: 最小限のデバッグログを追加`, 'info');
+            log(`📋 v${getAppVersion()}: processFileWithPayloadSplit関数の開始/終了ログを追加`, 'info');
             log('✨ 並列ダウンロード: ' + (parallelDownloadEnabled ? '有効' : '無効'), 'info');
             log('システムを初期化してください', 'info');
             

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.7.47 - Fix chunk boundary indexing for Format v3.2</title>
+    <title>Kaspa P2P File Storage v4.7.48 - Fix Format v3.2 validation in meta-tx download</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -7326,9 +7326,9 @@
                         throw new Error('ペイロードが短すぎます');
                     }
                     
-                    // Verify this is a meta-tx
-                    if (metaData.version === "2.1" && metaData.type === "kaspa-meta-tx") {
-                        log('メタトランザクションを正常に復号化しました', 'success');
+                    // Verify this is a meta-tx (v2.1 or v3.2)
+                    if ((metaData.version === "2.1" || metaData.version === "3.2") && metaData.type === "kaspa-meta-tx") {
+                        log(`メタトランザクションを正常に復号化しました (v${metaData.version})`, 'success');
                         log(`メタデータ内容: ${JSON.stringify(metaData, null, 2)}`, 'info');
                         
                         // ディレクトリタイプの場合
@@ -7352,16 +7352,11 @@
                         // 通常ファイルの場合
                         // Set kaspaMetadata from meta-tx data
                         kaspaMetadata = {
-                            version: "2.0", // Convert back to standard format
-                            kaspa: metaData.kaspa,
-                            file: metaData.file,
-                            encryption: metaData.encryption,
-                            compression: metaData.compression,
-                            chunks: metaData.chunks,
-                            chunkBlockIds: metaData.chunkBlockIds,  // v3.1フォーマット準拠
-                            metadata: metaData.metadata,
+                            // Keep original version from meta-tx (v3.2 or v2.1)
+                            ...metaData,
                             metaTx: {
                                 txid: metaTxId,
+                                blockId: blockId,
                                 loadedAt: Date.now()
                             }
                         };
@@ -7373,7 +7368,7 @@
                             `チャンク数: ${kaspaMetadata.chunks.length}\n` +
                             `暗号化: ${kaspaMetadata.encryption.algorithm}\n` +
                             `圧縮: ${kaspaMetadata.file?.compression?.enabled ? kaspaMetadata.file.compression.algorithm : 'なし'}\n` +
-                            `作成日時: ${new Date(kaspaMetadata.metadata.createdAt).toLocaleString()}\n` +
+                            `作成日時: ${new Date(kaspaMetadata.metadata?.uploadDate || kaspaMetadata.created || Date.now()).toLocaleString()}\n` +
                             `メタTxID: ${metaTxId.substring(0, 16)}...`;
                         
                         // Set password for download

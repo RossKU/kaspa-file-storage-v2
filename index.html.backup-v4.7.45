@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.7.46 - Format v3.2 with unified metadata structure</title>
+    <title>Kaspa P2P File Storage v4.7.45 - Add parallel download to DownloadManager</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -1356,7 +1356,7 @@
                 // Create .kaspa metadata from history for files with unified structure
                 const kaspaMetadata = {
                     type: 'kaspa-file',
-                    version: "3.2",  // v4.7.46: Updated to Format v3.2
+                    version: "3.1",
                     created: item.uploadDate,
                     network: item.network || 'testnet-10',
                     
@@ -3368,97 +3368,6 @@
                 log('[DownloadManager] メタデータをクリアしました', 'debug');
             }
             
-            // v4.7.46: Convert old format metadata to v3.2
-            convertToV32Format(oldMetadata) {
-                // Already v3.2
-                if (oldMetadata.version === "3.2") {
-                    return oldMetadata;
-                }
-                
-                log(`[DownloadManager] Converting from v${oldMetadata.version} to v3.2`, 'info');
-                
-                // Clone metadata to avoid mutation
-                const newMetadata = JSON.parse(JSON.stringify(oldMetadata));
-                newMetadata.version = "3.2";
-                
-                // Convert chunks array to v3.2 format
-                if (Array.isArray(oldMetadata.chunks) && typeof oldMetadata.chunks[0] === 'string') {
-                    // Old format: array of txids
-                    newMetadata.chunks = oldMetadata.chunks.map((txid, index) => {
-                        const chunkInfo = {
-                            txid: txid,
-                            blockId: '',
-                            index: index,
-                            encryptedSize: 0,
-                            originalSize: 0,
-                            compressedSize: 0,
-                            boundary: {
-                                offset: index * (oldMetadata.recovery?.chunkSize || 20480),
-                                length: 0
-                            }
-                        };
-                        
-                        // Extract blockId from chunkBlockIds if available
-                        if (oldMetadata.chunkBlockIds && oldMetadata.chunkBlockIds[index]) {
-                            const blockIdStr = oldMetadata.chunkBlockIds[index];
-                            if (blockIdStr.includes(':')) {
-                                chunkInfo.blockId = blockIdStr.split(':')[1];
-                            } else {
-                                chunkInfo.blockId = blockIdStr;
-                            }
-                        }
-                        
-                        // Get size info from various sources
-                        if (oldMetadata.chunkSizes && oldMetadata.chunkSizes[index]) {
-                            chunkInfo.originalSize = oldMetadata.chunkSizes[index];
-                            chunkInfo.boundary.length = oldMetadata.chunkSizes[index];
-                        }
-                        
-                        // Get boundary info if available
-                        if (oldMetadata.metadata?.chunkBoundaries && oldMetadata.metadata.chunkBoundaries[index]) {
-                            const boundary = oldMetadata.metadata.chunkBoundaries[index];
-                            chunkInfo.encryptedSize = boundary.size || 0;
-                            chunkInfo.originalSize = boundary.originalSize || chunkInfo.originalSize;
-                            chunkInfo.compressedSize = boundary.compressedSize || 0;
-                            chunkInfo.boundary.offset = boundary.offset || chunkInfo.boundary.offset;
-                            chunkInfo.boundary.length = boundary.originalSize || chunkInfo.boundary.length;
-                        }
-                        
-                        return chunkInfo;
-                    });
-                }
-                
-                // Ensure file compression info is complete
-                if (!newMetadata.file?.compression) {
-                    newMetadata.file = newMetadata.file || {};
-                    newMetadata.file.compression = {
-                        enabled: false,
-                        algorithm: "none",
-                        variableChunk: false,
-                        strategy: "fixed"
-                    };
-                } else {
-                    // Add v3.2 fields if missing
-                    newMetadata.file.compression.variableChunk = 
-                        newMetadata.file.compression.variableChunk || 
-                        !!oldMetadata.metadata?.payloadSplit;
-                    newMetadata.file.compression.strategy = 
-                        newMetadata.file.compression.strategy || 
-                        (oldMetadata.metadata?.payloadSplit ? "adaptive" : "fixed");
-                }
-                
-                // Ensure kaspa field exists (v3.2 requirement)
-                if (!newMetadata.kaspa) {
-                    newMetadata.kaspa = {
-                        address: oldMetadata.metadata?.uploadedBy || '',
-                        totalCost: oldMetadata.recovery?.uploadCost || 0,
-                        chunks: oldMetadata.chunks?.length || 0
-                    };
-                }
-                
-                return newMetadata;
-            }
-            
             // Fetch metadata from blockchain
             async fetchMetadata(metaTxId, blockId, password) {
                 try {
@@ -3641,13 +3550,6 @@
                     const { onProgress, onComplete, folderStructure } = options;
                     
                     log(`[DownloadManager] ダウンロード開始: ${metadata.file?.name || 'unknown'}`, 'info');
-                    log(`[DownloadManager] フォーマット: v${metadata.version}`, 'info');
-                    
-                    // Convert metadata to v3.2 format if needed
-                    if (metadata.version !== "3.2") {
-                        metadata = this.convertToV32Format(metadata);
-                        log(`[DownloadManager] メタデータをv3.2形式に変換しました`, 'info');
-                    }
                     
                     // Derive encryption key
                     const salt = fromBase64(metadata.encryption.pbkdf2.salt);
@@ -3658,8 +3560,7 @@
                     // Check if using new payload split approach
                     let combined;
                     
-                    // v3.2: Check for variable chunk compression
-                    if (metadata.file?.compression?.variableChunk || metadata.metadata?.payloadSplit) {
+                    if (metadata.metadata?.payloadSplit) {
                         // New approach: download payloads and reconstruct
                         log('[DownloadManager] 新方式: ペイロード分割ダウンロードを使用', 'info');
                         
@@ -5422,9 +5323,6 @@
                 // v3.6.3 fix: Set upload flag
                 isUploadingFile = true;
                 
-                // v4.7.46: Track upload start time for Format v3.2
-                const uploadStartTime = Date.now();
-                
                 log(`処理開始: ${currentFile.name}`);
                 log(`ファイルサイズ: ${(currentFile.size / 1024 / 1024).toFixed(2)} MB`);
                 
@@ -6069,10 +5967,10 @@
                 await progressManager.saveProgress();
                 log('最終進捗を保存しました', 'success');
                 
-                // Prepare metadata with Format v3.2
+                // Prepare metadata with unified structure
                 kaspaMetadata = {
                     type: 'kaspa-file',
-                    version: "3.2",  // v4.7.46: Updated to Format v3.2
+                    version: "3.1",
                     created: new Date().toISOString(),
                     network: config.network,
                     
@@ -6093,41 +5991,19 @@
                         sha256: fileHash,
                         encrypted: true,
                         compression: {
-                            algorithm: useCompression ? "lz-string" : "none",
+                            algorithm: useCompression ? "LZ77" : "none",
                             enabled: useCompression,
                             originalSize: currentFile.size,
-                            compressedSize: processedChunks.reduce((sum, c) => sum + c.compressedSize, 0),
-                            // v3.2: Variable chunk compression flag
-                            variableChunk: useNewApproach,
-                            strategy: useNewApproach ? "adaptive" : "fixed"
+                            compressedSize: processedChunks.reduce((sum, c) => sum + c.compressedSize, 0)
                         }
                     },
                     
-                    // Kaspa information
-                    kaspa: {
-                        address: address.toString(),
-                        totalCost: totalCost,
-                        chunks: totalChunks
-                    },
+                    // Chunk information
+                    chunks: processedChunks.map(c => c.txid),
+                    chunkBlockIds: processedChunks.map(c => c.blockId),
+                    chunkSizes: processedChunks.map(c => c.originalSize), // v4.7.36: 各チャンクの実際のサイズ
                     
-                    // v3.2: Enhanced chunk information
-                    chunks: processedChunks.map((c, index) => ({
-                        txid: c.txid,
-                        blockId: c.blockId,
-                        index: index,
-                        encryptedSize: c.payloadSize,
-                        originalSize: c.originalSize,
-                        compressedSize: c.compressedSize,
-                        boundary: useNewApproach && progressManager.progress.metadata.chunkBoundaries ? {
-                            offset: progressManager.progress.metadata.chunkBoundaries[index].offset,
-                            length: progressManager.progress.metadata.chunkBoundaries[index].originalSize
-                        } : {
-                            offset: index * config.chunkSize,
-                            length: c.originalSize
-                        }
-                    })),
-                    
-                    // Recovery information (for backward compatibility)
+                    // Recovery information
                     recovery: {
                         totalChunks: totalChunks,
                         chunkSize: config.chunkSize,
@@ -6142,17 +6018,9 @@
                         uploadDate: new Date().toISOString(),
                         blockTime: null,
                         uploadedBy: address.toString(),
-                        // v3.2: Performance statistics
-                        performance: {
-                            uploadDuration: Date.now() - uploadStartTime,
-                            compressionRatio: useCompression ? processedChunks.reduce((sum, c) => sum + c.compressedSize, 0) / currentFile.size : 1.0,
-                            averageChunkSize: processedChunks.reduce((sum, c) => sum + c.originalSize, 0) / processedChunks.length
-                        }
-                    },
-                    
-                    // Backward compatibility fields
-                    chunkBlockIds: processedChunks.map(c => `${c.txid}:${c.blockId}`),  // v3.1.1 compatibility
-                    chunkSizes: processedChunks.map(c => c.originalSize) // v4.7.36 compatibility
+                        payloadSplit: useNewApproach, // Flag for new approach
+                        chunkBoundaries: useNewApproach ? progressManager.progress.metadata.chunkBoundaries : undefined
+                    }
                 };
                 
                 // Save to history
@@ -6316,24 +6184,17 @@
             try {
                 log('メタトランザクション作成を開始します...', 'info');
                 
-                // Prepare meta-tx data with Format v3.2
+                // Prepare meta-tx data (similar to .kaspa file but with version 2.1)
                 const metaTxData = {
+                    version: "2.1",
                     type: "kaspa-meta-tx",
-                    version: "3.2",  // v4.7.46: Updated to Format v3.2
-                    created: kaspaMetadata.created,
-                    network: kaspaMetadata.network,
-                    encryption: kaspaMetadata.encryption,
-                    file: kaspaMetadata.file,
                     kaspa: kaspaMetadata.kaspa,
-                    chunks: kaspaMetadata.chunks,  // v3.2 enhanced chunk format
-                    recovery: kaspaMetadata.recovery,
-                    metadata: {
-                        ...kaspaMetadata.metadata,
-                        metaTxId: null,  // Avoid self-reference
-                        metaTxBlockId: null
-                    },
-                    // Backward compatibility
-                    chunkBlockIds: kaspaMetadata.chunkBlockIds
+                    file: kaspaMetadata.file,
+                    encryption: kaspaMetadata.encryption,
+                    compression: kaspaMetadata.compression,
+                    chunks: kaspaMetadata.chunks,
+                    chunkBlockIds: kaspaMetadata.chunkBlockIds,  // v3.1フォーマット準拠
+                    metadata: kaspaMetadata.metadata
                 };
                 
                 // Encrypt meta-tx data with the same password
@@ -7421,14 +7282,12 @@
                 log(`Salt (base64): ${kaspaMetadata.encryption.pbkdf2.salt}`, 'debug');
                 log(`Salt (bytes): ${salt.length} bytes`, 'debug');
                 
-                // v3.0, v3.1, v3.2の互換性対応
+                // v3.0とv3.1の互換性対応
                 let iterations = kaspaMetadata.encryption.pbkdf2.iterations || 100000;
                 if (kaspaMetadata.version === "3.0") {
                     // v3.0の場合は10000回を使用
                     iterations = 10000;
                     log(`v3.0フォーマット検出: PBKDF2 ${iterations}回を使用`, 'info');
-                } else if (kaspaMetadata.version === "3.2") {
-                    log(`v3.2フォーマット: PBKDF2 ${iterations}回を使用 (拡張チャンク情報対応)`, 'info');
                 } else {
                     log(`v3.1フォーマット: PBKDF2 ${iterations}回を使用`, 'info');
                 }

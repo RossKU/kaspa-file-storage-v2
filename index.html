@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.7.46 - Format v3.2 with unified metadata structure</title>
+    <title>Kaspa P2P File Storage v4.7.47 - Fix chunk boundary indexing for Format v3.2</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -6111,21 +6111,43 @@
                     },
                     
                     // v3.2: Enhanced chunk information
-                    chunks: processedChunks.map((c, index) => ({
-                        txid: c.txid,
-                        blockId: c.blockId,
-                        index: index,
-                        encryptedSize: c.payloadSize,
-                        originalSize: c.originalSize,
-                        compressedSize: c.compressedSize,
-                        boundary: useNewApproach && progressManager.progress.metadata.chunkBoundaries ? {
-                            offset: progressManager.progress.metadata.chunkBoundaries[index].offset,
-                            length: progressManager.progress.metadata.chunkBoundaries[index].originalSize
-                        } : {
-                            offset: index * config.chunkSize,
-                            length: c.originalSize
+                    chunks: processedChunks.map((c, index) => {
+                        // Get boundary info safely
+                        let boundary;
+                        if (useNewApproach && progressManager.progress.metadata.chunkBoundaries) {
+                            const boundaryIndex = c.originalIndex !== undefined ? c.originalIndex : index;
+                            const boundaryInfo = progressManager.progress.metadata.chunkBoundaries[boundaryIndex];
+                            if (boundaryInfo) {
+                                boundary = {
+                                    offset: boundaryInfo.offset,
+                                    length: boundaryInfo.originalSize
+                                };
+                            } else {
+                                // Fallback if boundary info is missing
+                                log(`[DEBUG] Missing boundary info for chunk ${boundaryIndex}`, 'warning');
+                                boundary = {
+                                    offset: boundaryIndex * config.chunkSize,
+                                    length: c.originalSize
+                                };
+                            }
+                        } else {
+                            // Fixed chunk size approach
+                            boundary = {
+                                offset: index * config.chunkSize,
+                                length: c.originalSize
+                            };
                         }
-                    })),
+                        
+                        return {
+                            txid: c.txid,
+                            blockId: c.blockId,
+                            index: index,
+                            encryptedSize: c.payloadSize,
+                            originalSize: c.originalSize,
+                            compressedSize: c.compressedSize,
+                            boundary: boundary
+                        };
+                    }),
                     
                     // Recovery information (for backward compatibility)
                     recovery: {

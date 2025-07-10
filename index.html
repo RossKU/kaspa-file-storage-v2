@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.7.50 - Update to Format v3.3</title>
+    <title>Kaspa P2P File Storage v4.7.55 - Add minimal debug logging</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -5454,6 +5454,11 @@
                 // Check if we need to use new approach
                 const useNewApproach = actualChunkSize >= 22528; // Use new approach for 22KB chunks
                 
+                // v4.7.55: デバッグログを追加（最小限の変更）
+                if (actualChunkSize >= 22528) {
+                    log(`[INFO] チャンクサイズ: ${actualChunkSize} - 新方式対象`, 'info');
+                }
+                
                 // Declare nextChunkIndex outside of if/else blocks
                 let nextChunkIndex = -1;
                 
@@ -7789,7 +7794,7 @@
             }
             
             log(`🚀 Kaspa P2P v${getAppVersion()} 準備完了！`, 'info');
-            log(`📋 v${getAppVersion()}: アップロードチェックボックスUI修正`, 'info');
+            log(`📋 v${getAppVersion()}: 最小限のデバッグログを追加`, 'info');
             log('✨ 並列ダウンロード: ' + (parallelDownloadEnabled ? '有効' : '無効'), 'info');
             log('システムを初期化してください', 'info');
             

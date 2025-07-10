@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.7.64 - Fix directory metadata type validation</title>
+    <title>Kaspa P2P File Storage v5.0.0 - Super Metadata for Large Files</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -2797,7 +2797,13 @@
             network: 'testnet-10',
             retryCount: 3,
             timeout: 30000,
-            testPrivateKey: 'b7e151628aed2a6abf7158809cf4f3c762e7160f38b4da56a784d9045190cfef'
+            testPrivateKey: 'b7e151628aed2a6abf7158809cf4f3c762e7160f38b4da56a784d9045190cfef',
+            // Super metadata configuration (experimental)
+            superMeta: {
+                enabled: true,
+                chunksPerMeta: 2,  // 実験的: 2チャンクごとにメタデータ生成
+                metasPerSuper: 2   // 実験的: 2メタデータごとにスーパーメタ生成
+            }
         };
 
         // Safe hex decode function
@@ -6220,6 +6226,77 @@
             try {
                 log('メタトランザクション作成を開始します...', 'info');
                 
+                // Check if super metadata is needed (experimental: 2 chunks)
+                const totalChunks = kaspaMetadata.chunks.length;
+                if (config.superMeta.enabled && totalChunks > config.superMeta.chunksPerMeta) {
+                    log(`[SuperMeta] 実験的: ${totalChunks}チャンク検出 - スーパーメタデータを生成します`, 'info');
+                    
+                    // Group chunks
+                    const chunkGroups = [];
+                    for (let i = 0; i < totalChunks; i += config.superMeta.chunksPerMeta) {
+                        const group = [];
+                        for (let j = 0; j < config.superMeta.chunksPerMeta && i + j < totalChunks; j++) {
+                            group.push({
+                                txid: kaspaMetadata.chunks[i + j],
+                                blockId: kaspaMetadata.chunkBlockIds[i + j]
+                            });
+                        }
+                        chunkGroups.push(group);
+                    }
+                    
+                    log(`[SuperMeta] ${chunkGroups.length}個のチャンクグループを作成`, 'info');
+                    
+                    // Create intermediate meta-txs
+                    const intermediateMetaTxs = [];
+                    for (let i = 0; i < chunkGroups.length; i++) {
+                        const intermediateMeta = await createIntermediateMetaTx(
+                            chunkGroups[i], 
+                            i, 
+                            chunkGroups.length,
+                            kaspaMetadata,
+                            currentPassword
+                        );
+                        intermediateMetaTxs.push(intermediateMeta);
+                    }
+                    
+                    // Create super meta-tx
+                    const superMeta = await createSuperMetaTx(intermediateMetaTxs, kaspaMetadata, currentPassword);
+                    
+                    // Update metadata with super meta info
+                    kaspaMetadata.metaTx = {
+                        type: 'super',
+                        txid: superMeta.txId,
+                        blockId: superMeta.blockId,
+                        reference: superMeta.blockId ? `${superMeta.txId}:${superMeta.blockId}` : superMeta.txId,
+                        createdAt: Date.now(),
+                        intermediateMetaTxs: intermediateMetaTxs
+                    };
+                    
+                    // Update history
+                    if (window.historyManager && window.currentFileCID) {
+                        const history = window.historyManager.getHistory();
+                        const latestUpload = history.find(h => h.cid === window.currentFileCID);
+                        if (latestUpload) {
+                            latestUpload.metaTxId = superMeta.txId;
+                            latestUpload.metaTxBlockId = superMeta.blockId;
+                            latestUpload.metaTxType = 'super';
+                            localStorage.setItem(window.historyManager.dbName, JSON.stringify(history));
+                            await window.historyManager.saveToFile();
+                        }
+                    }
+                    
+                    log(`[SuperMeta] 🎉 スーパーメタデータ作成完了！`, 'success');
+                    
+                    // Auto-stop monitoring
+                    if (window.wsMonitorActive) {
+                        await stopMonitoring();
+                    }
+                    
+                    switchTab('history');
+                    return;
+                }
+                
+                // Regular meta-tx creation (for files <= 2 chunks)
                 // Prepare meta-tx data with Format v3.3
                 const metaTxData = {
                     type: "kaspa-meta-tx",
@@ -6231,7 +6308,12 @@
                     chunks: kaspaMetadata.chunks,
                     chunkBlockIds: kaspaMetadata.chunkBlockIds,  // v3.3フォーマット準拠
                     recovery: kaspaMetadata.recovery,
-                    metadata: kaspaMetadata.metadata
+                    metadata: kaspaMetadata.metadata,
+                    // Add flat structure for regular meta-tx
+                    chunkStructure: {
+                        type: "flat",
+                        totalChunks: totalChunks
+                    }
                 };
                 
                 // Encrypt meta-tx data with the same password
@@ -6419,6 +6501,256 @@
                 // Error occurred - no fallback needed as .kaspa generation is in History tab
             }
         };
+
+        // Create intermediate meta-tx for chunk groups (experimental)
+        async function createIntermediateMetaTx(chunkGroup, groupIndex, totalGroups, fileMetadata, password) {
+            try {
+                log(`[SuperMeta] 中間メタデータ ${groupIndex + 1}/${totalGroups} を生成中...`, 'info');
+                
+                // Create metadata for this chunk group
+                const metaTxData = {
+                    type: "kaspa-meta-tx",
+                    version: "3.3",
+                    created: new Date().toISOString(),
+                    network: config.network,
+                    
+                    // Mark as intermediate metadata
+                    chunkStructure: {
+                        type: "meta",
+                        level: 1,
+                        groupIndex: groupIndex,
+                        totalGroups: totalGroups,
+                        chunkRange: [
+                            groupIndex * config.superMeta.chunksPerMeta,
+                            Math.min((groupIndex + 1) * config.superMeta.chunksPerMeta - 1, fileMetadata.recovery.totalChunks - 1)
+                        ]
+                    },
+                    
+                    encryption: fileMetadata.encryption,
+                    file: fileMetadata.file,
+                    
+                    // Only include chunks for this group
+                    chunks: chunkGroup.map(c => c.txid),
+                    chunkBlockIds: chunkGroup.map(c => c.blockId),
+                    
+                    recovery: {
+                        totalChunks: chunkGroup.length,
+                        checksum: fileMetadata.file.sha256,
+                        uploadCost: chunkGroup.length * 0.00005
+                    },
+                    
+                    metadata: {
+                        parentFile: fileMetadata.file.name,
+                        groupInfo: {
+                            index: groupIndex,
+                            startChunk: groupIndex * config.superMeta.chunksPerMeta,
+                            endChunk: (groupIndex + 1) * config.superMeta.chunksPerMeta - 1
+                        }
+                    }
+                };
+                
+                // Encrypt and upload
+                const metaDataString = JSON.stringify(metaTxData);
+                const metaDataBytes = new TextEncoder().encode(metaDataString);
+                
+                const salt = fromBase64(fileMetadata.encryption.pbkdf2.salt);
+                const key = await deriveKey(password, salt);
+                
+                const encryptedMetaData = await encryptChunk(metaDataBytes, key, -1);
+                const metaPayload = new Uint8Array(salt.length + encryptedMetaData.length);
+                metaPayload.set(salt, 0);
+                metaPayload.set(encryptedMetaData, salt.length);
+                
+                log(`[SuperMeta] 中間メタデータサイズ: ${metaDataBytes.length} bytes`, 'debug');
+                
+                // Upload to blockchain
+                const utxoResponse = await rpcClient.getUtxosByAddresses([address.toString()]);
+                const entries = utxoResponse.entries || [];
+                
+                const formattedUtxos = entries.map(utxo => ({
+                    address: address.toString(),
+                    outpoint: {
+                        transactionId: utxo.outpoint.transactionId,
+                        index: utxo.outpoint.index
+                    },
+                    scriptPublicKey: utxo.scriptPublicKey,
+                    amount: BigInt(utxo.amount),
+                    isCoinbase: utxo.isCoinbase || false,
+                    blockDaaScore: BigInt(utxo.blockDaaScore)
+                }));
+                
+                const result = await kaspa.createTransactions({
+                    entries: formattedUtxos,
+                    outputs: [{
+                        address: address.toString(),
+                        amount: 100000000n // 1 KAS
+                    }],
+                    changeAddress: address.toString(),
+                    priorityFee: 10000n,
+                    networkId: config.network,
+                    payload: metaPayload
+                });
+                
+                const pendingTx = result.transactions[0];
+                await pendingTx.sign([privateKey]);
+                const metaTxId = await pendingTx.submit(rpcClient);
+                
+                log(`[SuperMeta] 中間メタTxID: ${metaTxId.substring(0, 16)}...`, 'success');
+                
+                // Wait for confirmation
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                
+                // Get BlockID (simplified for now)
+                let metaBlockId = null;
+                let waitTime = 0;
+                while (!metaBlockId && waitTime < 30000) {
+                    if (monitoredTransactions.has(metaTxId)) {
+                        const monitorData = monitoredTransactions.get(metaTxId);
+                        if (monitorData.blockId) {
+                            metaBlockId = monitorData.blockId;
+                            break;
+                        }
+                    }
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    waitTime += 500;
+                }
+                
+                return {
+                    txId: metaTxId,
+                    blockId: metaBlockId,
+                    groupIndex: groupIndex,
+                    chunkRange: metaTxData.chunkStructure.chunkRange
+                };
+                
+            } catch (error) {
+                log(`[SuperMeta] 中間メタデータ生成エラー: ${error.message}`, 'error');
+                throw error;
+            }
+        }
+
+        // Create super meta-tx that references all intermediate meta-txs
+        async function createSuperMetaTx(intermediateMetaTxs, fileMetadata, password) {
+            try {
+                log(`[SuperMeta] スーパーメタデータを生成中...`, 'info');
+                
+                // Create super metadata
+                const superMetaTxData = {
+                    type: "kaspa-meta-tx",
+                    version: "3.3",
+                    created: new Date().toISOString(),
+                    network: config.network,
+                    
+                    // Mark as super metadata
+                    chunkStructure: {
+                        type: "super",
+                        level: 2,
+                        totalChunks: fileMetadata.recovery.totalChunks,
+                        hierarchy: {
+                            chunksPerMeta: config.superMeta.chunksPerMeta,
+                            metasPerSuper: intermediateMetaTxs.length
+                        }
+                    },
+                    
+                    encryption: fileMetadata.encryption,
+                    file: fileMetadata.file,
+                    
+                    // chunks array contains intermediate meta-tx IDs
+                    chunks: intermediateMetaTxs.map(m => m.txId),
+                    chunkBlockIds: intermediateMetaTxs.map(m => m.blockId || ''),
+                    
+                    recovery: {
+                        totalChunks: fileMetadata.recovery.totalChunks,
+                        checksum: fileMetadata.file.sha256,
+                        uploadCost: fileMetadata.recovery.uploadCost
+                    },
+                    
+                    metadata: {
+                        hierarchy: {
+                            childMetadata: intermediateMetaTxs.map(m => ({
+                                index: m.groupIndex,
+                                range: m.chunkRange,
+                                txId: m.txId,
+                                blockId: m.blockId
+                            }))
+                        }
+                    }
+                };
+                
+                // Encrypt and upload
+                const metaDataString = JSON.stringify(superMetaTxData);
+                const metaDataBytes = new TextEncoder().encode(metaDataString);
+                
+                const salt = fromBase64(fileMetadata.encryption.pbkdf2.salt);
+                const key = await deriveKey(password, salt);
+                
+                const encryptedMetaData = await encryptChunk(metaDataBytes, key, -1);
+                const metaPayload = new Uint8Array(salt.length + encryptedMetaData.length);
+                metaPayload.set(salt, 0);
+                metaPayload.set(encryptedMetaData, salt.length);
+                
+                log(`[SuperMeta] スーパーメタデータサイズ: ${metaDataBytes.length} bytes`, 'debug');
+                
+                // Upload to blockchain
+                const utxoResponse = await rpcClient.getUtxosByAddresses([address.toString()]);
+                const entries = utxoResponse.entries || [];
+                
+                const formattedUtxos = entries.map(utxo => ({
+                    address: address.toString(),
+                    outpoint: {
+                        transactionId: utxo.outpoint.transactionId,
+                        index: utxo.outpoint.index
+                    },
+                    scriptPublicKey: utxo.scriptPublicKey,
+                    amount: BigInt(utxo.amount),
+                    isCoinbase: utxo.isCoinbase || false,
+                    blockDaaScore: BigInt(utxo.blockDaaScore)
+                }));
+                
+                const result = await kaspa.createTransactions({
+                    entries: formattedUtxos,
+                    outputs: [{
+                        address: address.toString(),
+                        amount: 100000000n // 1 KAS
+                    }],
+                    changeAddress: address.toString(),
+                    priorityFee: 10000n,
+                    networkId: config.network,
+                    payload: metaPayload
+                });
+                
+                const pendingTx = result.transactions[0];
+                await pendingTx.sign([privateKey]);
+                const superMetaTxId = await pendingTx.submit(rpcClient);
+                
+                log(`[SuperMeta] スーパーメタTxID: ${superMetaTxId}`, 'success');
+                
+                // Wait for confirmation
+                let superMetaBlockId = null;
+                let waitTime = 0;
+                while (!superMetaBlockId && waitTime < 30000) {
+                    if (monitoredTransactions.has(superMetaTxId)) {
+                        const monitorData = monitoredTransactions.get(superMetaTxId);
+                        if (monitorData.blockId) {
+                            superMetaBlockId = monitorData.blockId;
+                            break;
+                        }
+                    }
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    waitTime += 500;
+                }
+                
+                return {
+                    txId: superMetaTxId,
+                    blockId: superMetaBlockId,
+                    type: 'super',
+                    metaCount: intermediateMetaTxs.length
+                };
+                
+            } catch (error) {
+                log(`[SuperMeta] スーパーメタデータ生成エラー: ${error.message}`, 'error');
+                throw error;
+            }
+        }
 
         // Load directory metadata
         async function loadDirectoryMetadata(dirMetadata) {
@@ -7227,24 +7559,116 @@
                         }
                         
                         // 通常ファイルの場合
-                        // Set kaspaMetadata from meta-tx data
-                        kaspaMetadata = {
-                            ...metaData,  // Keep all fields from meta-tx
-                            metaTx: {
-                                txid: metaTxId,
-                                blockId: blockId,
-                                loadedAt: Date.now()
+                        
+                        // Check if this is super metadata
+                        if (metaData.chunkStructure?.type === 'super') {
+                            log('[SuperMeta] スーパーメタデータを検出しました', 'info');
+                            log(`[SuperMeta] メタデータ数: ${metaData.chunks.length}`, 'info');
+                            log(`[SuperMeta] 総チャンク数: ${metaData.chunkStructure.totalChunks}`, 'info');
+                            
+                            // Download all intermediate metadata
+                            const intermediateMetadatas = [];
+                            for (let i = 0; i < metaData.chunks.length; i++) {
+                                const intMetaTxId = metaData.chunks[i];
+                                const intMetaBlockId = metaData.chunkBlockIds[i];
+                                
+                                log(`[SuperMeta] 中間メタデータ ${i + 1}/${metaData.chunks.length} を取得中...`, 'info');
+                                
+                                // Download intermediate metadata
+                                try {
+                                    const blockResponse = await rpcClient.getBlock({
+                                        hash: intMetaBlockId,
+                                        includeTransactions: true
+                                    });
+                                    
+                                    const block = blockResponse?.block?.block || blockResponse?.block;
+                                    if (!block) {
+                                        throw new Error(`中間メタデータのブロックが見つかりません: ${intMetaBlockId}`);
+                                    }
+                                    
+                                    // Find the intermediate meta transaction
+                                    let intPayload = null;
+                                    for (const tx of block.transactions || []) {
+                                        const txId = tx.verboseData?.transactionId || tx.id || tx.transactionId;
+                                        if (txId === intMetaTxId) {
+                                            if (tx.payload && tx.payload !== '') {
+                                                const hexPayload = tx.payload;
+                                                intPayload = safeHexDecode(hexPayload, 'intermediate meta-tx payload');
+                                                break;
+                                            }
+                                        }
+                                    }
+                                    
+                                    if (!intPayload) {
+                                        throw new Error(`中間メタデータのペイロードが見つかりません`);
+                                    }
+                                    
+                                    // Decrypt intermediate metadata
+                                    const intSalt = intPayload.slice(0, 16);
+                                    const intEncryptedData = intPayload.slice(16);
+                                    const intKey = await deriveKey(password, intSalt);
+                                    const intDecrypted = await decryptChunk(intEncryptedData, intKey, -1);
+                                    const intMetaData = JSON.parse(new TextDecoder().decode(intDecrypted));
+                                    
+                                    intermediateMetadatas.push(intMetaData);
+                                    log(`[SuperMeta] 中間メタデータ ${i + 1} 取得完了`, 'success');
+                                    
+                                } catch (error) {
+                                    log(`[SuperMeta] 中間メタデータ取得エラー: ${error.message}`, 'error');
+                                    throw error;
+                                }
                             }
-                        };
+                            
+                            // Merge all chunk references from intermediate metadata
+                            const allChunks = [];
+                            const allChunkBlockIds = [];
+                            for (const intMeta of intermediateMetadatas) {
+                                allChunks.push(...intMeta.chunks);
+                                allChunkBlockIds.push(...intMeta.chunkBlockIds);
+                            }
+                            
+                            // Create unified metadata from super metadata
+                            kaspaMetadata = {
+                                ...metaData,
+                                chunks: allChunks,
+                                chunkBlockIds: allChunkBlockIds,
+                                chunkStructure: {
+                                    ...metaData.chunkStructure,
+                                    intermediateMetadatas: intermediateMetadatas.length
+                                },
+                                metaTx: {
+                                    type: 'super',
+                                    txid: metaTxId,
+                                    blockId: blockId,
+                                    loadedAt: Date.now()
+                                }
+                            };
+                            
+                            log(`[SuperMeta] 統合完了: ${allChunks.length}チャンク`, 'success');
+                            
+                        } else {
+                            // Regular metadata
+                            kaspaMetadata = {
+                                ...metaData,  // Keep all fields from meta-tx
+                                metaTx: {
+                                    txid: metaTxId,
+                                    blockId: blockId,
+                                    loadedAt: Date.now()
+                                }
+                            };
+                        }
                         
                         // Show file info
+                        const metaType = kaspaMetadata.chunkStructure?.type || 'flat';
+                        const totalChunks = kaspaMetadata.chunkStructure?.totalChunks || kaspaMetadata.chunks.length;
+                        
                         document.getElementById('fileInfo').textContent = 
                             `ファイル名: ${kaspaMetadata.file.name}\n` +
                             `サイズ: ${(kaspaMetadata.file.size / 1024).toFixed(1)} KB\n` +
-                            `チャンク数: ${kaspaMetadata.chunks.length}\n` +
+                            `チャンク数: ${totalChunks} (${metaType === 'super' ? 'スーパーメタデータ' : '通常'})\n` +
                             `暗号化: ${kaspaMetadata.encryption.algorithm}\n` +
                             `圧縮: ${kaspaMetadata.file?.compression?.enabled ? kaspaMetadata.file.compression.algorithm : 'なし'}\n` +
-                            `作成日時: ${new Date(kaspaMetadata.metadata.createdAt).toLocaleString()}\n` +
+                            `作成日時: ${new Date(kaspaMetadata.created || kaspaMetadata.metadata?.createdAt).toLocaleString()}\n` +
                             `メタTxID: ${metaTxId.substring(0, 16)}...`;
                         
                         // Set password for download
@@ -7826,7 +8250,7 @@
             }
             
             log(`🚀 Kaspa P2P v${getAppVersion()} 準備完了！`, 'info');
-            log(`📋 v${getAppVersion()}: ディレクトリメタデータ型検証を修正`, 'info');
+            log(`📋 v${getAppVersion()}: スーパーメタデータで大規模ファイル対応`, 'info');
             log('✨ 並列ダウンロード: ' + (parallelDownloadEnabled ? '有効' : '無効'), 'info');
             log('システムを初期化してください', 'info');
             

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v4.7.56 - Add function start/end logging</title>
+    <title>Kaspa P2P File Storage v4.7.57 - Add error handling for new approach</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -5101,8 +5101,9 @@
             // v4.7.56: 関数開始ログを追加
             log('[processFileWithPayloadSplit] 開始', 'info');
             
-            const PROCESS_CHUNK_SIZE = 128 * 1024; // 128KB processing chunks
-            const PAYLOAD_SIZE = 22 * 1024; // 22KB payloads
+            try {
+                const PROCESS_CHUNK_SIZE = 128 * 1024; // 128KB processing chunks
+                const PAYLOAD_SIZE = 22 * 1024; // 22KB payloads
             
             // Generate proper salt using file hash
             let fileHash;
@@ -5191,6 +5192,12 @@
             log(`[processFileWithPayloadSplit] 完了 - ${payloads.length}個のペイロード生成`, 'info');
             
             return { payloads, key, salt, chunkBoundaries };
+            } catch (error) {
+                // v4.7.57: エラーハンドリングを追加
+                log(`[processFileWithPayloadSplit] エラー: ${error.message}`, 'error');
+                log(`[processFileWithPayloadSplit] スタック: ${error.stack}`, 'error');
+                throw error;
+            }
         }
         
         // Check if transaction exists on blockchain
@@ -5471,13 +5478,14 @@
                 if (useNewApproach) {
                     log('🚀 新方式: 暗号化後ペイロード分割を使用', 'info');
                     
-                    // Process entire file and split into payloads
-                    const { payloads, key: encKey, salt: encSalt, chunkBoundaries } = await processFileWithPayloadSplit(
-                        currentFile, 
-                        password, 
-                        progressManager, 
-                        useCompression
-                    );
+                    try {
+                        // Process entire file and split into payloads
+                        const { payloads, key: encKey, salt: encSalt, chunkBoundaries } = await processFileWithPayloadSplit(
+                            currentFile, 
+                            password, 
+                            progressManager, 
+                            useCompression
+                        );
                     
                     // Upload each payload
                     for (let i = 0; i < payloads.length; i++) {
@@ -5690,6 +5698,13 @@
                     
                     // Skip old chunk processing
                     nextChunkIndex = -1;
+                    
+                    } catch (error) {
+                        // v4.7.57: 新方式のエラーハンドリング
+                        log(`[新方式] エラーが発生しました: ${error.message}`, 'error');
+                        log(`[新方式] 処理を中断します`, 'error');
+                        throw error;
+                    }
                     
                 } else {
                     // Use old approach for smaller chunks
@@ -7800,7 +7815,7 @@
             }
             
             log(`🚀 Kaspa P2P v${getAppVersion()} 準備完了！`, 'info');
-            log(`📋 v${getAppVersion()}: processFileWithPayloadSplit関数の開始/終了ログを追加`, 'info');
+            log(`📋 v${getAppVersion()}: 新方式のエラーハンドリングを追加`, 'info');
             log('✨ 並列ダウンロード: ' + (parallelDownloadEnabled ? '有効' : '無効'), 'info');
             log('システムを初期化してください', 'info');
             

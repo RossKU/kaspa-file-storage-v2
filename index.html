@@ -6226,16 +6226,18 @@
             try {
                 log('メタトランザクション作成を開始します...', 'info');
                 
-                // Check if super metadata is needed (experimental: 2 chunks)
+                // Check if super metadata is needed based on chunk count
                 const totalChunks = kaspaMetadata.chunks.length;
-                if (config.superMeta.enabled && totalChunks > config.superMeta.chunksPerMeta) {
+                const CHUNKS_PER_META = 200; // Standard limit for meta transaction size
+                
+                if (totalChunks > CHUNKS_PER_META) {
                     log(`[SuperMeta] 実験的: ${totalChunks}チャンク検出 - スーパーメタデータを生成します`, 'info');
                     
                     // Group chunks
                     const chunkGroups = [];
-                    for (let i = 0; i < totalChunks; i += config.superMeta.chunksPerMeta) {
+                    for (let i = 0; i < totalChunks; i += CHUNKS_PER_META) {
                         const group = [];
-                        for (let j = 0; j < config.superMeta.chunksPerMeta && i + j < totalChunks; j++) {
+                        for (let j = 0; j < CHUNKS_PER_META && i + j < totalChunks; j++) {
                             group.push({
                                 txid: kaspaMetadata.chunks[i + j],
                                 blockId: kaspaMetadata.chunkBlockIds[i + j]
@@ -6521,8 +6523,8 @@
                         groupIndex: groupIndex,
                         totalGroups: totalGroups,
                         chunkRange: [
-                            groupIndex * config.superMeta.chunksPerMeta,
-                            Math.min((groupIndex + 1) * config.superMeta.chunksPerMeta - 1, fileMetadata.recovery.totalChunks - 1)
+                            groupIndex * CHUNKS_PER_META,
+                            Math.min((groupIndex + 1) * CHUNKS_PER_META - 1, fileMetadata.recovery.totalChunks - 1)
                         ]
                     },
                     
@@ -6543,8 +6545,8 @@
                         parentFile: fileMetadata.file.name,
                         groupInfo: {
                             index: groupIndex,
-                            startChunk: groupIndex * config.superMeta.chunksPerMeta,
-                            endChunk: (groupIndex + 1) * config.superMeta.chunksPerMeta - 1
+                            startChunk: groupIndex * CHUNKS_PER_META,
+                            endChunk: (groupIndex + 1) * CHUNKS_PER_META - 1
                         }
                     }
                 };
@@ -6597,22 +6599,37 @@
                 
                 log(`[SuperMeta] 中間メタTxID: ${metaTxId.substring(0, 16)}...`, 'success');
                 
-                // Wait for confirmation
-                await new Promise(resolve => setTimeout(resolve, 2000));
+                // Add to monitoring list
+                if (window.wsMonitorActive && window.addTransactionToMonitor) {
+                    window.addTransactionToMonitor(metaTxId, '中間メタトランザクション');
+                }
                 
-                // Get BlockID (simplified for now)
+                // Wait for BlockID using WebSocket monitoring
                 let metaBlockId = null;
-                let waitTime = 0;
-                while (!metaBlockId && waitTime < 30000) {
-                    if (monitoredTransactions.has(metaTxId)) {
-                        const monitorData = monitoredTransactions.get(metaTxId);
-                        if (monitorData.blockId) {
-                            metaBlockId = monitorData.blockId;
-                            break;
-                        }
+                const maxWaitTime = 30000; // 30 seconds max
+                const startTime = Date.now();
+                
+                // Create promise that resolves when BlockID is received
+                const blockIdPromise = new Promise((resolve) => {
+                    if (!window.pendingBlockIds) {
+                        window.pendingBlockIds = new Map();
                     }
-                    await new Promise(resolve => setTimeout(resolve, 500));
-                    waitTime += 500;
+                    window.pendingBlockIds.set(metaTxId, resolve);
+                });
+                
+                // Wait for BlockID with timeout
+                try {
+                    metaBlockId = await Promise.race([
+                        blockIdPromise,
+                        new Promise((_, reject) => 
+                            setTimeout(() => reject(new Error('BlockID取得タイムアウト')), maxWaitTime)
+                        )
+                    ]);
+                    
+                    log(`[SuperMeta] 中間メタBlockID取得: ${metaBlockId.substring(0, 16)}...`, 'success');
+                } catch (timeoutError) {
+                    log(`[SuperMeta] 警告: BlockID取得がタイムアウトしました`, 'warning');
+                    // Continue without BlockID (REST API fallback will be available)
                 }
                 
                 return {
@@ -6646,7 +6663,7 @@
                         level: 2,
                         totalChunks: fileMetadata.recovery.totalChunks,
                         hierarchy: {
-                            chunksPerMeta: config.superMeta.chunksPerMeta,
+                            chunksPerMeta: CHUNKS_PER_META,
                             metasPerSuper: intermediateMetaTxs.length
                         }
                     },
@@ -7576,31 +7593,54 @@
                                 
                                 // Download intermediate metadata
                                 try {
-                                    const blockResponse = await rpcClient.getBlock({
-                                        hash: intMetaBlockId,
-                                        includeTransactions: true
-                                    });
-                                    
-                                    const block = blockResponse?.block?.block || blockResponse?.block;
-                                    if (!block) {
-                                        throw new Error(`中間メタデータのブロックが見つかりません: ${intMetaBlockId}`);
-                                    }
-                                    
-                                    // Find the intermediate meta transaction
+                                    // Try BlockID first if available
                                     let intPayload = null;
-                                    for (const tx of block.transactions || []) {
-                                        const txId = tx.verboseData?.transactionId || tx.id || tx.transactionId;
-                                        if (txId === intMetaTxId) {
-                                            if (tx.payload && tx.payload !== '') {
-                                                const hexPayload = tx.payload;
-                                                intPayload = safeHexDecode(hexPayload, 'intermediate meta-tx payload');
-                                                break;
+                                    
+                                    if (intMetaBlockId && intMetaBlockId !== '') {
+                                        // Try to get via BlockID
+                                        try {
+                                            const blockResponse = await rpcClient.getBlock({
+                                                hash: intMetaBlockId,
+                                                includeTransactions: true
+                                            });
+                                            
+                                            const block = blockResponse?.block?.block || blockResponse?.block;
+                                            if (!block) {
+                                                throw new Error(`中間メタデータのブロックが見つかりません: ${intMetaBlockId}`);
                                             }
+                                            
+                                            // Find the intermediate meta transaction
+                                            for (const tx of block.transactions || []) {
+                                                const txId = tx.verboseData?.transactionId || tx.id || tx.transactionId;
+                                                if (txId === intMetaTxId) {
+                                                    if (tx.payload && tx.payload !== '') {
+                                                        const hexPayload = tx.payload;
+                                                        intPayload = safeHexDecode(hexPayload, 'intermediate meta-tx payload');
+                                                        break;
+                                                    }
+                                                }
+                                            }
+                                        } catch (blockError) {
+                                            log(`[SuperMeta] BlockID経由の取得に失敗、REST APIにフォールバック`, 'warning');
                                         }
                                     }
                                     
+                                    // Fallback to REST API if BlockID failed or not available
                                     if (!intPayload) {
-                                        throw new Error(`中間メタデータのペイロードが見つかりません`);
+                                        log(`[SuperMeta] REST API経由で中間メタデータを取得中...`, 'info');
+                                        
+                                        const txResponse = await fetch(`https://api.kaspa.org/transactions/${intMetaTxId}`);
+                                        if (!txResponse.ok) {
+                                            throw new Error(`中間メタデータが見つかりません: ${intMetaTxId}`);
+                                        }
+                                        
+                                        const txData = await txResponse.json();
+                                        
+                                        if (txData.payload && txData.payload !== '') {
+                                            intPayload = safeHexDecode(txData.payload, 'intermediate meta-tx payload from API');
+                                        } else {
+                                            throw new Error(`中間メタデータのペイロードが空です`);
+                                        }
                                     }
                                     
                                     // Decrypt intermediate metadata

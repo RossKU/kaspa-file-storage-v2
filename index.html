@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.0.3 - Super Metadata Fix</title>
+    <title>Kaspa P2P File Storage v5.0.4 - Super Metadata Working</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -6631,30 +6631,27 @@
                     window.addTransactionToMonitor(metaTxId, '中間メタトランザクション');
                 }
                 
-                // Wait for BlockID using WebSocket monitoring
+                // Wait for BlockID using WebSocket monitoring (same pattern as regular meta-tx)
                 let metaBlockId = null;
+                let waitTime = 0;
                 const maxWaitTime = 30000; // 30 seconds max
-                const startTime = Date.now();
                 
-                // Create promise that resolves when BlockID is received
-                const blockIdPromise = new Promise((resolve) => {
-                    if (!window.pendingBlockIds) {
-                        window.pendingBlockIds = new Map();
+                while (!metaBlockId && waitTime < maxWaitTime) {
+                    if (monitoredTransactions.has(metaTxId)) {
+                        const monitorData = monitoredTransactions.get(metaTxId);
+                        if (monitorData.blockId) {
+                            metaBlockId = monitorData.blockId;
+                            // Remove from monitoring list
+                            monitoredTransactions.delete(metaTxId);
+                            log(`[SuperMeta] 中間メタBlockID取得: ${metaBlockId.substring(0, 16)}...`, 'success');
+                            break;
+                        }
                     }
-                    window.pendingBlockIds.set(metaTxId, resolve);
-                });
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    waitTime += 500;
+                }
                 
-                // Wait for BlockID with timeout
-                try {
-                    metaBlockId = await Promise.race([
-                        blockIdPromise,
-                        new Promise((_, reject) => 
-                            setTimeout(() => reject(new Error('BlockID取得タイムアウト')), maxWaitTime)
-                        )
-                    ]);
-                    
-                    log(`[SuperMeta] 中間メタBlockID取得: ${metaBlockId.substring(0, 16)}...`, 'success');
-                } catch (timeoutError) {
+                if (!metaBlockId) {
                     log(`[SuperMeta] 警告: BlockID取得がタイムアウトしました`, 'warning');
                     // Continue without BlockID (REST API fallback will be available)
                 }

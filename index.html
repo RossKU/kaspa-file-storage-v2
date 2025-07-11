@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.0.5 - Debug Super Metadata Integration</title>
+    <title>Kaspa P2P File Storage v5.0.6 - Fix PayloadSplit Flag in Super Metadata</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -6551,7 +6551,9 @@
                             index: groupIndex,
                             startChunk: groupIndex * chunksPerMeta,
                             endChunk: (groupIndex + 1) * chunksPerMeta - 1
-                        }
+                        },
+                        // Pass through payloadSplit flag if present
+                        payloadSplit: fileMetadata.metadata?.payloadSplit || false
                     }
                 };
                 
@@ -7692,9 +7694,14 @@
                             // Merge all chunk references from intermediate metadata
                             const allChunks = [];
                             const allChunkBlockIds = [];
+                            let payloadSplitFlag = false;
                             for (const intMeta of intermediateMetadatas) {
                                 allChunks.push(...intMeta.chunks);
                                 allChunkBlockIds.push(...intMeta.chunkBlockIds);
+                                // Check if any intermediate metadata has payloadSplit flag
+                                if (intMeta.metadata?.payloadSplit) {
+                                    payloadSplitFlag = true;
+                                }
                             }
                             
                             // Create unified metadata from super metadata
@@ -7705,6 +7712,11 @@
                                 chunkStructure: {
                                     ...metaData.chunkStructure,
                                     intermediateMetadatas: intermediateMetadatas.length
+                                },
+                                // Merge metadata with payloadSplit flag
+                                metadata: {
+                                    ...metaData.metadata,
+                                    payloadSplit: payloadSplitFlag
                                 },
                                 metaTx: {
                                     type: 'super',

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.0.4 - Super Metadata Working</title>
+    <title>Kaspa P2P File Storage v5.0.5 - Super Metadata Scope Fix</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -6604,9 +6604,12 @@
                 const txId = pendingTx.id;
                 log(`[SuperMeta] トランザクションID (送信前): ${txId.substring(0, 16)}...`, 'debug');
                 
+                // Declare metaTxId outside try block for proper scope
+                let metaTxId;
+                
                 // Submit transaction - using the same pattern as chunk upload
                 try {
-                    const metaTxId = await pendingTx.submit(rpcClient);
+                    metaTxId = await pendingTx.submit(rpcClient);
                     
                     if (!metaTxId) {
                         throw new Error('submit()がnullを返しました');

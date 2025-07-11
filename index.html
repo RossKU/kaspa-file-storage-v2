@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.2.0 - Single/Super/Ultra Hierarchy</title>
+    <title>Kaspa P2P File Storage v5.2.1 - Performance Optimizations</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -5183,7 +5183,7 @@
             log('[processFileWithPayloadSplit] 開始', 'info');
             
             try {
-                const PROCESS_CHUNK_SIZE = 128 * 1024; // 128KB processing chunks
+                const PROCESS_CHUNK_SIZE = 1024 * 1024; // 1MB processing chunks
                 const PAYLOAD_SIZE = 22 * 1024; // 22KB payloads
             
             // Generate proper salt using file hash
@@ -5663,8 +5663,7 @@
                                     blockId: null
                                 });
                                 
-                                // Wait for confirmation
-                                await new Promise(resolve => setTimeout(resolve, 2000));
+                                // WebSocket monitoring will handle confirmation immediately
                                 
                                 // Get BlockID (existing logic)
                                 let waitTime = 0;
@@ -5738,7 +5737,7 @@
                                     await progressManager.saveProgress();
                                     throw error;
                                 }
-                                await new Promise(resolve => setTimeout(resolve, 2000));
+                                // No delay needed - WebSocket monitoring handles confirmation
                             }
                         }
                         
@@ -5929,7 +5928,7 @@
                             
                             // Wait for transaction to be accepted
                             log(`トランザクションの確認待ち...`);
-                            await new Promise(resolve => setTimeout(resolve, 2000));
+                            // No delay needed - WebSocket monitoring handles confirmation
                             
                             // Try WebSocket monitoring first
                             log(`トランザクション確認を待機中...`);
@@ -6051,7 +6050,7 @@
                                 throw error;
                             }
                             log(`2秒待機後にリトライ...`);
-                            await new Promise(resolve => setTimeout(resolve, 2000));
+                            // No delay needed - WebSocket monitoring handles confirmation
                         }
                     }
                     

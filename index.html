@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.0.5 - Super Metadata Scope Fix</title>
+    <title>Kaspa P2P File Storage v5.0.5 - Debug Super Metadata Integration</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -3561,6 +3561,9 @@
                     const { onProgress, onComplete, folderStructure } = options;
                     
                     log(`[DownloadManager] ダウンロード開始: ${metadata.file?.name || 'unknown'}`, 'info');
+                    log(`[DownloadManager DEBUG] chunks[0]: ${metadata.chunks[0]?.substring(0, 16)}...`, 'debug');
+                    log(`[DownloadManager DEBUG] chunks配列長: ${metadata.chunks?.length}`, 'debug');
+                    log(`[DownloadManager DEBUG] chunkStructure.type: ${metadata.chunkStructure?.type}`, 'debug');
                     
                     // Derive encryption key
                     const salt = fromBase64(metadata.encryption.pbkdf2.salt);
@@ -7712,6 +7715,8 @@
                             };
                             
                             log(`[SuperMeta] 統合完了: ${allChunks.length}チャンク`, 'success');
+                            log(`[SuperMeta DEBUG] 統合後のchunks[0]: ${kaspaMetadata.chunks[0]?.substring(0, 16)}...`, 'debug');
+                            log(`[SuperMeta DEBUG] allChunks[0]: ${allChunks[0]?.substring(0, 16)}...`, 'debug');
                             
                         } else {
                             // Regular metadata
@@ -7796,6 +7801,8 @@
                                kaspaMetadata.directory?.name || 
                                'unknown';
                 log(`ダウンロード開始: ${fileName}`);
+                log(`[DEBUG] ダウンロード時のchunks[0]: ${kaspaMetadata.chunks[0]?.substring(0, 16)}...`, 'debug');
+                log(`[DEBUG] chunks配列長: ${kaspaMetadata.chunks?.length}`, 'debug');
                 
                 // Derive key
                 if (!kaspaMetadata.encryption || !kaspaMetadata.encryption.pbkdf2) {

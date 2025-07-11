@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.2.2 - Stable Transaction Confirmation</title>
+    <title>Kaspa P2P File Storage v5.2.3 - Large File Error Handling</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -4155,6 +4155,13 @@
             currentFile = file;
             log(`ファイル選択: ${file.name} (${(file.size/1024).toFixed(1)}KB)`);
             
+            // Check if file size exceeds 550MB
+            const MAX_SIZE_WITH_META = 550 * 1024 * 1024; // 550MB
+            if (file.size > MAX_SIZE_WITH_META) {
+                log(`⚠️ 警告: このファイルサイズ(${(file.size/1024/1024).toFixed(1)}MB)では、ブロックチェーン上のメタデータトランザクションが生成されない可能性があります`, 'warning');
+                log('.kaspaファイルは生成されますが、メタデータの共有が制限されます', 'warning');
+            }
+            
             // Auto-detect progress file from workspace
             if (!window.pendingProgress && progressFileMap.has(file.name)) {
                 const progressInfo = progressFileMap.get(file.name);
@@ -6294,6 +6301,30 @@
                 // Check if super metadata is needed based on chunk count
                 const totalChunks = kaspaMetadata.chunks.length;
                 const CHUNKS_PER_META = 160; // 160 chunks per single MetaTxID
+                const MAX_CHUNKS_SUPPORTED = 25600; // 160 × 160
+                
+                // Check if exceeds maximum supported chunks
+                if (totalChunks > MAX_CHUNKS_SUPPORTED) {
+                    log(`❌ エラー: チャンク数(${totalChunks})が最大サポート数(${MAX_CHUNKS_SUPPORTED})を超えています`, 'error');
+                    log('このファイルサイズではメタデータトランザクションを生成できません', 'error');
+                    
+                    const continueUpload = confirm(
+                        `このファイルは${totalChunks}個のチャンクに分割されており、` +
+                        `最大サポート数の${MAX_CHUNKS_SUPPORTED}チャンクを超えています。\n\n` +
+                        `ブロックチェーン上にメタデータトランザクションは生成されません。\n` +
+                        `.kaspaファイル（ローカル）のみが生成されます。\n` +
+                        `チャンクはブロックチェーンに保存されますが、メタデータの共有が制限されます。\n\n` +
+                        `続行しますか？`
+                    );
+                    
+                    if (!continueUpload) {
+                        log('ユーザーによりアップロードがキャンセルされました', 'info');
+                        return;
+                    }
+                    
+                    log('メタデータトランザクションなしで続行します', 'warning');
+                    return;
+                }
                 
                 if (totalChunks > CHUNKS_PER_META) {
                     log(`[SuperMeta] ${totalChunks}チャンク検出 - スーパーメタデータを生成します`, 'info');

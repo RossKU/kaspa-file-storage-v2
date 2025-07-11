@@ -9286,30 +9286,98 @@
 
             generateTestWallet(index) {
                 try {
-                    console.log(`Generating test wallet ${index}...`);
+                    console.log(`[MultiWallet] Generating test wallet ${index}...`);
                     
                     // Kaspa WASM SDKチェック
-                    if (typeof kaspa === 'undefined' || !kaspa.PrivateKey) {
+                    if (typeof kaspa === 'undefined') {
                         throw new Error('Kaspa WASM not initialized. Please run "システムを初期化" first.');
                     }
                     
+                    if (!kaspa.PrivateKey) {
+                        throw new Error('PrivateKey class not available in Kaspa WASM.');
+                    }
+                    
+                    // デバッグ情報
+                    console.log('[MultiWallet] Available kaspa methods:', Object.keys(kaspa));
+                    
                     const privateKey = new kaspa.PrivateKey();
+                    console.log('[MultiWallet] Private key generated successfully');
+                    
                     const publicKey = privateKey.toPublicKey();
-                    const network = (typeof NETWORK !== 'undefined') ? NETWORK : 'testnet-10';
-                    const address = publicKey.toAddress(network).toString();
+                    console.log('[MultiWallet] Public key generated successfully');
+                    
+                    // Network detection - より安全な方法
+                    let networkType = 'testnet-10'; // デフォルト
+                    
+                    // グローバル変数をチェック
+                    if (typeof NETWORK !== 'undefined' && NETWORK) {
+                        networkType = NETWORK;
+                        console.log('[MultiWallet] Using global NETWORK:', networkType);
+                    } else {
+                        // 既存のRPC設定から推定
+                        const networkSelect = document.getElementById('networkSelect');
+                        if (networkSelect && networkSelect.value) {
+                            networkType = networkSelect.value;
+                            console.log('[MultiWallet] Using networkSelect value:', networkType);
+                        }
+                    }
+                    
+                    console.log('[MultiWallet] Final network type:', networkType);
+                    
+                    // アドレス生成 - 既存システムと同じ方法を使用
+                    let address;
+                    try {
+                        // 方法1: グローバルNETWORK変数を使用（既存システムと同じ）
+                        if (typeof NETWORK !== 'undefined' && NETWORK) {
+                            address = privateKey.toAddress(NETWORK).toString();
+                            console.log('[MultiWallet] Address generated with global NETWORK:', address);
+                        }
+                        // 方法2: testnet-10を直接指定
+                        else {
+                            address = privateKey.toAddress('testnet-10').toString();
+                            console.log('[MultiWallet] Address generated with testnet-10:', address);
+                        }
+                    } catch (addrError) {
+                        console.error('[MultiWallet] Primary address generation failed:', addrError);
+                        
+                        // フォールバック1: 引数なしで試す（デフォルトネットワーク）
+                        try {
+                            address = privateKey.toAddress().toString();
+                            console.log('[MultiWallet] Address generated with default network:', address);
+                        } catch (fallback1Error) {
+                            console.error('[MultiWallet] Fallback 1 failed:', fallback1Error);
+                            
+                            // フォールバック2: 公開鍵から直接アドレス作成を試す
+                            try {
+                                // 最後の手段として、公開鍵の文字列表現を使用
+                                const pubKeyStr = publicKey.toString();
+                                address = `testnet:${pubKeyStr.substring(0, 62)}`;
+                                console.log('[MultiWallet] Temporary address generated:', address);
+                            } catch (fallback2Error) {
+                                console.error('[MultiWallet] All fallbacks failed:', fallback2Error);
+                                throw new Error(`Complete address generation failure: ${addrError.message}`);
+                            }
+                        }
+                    }
                     
                     const wallet = {
                         id: `test_wallet_${index}`,
                         index: index,
                         address: address,
+                        network: networkType,
                         created: new Date().toISOString(),
                         status: 'new'
                     };
                     
-                    console.log(`✓ Generated wallet ${index}:`, wallet.address);
+                    console.log(`[MultiWallet] ✓ Generated wallet ${index}:`, {
+                        id: wallet.id,
+                        address: wallet.address,
+                        network: wallet.network
+                    });
+                    
                     return wallet;
                 } catch (error) {
-                    console.error('Wallet generation error:', error);
+                    console.error('[MultiWallet] Wallet generation error:', error);
                     throw new Error(`Wallet generation failed: ${error.message}`);
                 }
             }

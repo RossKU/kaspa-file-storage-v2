@@ -9275,9 +9275,120 @@
         // グローバル変数として定義
         let multiWalletTestMode = false;
         let simpleWalletManager = null;
-    </script>
-    <script src="phase1-multi-wallet.js"></script>
-    <script>
+
+        // 安全なインライン実装
+        class SimpleWalletManager {
+            constructor() {
+                this.subWallets = [];
+                this.isTestMode = true;
+                this.version = '1.0';
+            }
+
+            generateTestWallet(index) {
+                try {
+                    console.log(`Generating test wallet ${index}...`);
+                    
+                    // Kaspa WASM SDKチェック
+                    if (typeof kaspa === 'undefined' || !kaspa.PrivateKey) {
+                        throw new Error('Kaspa WASM not initialized. Please run "システムを初期化" first.');
+                    }
+                    
+                    const privateKey = new kaspa.PrivateKey();
+                    const publicKey = privateKey.toPublicKey();
+                    const network = (typeof NETWORK !== 'undefined') ? NETWORK : 'testnet-10';
+                    const address = publicKey.toAddress(network).toString();
+                    
+                    const wallet = {
+                        id: `test_wallet_${index}`,
+                        index: index,
+                        address: address,
+                        created: new Date().toISOString(),
+                        status: 'new'
+                    };
+                    
+                    console.log(`✓ Generated wallet ${index}:`, wallet.address);
+                    return wallet;
+                } catch (error) {
+                    console.error('Wallet generation error:', error);
+                    throw new Error(`Wallet generation failed: ${error.message}`);
+                }
+            }
+
+            generateMultipleWallets(count) {
+                console.log(`Generating ${count} test wallets...`);
+                const newWallets = [];
+                
+                for (let i = 0; i < count; i++) {
+                    const wallet = this.generateTestWallet(i);
+                    if (wallet) {
+                        newWallets.push(wallet);
+                    }
+                }
+                
+                this.subWallets = newWallets;
+                console.log(`✓ Successfully generated ${newWallets.length} wallets`);
+                return newWallets;
+            }
+
+            saveToLocalStorage() {
+                try {
+                    const publicData = {
+                        version: this.version,
+                        testMode: this.isTestMode,
+                        timestamp: new Date().toISOString(),
+                        wallets: this.subWallets.map(w => ({
+                            id: w.id,
+                            index: w.index,
+                            address: w.address,
+                            created: w.created,
+                            status: w.status
+                        }))
+                    };
+                    
+                    localStorage.setItem('multiWalletTest_public', JSON.stringify(publicData));
+                    console.log('✓ Wallet data saved to localStorage');
+                    return true;
+                } catch (error) {
+                    console.error('Save error:', error);
+                    return false;
+                }
+            }
+        }
+
+        // テスト関数
+        function testPhase1_Basic() {
+            console.log('\n=== Phase 1 Basic Test ===');
+            
+            try {
+                // マネージャーの初期化
+                simpleWalletManager = new SimpleWalletManager();
+                console.log('✓ Manager initialized');
+                
+                // 2つのウォレットを生成
+                const wallets = simpleWalletManager.generateMultipleWallets(2);
+                
+                if (wallets.length === 2) {
+                    console.log('✓ Successfully generated 2 wallets');
+                } else {
+                    throw new Error('Failed to generate wallets');
+                }
+                
+                // 保存テスト
+                const saved = simpleWalletManager.saveToLocalStorage();
+                console.log(`Save result: ${saved ? 'SUCCESS' : 'FAILED'}`);
+                
+                return { success: true, wallets: wallets };
+            } catch (error) {
+                console.error('Test failed:', error);
+                throw error;
+            }
+        }
+
+        function clearTestData() {
+            localStorage.removeItem('multiWalletTest_public');
+            console.log('✓ Test data cleared');
+        }
+
         // UI用の関数
         function runPhase1Test() {
             const statusEl = document.getElementById('phase1TestStatus');
@@ -9286,15 +9397,16 @@
             
             try {
                 // テスト実行
-                testPhase1_Basic();
+                const result = testPhase1_Basic();
                 
                 statusEl.textContent += '\n✅ Phase 1 test completed successfully!\n';
                 statusEl.textContent += 'Check browser console for detailed results.\n';
                 statusEl.textContent += '\nGenerated wallets:\n';
                 
-                if (simpleWalletManager && simpleWalletManager.subWallets.length > 0) {
-                    simpleWalletManager.subWallets.forEach((w, i) => {
-                        statusEl.textContent += `${i + 1}. ${w.address.substring(0, 20)}...${w.address.substring(w.address.length - 10)}\n`;
+                if (result.wallets && result.wallets.length > 0) {
+                    result.wallets.forEach((w, i) => {
+                        const shortAddr = `${w.address.substring(0, 20)}...${w.address.substring(w.address.length - 10)}`;
+                        statusEl.textContent += `${i + 1}. ${shortAddr}\n`;
                     });
                 }
                 
@@ -9311,16 +9423,21 @@
             const data = localStorage.getItem('multiWalletTest_public');
             
             if (data) {
-                const parsed = JSON.parse(data);
-                statusEl.textContent = 'Saved wallet data:\n\n';
-                statusEl.textContent += `Version: ${parsed.version}\n`;
-                statusEl.textContent += `Test Mode: ${parsed.testMode}\n`;
-                statusEl.textContent += `Timestamp: ${parsed.timestamp}\n`;
-                statusEl.textContent += `Wallets: ${parsed.wallets.length}\n\n`;
-                
-                parsed.wallets.forEach(w => {
-                    statusEl.textContent += `${w.id}: ${w.address.substring(0, 20)}...${w.address.substring(w.address.length - 10)}\n`;
-                });
+                try {
+                    const parsed = JSON.parse(data);
+                    statusEl.textContent = 'Saved wallet data:\n\n';
+                    statusEl.textContent += `Version: ${parsed.version}\n`;
+                    statusEl.textContent += `Test Mode: ${parsed.testMode}\n`;
+                    statusEl.textContent += `Timestamp: ${parsed.timestamp}\n`;
+                    statusEl.textContent += `Wallets: ${parsed.wallets.length}\n\n`;
+                    
+                    parsed.wallets.forEach(w => {
+                        const shortAddr = `${w.address.substring(0, 20)}...${w.address.substring(w.address.length - 10)}`;
+                        statusEl.textContent += `${w.id}: ${shortAddr}\n`;
+                    });
+                } catch (e) {
+                    statusEl.textContent = 'Error reading saved data: ' + e.message;
+                }
             } else {
                 statusEl.textContent = 'No saved wallet data found.\n';
                 statusEl.textContent += 'Run the test first to generate wallets.';

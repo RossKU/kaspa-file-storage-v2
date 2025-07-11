@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.0.9 - Backward Compatibility for v5.0.7</title>
+    <title>Kaspa P2P File Storage v5.0.10 - Multi-Wallet Phase 1 Test</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -728,6 +728,68 @@
             <div class="metric-box">
                 <h3>アップロード履歴</h3>
                 <div id="uploadHistory"></div>
+            </div>
+            
+            <!-- Multi-Wallet Phase 1 Test -->
+            <div class="metric-box" style="margin-top: 30px; background: rgba(73, 234, 203, 0.1); border: 2px solid #49EACB;">
+                <h3>🧪 Multi-Wallet Phase 1 Test</h3>
+                <p style="color: #999; font-size: 14px; margin-bottom: 15px;">
+                    実験的機能: マルチウォレットによる並列アップロード高速化のテスト
+                </p>
+                
+                <div style="margin: 15px 0;">
+                    <button onclick="runPhase1Test()" style="
+                        padding: 10px 20px;
+                        background: #49EACB;
+                        color: #16213e;
+                        border: none;
+                        border-radius: 5px;
+                        cursor: pointer;
+                        font-size: 16px;
+                        font-weight: bold;
+                    ">
+                        Run Phase 1 Test
+                    </button>
+                    
+                    <button onclick="viewTestResults()" style="
+                        padding: 10px 20px;
+                        background: #16213e;
+                        color: #49EACB;
+                        border: 2px solid #49EACB;
+                        border-radius: 5px;
+                        cursor: pointer;
+                        font-size: 16px;
+                        margin-left: 10px;
+                    ">
+                        View Saved Wallets
+                    </button>
+                    
+                    <button onclick="clearPhase1Data()" style="
+                        padding: 10px 20px;
+                        background: #16213e;
+                        color: #e94560;
+                        border: 2px solid #e94560;
+                        border-radius: 5px;
+                        cursor: pointer;
+                        font-size: 16px;
+                        margin-left: 10px;
+                    ">
+                        Clear Test Data
+                    </button>
+                </div>
+                
+                <div id="phase1TestStatus" style="
+                    margin-top: 15px;
+                    padding: 10px;
+                    background: rgba(15, 52, 96, 0.5);
+                    border-radius: 5px;
+                    font-family: monospace;
+                    white-space: pre-wrap;
+                    display: none;
+                    font-size: 14px;
+                    color: #49EACB;
+                    border: 1px solid rgba(73, 234, 203, 0.3);
+                "></div>
             </div>
         </div>
     </div>
@@ -9206,6 +9268,73 @@
                 });
             }
         });
+    </script>
+    
+    <!-- Multi-Wallet Phase 1 Integration -->
+    <script>
+        // グローバル変数として定義
+        let multiWalletTestMode = false;
+        let simpleWalletManager = null;
+    </script>
+    <script src="phase1-multi-wallet.js"></script>
+    <script>
+        // UI用の関数
+        function runPhase1Test() {
+            const statusEl = document.getElementById('phase1TestStatus');
+            statusEl.style.display = 'block';
+            statusEl.textContent = 'Running Phase 1 test...\n';
+            
+            try {
+                // テスト実行
+                testPhase1_Basic();
+                
+                statusEl.textContent += '\n✅ Phase 1 test completed successfully!\n';
+                statusEl.textContent += 'Check browser console for detailed results.\n';
+                statusEl.textContent += '\nGenerated wallets:\n';
+                
+                if (simpleWalletManager && simpleWalletManager.subWallets.length > 0) {
+                    simpleWalletManager.subWallets.forEach((w, i) => {
+                        statusEl.textContent += `${i + 1}. ${w.address.substring(0, 20)}...${w.address.substring(w.address.length - 10)}\n`;
+                    });
+                }
+                
+            } catch (error) {
+                statusEl.textContent += `\n❌ Error: ${error.message}\n`;
+                console.error('Phase 1 test error:', error);
+            }
+        }
+
+        function viewTestResults() {
+            const statusEl = document.getElementById('phase1TestStatus');
+            statusEl.style.display = 'block';
+            
+            const data = localStorage.getItem('multiWalletTest_public');
+            
+            if (data) {
+                const parsed = JSON.parse(data);
+                statusEl.textContent = 'Saved wallet data:\n\n';
+                statusEl.textContent += `Version: ${parsed.version}\n`;
+                statusEl.textContent += `Test Mode: ${parsed.testMode}\n`;
+                statusEl.textContent += `Timestamp: ${parsed.timestamp}\n`;
+                statusEl.textContent += `Wallets: ${parsed.wallets.length}\n\n`;
+                
+                parsed.wallets.forEach(w => {
+                    statusEl.textContent += `${w.id}: ${w.address.substring(0, 20)}...${w.address.substring(w.address.length - 10)}\n`;
+                });
+            } else {
+                statusEl.textContent = 'No saved wallet data found.\n';
+                statusEl.textContent += 'Run the test first to generate wallets.';
+            }
+        }
+
+        function clearPhase1Data() {
+            if (confirm('Clear all test wallet data?')) {
+                clearTestData();
+                const statusEl = document.getElementById('phase1TestStatus');
+                statusEl.style.display = 'block';
+                statusEl.textContent = 'Test data cleared.';
+            }
+        }
     </script>
 </body>
 </html><!-- Force GitHub Pages update: Sat Jul  5 09:53:35 JST 2025 -->

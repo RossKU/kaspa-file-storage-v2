@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.0.6 - Super Metadata Chunk Reference Fix</title>
+    <title>Kaspa P2P File Storage v5.0.5 - Super Metadata Scope Fix</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -6663,10 +6663,7 @@
                     txId: metaTxId,
                     blockId: metaBlockId,
                     groupIndex: groupIndex,
-                    chunkRange: metaTxData.chunkStructure.chunkRange,
-                    // Include actual chunk data for super metadata
-                    chunkTxIds: chunkGroup.map(c => c.txid),
-                    chunkBlockIds: chunkGroup.map(c => c.blockId)
+                    chunkRange: metaTxData.chunkStructure.chunkRange
                 };
                 
             } catch (error) {
@@ -6701,9 +6698,9 @@
                     encryption: fileMetadata.encryption,
                     file: fileMetadata.file,
                     
-                    // chunks array contains all actual chunk TxIDs from all intermediate metadata
-                    chunks: intermediateMetaTxs.flatMap(m => m.chunkTxIds),
-                    chunkBlockIds: intermediateMetaTxs.flatMap(m => m.chunkBlockIds),
+                    // chunks array contains intermediate meta-tx IDs
+                    chunks: intermediateMetaTxs.map(m => m.txId),
+                    chunkBlockIds: intermediateMetaTxs.map(m => m.blockId || ''),
                     
                     recovery: {
                         totalChunks: fileMetadata.recovery.totalChunks,

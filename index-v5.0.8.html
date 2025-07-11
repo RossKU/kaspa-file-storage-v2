@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.2.4 - Improved Large File Handling</title>
+    <title>Kaspa P2P File Storage v5.0.8 - Hierarchical Chunk Boundary Management</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -405,7 +405,7 @@
 </head>
 <body>
     <div class="header">
-        <h1 id="appTitle">🚀 Kaspa P2P File Storage v5.2.4 - Loading...</h1>
+        <h1 id="appTitle">🚀 Kaspa P2P File Storage - Loading...</h1>
         <p>実ネットワーク接続による完全なP2Pファイル共有システム（用語修正）</p>
         <p id="appSubtitle" style="font-size: 12px; color: #49EACB; margin-top: 5px;">📋 Loading version...</p>
         <div id="networkStatus" style="margin-top: 10px;">
@@ -471,10 +471,10 @@
                     <label>チャンクサイズ</label>
                     <select id="chunkSize">
                         <option value="10">10KB chunks (安全)</option>
-                        <option value="12">12KB chunks (旧方式)</option>
+                        <option value="12" selected>12KB chunks (推奨)</option>
                         <option value="15">15KB chunks (リスクあり)</option>
                         <option value="20">🧪 20KB chunks (実験的)</option>
-                    <option value="22" selected>🚀 22KB chunks (推奨・可変チャンク)</option>
+                    <option value="22">🚀 22KB chunks (最適化・実験的)</option>
                     </select>
                 </div>
             </div>
@@ -729,68 +729,6 @@
                 <h3>アップロード履歴</h3>
                 <div id="uploadHistory"></div>
             </div>
-            
-            <!-- Multi-Wallet Phase 1 Test -->
-            <div class="metric-box" style="margin-top: 30px; background: rgba(73, 234, 203, 0.1); border: 2px solid #49EACB;">
-                <h3>🧪 Multi-Wallet Phase 1 Test</h3>
-                <p style="color: #999; font-size: 14px; margin-bottom: 15px;">
-                    実験的機能: マルチウォレットによる並列アップロード高速化のテスト
-                </p>
-                
-                <div style="margin: 15px 0;">
-                    <button onclick="runPhase1Test()" style="
-                        padding: 10px 20px;
-                        background: #49EACB;
-                        color: #16213e;
-                        border: none;
-                        border-radius: 5px;
-                        cursor: pointer;
-                        font-size: 16px;
-                        font-weight: bold;
-                    ">
-                        Run Phase 1 Test
-                    </button>
-                    
-                    <button onclick="viewTestResults()" style="
-                        padding: 10px 20px;
-                        background: #16213e;
-                        color: #49EACB;
-                        border: 2px solid #49EACB;
-                        border-radius: 5px;
-                        cursor: pointer;
-                        font-size: 16px;
-                        margin-left: 10px;
-                    ">
-                        View Saved Wallets
-                    </button>
-                    
-                    <button onclick="clearPhase1Data()" style="
-                        padding: 10px 20px;
-                        background: #16213e;
-                        color: #e94560;
-                        border: 2px solid #e94560;
-                        border-radius: 5px;
-                        cursor: pointer;
-                        font-size: 16px;
-                        margin-left: 10px;
-                    ">
-                        Clear Test Data
-                    </button>
-                </div>
-                
-                <div id="phase1TestStatus" style="
-                    margin-top: 15px;
-                    padding: 10px;
-                    background: rgba(15, 52, 96, 0.5);
-                    border-radius: 5px;
-                    font-family: monospace;
-                    white-space: pre-wrap;
-                    display: none;
-                    font-size: 14px;
-                    color: #49EACB;
-                    border: 1px solid rgba(73, 234, 203, 0.3);
-                "></div>
-            </div>
         </div>
     </div>
 
@@ -835,11 +773,6 @@
         let uploadingMetaTx = false; // Whether meta-tx is being uploaded
         let uploadingDirMeta = false; // Whether directory meta is being uploaded
         let isUploadingFile = false; // Overall file upload status (v3.6.3 fix)
-        
-        // Constants
-        const CHUNKS_PER_META = 160; // Maximum chunks per MetaTxID
-        const MAX_CHUNKS_SUPPORTED = 25600; // Maximum chunks supported via Super (160 × 160)
-        const PROCESS_CHUNK_SIZE = 1024 * 1024; // 1MB processing chunks
         
         // Parallel download settings (v3.6.2)
         let parallelDownloadEnabled = false; // Default OFF for v3.5.0 compatibility
@@ -4160,13 +4093,6 @@
             currentFile = file;
             log(`ファイル選択: ${file.name} (${(file.size/1024).toFixed(1)}KB)`);
             
-            // Check if file size exceeds 550MB
-            const MAX_SIZE_WITH_META = 550 * 1024 * 1024; // 550MB
-            if (file.size > MAX_SIZE_WITH_META) {
-                log(`⚠️ 警告: このファイルサイズ(${(file.size/1024/1024).toFixed(1)}MB)では、ブロックチェーン上のメタデータトランザクションが生成されない可能性があります`, 'warning');
-                log('.kaspaファイルは生成されますが、メタデータの共有が制限されます', 'warning');
-            }
-            
             // Auto-detect progress file from workspace
             if (!window.pendingProgress && progressFileMap.has(file.name)) {
                 const progressInfo = progressFileMap.get(file.name);
@@ -5195,7 +5121,7 @@
             log('[processFileWithPayloadSplit] 開始', 'info');
             
             try {
-                const PROCESS_CHUNK_SIZE = 1024 * 1024; // 1MB processing chunks
+                const PROCESS_CHUNK_SIZE = 128 * 1024; // 128KB processing chunks
                 const PAYLOAD_SIZE = 22 * 1024; // 22KB payloads
             
             // Generate proper salt using file hash
@@ -5539,31 +5465,6 @@
                 
                 const totalChunks = progressManager.progress.metadata.totalChunks;
                 log(`総チャンク数: ${totalChunks}`);
-                
-                // Check if chunks exceed MAX_CHUNKS_SUPPORTED
-                if (totalChunks > MAX_CHUNKS_SUPPORTED) {
-                    log(`⚠️ チャンク数が上限を超えています: ${totalChunks} > ${MAX_CHUNKS_SUPPORTED}`, 'warning');
-                    const continueUpload = confirm(
-                        `このファイルは${totalChunks.toLocaleString()}個のチャンクに分割されており、` +
-                        `最大サポート数の${MAX_CHUNKS_SUPPORTED.toLocaleString()}チャンクを超えています。\n\n` +
-                        `ブロックチェーン上にメタデータトランザクションは生成されません。\n` +
-                        `.kaspaファイル（ローカル）のみが生成されます。\n\n` +
-                        `続行しますか？`
-                    );
-                    
-                    if (!continueUpload) {
-                        log('アップロードがキャンセルされました', 'info');
-                        document.getElementById('uploadBtn').disabled = false;
-                        document.getElementById('uploadProgress').style.display = 'none';
-                        progressManager = null;
-                        isUploadingFile = false;
-                        return;
-                    }
-                    
-                    // Disable meta-tx option
-                    document.getElementById('useMetaTx').checked = false;
-                    log('メタトランザクションを自動的に無効化しました', 'info');
-                }
                 
                 // Initial UTXO fetch
                 let currentUtxos = null;
@@ -6330,21 +6231,10 @@
                 
                 // Check if super metadata is needed based on chunk count
                 const totalChunks = kaspaMetadata.chunks.length;
-                const CHUNKS_PER_META = 160; // 160 chunks per single MetaTxID
-                const MAX_CHUNKS_SUPPORTED = 25600; // 160 × 160
-                
-                // Check if exceeds maximum supported chunks
-                if (totalChunks > MAX_CHUNKS_SUPPORTED) {
-                    log(`❌ エラー: チャンク数(${totalChunks})が最大サポート数(${MAX_CHUNKS_SUPPORTED})を超えています`, 'error');
-                    log('メタデータトランザクションは生成されません', 'warning');
-                    log('.kaspaファイル（ローカル）は引き続き生成可能です', 'info');
-                    
-                    // Already warned in processAndUpload, so just skip meta-tx creation
-                    return;
-                }
+                const CHUNKS_PER_META = 2; // Testing with 2 chunks per meta
                 
                 if (totalChunks > CHUNKS_PER_META) {
-                    log(`[SuperMeta] ${totalChunks}チャンク検出 - スーパーメタデータを生成します`, 'info');
+                    log(`[SuperMeta] テスト中: ${totalChunks}チャンク検出 (2チャンク毎) - スーパーメタデータを生成します`, 'info');
                     
                     // Group chunks
                     const chunkGroups = [];
@@ -6362,9 +6252,9 @@
                     log(`[SuperMeta] ${chunkGroups.length}個のチャンクグループを作成`, 'info');
                     
                     // Create intermediate meta-txs
-                    const singleMetaTxs = [];
+                    const intermediateMetaTxs = [];
                     for (let i = 0; i < chunkGroups.length; i++) {
-                        const singleMeta = await createSingleMetaTx(
+                        const intermediateMeta = await createIntermediateMetaTx(
                             chunkGroups[i], 
                             i, 
                             chunkGroups.length,
@@ -6372,11 +6262,11 @@
                             currentPassword,
                             CHUNKS_PER_META
                         );
-                        singleMetaTxs.push(singleMeta);
+                        intermediateMetaTxs.push(intermediateMeta);
                     }
                     
                     // Create super meta-tx
-                    const superMeta = await createSuperMetaTx(singleMetaTxs, kaspaMetadata, currentPassword);
+                    const superMeta = await createSuperMetaTx(intermediateMetaTxs, kaspaMetadata, currentPassword);
                     
                     // Update metadata with super meta info
                     kaspaMetadata.metaTx = {
@@ -6385,7 +6275,7 @@
                         blockId: superMeta.blockId,
                         reference: superMeta.blockId ? `${superMeta.txId}:${superMeta.blockId}` : superMeta.txId,
                         createdAt: Date.now(),
-                        singleMetaTxs: singleMetaTxs
+                        intermediateMetaTxs: intermediateMetaTxs
                     };
                     
                     // Update history
@@ -6525,9 +6415,6 @@
                 });
                 log(`[DEBUG] WebSocket監視リストに追加: TxID: ${metaTxId.substring(0, 16)}... (メタトランザクション)`, 'debug');
                 
-                // Wait for confirmation
-                await new Promise(resolve => setTimeout(resolve, 2000));
-                
                 // Wait for BlockID from WebSocket monitor
                 log(`メタトランザクションのBlockIDを待機中...`);
                 let metaBlockId = null;
@@ -6622,7 +6509,7 @@
         };
 
         // Create intermediate meta-tx for chunk groups (experimental)
-        async function createSingleMetaTx(chunkGroup, groupIndex, totalGroups, fileMetadata, password, chunksPerMeta) {
+        async function createIntermediateMetaTx(chunkGroup, groupIndex, totalGroups, fileMetadata, password, chunksPerMeta) {
             try {
                 log(`[SuperMeta] 中間メタデータ ${groupIndex + 1}/${totalGroups} を生成中...`, 'info');
                 
@@ -6635,7 +6522,7 @@
                     
                     // Mark as intermediate metadata
                     chunkStructure: {
-                        type: "single",
+                        type: "meta",
                         level: 1,
                         groupIndex: groupIndex,
                         totalGroups: totalGroups,
@@ -6749,9 +6636,6 @@
                         timestamp: Date.now(),
                         blockId: null
                     });
-                    
-                    // Wait for confirmation
-                    await new Promise(resolve => setTimeout(resolve, 2000));
                 } catch (submitError) {
                     log(`[SuperMeta] 送信エラー: ${submitError.message}`, 'error');
                     throw submitError;
@@ -6801,7 +6685,7 @@
         }
 
         // Create super meta-tx that references all intermediate meta-txs
-        async function createSuperMetaTx(singleMetaTxs, fileMetadata, password) {
+        async function createSuperMetaTx(intermediateMetaTxs, fileMetadata, password) {
             try {
                 log(`[SuperMeta] スーパーメタデータを生成中...`, 'info');
                 
@@ -6819,7 +6703,7 @@
                         totalChunks: fileMetadata.recovery.totalChunks,
                         hierarchy: {
                             chunksPerMeta: 2,
-                            metasPerSuper: singleMetaTxs.length
+                            metasPerSuper: intermediateMetaTxs.length
                         }
                     },
                     
@@ -6827,8 +6711,8 @@
                     file: fileMetadata.file,
                     
                     // chunks array contains intermediate meta-tx IDs
-                    chunks: singleMetaTxs.map(m => m.txId),
-                    chunkBlockIds: singleMetaTxs.map(m => m.blockId || ''),
+                    chunks: intermediateMetaTxs.map(m => m.txId),
+                    chunkBlockIds: intermediateMetaTxs.map(m => m.blockId || ''),
                     
                     recovery: {
                         totalChunks: fileMetadata.recovery.totalChunks,
@@ -6838,7 +6722,7 @@
                     
                     metadata: {
                         hierarchy: {
-                            childMetadata: singleMetaTxs.map(m => ({
+                            childMetadata: intermediateMetaTxs.map(m => ({
                                 index: m.groupIndex,
                                 range: m.chunkRange,
                                 txId: m.txId,
@@ -6907,8 +6791,6 @@
                 });
                 
                 // Wait for confirmation
-                await new Promise(resolve => setTimeout(resolve, 2000));
-                
                 let superMetaBlockId = null;
                 let waitTime = 0;
                 while (!superMetaBlockId && waitTime < 30000) {
@@ -6932,7 +6814,7 @@
                     txId: superMetaTxId,
                     blockId: superMetaBlockId,
                     type: 'super',
-                    metaCount: singleMetaTxs.length
+                    metaCount: intermediateMetaTxs.length
                 };
                 
             } catch (error) {
@@ -7756,7 +7638,7 @@
                             log(`[SuperMeta] 総チャンク数: ${metaData.chunkStructure.totalChunks}`, 'info');
                             
                             // Download all intermediate metadata
-                            const singleMetadatas = [];
+                            const intermediateMetadatas = [];
                             for (let i = 0; i < metaData.chunks.length; i++) {
                                 const intMetaTxId = metaData.chunks[i];
                                 const intMetaBlockId = metaData.chunkBlockIds[i];
@@ -7822,13 +7704,7 @@
                                     const intDecrypted = await decryptChunk(intEncryptedData, intKey, -1);
                                     const intMetaData = JSON.parse(new TextDecoder().decode(intDecrypted));
                                     
-                                    // デバッグ: 中間メタデータの内容を確認
-                                    log(`[SuperMeta DEBUG] 中間メタ ${i + 1} - payloadSplit: ${intMetaData.metadata?.payloadSplit}, chunkBoundaries: ${intMetaData.metadata?.chunkBoundaries?.length || 0}`, 'debug');
-                                    if (intMetaData.metadata?.chunkBoundaries?.length > 0) {
-                                        log(`[SuperMeta DEBUG] 中間メタ ${i + 1} - バウンダリ[0]: ${JSON.stringify(intMetaData.metadata.chunkBoundaries[0])}`, 'debug');
-                                    }
-                                    
-                                    singleMetadatas.push(intMetaData);
+                                    intermediateMetadatas.push(intMetaData);
                                     log(`[SuperMeta] 中間メタデータ ${i + 1} 取得完了`, 'success');
                                     
                                 } catch (error) {
@@ -7843,7 +7719,7 @@
                             let payloadSplitFlag = false;
                             const allChunkBoundaries = [];
                             
-                            for (const intMeta of singleMetadatas) {
+                            for (const intMeta of intermediateMetadatas) {
                                 allChunks.push(...intMeta.chunks);
                                 allChunkBlockIds.push(...intMeta.chunkBlockIds);
                                 // Check if any intermediate metadata has payloadSplit flag
@@ -7856,16 +7732,6 @@
                                 }
                             }
                             
-                            // デバッグ: 中間メタデータの内容を確認
-                            if (payloadSplitFlag && allChunkBoundaries.length === 0) {
-                                log(`[SuperMeta WARNING] payloadSplitフラグがtrueですが、チャンクバウンダリが見つかりません`, 'warning');
-                                log(`[SuperMeta DEBUG] 中間メタデータ数: ${singleMetadatas.length}`, 'debug');
-                                for (let i = 0; i < singleMetadatas.length; i++) {
-                                    const intMeta = singleMetadatas[i];
-                                    log(`[SuperMeta DEBUG] 中間メタ[${i}] payloadSplit: ${intMeta.metadata?.payloadSplit}, boundaries: ${intMeta.metadata?.chunkBoundaries?.length || 0}`, 'debug');
-                                }
-                            }
-                            
                             // Create unified metadata from super metadata
                             kaspaMetadata = {
                                 ...metaData,
@@ -7873,7 +7739,7 @@
                                 chunkBlockIds: allChunkBlockIds,
                                 chunkStructure: {
                                     ...metaData.chunkStructure,
-                                    singleMetadatas: singleMetadatas.length
+                                    intermediateMetadatas: intermediateMetadatas.length
                                 },
                                 // Merge metadata with payloadSplit flag
                                 metadata: {
@@ -7883,7 +7749,7 @@
                                     ...(allChunkBoundaries.length > 0 ? { chunkBoundaries: allChunkBoundaries } : {})
                                 },
                                 // 中間メタデータを保持（将来の拡張用）
-                                _singleMetadatas: singleMetadatas,
+                                _intermediateMetadatas: intermediateMetadatas,
                                 metaTx: {
                                     type: 'super',
                                     txid: metaTxId,
@@ -7891,30 +7757,6 @@
                                     loadedAt: Date.now()
                                 }
                             };
-                            
-                            // 後方互換性: v5.0.7以前のアップロードでチャンクバウンダリがない場合の対応
-                            if (payloadSplitFlag && allChunkBoundaries.length === 0) {
-                                log(`[SuperMeta COMPAT] v5.0.7以前のアップロードを検出 - アップロードヒストリーからチャンクバウンダリを取得試行`, 'warning');
-                                
-                                // アップロードヒストリーから該当するファイルを探す
-                                try {
-                                    const history = JSON.parse(localStorage.getItem('kaspa_upload_history') || '[]');
-                                    const matchingEntry = history.find(entry => 
-                                        entry.metadata?.metaTx?.txid === metaTxId ||
-                                        (entry.metadata?.file?.sha256 === metaData.file?.sha256 && 
-                                         entry.metadata?.file?.size === metaData.file?.size)
-                                    );
-                                    
-                                    if (matchingEntry && matchingEntry.metadata?.metadata?.chunkBoundaries) {
-                                        kaspaMetadata.metadata.chunkBoundaries = matchingEntry.metadata.metadata.chunkBoundaries;
-                                        log(`[SuperMeta COMPAT] アップロードヒストリーからチャンクバウンダリを復元: ${kaspaMetadata.metadata.chunkBoundaries.length}個`, 'success');
-                                    } else {
-                                        log(`[SuperMeta COMPAT] アップロードヒストリーにチャンクバウンダリが見つかりません`, 'warning');
-                                    }
-                                } catch (e) {
-                                    log(`[SuperMeta COMPAT] アップロードヒストリーの読み込みエラー: ${e.message}`, 'error');
-                                }
-                            }
                             
                             log(`[SuperMeta] 統合完了: ${allChunks.length}チャンク`, 'success');
                             log(`[SuperMeta DEBUG] 統合後のchunks[0]: ${kaspaMetadata.chunks[0]?.substring(0, 16)}...`, 'debug');
@@ -9324,258 +9166,6 @@
                 });
             }
         });
-    </script>
-    
-    <!-- Multi-Wallet Phase 1 Integration -->
-    <script>
-        // グローバル変数として定義
-        let multiWalletTestMode = false;
-        let simpleWalletManager = null;
-
-        // 安全なインライン実装
-        class SimpleWalletManager {
-            constructor() {
-                this.subWallets = [];
-                this.isTestMode = true;
-                this.version = '1.0';
-            }
-
-            generateTestWallet(index) {
-                try {
-                    console.log(`[MultiWallet] Generating test wallet ${index}...`);
-                    
-                    // Kaspa WASM SDKチェック
-                    if (typeof kaspa === 'undefined') {
-                        throw new Error('Kaspa WASM not initialized. Please run "システムを初期化" first.');
-                    }
-                    
-                    if (!kaspa.PrivateKey) {
-                        throw new Error('PrivateKey class not available in Kaspa WASM.');
-                    }
-                    
-                    // デバッグ情報
-                    console.log('[MultiWallet] Available kaspa methods:', Object.keys(kaspa));
-                    
-                    const privateKey = new kaspa.PrivateKey();
-                    console.log('[MultiWallet] Private key generated successfully');
-                    
-                    const publicKey = privateKey.toPublicKey();
-                    console.log('[MultiWallet] Public key generated successfully');
-                    
-                    // Network detection - より安全な方法
-                    let networkType = 'testnet-10'; // デフォルト
-                    
-                    // グローバル変数をチェック
-                    if (typeof NETWORK !== 'undefined' && NETWORK) {
-                        networkType = NETWORK;
-                        console.log('[MultiWallet] Using global NETWORK:', networkType);
-                    } else {
-                        // 既存のRPC設定から推定
-                        const networkSelect = document.getElementById('networkSelect');
-                        if (networkSelect && networkSelect.value) {
-                            networkType = networkSelect.value;
-                            console.log('[MultiWallet] Using networkSelect value:', networkType);
-                        }
-                    }
-                    
-                    console.log('[MultiWallet] Final network type:', networkType);
-                    
-                    // アドレス生成 - 既存システムと同じ方法を使用
-                    let address;
-                    try {
-                        // 方法1: グローバルNETWORK変数を使用（既存システムと同じ）
-                        if (typeof NETWORK !== 'undefined' && NETWORK) {
-                            address = privateKey.toAddress(NETWORK).toString();
-                            console.log('[MultiWallet] Address generated with global NETWORK:', address);
-                        }
-                        // 方法2: testnet-10を直接指定
-                        else {
-                            address = privateKey.toAddress('testnet-10').toString();
-                            console.log('[MultiWallet] Address generated with testnet-10:', address);
-                        }
-                    } catch (addrError) {
-                        console.error('[MultiWallet] Primary address generation failed:', addrError);
-                        
-                        // フォールバック1: 引数なしで試す（デフォルトネットワーク）
-                        try {
-                            address = privateKey.toAddress().toString();
-                            console.log('[MultiWallet] Address generated with default network:', address);
-                        } catch (fallback1Error) {
-                            console.error('[MultiWallet] Fallback 1 failed:', fallback1Error);
-                            
-                            // フォールバック2: 公開鍵から直接アドレス作成を試す
-                            try {
-                                // 最後の手段として、公開鍵の文字列表現を使用
-                                const pubKeyStr = publicKey.toString();
-                                address = `testnet:${pubKeyStr.substring(0, 62)}`;
-                                console.log('[MultiWallet] Temporary address generated:', address);
-                            } catch (fallback2Error) {
-                                console.error('[MultiWallet] All fallbacks failed:', fallback2Error);
-                                throw new Error(`Complete address generation failure: ${addrError.message}`);
-                            }
-                        }
-                    }
-                    
-                    const wallet = {
-                        id: `test_wallet_${index}`,
-                        index: index,
-                        address: address,
-                        network: networkType,
-                        created: new Date().toISOString(),
-                        status: 'new'
-                    };
-                    
-                    console.log(`[MultiWallet] ✓ Generated wallet ${index}:`, {
-                        id: wallet.id,
-                        address: wallet.address,
-                        network: wallet.network
-                    });
-                    
-                    return wallet;
-                } catch (error) {
-                    console.error('[MultiWallet] Wallet generation error:', error);
-                    throw new Error(`Wallet generation failed: ${error.message}`);
-                }
-            }
-
-            generateMultipleWallets(count) {
-                console.log(`Generating ${count} test wallets...`);
-                const newWallets = [];
-                
-                for (let i = 0; i < count; i++) {
-                    const wallet = this.generateTestWallet(i);
-                    if (wallet) {
-                        newWallets.push(wallet);
-                    }
-                }
-                
-                this.subWallets = newWallets;
-                console.log(`✓ Successfully generated ${newWallets.length} wallets`);
-                return newWallets;
-            }
-
-            saveToLocalStorage() {
-                try {
-                    const publicData = {
-                        version: this.version,
-                        testMode: this.isTestMode,
-                        timestamp: new Date().toISOString(),
-                        wallets: this.subWallets.map(w => ({
-                            id: w.id,
-                            index: w.index,
-                            address: w.address,
-                            created: w.created,
-                            status: w.status
-                        }))
-                    };
-                    
-                    localStorage.setItem('multiWalletTest_public', JSON.stringify(publicData));
-                    console.log('✓ Wallet data saved to localStorage');
-                    return true;
-                } catch (error) {
-                    console.error('Save error:', error);
-                    return false;
-                }
-            }
-        }
-
-        // テスト関数
-        function testPhase1_Basic() {
-            console.log('\n=== Phase 1 Basic Test ===');
-            
-            try {
-                // マネージャーの初期化
-                simpleWalletManager = new SimpleWalletManager();
-                console.log('✓ Manager initialized');
-                
-                // 2つのウォレットを生成
-                const wallets = simpleWalletManager.generateMultipleWallets(2);
-                
-                if (wallets.length === 2) {
-                    console.log('✓ Successfully generated 2 wallets');
-                } else {
-                    throw new Error('Failed to generate wallets');
-                }
-                
-                // 保存テスト
-                const saved = simpleWalletManager.saveToLocalStorage();
-                console.log(`Save result: ${saved ? 'SUCCESS' : 'FAILED'}`);
-                
-                return { success: true, wallets: wallets };
-            } catch (error) {
-                console.error('Test failed:', error);
-                throw error;
-            }
-        }
-
-        function clearTestData() {
-            localStorage.removeItem('multiWalletTest_public');
-            console.log('✓ Test data cleared');
-        }
-
-        // UI用の関数
-        function runPhase1Test() {
-            const statusEl = document.getElementById('phase1TestStatus');
-            statusEl.style.display = 'block';
-            statusEl.textContent = 'Running Phase 1 test...\n';
-            
-            try {
-                // テスト実行
-                const result = testPhase1_Basic();
-                
-                statusEl.textContent += '\n✅ Phase 1 test completed successfully!\n';
-                statusEl.textContent += 'Check browser console for detailed results.\n';
-                statusEl.textContent += '\nGenerated wallets:\n';
-                
-                if (result.wallets && result.wallets.length > 0) {
-                    result.wallets.forEach((w, i) => {
-                        const shortAddr = `${w.address.substring(0, 20)}...${w.address.substring(w.address.length - 10)}`;
-                        statusEl.textContent += `${i + 1}. ${shortAddr}\n`;
-                    });
-                }
-                
-            } catch (error) {
-                statusEl.textContent += `\n❌ Error: ${error.message}\n`;
-                console.error('Phase 1 test error:', error);
-            }
-        }
-
-        function viewTestResults() {
-            const statusEl = document.getElementById('phase1TestStatus');
-            statusEl.style.display = 'block';
-            
-            const data = localStorage.getItem('multiWalletTest_public');
-            
-            if (data) {
-                try {
-                    const parsed = JSON.parse(data);
-                    statusEl.textContent = 'Saved wallet data:\n\n';
-                    statusEl.textContent += `Version: ${parsed.version}\n`;
-                    statusEl.textContent += `Test Mode: ${parsed.testMode}\n`;
-                    statusEl.textContent += `Timestamp: ${parsed.timestamp}\n`;
-                    statusEl.textContent += `Wallets: ${parsed.wallets.length}\n\n`;
-                    
-                    parsed.wallets.forEach(w => {
-                        const shortAddr = `${w.address.substring(0, 20)}...${w.address.substring(w.address.length - 10)}`;
-                        statusEl.textContent += `${w.id}: ${shortAddr}\n`;
-                    });
-                } catch (e) {
-                    statusEl.textContent = 'Error reading saved data: ' + e.message;
-                }
-            } else {
-                statusEl.textContent = 'No saved wallet data found.\n';
-                statusEl.textContent += 'Run the test first to generate wallets.';
-            }
-        }
-
-        function clearPhase1Data() {
-            if (confirm('Clear all test wallet data?')) {
-                clearTestData();
-                const statusEl = document.getElementById('phase1TestStatus');
-                statusEl.style.display = 'block';
-                statusEl.textContent = 'Test data cleared.';
-            }
-        }
     </script>
 </body>
 </html><!-- Force GitHub Pages update: Sat Jul  5 09:53:35 JST 2025 -->

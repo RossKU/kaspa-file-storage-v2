@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.0.6 - Fix PayloadSplit Flag in Super Metadata</title>
+    <title>Kaspa P2P File Storage v5.0.7 - Add WebSocket Monitoring for Super Metadata</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -6773,6 +6773,13 @@
                 
                 log(`[SuperMeta] スーパーメタTxID: ${superMetaTxId}`, 'success');
                 
+                // Add to monitoring list for WebSocket
+                monitoredTransactions.set(superMetaTxId, {
+                    type: 'super-meta',
+                    timestamp: Date.now(),
+                    blockId: null
+                });
+                
                 // Wait for confirmation
                 let superMetaBlockId = null;
                 let waitTime = 0;
@@ -6781,11 +6788,16 @@
                         const monitorData = monitoredTransactions.get(superMetaTxId);
                         if (monitorData.blockId) {
                             superMetaBlockId = monitorData.blockId;
+                            log(`[SuperMeta] スーパーメタBlockID取得: ${superMetaBlockId.substring(0, 16)}...`, 'success');
                             break;
                         }
                     }
                     await new Promise(resolve => setTimeout(resolve, 500));
                     waitTime += 500;
+                }
+                
+                if (!superMetaBlockId) {
+                    log(`[SuperMeta] 警告: BlockID取得がタイムアウトしました`, 'warning');
                 }
                 
                 return {

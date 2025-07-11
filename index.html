@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.2.1 - Performance Optimizations</title>
+    <title>Kaspa P2P File Storage v5.2.2 - Stable Transaction Confirmation</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -5663,7 +5663,8 @@
                                     blockId: null
                                 });
                                 
-                                // WebSocket monitoring will handle confirmation immediately
+                                // Wait for confirmation
+                                await new Promise(resolve => setTimeout(resolve, 2000));
                                 
                                 // Get BlockID (existing logic)
                                 let waitTime = 0;
@@ -5737,7 +5738,7 @@
                                     await progressManager.saveProgress();
                                     throw error;
                                 }
-                                // No delay needed - WebSocket monitoring handles confirmation
+                                await new Promise(resolve => setTimeout(resolve, 2000));
                             }
                         }
                         
@@ -5928,7 +5929,7 @@
                             
                             // Wait for transaction to be accepted
                             log(`トランザクションの確認待ち...`);
-                            // No delay needed - WebSocket monitoring handles confirmation
+                            await new Promise(resolve => setTimeout(resolve, 2000));
                             
                             // Try WebSocket monitoring first
                             log(`トランザクション確認を待機中...`);
@@ -6050,7 +6051,7 @@
                                 throw error;
                             }
                             log(`2秒待機後にリトライ...`);
-                            // No delay needed - WebSocket monitoring handles confirmation
+                            await new Promise(resolve => setTimeout(resolve, 2000));
                         }
                     }
                     
@@ -6476,6 +6477,9 @@
                 });
                 log(`[DEBUG] WebSocket監視リストに追加: TxID: ${metaTxId.substring(0, 16)}... (メタトランザクション)`, 'debug');
                 
+                // Wait for confirmation
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                
                 // Wait for BlockID from WebSocket monitor
                 log(`メタトランザクションのBlockIDを待機中...`);
                 let metaBlockId = null;
@@ -6697,6 +6701,9 @@
                         timestamp: Date.now(),
                         blockId: null
                     });
+                    
+                    // Wait for confirmation
+                    await new Promise(resolve => setTimeout(resolve, 2000));
                 } catch (submitError) {
                     log(`[SuperMeta] 送信エラー: ${submitError.message}`, 'error');
                     throw submitError;
@@ -6852,6 +6859,8 @@
                 });
                 
                 // Wait for confirmation
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                
                 let superMetaBlockId = null;
                 let waitTime = 0;
                 while (!superMetaBlockId && waitTime < 30000) {

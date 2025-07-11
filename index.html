@@ -6256,7 +6256,8 @@
                             i, 
                             chunkGroups.length,
                             kaspaMetadata,
-                            currentPassword
+                            currentPassword,
+                            CHUNKS_PER_META
                         );
                         intermediateMetaTxs.push(intermediateMeta);
                     }
@@ -6505,7 +6506,7 @@
         };
 
         // Create intermediate meta-tx for chunk groups (experimental)
-        async function createIntermediateMetaTx(chunkGroup, groupIndex, totalGroups, fileMetadata, password) {
+        async function createIntermediateMetaTx(chunkGroup, groupIndex, totalGroups, fileMetadata, password, chunksPerMeta) {
             try {
                 log(`[SuperMeta] 中間メタデータ ${groupIndex + 1}/${totalGroups} を生成中...`, 'info');
                 
@@ -6523,8 +6524,8 @@
                         groupIndex: groupIndex,
                         totalGroups: totalGroups,
                         chunkRange: [
-                            groupIndex * CHUNKS_PER_META,
-                            Math.min((groupIndex + 1) * CHUNKS_PER_META - 1, fileMetadata.recovery.totalChunks - 1)
+                            groupIndex * chunksPerMeta,
+                            Math.min((groupIndex + 1) * chunksPerMeta - 1, fileMetadata.recovery.totalChunks - 1)
                         ]
                     },
                     
@@ -6545,8 +6546,8 @@
                         parentFile: fileMetadata.file.name,
                         groupInfo: {
                             index: groupIndex,
-                            startChunk: groupIndex * CHUNKS_PER_META,
-                            endChunk: (groupIndex + 1) * CHUNKS_PER_META - 1
+                            startChunk: groupIndex * chunksPerMeta,
+                            endChunk: (groupIndex + 1) * chunksPerMeta - 1
                         }
                     }
                 };

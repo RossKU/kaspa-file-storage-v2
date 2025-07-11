@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.0.2 - Super Metadata Debug</title>
+    <title>Kaspa P2P File Storage v5.0.3 - Super Metadata Fix</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -6604,17 +6604,26 @@
                 const txId = pendingTx.id;
                 log(`[SuperMeta] トランザクションID (送信前): ${txId.substring(0, 16)}...`, 'debug');
                 
-                // Submit transaction
-                const submitResult = await pendingTx.submit(rpcClient);
-                
-                // The submit method returns the txId on success
-                const metaTxId = submitResult || txId;
-                
-                log(`[SuperMeta] 中間メタTxID: ${metaTxId.substring(0, 16)}...`, 'success');
-                
-                // Verify transaction was actually sent
-                if (!metaTxId) {
-                    throw new Error('トランザクション送信に失敗しました - TxIDが空です');
+                // Submit transaction - using the same pattern as chunk upload
+                try {
+                    const metaTxId = await pendingTx.submit(rpcClient);
+                    
+                    if (!metaTxId) {
+                        throw new Error('submit()がnullを返しました');
+                    }
+                    
+                    log(`[SuperMeta] 中間メタTxID: ${metaTxId.substring(0, 16)}...`, 'success');
+                    
+                    // Add to monitored transactions (same as chunk upload)
+                    monitoredTransactions.set(metaTxId, {
+                        type: 'intermediate-meta',
+                        groupIndex: groupIndex,
+                        timestamp: Date.now(),
+                        blockId: null
+                    });
+                } catch (submitError) {
+                    log(`[SuperMeta] 送信エラー: ${submitError.message}`, 'error');
+                    throw submitError;
                 }
                 
                 // Add to monitoring list

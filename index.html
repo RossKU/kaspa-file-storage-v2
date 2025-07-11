@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.0.7 - Add WebSocket Monitoring for Super Metadata</title>
+    <title>Kaspa P2P File Storage v5.0.9 - Backward Compatibility for v5.0.7</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -6553,7 +6553,14 @@
                             endChunk: (groupIndex + 1) * chunksPerMeta - 1
                         },
                         // Pass through payloadSplit flag if present
-                        payloadSplit: fileMetadata.metadata?.payloadSplit || false
+                        payloadSplit: fileMetadata.metadata?.payloadSplit || false,
+                        // Include chunk boundaries for this group if available
+                        ...(fileMetadata.metadata?.chunkBoundaries ? {
+                            chunkBoundaries: fileMetadata.metadata.chunkBoundaries.slice(
+                                groupIndex * chunksPerMeta,
+                                Math.min((groupIndex + 1) * chunksPerMeta, fileMetadata.metadata.chunkBoundaries.length)
+                            )
+                        } : {})
                     }
                 };
                 
@@ -6721,7 +6728,10 @@
                                 txId: m.txId,
                                 blockId: m.blockId
                             }))
-                        }
+                        },
+                        // SuperMetaにはチャンクバウンダリを含めない（容量制限のため）
+                        // 各中間メタデータが管轄するチャンクのバウンダリを保持
+                        payloadSplit: fileMetadata.metadata?.payloadSplit || false
                     }
                 };
                 
@@ -7694,6 +7704,12 @@
                                     const intDecrypted = await decryptChunk(intEncryptedData, intKey, -1);
                                     const intMetaData = JSON.parse(new TextDecoder().decode(intDecrypted));
                                     
+                                    // デバッグ: 中間メタデータの内容を確認
+                                    log(`[SuperMeta DEBUG] 中間メタ ${i + 1} - payloadSplit: ${intMetaData.metadata?.payloadSplit}, chunkBoundaries: ${intMetaData.metadata?.chunkBoundaries?.length || 0}`, 'debug');
+                                    if (intMetaData.metadata?.chunkBoundaries?.length > 0) {
+                                        log(`[SuperMeta DEBUG] 中間メタ ${i + 1} - バウンダリ[0]: ${JSON.stringify(intMetaData.metadata.chunkBoundaries[0])}`, 'debug');
+                                    }
+                                    
                                     intermediateMetadatas.push(intMetaData);
                                     log(`[SuperMeta] 中間メタデータ ${i + 1} 取得完了`, 'success');
                                     
@@ -7707,12 +7723,28 @@
                             const allChunks = [];
                             const allChunkBlockIds = [];
                             let payloadSplitFlag = false;
+                            const allChunkBoundaries = [];
+                            
                             for (const intMeta of intermediateMetadatas) {
                                 allChunks.push(...intMeta.chunks);
                                 allChunkBlockIds.push(...intMeta.chunkBlockIds);
                                 // Check if any intermediate metadata has payloadSplit flag
                                 if (intMeta.metadata?.payloadSplit) {
                                     payloadSplitFlag = true;
+                                }
+                                // Collect chunk boundaries if present
+                                if (intMeta.metadata?.chunkBoundaries) {
+                                    allChunkBoundaries.push(...intMeta.metadata.chunkBoundaries);
+                                }
+                            }
+                            
+                            // デバッグ: 中間メタデータの内容を確認
+                            if (payloadSplitFlag && allChunkBoundaries.length === 0) {
+                                log(`[SuperMeta WARNING] payloadSplitフラグがtrueですが、チャンクバウンダリが見つかりません`, 'warning');
+                                log(`[SuperMeta DEBUG] 中間メタデータ数: ${intermediateMetadatas.length}`, 'debug');
+                                for (let i = 0; i < intermediateMetadatas.length; i++) {
+                                    const intMeta = intermediateMetadatas[i];
+                                    log(`[SuperMeta DEBUG] 中間メタ[${i}] payloadSplit: ${intMeta.metadata?.payloadSplit}, boundaries: ${intMeta.metadata?.chunkBoundaries?.length || 0}`, 'debug');
                                 }
                             }
                             
@@ -7728,8 +7760,12 @@
                                 // Merge metadata with payloadSplit flag
                                 metadata: {
                                     ...metaData.metadata,
-                                    payloadSplit: payloadSplitFlag
+                                    payloadSplit: payloadSplitFlag,
+                                    // チャンクバウンダリは階層的に管理（中間メタデータから収集）
+                                    ...(allChunkBoundaries.length > 0 ? { chunkBoundaries: allChunkBoundaries } : {})
                                 },
+                                // 中間メタデータを保持（将来の拡張用）
+                                _intermediateMetadatas: intermediateMetadatas,
                                 metaTx: {
                                     type: 'super',
                                     txid: metaTxId,
@@ -7738,9 +7774,37 @@
                                 }
                             };
                             
+                            // 後方互換性: v5.0.7以前のアップロードでチャンクバウンダリがない場合の対応
+                            if (payloadSplitFlag && allChunkBoundaries.length === 0) {
+                                log(`[SuperMeta COMPAT] v5.0.7以前のアップロードを検出 - アップロードヒストリーからチャンクバウンダリを取得試行`, 'warning');
+                                
+                                // アップロードヒストリーから該当するファイルを探す
+                                try {
+                                    const history = JSON.parse(localStorage.getItem('kaspa_upload_history') || '[]');
+                                    const matchingEntry = history.find(entry => 
+                                        entry.metadata?.metaTx?.txid === metaTxId ||
+                                        (entry.metadata?.file?.sha256 === metaData.file?.sha256 && 
+                                         entry.metadata?.file?.size === metaData.file?.size)
+                                    );
+                                    
+                                    if (matchingEntry && matchingEntry.metadata?.metadata?.chunkBoundaries) {
+                                        kaspaMetadata.metadata.chunkBoundaries = matchingEntry.metadata.metadata.chunkBoundaries;
+                                        log(`[SuperMeta COMPAT] アップロードヒストリーからチャンクバウンダリを復元: ${kaspaMetadata.metadata.chunkBoundaries.length}個`, 'success');
+                                    } else {
+                                        log(`[SuperMeta COMPAT] アップロードヒストリーにチャンクバウンダリが見つかりません`, 'warning');
+                                    }
+                                } catch (e) {
+                                    log(`[SuperMeta COMPAT] アップロードヒストリーの読み込みエラー: ${e.message}`, 'error');
+                                }
+                            }
+                            
                             log(`[SuperMeta] 統合完了: ${allChunks.length}チャンク`, 'success');
                             log(`[SuperMeta DEBUG] 統合後のchunks[0]: ${kaspaMetadata.chunks[0]?.substring(0, 16)}...`, 'debug');
                             log(`[SuperMeta DEBUG] allChunks[0]: ${allChunks[0]?.substring(0, 16)}...`, 'debug');
+                            log(`[SuperMeta DEBUG] チャンクバウンダリ数: ${allChunkBoundaries.length}`, 'debug');
+                            if (allChunkBoundaries.length > 0) {
+                                log(`[SuperMeta DEBUG] チャンクバウンダリ[0]: ${JSON.stringify(allChunkBoundaries[0])}`, 'debug');
+                            }
                             
                         } else {
                             // Regular metadata

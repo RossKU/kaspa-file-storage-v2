@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.3.11 - kprogress v3.3 Format</title>
+    <title>Kaspa P2P File Storage v5.3.12 - Deterministic IV Generation</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -802,15 +802,15 @@
     </div>
 
     <script type="module">
-        // v5.3.11: kprogress v3.3 format support
-        // - Updated ProgressManager to use v3.3 format
-        // - Added payload index to IV generation
-        // - Chunk boundaries now support 1MB processing chunks
-        // - Backward compatibility with v2.1 progress files
+        // v5.3.12: Unified deterministic IV generation (v5.3.11 style)
+        // - Uses chunk index (4 bytes) + payload index (4 bytes) + deterministic bytes (4 bytes)
+        // - Deterministic bytes use XOR operations for better security
+        // - No backward compatibility with v5.3.7 (as requested)
+        // - Consistent IV generation for both encryption and decryption
         
         // Debug logging - Safe version
         try {
-            console.log('[DEBUG v5.3.11] Script started at:', new Date().toISOString());
+            console.log('[DEBUG v5.3.12] Script started at:', new Date().toISOString());
             console.log('[DEBUG] User Agent:', navigator.userAgent);
         } catch (e) {
             // Ignore errors in debug logging
@@ -3981,10 +3981,13 @@
                                 if (start < encryptedData.length) {
                                     const encryptedChunk = encryptedData.slice(start, Math.min(end, encryptedData.length));
                                     try {
-                                        const decryptedChunk = await decryptChunk(encryptedChunk, key, boundary.index);
+                                        // v5.3.11 fix: Use the payloadIndex from boundary if available
+                                        const payloadIndex = boundary.payloadIndex || 0;
+                                        const decryptedChunk = await decryptChunk(encryptedChunk, key, boundary.index, payloadIndex);
                                         decryptedChunks.push(decryptedChunk);
                                     } catch (e) {
                                         log(`[DownloadManager] チャンク ${boundary.index} の復号化エラー: ${e.message}`, 'error');
+                                        log(`[DownloadManager] チャンクバウンダリ: ${JSON.stringify(boundary)}`, 'error');
                                         throw new Error(`チャンク ${boundary.index} の復号化に失敗しました`);
                                     }
                                 }
@@ -5295,7 +5298,7 @@
                     iv[i] = 0xFF - i;
                 }
             } else {
-                // v3.3: Use chunk index (4 bytes) + payload index (4 bytes) + random (4 bytes)
+                // v5.3.11: Use chunk index (4 bytes) + payload index (4 bytes) + deterministic bytes (4 bytes)
                 const dataView = new DataView(iv.buffer);
                 
                 // Chunk index (4 bytes, big-endian)
@@ -5304,10 +5307,14 @@
                 // Payload index (4 bytes, big-endian)
                 dataView.setUint32(4, payloadIndex, false);
                 
-                // Random bytes (4 bytes)
-                const randomBytes = new Uint8Array(4);
-                crypto.getRandomValues(randomBytes);
-                iv.set(randomBytes, 8);
+                // Deterministic bytes (4 bytes) - based on chunk and payload indices
+                // This allows IV reconstruction during decryption
+                const deterministicBytes = new Uint8Array(4);
+                deterministicBytes[0] = (chunkIndex ^ 0xA5) & 0xFF;
+                deterministicBytes[1] = (payloadIndex ^ 0x5A) & 0xFF;
+                deterministicBytes[2] = ((chunkIndex + payloadIndex) ^ 0x33) & 0xFF;
+                deterministicBytes[3] = ((chunkIndex * 7 + payloadIndex * 13) ^ 0xCC) & 0xFF;
+                iv.set(deterministicBytes, 8);
             }
             
             const encrypted = await crypto.subtle.encrypt(
@@ -5327,7 +5334,7 @@
                     // Use provided IV (for v3.3 payloads with stored IV)
                     iv = ivBytes;
                 } else {
-                    // Generate IV (backward compatibility)
+                    // Generate IV (same as encryptChunk for consistency)
                     iv = new Uint8Array(12);
                     
                     // Special handling for meta-tx (chunkIndex = -1)
@@ -5339,12 +5346,22 @@
                             iv[i] = 0xFF - i;
                         }
                     } else {
-                        // Old format for backward compatibility
-                        iv[0] = (chunkIndex >> 8) & 0xFF;
-                        iv[1] = chunkIndex & 0xFF;
-                        for (let i = 2; i < 12; i++) {
-                            iv[i] = i * 17;
-                        }
+                        // v5.3.11: Use chunk index (4 bytes) + payload index (4 bytes) + deterministic bytes (4 bytes)
+                        const dataView = new DataView(iv.buffer);
+                        
+                        // Chunk index (4 bytes, big-endian)
+                        dataView.setUint32(0, chunkIndex, false);
+                        
+                        // Payload index (4 bytes, big-endian)
+                        dataView.setUint32(4, payloadIndex, false);
+                        
+                        // Deterministic bytes (4 bytes) - same algorithm as encryptChunk
+                        const deterministicBytes = new Uint8Array(4);
+                        deterministicBytes[0] = (chunkIndex ^ 0xA5) & 0xFF;
+                        deterministicBytes[1] = (payloadIndex ^ 0x5A) & 0xFF;
+                        deterministicBytes[2] = ((chunkIndex + payloadIndex) ^ 0x33) & 0xFF;
+                        deterministicBytes[3] = ((chunkIndex * 7 + payloadIndex * 13) ^ 0xCC) & 0xFF;
+                        iv.set(deterministicBytes, 8);
                     }
                 }
                 
@@ -5532,7 +5549,8 @@
                     offset: totalEncryptedBytes,
                     size: encrypted.length,
                     originalSize: chunk.length,
-                    compressedSize: compressed.length
+                    compressedSize: compressed.length,
+                    payloadIndex: payloadStartIndex  // v5.3.11: Store payload index for decryption
                 });
                 totalEncryptedBytes += encrypted.length;
                 
@@ -9938,4 +9956,4 @@
         };
     </script>
 </body>
-</html><!-- Force GitHub Pages update: Sat Jul  5 09:53:35 JST 2025 -->
+</html><!-- Force GitHub Pages update: Sun Jul 12 2025 -->

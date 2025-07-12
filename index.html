@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.3.6 - WebSocket Monitoring Enhancement</title>
+    <title>Kaspa P2P File Storage v5.3.7 - Enhanced WebSocket Persistence</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -405,7 +405,7 @@
 </head>
 <body>
     <div class="header">
-        <h1 id="appTitle">🚀 Kaspa P2P File Storage v5.3.6 - Loading...</h1>
+        <h1 id="appTitle">🚀 Kaspa P2P File Storage v5.3.7 - Loading...</h1>
         <p>実ネットワーク接続による完全なP2Pファイル共有システム（用語修正）</p>
         <p id="appSubtitle" style="font-size: 12px; color: #49EACB; margin-top: 5px;">📋 Loading version...</p>
         <div id="networkStatus" style="margin-top: 10px;">
@@ -5490,6 +5490,10 @@
                 // v3.6.3 fix: Set upload flag
                 isUploadingFile = true;
                 
+                // v5.3.7: Also set uploadSessionActive
+                uploadSessionActive = true;
+                log('[INFO] アップロードセッションを開始 (メイン)', 'info');
+                
                 log(`処理開始: ${currentFile.name}`);
                 log(`ファイルサイズ: ${(currentFile.size / 1024 / 1024).toFixed(2)} MB`);
                 
@@ -5615,6 +5619,7 @@
                         document.getElementById('uploadProgress').style.display = 'none';
                         progressManager = null;
                         isUploadingFile = false;
+                        uploadSessionActive = false; // v5.3.7
                         return;
                     }
                     
@@ -6329,6 +6334,19 @@
             } finally {
                 // v3.6.3 fix: Clear upload flag
                 isUploadingFile = false;
+                
+                // v5.3.7: End upload session
+                uploadSessionActive = false;
+                log('[INFO] アップロードセッションを終了 (メイン)', 'info');
+                
+                // Check monitoring stop after 10 seconds
+                setTimeout(async () => {
+                    if (!uploadSessionActive && !isUploadingFile && monitoredTransactions.size === 0) {
+                        log('[DEBUG] アップロード完了から10秒経過 - 監視停止を検討', 'debug');
+                        await checkMonitoringStop();
+                    }
+                }, 10000);
+                
                 document.getElementById('uploadBtn').disabled = false;
                 
                 // v4.7.13: Reset ProgressManager to prevent reuse
@@ -8774,10 +8792,18 @@
                     clearTimeout(wsMonitorTimeout);
                 }
                 wsMonitorTimeout = setTimeout(async () => {
-                    // Don't stop monitoring during upload session
-                    if (uploadSessionActive) {
-                        log('[DEBUG] アップロードセッション中 - WebSocket監視を継続', 'debug');
+                    // v5.3.7: Enhanced check - Don't stop monitoring during any upload activity
+                    if (uploadSessionActive || isUploadingFile || uploadingChunksCount > 0 || uploadingMetaTx || uploadingDirMeta) {
+                        log(`[DEBUG] アップロード中 - WebSocket監視を継続 (session=${uploadSessionActive}, file=${isUploadingFile}, chunks=${uploadingChunksCount})`, 'debug');
                         // Reset timeout
+                        clearTimeout(wsMonitorTimeout);
+                        wsMonitorTimeout = setTimeout(arguments.callee, 5 * 60 * 1000);
+                        return;
+                    }
+                    
+                    // Also check if there are monitored transactions
+                    if (monitoredTransactions.size > 0) {
+                        log(`[DEBUG] 監視中のトランザクションあり (${monitoredTransactions.size}件) - 監視を継続`, 'debug');
                         clearTimeout(wsMonitorTimeout);
                         wsMonitorTimeout = setTimeout(arguments.callee, 5 * 60 * 1000);
                         return;

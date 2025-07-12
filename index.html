@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.3.7 - Enhanced WebSocket Persistence</title>
+    <title>Kaspa P2P File Storage v5.3.11 - kprogress v3.3 Format</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -405,7 +405,7 @@
 </head>
 <body>
     <div class="header">
-        <h1 id="appTitle">🚀 Kaspa P2P File Storage v5.3.7 - Loading...</h1>
+        <h1 id="appTitle">🚀 Kaspa P2P File Storage v5.3.11 - Loading...</h1>
         <p>実ネットワーク接続による完全なP2Pファイル共有システム（用語修正）</p>
         <p id="appSubtitle" style="font-size: 12px; color: #49EACB; margin-top: 5px;">📋 Loading version...</p>
         <div id="networkStatus" style="margin-top: 10px;">
@@ -802,9 +802,15 @@
     </div>
 
     <script type="module">
+        // v5.3.11: kprogress v3.3 format support
+        // - Updated ProgressManager to use v3.3 format
+        // - Added payload index to IV generation
+        // - Chunk boundaries now support 1MB processing chunks
+        // - Backward compatibility with v2.1 progress files
+        
         // Debug logging - Safe version
         try {
-            console.log('[DEBUG v4.6.3] Script started at:', new Date().toISOString());
+            console.log('[DEBUG v5.3.11] Script started at:', new Date().toISOString());
             console.log('[DEBUG] User Agent:', navigator.userAgent);
         } catch (e) {
             // Ignore errors in debug logging
@@ -2322,7 +2328,7 @@
             async initialize(existingProgress = null) {
                 if (existingProgress) {
                     this.progress = existingProgress;
-                    log(`既存の進捗から再開: ${this.progress.metadata.completedChunks}/${this.progress.metadata.totalChunks} チャンク完了`, 'info');
+                    log(`既存の進捗から再開: ${this.progress._progress.completedChunks}/${this.progress.recovery.totalChunks} チャンク完了`, 'info');
                     
                     // v4.7.25: Remove save frequency optimization log
                     
@@ -2335,36 +2341,91 @@
                 const hashArray = Array.from(new Uint8Array(hashBuffer));
                 const fileHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
                 
+                // Calculate file SHA256 (full hash)
+                const fullFileData = await this.file.arrayBuffer();
+                const fullHashBuffer = await crypto.subtle.digest('SHA-256', fullFileData);
+                const fullHashArray = Array.from(new Uint8Array(fullHashBuffer));
+                const fullFileHash = fullHashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+                
+                // Calculate 1MB processing chunk boundaries
+                const PROCESSING_CHUNK_SIZE = 1048576; // 1MB
+                const chunkBoundaries = [];
+                for (let offset = 0; offset < this.file.size; offset += PROCESSING_CHUNK_SIZE) {
+                    const size = Math.min(PROCESSING_CHUNK_SIZE, this.file.size - offset);
+                    chunkBoundaries.push({
+                        index: Math.floor(offset / PROCESSING_CHUNK_SIZE),
+                        offset: offset,
+                        size: size,
+                        originalSize: size,
+                        compressedSize: size
+                    });
+                }
+                
                 this.progress = {
-                    version: "2.1",
-                    type: this.type, // 'upload' or 'download'
-                    cid: this.cid,
-                    fileInfo: {
+                    // v3.3 compliant format
+                    version: "3.3",
+                    type: "kaspa-file",
+                    created: new Date().toISOString(),
+                    network: "testnet-10",
+                    
+                    // File information
+                    file: {
                         name: this.file.name,
                         size: this.file.size,
-                        lastModified: this.file.lastModified,
-                        sha256: fileHash.substring(0, 16), // First 16 chars of hash
-                        mimeType: this.file.type || 'application/octet-stream'
+                        mimeType: this.file.type || 'application/octet-stream',
+                        sha256: fullFileHash, // Full 64-char hash
+                        encrypted: true,
+                        compression: {
+                            algorithm: "none",
+                            enabled: false,
+                            originalSize: this.file.size,
+                            compressedSize: null
+                        }
                     },
+                    
+                    // Encryption (v3.3 structure)
                     encryption: {
                         algorithm: "AES-256-GCM",
-                        salt: null, // Will be set during encryption
-                        compressed: null
+                        pbkdf2: {
+                            salt: null, // Will be set during encryption
+                            iterations: 100000
+                        }
                     },
-                    chunks: [],
-                    metadata: {
+                    
+                    // Chunk arrays (v3.3 format)
+                    chunks: [],           // Will contain txid strings
+                    chunkBlockIds: [],    // Will contain blockId strings
+                    
+                    // Recovery section
+                    recovery: {
                         totalChunks: Math.ceil(this.file.size / this.chunkSize),
-                        completedChunks: 0,
                         chunkSize: this.chunkSize,
-                        totalCost: 0,
+                        checksum: fullFileHash,
+                        uploadCost: 0
+                    },
+                    
+                    // Metadata
+                    metadata: {
+                        uploadDate: new Date().toISOString(),
+                        uploadedBy: "", // Will be set from wallet
+                        chunkBoundaries: chunkBoundaries,
+                        payloadSplit: true
+                    },
+                    
+                    // Progress-specific data (prefixed with _)
+                    _progress: {
+                        cid: this.cid,
+                        completedChunks: 0,
                         startedAt: Date.now(),
                         lastUpdateAt: Date.now(),
-                        estimatedCompletion: null
-                    },
-                    resume: {
-                        nextChunkIndex: 0,
-                        failedChunks: [],
-                        retryCount: {}
+                        estimatedCompletion: null,
+                        resume: {
+                            nextChunkIndex: 0,
+                            failedChunks: [],
+                            retryCount: {}
+                        },
+                        // Keep chunk details for progress tracking
+                        chunkDetails: []
                     }
                 };
                 
@@ -2387,7 +2448,12 @@
             }
             
             async markChunkComplete(index, txid, blockId, size) {
-                const chunk = {
+                // v3.3 format: store txid and blockId in separate arrays
+                this.progress.chunks[index] = txid;
+                this.progress.chunkBlockIds[index] = blockId;
+                
+                // Store detailed info in _progress for tracking
+                const chunkDetail = {
                     index: index,
                     txid: txid,
                     blockId: blockId,
@@ -2396,44 +2462,48 @@
                     verified: true
                 };
                 
-                // Update or add chunk
-                const existingIndex = this.progress.chunks.findIndex(c => c.index === index);
+                // Update or add chunk detail
+                const existingIndex = this.progress._progress.chunkDetails.findIndex(c => c.index === index);
                 if (existingIndex >= 0) {
-                    this.progress.chunks[existingIndex] = chunk;
+                    this.progress._progress.chunkDetails[existingIndex] = chunkDetail;
                 } else {
-                    this.progress.chunks.push(chunk);
+                    this.progress._progress.chunkDetails.push(chunkDetail);
                 }
                 
-                this.progress.metadata.completedChunks = this.progress.chunks.length;
-                this.progress.metadata.lastUpdateAt = Date.now();
-                this.progress.resume.nextChunkIndex = this.getNextChunkIndex();
+                // Update progress tracking
+                this.progress._progress.completedChunks = this.progress._progress.chunkDetails.length;
+                this.progress._progress.lastUpdateAt = Date.now();
+                this.progress._progress.resume.nextChunkIndex = this.getNextChunkIndex();
+                
+                // Update recovery section
+                this.progress.recovery.uploadCost += 0.00025; // Approximate cost per chunk
                 
                 // Calculate estimated completion
-                const elapsed = Date.now() - this.progress.metadata.startedAt;
-                const rate = this.progress.metadata.completedChunks / elapsed;
-                const remaining = this.progress.metadata.totalChunks - this.progress.metadata.completedChunks;
-                this.progress.metadata.estimatedCompletion = Date.now() + (remaining / rate);
+                const elapsed = Date.now() - this.progress._progress.startedAt;
+                const rate = this.progress._progress.completedChunks / elapsed;
+                const remaining = this.progress.recovery.totalChunks - this.progress._progress.completedChunks;
+                this.progress._progress.estimatedCompletion = Date.now() + (remaining / rate);
                 
                 // v4.7.25: Save progress after every chunk
                 await this.saveProgress();
             }
             
             markChunkFailed(index) {
-                if (!this.progress.resume.failedChunks.includes(index)) {
-                    this.progress.resume.failedChunks.push(index);
+                if (!this.progress._progress.resume.failedChunks.includes(index)) {
+                    this.progress._progress.resume.failedChunks.push(index);
                 }
-                this.progress.resume.retryCount[index] = (this.progress.resume.retryCount[index] || 0) + 1;
+                this.progress._progress.resume.retryCount[index] = (this.progress._progress.resume.retryCount[index] || 0) + 1;
             }
             
             getNextChunkIndex() {
                 // First, try failed chunks
-                if (this.progress.resume.failedChunks.length > 0) {
-                    return this.progress.resume.failedChunks.shift();
+                if (this.progress._progress.resume.failedChunks.length > 0) {
+                    return this.progress._progress.resume.failedChunks.shift();
                 }
                 
                 // Then find next incomplete chunk
-                for (let i = 0; i < this.progress.metadata.totalChunks; i++) {
-                    if (!this.progress.chunks.some(c => c.index === i)) {
+                for (let i = 0; i < this.progress.recovery.totalChunks; i++) {
+                    if (!this.progress._progress.chunkDetails.some(c => c.index === i)) {
                         return i;
                     }
                 }
@@ -2511,21 +2581,21 @@
             
             async exportAsKaspa(kaspaMetadata) {
                 // Convert progress to .kaspa format when upload completes
+                // Remove _progress fields for final .kaspa file
                 const kaspaFile = {
-                    ...kaspaMetadata,
-                    resume: {
-                        supported: true,
-                        progressFile: this.progressFileName,
-                        chunks: this.progress.chunks
-                    }
+                    ...this.progress,
+                    ...kaspaMetadata
                 };
+                
+                // Remove progress-specific fields
+                delete kaspaFile._progress;
                 
                 return kaspaFile;
             }
             
             getStats() {
-                const completed = this.progress.metadata.completedChunks;
-                const total = this.progress.metadata.totalChunks;
+                const completed = this.progress._progress.completedChunks;
+                const total = this.progress.recovery.totalChunks;
                 const progressPercent = (completed / total * 100);
                 
                 console.log(`ProgressManager Stats: ${completed}/${total} 完了 (${progressPercent.toFixed(1)}%)`);
@@ -2535,13 +2605,13 @@
                     totalChunks: total,
                     percentage: progressPercent,
                     remaining: total - completed,
-                    estimatedTime: this.progress.metadata.estimatedCompletion ? 
-                        new Date(this.progress.metadata.estimatedCompletion).toLocaleTimeString() : 'N/A'
+                    estimatedTime: this.progress._progress.estimatedCompletion ? 
+                        new Date(this.progress._progress.estimatedCompletion).toLocaleTimeString() : 'N/A'
                 };
             }
             
             isChunkCompleted(index) {
-                return this.progress.chunks.some(c => c.index === index);
+                return this.progress._progress.chunkDetails.some(c => c.index === index);
             }
         }
         
@@ -3392,6 +3462,92 @@
             document.getElementById('progressFileInput').click();
         };
 
+        // v2.1 から v3.3 形式への変換関数
+        function convertV21ToV33Progress(v21Progress) {
+            // Calculate 1MB processing chunk boundaries
+            const PROCESSING_CHUNK_SIZE = 1048576; // 1MB
+            const fileSize = v21Progress.fileInfo.size;
+            const chunkBoundaries = [];
+            
+            for (let offset = 0; offset < fileSize; offset += PROCESSING_CHUNK_SIZE) {
+                const size = Math.min(PROCESSING_CHUNK_SIZE, fileSize - offset);
+                chunkBoundaries.push({
+                    index: Math.floor(offset / PROCESSING_CHUNK_SIZE),
+                    offset: offset,
+                    size: size,
+                    originalSize: size,
+                    compressedSize: size
+                });
+            }
+            
+            // Build v3.3 format
+            const v33Progress = {
+                // Basic info
+                version: "3.3",
+                type: "kaspa-file",
+                created: new Date().toISOString(),
+                network: "testnet-10",
+                
+                // File information
+                file: {
+                    name: v21Progress.fileInfo.name,
+                    size: v21Progress.fileInfo.size,
+                    mimeType: v21Progress.fileInfo.mimeType,
+                    sha256: v21Progress.fileInfo.sha256, // Should be extended to 64 chars if truncated
+                    encrypted: true,
+                    compression: {
+                        algorithm: v21Progress.encryption?.compressed ? "lz-string" : "none",
+                        enabled: v21Progress.encryption?.compressed || false,
+                        originalSize: v21Progress.fileInfo.size,
+                        compressedSize: v21Progress.encryption?.compressed ? null : v21Progress.fileInfo.size
+                    }
+                },
+                
+                // Encryption (v3.3 structure)
+                encryption: {
+                    algorithm: "AES-256-GCM",
+                    pbkdf2: {
+                        salt: v21Progress.encryption.salt,
+                        iterations: 100000
+                    }
+                },
+                
+                // Chunk arrays (v3.3 format)
+                chunks: v21Progress.chunks.map(c => c.txid),
+                chunkBlockIds: v21Progress.chunks.map(c => c.blockId),
+                
+                // Recovery section
+                recovery: {
+                    totalChunks: v21Progress.metadata.totalChunks,
+                    chunkSize: v21Progress.metadata.chunkSize,
+                    checksum: v21Progress.fileInfo.sha256,
+                    uploadCost: v21Progress.metadata.totalCost || 0
+                },
+                
+                // Metadata
+                metadata: {
+                    uploadDate: new Date(v21Progress.metadata.startedAt).toISOString(),
+                    uploadedBy: "", // Will be set from wallet
+                    chunkBoundaries: chunkBoundaries,
+                    payloadSplit: true
+                },
+                
+                // Progress-specific data (prefixed with _)
+                _progress: {
+                    cid: v21Progress.cid,
+                    completedChunks: v21Progress.metadata.completedChunks,
+                    startedAt: v21Progress.metadata.startedAt,
+                    lastUpdateAt: v21Progress.metadata.lastUpdateAt,
+                    estimatedCompletion: v21Progress.metadata.estimatedCompletion,
+                    resume: v21Progress.resume,
+                    // Convert chunk details
+                    chunkDetails: v21Progress.chunks
+                }
+            };
+            
+            return v33Progress;
+        }
+        
         window.handleProgressFileSelect = async function(event) {
             const file = event.target.files[0];
             if (!file || !file.name.endsWith('.kprogress')) {
@@ -3421,17 +3577,27 @@
             try {
                 
                 // Validate progress format
-                if (!progress.version || !progress.fileInfo || !progress.chunks) {
+                if (!progress.version || (!progress.fileInfo && !progress.file) || !progress.chunks) {
                     throw new Error('無効な進捗ファイル形式');
                 }
                 
+                // Convert v2.1 format to v3.3 if needed
+                if (progress.version === "2.1") {
+                    progress = convertV21ToV33Progress(progress);
+                }
+                
                 // Show resume info
+                const fileInfo = progress.file || progress.fileInfo;
+                const completedChunks = progress._progress?.completedChunks || progress.metadata?.completedChunks || 0;
+                const totalChunks = progress.recovery?.totalChunks || progress.metadata?.totalChunks || 0;
+                const lastUpdate = progress._progress?.lastUpdateAt || progress.metadata?.lastUpdateAt || Date.now();
+                
                 document.getElementById('resumeInfo').style.display = 'block';
                 document.getElementById('resumeDetails').innerHTML = `
-                    <p><strong>ファイル:</strong> ${progress.fileInfo.name}</p>
-                    <p><strong>サイズ:</strong> ${(progress.fileInfo.size / 1024 / 1024).toFixed(2)} MB</p>
-                    <p><strong>進捗:</strong> ${progress.metadata.completedChunks}/${progress.metadata.totalChunks} チャンク (${(progress.metadata.completedChunks / progress.metadata.totalChunks * 100).toFixed(1)}%)</p>
-                    <p><strong>最終更新:</strong> ${new Date(progress.metadata.lastUpdateAt).toLocaleString()}</p>
+                    <p><strong>ファイル:</strong> ${fileInfo.name}</p>
+                    <p><strong>サイズ:</strong> ${(fileInfo.size / 1024 / 1024).toFixed(2)} MB</p>
+                    <p><strong>進捗:</strong> ${completedChunks}/${totalChunks} チャンク (${(completedChunks / totalChunks * 100).toFixed(1)}%)</p>
+                    <p><strong>最終更新:</strong> ${new Date(lastUpdate).toLocaleString()}</p>
                     <p class="warning">⚠️ 同じファイルを選択してアップロードを続行してください</p>
                 `;
                 
@@ -5069,7 +5235,7 @@
             );
         }
 
-        async function encryptChunk(data, key, chunkIndex) {
+        async function encryptChunk(data, key, chunkIndex, payloadIndex = 0) {
             const iv = new Uint8Array(12);
             
             // Special handling for meta-tx (chunkIndex = -1)
@@ -5081,11 +5247,19 @@
                     iv[i] = 0xFF - i;
                 }
             } else {
-                iv[0] = (chunkIndex >> 8) & 0xFF;
-                iv[1] = chunkIndex & 0xFF;
-                for (let i = 2; i < 12; i++) {
-                    iv[i] = i * 17;
-                }
+                // v3.3: Use chunk index (4 bytes) + payload index (4 bytes) + random (4 bytes)
+                const dataView = new DataView(iv.buffer);
+                
+                // Chunk index (4 bytes, big-endian)
+                dataView.setUint32(0, chunkIndex, false);
+                
+                // Payload index (4 bytes, big-endian)
+                dataView.setUint32(4, payloadIndex, false);
+                
+                // Random bytes (4 bytes)
+                const randomBytes = new Uint8Array(4);
+                crypto.getRandomValues(randomBytes);
+                iv.set(randomBytes, 8);
             }
             
             const encrypted = await crypto.subtle.encrypt(
@@ -5097,23 +5271,32 @@
             return new Uint8Array(encrypted);
         }
 
-        async function decryptChunk(data, key, chunkIndex) {
+        async function decryptChunk(data, key, chunkIndex, payloadIndex = 0, ivBytes = null) {
             try {
-                const iv = new Uint8Array(12);
+                let iv;
                 
-                // Special handling for meta-tx (chunkIndex = -1)
-                if (chunkIndex === -1) {
-                    // Use a special pattern for meta-tx
-                    iv[0] = 0xFF;
-                    iv[1] = 0xFF;
-                    for (let i = 2; i < 12; i++) {
-                        iv[i] = 0xFF - i;
-                    }
+                if (ivBytes) {
+                    // Use provided IV (for v3.3 payloads with stored IV)
+                    iv = ivBytes;
                 } else {
-                    iv[0] = (chunkIndex >> 8) & 0xFF;
-                    iv[1] = chunkIndex & 0xFF;
-                    for (let i = 2; i < 12; i++) {
-                        iv[i] = i * 17;
+                    // Generate IV (backward compatibility)
+                    iv = new Uint8Array(12);
+                    
+                    // Special handling for meta-tx (chunkIndex = -1)
+                    if (chunkIndex === -1) {
+                        // Use a special pattern for meta-tx
+                        iv[0] = 0xFF;
+                        iv[1] = 0xFF;
+                        for (let i = 2; i < 12; i++) {
+                            iv[i] = 0xFF - i;
+                        }
+                    } else {
+                        // Old format for backward compatibility
+                        iv[0] = (chunkIndex >> 8) & 0xFF;
+                        iv[1] = chunkIndex & 0xFF;
+                        for (let i = 2; i < 12; i++) {
+                            iv[i] = i * 17;
+                        }
                     }
                 }
                 
@@ -5266,10 +5449,13 @@
             const salt = safeHexDecode(saltHash.substring(0, 32), 'salt generation');
             const key = await deriveKey(password, salt);
             
-            // Update progress manager with encryption info
-            progressManager.progress.encryption.salt = toBase64(salt);
-            progressManager.progress.encryption.compressed = useCompression;
+            // Update progress manager with encryption info (v3.3 format)
+            progressManager.progress.encryption.pbkdf2.salt = toBase64(salt);
             progressManager.progress.metadata.payloadSplit = true; // New flag
+            // Set wallet address if available
+            if (window.currentAddress) {
+                progressManager.progress.metadata.uploadedBy = window.currentAddress;
+            }
             
             const payloads = [];
             const chunkBoundaries = []; // Track encrypted chunk boundaries
@@ -5289,7 +5475,8 @@
                 
                 // Encrypt (continuous stream)
                 const chunkIndex = Math.floor(processedBytes / PROCESS_CHUNK_SIZE);
-                const encrypted = await encryptChunk(compressed, key, chunkIndex);
+                const payloadStartIndex = payloads.length; // Current payload index for this chunk
+                const encrypted = await encryptChunk(compressed, key, chunkIndex, payloadStartIndex);
                 
                 // Record chunk boundary
                 chunkBoundaries.push({
@@ -5327,7 +5514,9 @@
             
             // Update totalChunks to match payload count
             progressManager.progress.metadata.totalChunks = payloads.length;
-            progressManager.progress.metadata.chunkBoundaries = chunkBoundaries; // Save boundaries
+            // Update v3.3 format metadata
+            progressManager.progress.metadata.chunkBoundaries = chunkBoundaries;
+            progressManager.progress.recovery.totalChunks = payloads.length; // Total payloads, not chunks // Save boundaries
             await progressManager.saveProgress();
             
             // v4.7.56: 関数完了ログを追加

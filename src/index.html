@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.3.13 - kprogress Chunk Restoration</title>
+    <title>Kaspa P2P File Storage v5.3.14 - Optimized kprogress Format</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -802,15 +802,15 @@
     </div>
 
     <script type="module">
-        // v5.3.13: kprogress chunk restoration fix
-        // - Fixed processedChunks initialization to restore existing chunks from kprogress
-        // - Ensures all uploaded chunks (existing + new) are included in .kaspa file
-        // - Resolves issue where only newly uploaded chunks were recorded
-        // - Maintains complete chunk history for proper file reconstruction
+        // v5.3.14: Optimized kprogress format
+        // - Removed duplicate chunks/chunkBlockIds arrays from root level
+        // - All chunk information now stored only in _progress.chunkDetails
+        // - Reduces kprogress file size by eliminating redundant data
+        // - Maintains backward compatibility by reading from chunkDetails
         
         // Debug logging - Safe version
         try {
-            console.log('[DEBUG v5.3.13] Script started at:', new Date().toISOString());
+            console.log('[DEBUG v5.3.14] Script started at:', new Date().toISOString());
             console.log('[DEBUG] User Agent:', navigator.userAgent);
         } catch (e) {
             // Ignore errors in debug logging
@@ -2403,10 +2403,6 @@
                         }
                     },
                     
-                    // Chunk arrays (v3.3 format)
-                    chunks: [],           // Will contain txid strings
-                    chunkBlockIds: [],    // Will contain blockId strings
-                    
                     // Recovery section
                     recovery: {
                         totalChunks: Math.ceil(actualFileSize / this.chunkSize), // 実際のバイト数を使用
@@ -2486,10 +2482,6 @@
             }
             
             async markChunkComplete(index, txid, blockId, size) {
-                // v3.3 format: store txid and blockId in separate arrays
-                this.progress.chunks[index] = txid;
-                this.progress.chunkBlockIds[index] = blockId;
-                
                 // Store detailed info in _progress for tracking
                 const chunkDetail = {
                     index: index,
@@ -5724,19 +5716,16 @@
             // Initialize processedChunks with existing chunks from progress
             processedChunks = [];
             if (progressManager && progressManager.progress) {
-                // Load existing chunks from kprogress
-                const existingChunks = progressManager.progress.chunks || [];
-                const existingBlockIds = progressManager.progress.chunkBlockIds || [];
+                // Load existing chunks from kprogress - use chunkDetails only
                 const chunkDetails = progressManager.progress._progress?.chunkDetails || [];
                 
-                // Reconstruct processedChunks from existing progress
-                for (let i = 0; i < existingChunks.length; i++) {
-                    if (existingChunks[i] && existingBlockIds[i]) {
-                        const detail = chunkDetails.find(d => d.index === i) || {};
+                // Reconstruct processedChunks from chunkDetails
+                for (const detail of chunkDetails) {
+                    if (detail.txid && detail.blockId) {
                         processedChunks.push({
-                            index: i,
-                            txid: existingChunks[i],
-                            blockId: existingBlockIds[i],
+                            index: detail.index,
+                            txid: detail.txid,
+                            blockId: detail.blockId,
                             originalSize: detail.size || 0,
                             compressedSize: detail.compressedSize || detail.size || 0,
                             payloadSize: detail.payloadSize || detail.size || 0,

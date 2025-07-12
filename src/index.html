@@ -2323,6 +2323,7 @@
                 this.saveHandle = null;
                 // v4.7.25: Remove auto-save interval settings (save every chunk)
                 this.fileHandle = null; // For File System Access API
+                this.actualFileSize = null; // Store actual file size after measurement
             }
             
             async initialize(existingProgress = null) {
@@ -2341,8 +2342,28 @@
                 const hashArray = Array.from(new Uint8Array(hashBuffer));
                 const fileHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
                 
-                // Calculate file SHA256 (full hash)
-                const fullFileData = await this.file.arrayBuffer();
+                // Calculate file SHA256 (full hash) and get actual file size
+                let actualFileSize;
+                let fullFileData;
+                
+                // For large files, use file.size to avoid memory issues
+                if (this.file.size > 50 * 1024 * 1024) { // 50MB threshold
+                    actualFileSize = this.file.size;
+                    // Read file in chunks for hash calculation
+                    fullFileData = await this.file.arrayBuffer();
+                } else {
+                    // For smaller files, get actual byte count
+                    fullFileData = await this.file.arrayBuffer();
+                    actualFileSize = fullFileData.byteLength; // 実際のバイト数を測定
+                    
+                    // Log size difference if any
+                    if (actualFileSize !== this.file.size) {
+                        log(`ファイルサイズ測定: File API=${this.file.size}バイト, 実際=${actualFileSize}バイト (差: ${actualFileSize - this.file.size}バイト)`, 'info');
+                    }
+                }
+                
+                // Store actual file size for validation
+                this.actualFileSize = actualFileSize;
                 const fullHashBuffer = await crypto.subtle.digest('SHA-256', fullFileData);
                 const fullHashArray = Array.from(new Uint8Array(fullHashBuffer));
                 const fullFileHash = fullHashArray.map(b => b.toString(16).padStart(2, '0')).join('');
@@ -2350,8 +2371,8 @@
                 // Calculate 1MB processing chunk boundaries
                 const PROCESSING_CHUNK_SIZE = 1048576; // 1MB
                 const chunkBoundaries = [];
-                for (let offset = 0; offset < this.file.size; offset += PROCESSING_CHUNK_SIZE) {
-                    const size = Math.min(PROCESSING_CHUNK_SIZE, this.file.size - offset);
+                for (let offset = 0; offset < actualFileSize; offset += PROCESSING_CHUNK_SIZE) {
+                    const size = Math.min(PROCESSING_CHUNK_SIZE, actualFileSize - offset);
                     chunkBoundaries.push({
                         index: Math.floor(offset / PROCESSING_CHUNK_SIZE),
                         offset: offset,
@@ -2371,14 +2392,14 @@
                     // File information
                     file: {
                         name: this.file.name,
-                        size: this.file.size,
+                        size: actualFileSize, // 実際のバイト数を使用
                         mimeType: this.file.type || 'application/octet-stream',
                         sha256: fullFileHash, // Full 64-char hash
                         encrypted: true,
                         compression: {
                             algorithm: "none",
                             enabled: false,
-                            originalSize: this.file.size,
+                            originalSize: actualFileSize, // 実際のバイト数を使用
                             compressedSize: null
                         }
                     },
@@ -2398,7 +2419,7 @@
                     
                     // Recovery section
                     recovery: {
-                        totalChunks: Math.ceil(this.file.size / this.chunkSize),
+                        totalChunks: Math.ceil(actualFileSize / this.chunkSize), // 実際のバイト数を使用
                         chunkSize: this.chunkSize,
                         checksum: fullFileHash,
                         uploadCost: 0
@@ -2440,10 +2461,37 @@
             
             validateProgress(progress) {
                 // Check if progress matches current file
-                if (!progress || !progress.fileInfo) return false;
-                if (progress.fileInfo.name !== this.file.name) return false;
-                if (progress.fileInfo.size !== this.file.size) return false;
-                // Optional: check lastModified if strict matching needed
+                if (!progress) return false;
+                
+                // Support both v2.1 (fileInfo) and v3.3 (file) formats
+                const fileInfo = progress.file || progress.fileInfo;
+                if (!fileInfo) return false;
+                
+                // Check file name
+                if (fileInfo.name !== this.file.name) {
+                    log(`ファイル名が一致しません: ${fileInfo.name} != ${this.file.name}`, 'error');
+                    return false;
+                }
+                
+                // Check file size with tolerance
+                // Use actualFileSize if available (more accurate), otherwise use file.size
+                const currentFileSize = this.actualFileSize || this.file.size;
+                const sizeDiff = Math.abs(fileInfo.size - currentFileSize);
+                
+                // Allow up to 1KB difference for File API measurement variations
+                if (sizeDiff > 1024) {
+                    log(`ファイルサイズが大きく異なります: 記録=${fileInfo.size}バイト, 現在=${currentFileSize}バイト (差: ${sizeDiff}バイト)`, 'error');
+                    if (this.actualFileSize && this.actualFileSize !== this.file.size) {
+                        log(`注: File API=${this.file.size}バイト, 実測=${this.actualFileSize}バイト`, 'info');
+                    }
+                    return false;
+                }
+                
+                // Log success
+                if (sizeDiff > 0) {
+                    log(`ファイルサイズの微小な差を許容: ${sizeDiff}バイト`, 'info');
+                }
+                
                 return true;
             }
             

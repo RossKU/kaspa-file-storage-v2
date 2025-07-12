@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.3.12 - Deterministic IV Generation</title>
+    <title>Kaspa P2P File Storage v5.3.13 - kprogress Chunk Restoration</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -802,15 +802,15 @@
     </div>
 
     <script type="module">
-        // v5.3.12: Unified deterministic IV generation (v5.3.11 style)
-        // - Uses chunk index (4 bytes) + payload index (4 bytes) + deterministic bytes (4 bytes)
-        // - Deterministic bytes use XOR operations for better security
-        // - No backward compatibility with v5.3.7 (as requested)
-        // - Consistent IV generation for both encryption and decryption
+        // v5.3.13: kprogress chunk restoration fix
+        // - Fixed processedChunks initialization to restore existing chunks from kprogress
+        // - Ensures all uploaded chunks (existing + new) are included in .kaspa file
+        // - Resolves issue where only newly uploaded chunks were recorded
+        // - Maintains complete chunk history for proper file reconstruction
         
         // Debug logging - Safe version
         try {
-            console.log('[DEBUG v5.3.12] Script started at:', new Date().toISOString());
+            console.log('[DEBUG v5.3.13] Script started at:', new Date().toISOString());
             console.log('[DEBUG] User Agent:', navigator.userAgent);
         } catch (e) {
             // Ignore errors in debug logging
@@ -5720,7 +5720,32 @@
             }
             
             currentPassword = password;
+            
+            // Initialize processedChunks with existing chunks from progress
             processedChunks = [];
+            if (progressManager && progressManager.progress) {
+                // Load existing chunks from kprogress
+                const existingChunks = progressManager.progress.chunks || [];
+                const existingBlockIds = progressManager.progress.chunkBlockIds || [];
+                const chunkDetails = progressManager.progress._progress?.chunkDetails || [];
+                
+                // Reconstruct processedChunks from existing progress
+                for (let i = 0; i < existingChunks.length; i++) {
+                    if (existingChunks[i] && existingBlockIds[i]) {
+                        const detail = chunkDetails.find(d => d.index === i) || {};
+                        processedChunks.push({
+                            index: i,
+                            txid: existingChunks[i],
+                            blockId: existingBlockIds[i],
+                            originalSize: detail.size || 0,
+                            compressedSize: detail.compressedSize || detail.size || 0,
+                            payloadSize: detail.payloadSize || detail.size || 0,
+                            uploadedAt: detail.uploadedAt || Date.now()
+                        });
+                    }
+                }
+                log(`既存のチャンク情報を復元: ${processedChunks.length}個`, 'info');
+            }
             
             document.getElementById('uploadBtn').disabled = true;
             const uploadProgressInit = document.getElementById('uploadProgress');

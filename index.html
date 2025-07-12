@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.3.0 - Content-Based CID Generation</title>
+    <title>Kaspa P2P File Storage v5.3.6 - WebSocket Monitoring Enhancement</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -405,7 +405,7 @@
 </head>
 <body>
     <div class="header">
-        <h1 id="appTitle">🚀 Kaspa P2P File Storage v5.3.0 - Loading...</h1>
+        <h1 id="appTitle">🚀 Kaspa P2P File Storage v5.3.6 - Loading...</h1>
         <p>実ネットワーク接続による完全なP2Pファイル共有システム（用語修正）</p>
         <p id="appSubtitle" style="font-size: 12px; color: #49EACB; margin-top: 5px;">📋 Loading version...</p>
         <div id="networkStatus" style="margin-top: 10px;">
@@ -835,6 +835,7 @@
         let uploadingMetaTx = false; // Whether meta-tx is being uploaded
         let uploadingDirMeta = false; // Whether directory meta is being uploaded
         let isUploadingFile = false; // Overall file upload status (v3.6.3 fix)
+        let uploadSessionActive = false; // Upload session active flag (v5.3.6)
         
         // Constants
         const CHUNKS_PER_META = 160; // Maximum chunks per MetaTxID
@@ -5238,6 +5239,10 @@
             // v4.7.56: 関数開始ログを追加
             log('[processFileWithPayloadSplit] 開始', 'info');
             
+            // v5.3.6: Start upload session
+            uploadSessionActive = true;
+            log('[INFO] アップロードセッションを開始', 'info');
+            
             try {
                 const PROCESS_CHUNK_SIZE = 1024 * 1024; // 1MB processing chunks
                 const PAYLOAD_SIZE = 22 * 1024; // 22KB payloads
@@ -5334,6 +5339,18 @@
                 log(`[processFileWithPayloadSplit] エラー: ${error.message}`, 'error');
                 log(`[processFileWithPayloadSplit] スタック: ${error.stack}`, 'error');
                 throw error;
+            } finally {
+                // v5.3.6: End upload session
+                uploadSessionActive = false;
+                log('[INFO] アップロードセッションを終了', 'info');
+                
+                // Check monitoring stop after 10 seconds
+                setTimeout(async () => {
+                    if (!uploadSessionActive && monitoredTransactions.size === 0) {
+                        log('[DEBUG] アップロード完了から10秒経過 - 監視停止を検討', 'debug');
+                        await checkMonitoringStop();
+                    }
+                }, 10000);
             }
         }
         
@@ -5652,6 +5669,12 @@
                         if (progressManager.isChunkCompleted(i)) {
                             log(`ペイロード ${i + 1}/${payloads.length} は既にアップロード済み`);
                             continue;
+                        }
+                        
+                        // v5.3.6: Check WebSocket monitoring every 10 chunks
+                        if (i > 0 && i % 10 === 0 && !wsMonitorActive && uploadSessionActive) {
+                            log('[WARNING] WebSocket監視が停止していたため再開', 'warning');
+                            await startMonitoring();
                         }
                         
                         // Get fresh UTXOs
@@ -8386,10 +8409,18 @@
 
         // Check if monitoring should stop
         async function checkMonitoringStop() {
+            // v5.3.6: Don't stop monitoring during upload session
+            if (uploadSessionActive) {
+                log('[DEBUG] アップロードセッション中のため監視を継続', 'debug');
+                return;
+            }
+            
             // v3.6.3 fix: Check overall upload status
             if (uploadingChunksCount === 0 && !uploadingMetaTx && !uploadingDirMeta && !isUploadingFile) {
                 log(`[DEBUG] WebSocket監視: 残り0件 - 自動停止します`, 'debug');
                 await stopMonitoring();
+            } else {
+                log(`[DEBUG] 監視継続: chunks=${uploadingChunksCount}, meta=${uploadingMetaTx}, dir=${uploadingDirMeta}, file=${isUploadingFile}`, 'debug');
             }
         }
         
@@ -8738,11 +8769,20 @@
                 log('WebSocket監視を開始...', 'info');
                 wsMonitorActive = true;
                 
-                // Set 5 minute timeout
+                // Set 5 minute timeout with upload session check (v5.3.6)
                 if (wsMonitorTimeout) {
                     clearTimeout(wsMonitorTimeout);
                 }
                 wsMonitorTimeout = setTimeout(async () => {
+                    // Don't stop monitoring during upload session
+                    if (uploadSessionActive) {
+                        log('[DEBUG] アップロードセッション中 - WebSocket監視を継続', 'debug');
+                        // Reset timeout
+                        clearTimeout(wsMonitorTimeout);
+                        wsMonitorTimeout = setTimeout(arguments.callee, 5 * 60 * 1000);
+                        return;
+                    }
+                    
                     log('WebSocket監視: 5分タイムアウト - 自動停止', 'warning');
                     await stopMonitoring();
                 }, 5 * 60 * 1000);
@@ -9620,6 +9660,19 @@
                 statusEl.textContent = 'Test data cleared.';
             }
         }
+        
+        // v5.3.6: Debug helper for upload status
+        window.getUploadStatus = function() {
+            return {
+                sessionActive: uploadSessionActive,
+                wsMonitoring: wsMonitorActive,
+                uploadingChunks: uploadingChunksCount,
+                uploadingMeta: uploadingMetaTx,
+                uploadingDir: uploadingDirMeta,
+                uploadingFile: isUploadingFile,
+                monitoredTx: monitoredTransactions.size
+            };
+        };
     </script>
 </body>
 </html><!-- Force GitHub Pages update: Sat Jul  5 09:53:35 JST 2025 -->

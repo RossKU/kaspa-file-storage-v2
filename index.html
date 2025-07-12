@@ -2368,19 +2368,9 @@
                 const fullHashArray = Array.from(new Uint8Array(fullHashBuffer));
                 const fullFileHash = fullHashArray.map(b => b.toString(16).padStart(2, '0')).join('');
                 
-                // Calculate 1MB processing chunk boundaries
-                const PROCESSING_CHUNK_SIZE = 1048576; // 1MB
+                // Initialize empty chunk boundaries - will be filled during actual upload
                 const chunkBoundaries = [];
-                for (let offset = 0; offset < actualFileSize; offset += PROCESSING_CHUNK_SIZE) {
-                    const size = Math.min(PROCESSING_CHUNK_SIZE, actualFileSize - offset);
-                    chunkBoundaries.push({
-                        index: Math.floor(offset / PROCESSING_CHUNK_SIZE),
-                        offset: offset,
-                        size: size,
-                        originalSize: size,
-                        compressedSize: size
-                    });
-                }
+                // Note: Actual chunk boundaries with encrypted sizes will be recorded during upload
                 
                 this.progress = {
                     // v3.3 compliant format
@@ -6137,6 +6127,9 @@
                             payloadInfo.innerHTML = `<strong>進捗: ${completedChunks}/${totalPayloads} ペイロード</strong>`;
                         }
                     }
+                    
+                    // Update progress manager with actual chunk boundaries
+                    progressManager.progress.metadata.chunkBoundaries = chunkBoundaries;
                     
                     // Skip old chunk processing
                     nextChunkIndex = -1;

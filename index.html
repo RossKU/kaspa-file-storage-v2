@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.3.16 - Debug Parallel Download</title>
+    <title>Kaspa P2P File Storage v5.4.0 - Archive Node Support</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -226,6 +226,59 @@
         }
         .log-success {
             color: #4CAF50;
+        }
+        /* Toggle switch styles */
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 24px;
+            vertical-align: middle;
+        }
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 24px;
+        }
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        input:checked + .toggle-slider {
+            background-color: #49EACB;
+        }
+        input:checked + .toggle-slider:before {
+            transform: translateX(26px);
+        }
+        .setting-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 15px 0;
+            padding: 10px;
+            background: #16213e;
+            border-radius: 5px;
+        }
+        .setting-label {
+            flex: 1;
         }
         .log-info {
             color: #2196F3;
@@ -697,6 +750,23 @@
                     <option value="testnet-10" selected>Testnet-10 (テスト用)</option>
                     <option value="mainnet">Mainnet (本番)</option>
                 </select>
+                
+                <label>ノードタイプ</label>
+                <select id="nodeTypeSelect" onchange="onNodeTypeChange()">
+                    <option value="auto" selected>自動選択 (推奨)</option>
+                    <option value="standard">通常ノード</option>
+                    <option value="archive">アーカイブノード</option>
+                    <option value="custom">カスタム</option>
+                </select>
+                
+                <div id="customEndpointSection" style="display: none; margin-top: 10px;">
+                    <label>カスタムRPCエンドポイント</label>
+                    <input type="text" id="customRpcEndpoint" placeholder="wss://your-node.example.com:17210" style="width: 100%; padding: 8px; background: #16213e; color: #eee; border: 1px solid #49EACB; border-radius: 5px;">
+                </div>
+                
+                <div id="nodeConnectionStatus" style="margin-top: 10px; padding: 10px; background: #16213e; border-radius: 5px; display: none;">
+                    <strong>接続状態:</strong> <span id="nodeConnectionInfo">未接続</span>
+                </div>
                 
                 <label>リトライ回数</label>
                 <input type="number" id="retryCount" value="3" min="0" max="10">
@@ -2990,7 +3060,20 @@
                 enabled: true,
                 chunksPerMeta: 2,  // 実験的: 2チャンクごとにメタデータ生成
                 metasPerSuper: 2   // 実験的: 2メタデータごとにスーパーメタ生成
-            }
+            },
+            // Archive node configuration
+            nodeType: 'auto', // auto, standard, archive
+            currentEndpoint: null, // Currently connected endpoint
+            customEndpoint: null, // User-defined custom endpoint
+            archiveEndpoints: {
+                'testnet-10': 'wss://archive-tn10.kaspa.org:17210',
+                'mainnet': 'wss://archive.kaspa.org:17110'
+            },
+            standardEndpoints: {
+                'testnet-10': null, // Use default resolver
+                'mainnet': null // Use default resolver
+            },
+            lastConnectionType: null // Track last successful connection type
         };
 
         // Safe hex decode function
@@ -4627,13 +4710,11 @@
                     }
                 }
                 
-                // Create new RPC client
-                rpcClient = new kaspa.RpcClient({
-                    resolver: new kaspa.Resolver(),
-                    networkId: config.network
-                });
+                // Create new RPC client with node type support
+                rpcClient = await createRpcClient();
                 
                 await rpcClient.connect();
+                updateNodeConnectionStatus(config.nodeType, config.currentEndpoint);
                 
                 // Test connection
                 const info = await rpcClient.getServerInfo();
@@ -8178,8 +8259,51 @@
                             throw new Error(`ブロック内にメタトランザクションが見つかりません`);
                         }
                     } catch (rpcError) {
-                        log(`RPCエラー: ${rpcError.message}`, 'error');
-                        throw rpcError;
+                        log(`[RPC] エラー: ${rpcError.message}`, 'error');
+                        
+                        // Check if error is due to pruned data
+                        if (config.nodeType === 'auto' && 
+                            (rpcError.message.includes('pruned') || 
+                             rpcError.message.includes('プルーニング') ||
+                             rpcError.message.includes('not found'))) {
+                            log(`[RPC] プルーニングされたデータを検出。アーカイブノードに切り替えます...`, 'info');
+                            
+                            const switched = await switchToArchiveNode();
+                            if (switched) {
+                                // Retry the operation with archive node
+                                log(`[RPC] アーカイブノードで再試行中...`, 'info');
+                                const blockResponse = await rpcClient.getBlock({
+                                    hash: blockId,
+                                    includeTransactions: true
+                                });
+                                
+                                const block = blockResponse?.block?.block || blockResponse?.block;
+                                if (!block) {
+                                    throw new Error(`ブロックが見つかりません: ${blockId}`);
+                                }
+                                
+                                // Find the meta transaction in the block
+                                for (const tx of block.transactions || []) {
+                                    const txId = tx.verboseData?.transactionId || tx.id || tx.transactionId;
+                                    if (txId === metaTxId) {
+                                        if (tx.payload && tx.payload !== '') {
+                                            const hexPayload = tx.payload;
+                                            payload = safeHexDecode(hexPayload, 'meta-tx payload from archive RPC');
+                                            log(`[RPC] アーカイブノードからメタトランザクションを取得: ${payload.length} bytes`, 'success');
+                                            break;
+                                        }
+                                    }
+                                }
+                                
+                                if (!payload) {
+                                    throw new Error(`ブロック内にメタトランザクションが見つかりません`);
+                                }
+                            } else {
+                                throw rpcError;
+                            }
+                        } else {
+                            throw rpcError;
+                        }
                     }
                 } else {
                     // Fall back to REST API if no BlockID provided
@@ -10243,6 +10367,29 @@
                 monitoredTx: monitoredTransactions.size
             };
         };
+        
+        // Initialize event handlers
+        document.addEventListener('DOMContentLoaded', function() {
+            // Network change handler
+            document.getElementById('networkSelect').addEventListener('change', (e) => {
+                config.network = e.target.value;
+                log(`[Config] ネットワーク変更: ${config.network}`, 'info');
+                log(`[Config] 次回の接続時に新しいネットワークが適用されます`, 'info');
+            });
+            
+            // Custom endpoint input handler
+            const customEndpointInput = document.getElementById('customRpcEndpoint');
+            if (customEndpointInput) {
+                customEndpointInput.addEventListener('blur', saveCustomEndpoint);
+            }
+            
+            // Initialize parallel download setting
+            loadParallelSetting();
+            
+            // Log archive node feature availability
+            log(`[システム] アーカイブノード接続機能が利用可能です`, 'info');
+            log(`[システム] ノードタイプ: ${config.nodeType} (デフォルト)`, 'debug');
+        });
     </script>
 </body>
-</html><!-- Force GitHub Pages update: Sun Jul 12 2025 -->
+</html><!-- Force GitHub Pages update: Mon Jul 13 2025 - v5.4.0: Archive Node Support -->

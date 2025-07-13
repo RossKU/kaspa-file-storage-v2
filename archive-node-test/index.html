@@ -198,12 +198,26 @@
                 
                 let client;
                 try {
-                    client = new kaspa.RpcClient({
-                        url: url,
-                        resolver: null,
-                        networkId: 'testnet-10'
-                    });
-                    log('RPC client created successfully');
+                    // Test 1: Try with only resolver (like main app)
+                    log('Test 1: Creating RPC client with resolver only...');
+                    try {
+                        const resolver = new kaspa.Resolver();
+                        client = new kaspa.RpcClient({
+                            resolver: resolver,
+                            networkId: 'testnet-10'
+                        });
+                        log('RPC client created with resolver only');
+                    } catch (e1) {
+                        log(`Test 1 failed: ${e1?.message || e1}`, 'warning');
+                        
+                        // Test 2: Try with direct URL
+                        log('Test 2: Creating RPC client with direct URL...');
+                        client = new kaspa.RpcClient({
+                            url: url,
+                            networkId: 'testnet-10'
+                        });
+                        log('RPC client created with direct URL');
+                    }
                 } catch (e) {
                     throw new Error(`Failed to create RPC client: ${e?.message || e}`);
                 }
@@ -216,9 +230,18 @@
                 // Connect
                 log('Attempting to connect...');
                 try {
-                    await Promise.race([client.connect(), timeoutPromise]);
+                    // Try connect with URL parameter
+                    log(`Connecting to: ${url}`);
+                    await Promise.race([client.connect(url), timeoutPromise]);
                 } catch (e) {
-                    throw new Error(`Connection failed: ${e?.message || e}`);
+                    // If that fails, try without URL
+                    log(`Connect with URL failed: ${e?.message || e}`, 'warning');
+                    log('Trying connect without URL parameter...');
+                    try {
+                        await Promise.race([client.connect(), timeoutPromise]);
+                    } catch (e2) {
+                        throw new Error(`Connection failed: ${e2?.message || e2}`);
+                    }
                 }
                 log('Connected successfully!', 'success');
                 
@@ -329,11 +352,20 @@
             try {
                 let client;
                 try {
-                    client = new kaspa.RpcClient({
-                        url: url,
-                        resolver: null,
-                        networkId: 'testnet-10'
-                    });
+                    // Try creating client with resolver first
+                    try {
+                        const resolver = new kaspa.Resolver();
+                        client = new kaspa.RpcClient({
+                            resolver: resolver,
+                            networkId: 'testnet-10'
+                        });
+                    } catch (e1) {
+                        // Fallback to direct URL
+                        client = new kaspa.RpcClient({
+                            url: url,
+                            networkId: 'testnet-10'
+                        });
+                    }
                 } catch (e) {
                     throw new Error(`RPC client creation failed: ${e?.message || e}`);
                 }
@@ -343,9 +375,15 @@
                 });
                 
                 try {
-                    await Promise.race([client.connect(), timeoutPromise]);
+                    // Try connect with URL first
+                    await Promise.race([client.connect(url), timeoutPromise]);
                 } catch (e) {
-                    throw new Error(`Connection error: ${e?.message || e}`);
+                    // Try without URL
+                    try {
+                        await Promise.race([client.connect(), timeoutPromise]);
+                    } catch (e2) {
+                        throw new Error(`Connection error: ${e2?.message || e2}`);
+                    }
                 }
                 const info = await client.getServerInfo();
                 await client.disconnect();

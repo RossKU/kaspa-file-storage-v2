@@ -93,7 +93,8 @@
 
     <div class="container">
         <h2>Block Height Calculator</h2>
-        <p>Calculate approximate block height based on date and current block info</p>
+        <p>Calculate approximate block height based on date and current block info<br>
+        <small style="color: #888">Note: Kaspa testnet-10 generates 10 blocks per second</small></p>
         <input type="number" id="currentHeight" placeholder="Current block height" value="1274055">
         <input type="datetime-local" id="currentTime" placeholder="Current block time">
         <input type="date" id="calcDate" value="2025-05-07">
@@ -163,11 +164,12 @@
             // Calculate time difference in seconds
             const timeDiff = (currentTime - targetDate) / 1000;
             
-            // Kaspa generates ~1 block per second
-            const estimatedHeight = Math.max(0, currentHeight - Math.floor(timeDiff));
+            // Kaspa generates ~10 blocks per second on testnet-10
+            const blocksPerSecond = 10;
+            const estimatedHeight = Math.max(0, currentHeight - Math.floor(timeDiff * blocksPerSecond));
             
             // Calculate when the chain started
-            const chainStartTime = new Date(currentTime - (currentHeight * 1000));
+            const chainStartTime = new Date(currentTime - (currentHeight * 1000 / blocksPerSecond));
             
             resultDiv.innerHTML = `<div class="result ${estimatedHeight > 0 ? 'success' : 'warning'}">
                 <strong>Calculation Results:</strong><br>
@@ -193,8 +195,9 @@
                             <th>Approximate Time</th>
                         </tr>`;
                 
-                for (let offset = -3600; offset <= 3600; offset += 1200) {
-                    const height = estimatedHeight + offset;
+                for (let offset = -3600; offset <= 3600; offset += 600) {
+                    const blockOffset = offset * blocksPerSecond;
+                    const height = estimatedHeight + blockOffset;
                     const time = new Date(targetDate.getTime() + (offset * 1000));
                     resultDiv.innerHTML += `
                         <tr>

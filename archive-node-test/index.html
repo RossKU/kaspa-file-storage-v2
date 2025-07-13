@@ -1,394 +1,442 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ja">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa Archive Block Test</title>
-    <script src="https://unpkg.com/kaspa-wasm@latest/web/kaspa-wasm.js"></script>
+    <title>Kaspa Node Connection Test - Minimal</title>
     <style>
         body {
-            font-family: Arial, sans-serif;
+            font-family: monospace;
             max-width: 1200px;
             margin: 0 auto;
             padding: 20px;
-            background-color: #f5f5f5;
+            background: #1a1a1a;
+            color: #e0e0e0;
         }
         .container {
-            background: white;
+            background: #2a2a2a;
             padding: 20px;
             border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        h1 {
-            color: #333;
             margin-bottom: 20px;
-        }
-        .input-group {
-            margin-bottom: 20px;
-        }
-        label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: bold;
-        }
-        input, textarea {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            box-sizing: border-box;
         }
         button {
-            background-color: #4CAF50;
+            background: #4CAF50;
             color: white;
-            padding: 10px 20px;
             border: none;
+            padding: 10px 20px;
+            margin: 5px;
             border-radius: 4px;
             cursor: pointer;
-            font-size: 16px;
-            margin-right: 10px;
         }
         button:hover {
-            background-color: #45a049;
+            background: #45a049;
         }
         button:disabled {
-            background-color: #ccc;
+            background: #666;
             cursor: not-allowed;
         }
-        .status {
-            margin-top: 20px;
+        .log {
+            background: #000;
             padding: 10px;
             border-radius: 4px;
-            font-family: monospace;
-        }
-        .success {
-            background-color: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-        .error {
-            background-color: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
-        .info {
-            background-color: #d1ecf1;
-            color: #0c5460;
-            border: 1px solid #bee5eb;
-        }
-        .results {
-            margin-top: 20px;
-            max-height: 600px;
+            max-height: 400px;
             overflow-y: auto;
-        }
-        .block-info {
-            background-color: #f8f9fa;
-            padding: 15px;
-            margin-bottom: 10px;
-            border-radius: 4px;
-            border: 1px solid #dee2e6;
-        }
-        .block-header {
-            font-weight: bold;
-            color: #495057;
-            margin-bottom: 10px;
-        }
-        .tx-info {
-            background-color: #fff;
-            padding: 10px;
-            margin-top: 10px;
-            border-radius: 4px;
-            border: 1px solid #e9ecef;
-        }
-        .payload-data {
-            background-color: #f1f3f4;
-            padding: 10px;
-            margin-top: 5px;
-            border-radius: 4px;
-            font-family: monospace;
-            word-break: break-all;
-            max-height: 200px;
-            overflow-y: auto;
-        }
-        pre {
+            font-size: 12px;
             white-space: pre-wrap;
-            word-wrap: break-word;
+        }
+        .success { color: #4CAF50; }
+        .error { color: #f44336; }
+        .warning { color: #ff9800; }
+        .info { color: #2196F3; }
+        input {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            background: #333;
+            color: #e0e0e0;
+            border: 1px solid #555;
+            border-radius: 4px;
+        }
+        .test-result {
+            margin: 10px 0;
+            padding: 10px;
+            background: #333;
+            border-radius: 4px;
+            border-left: 4px solid #666;
+        }
+        .test-result.success {
+            border-left-color: #4CAF50;
+        }
+        .test-result.error {
+            border-left-color: #f44336;
         }
     </style>
 </head>
 <body>
+    <h1>🔌 Kaspa Node Connection Test - Minimal Version</h1>
+    
     <div class="container">
-        <h1>Kaspa Archive Block Test</h1>
-        
-        <div class="input-group">
-            <label for="nodeUrl">Node URL (Archive Node Recommended):</label>
-            <input type="text" id="nodeUrl" value="wss://archive-tn10.kaspa.org:17210" placeholder="wss://archive-tn10.kaspa.org:17210">
-        </div>
-        
-        <div class="input-group">
-            <label for="blockRange">Block Range:</label>
-            <input type="text" id="blockRange" placeholder="e.g., 3000000-3000010 or single block hash">
-        </div>
-        
-        <div class="input-group">
-            <label for="searchPattern">Search Pattern (optional):</label>
-            <input type="text" id="searchPattern" placeholder="Search for specific content in payloads">
-        </div>
-        
-        <button onclick="startBlockTest()" id="testBtn">Start Block Test</button>
-        <button onclick="clearResults()">Clear Results</button>
-        
-        <div id="status" class="status info" style="display: none;"></div>
-        <div id="results" class="results"></div>
+        <h2>Step 1: Initialize Kaspa Module</h2>
+        <button onclick="initializeKaspa()" id="initBtn">Initialize Kaspa</button>
+        <div id="initStatus"></div>
     </div>
 
-    <script type="module">
-        let kaspa;
-        let rpcClient;
-        let isRunning = false;
+    <div class="container">
+        <h2>Step 2: Test Single Node Connection</h2>
+        <input type="text" id="nodeUrl" placeholder="wss://fermion-10.kaspa.green/kaspa/testnet-10/wrpc/borsh" 
+               value="wss://fermion-10.kaspa.green/kaspa/testnet-10/wrpc/borsh">
+        <button onclick="testSingleNode()" id="testBtn" disabled>Test Connection</button>
+        <div id="testResult"></div>
+    </div>
 
-        window.addEventListener('load', async () => {
-            try {
-                kaspa = await import('https://unpkg.com/kaspa-wasm@latest/web/kaspa-wasm.js');
-                await kaspa.default();
-                updateStatus('Kaspa WASM initialized', 'success');
-            } catch (error) {
-                updateStatus('Failed to initialize Kaspa WASM: ' + error.message, 'error');
-            }
-        });
+    <div class="container">
+        <h2>Step 3: Test Multiple Nodes</h2>
+        <button onclick="testAllNodes()" id="testAllBtn" disabled>Test All Known Nodes</button>
+        <div id="allTestResults"></div>
+    </div>
 
-        function updateStatus(message, type = 'info') {
-            const statusEl = document.getElementById('status');
-            statusEl.textContent = message;
-            statusEl.className = `status ${type}`;
-            statusEl.style.display = 'block';
+    <div class="container">
+        <h2>Debug Log</h2>
+        <div class="log" id="debugLog"></div>
+    </div>
+
+    <script>
+        // Global variables
+        let kaspa = null;
+        let isInitialized = false;
+
+        // Logging function
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logDiv = document.getElementById('debugLog');
+            const logEntry = document.createElement('div');
+            logEntry.className = type;
+            logEntry.textContent = `[${timestamp}] ${message}`;
+            logDiv.appendChild(logEntry);
+            logDiv.scrollTop = logDiv.scrollHeight;
             console.log(`[${type.toUpperCase()}] ${message}`);
         }
 
-        function addResult(html) {
-            const resultsEl = document.getElementById('results');
-            resultsEl.innerHTML += html;
-            resultsEl.scrollTop = resultsEl.scrollHeight;
-        }
-
-        async function connectToNode(url) {
-            try {
-                rpcClient = new kaspa.RpcClient({
-                    url: url,
-                    encoding: kaspa.Encoding.Borsh,
-                    networkId: "testnet-10"
-                });
-                
-                await rpcClient.connect();
-                updateStatus(`Connected to ${url}`, 'success');
-                return true;
-            } catch (error) {
-                updateStatus(`Failed to connect: ${error.message}`, 'error');
-                return false;
-            }
-        }
-
-        async function getBlockByHash(blockHash) {
-            try {
-                const response = await rpcClient.getBlock({
-                    hash: blockHash,
-                    includeTransactions: true
-                });
-                
-                return response?.block?.block || response?.block || null;
-            } catch (error) {
-                console.error(`Error fetching block ${blockHash}:`, error);
-                return null;
-            }
-        }
-
-        async function getBlockByHeight(height) {
-            try {
-                // First get the block hash from DAG info
-                const dagInfo = await rpcClient.getBlockDagInfo();
-                const virtualDaaScore = dagInfo.virtualDaaScore;
-                
-                // This is a simplified approach - in reality you'd need to traverse the DAG
-                // For now, we'll try to estimate block hash or skip this method
-                updateStatus(`Block height lookup not directly supported, use block hash instead`, 'error');
-                return null;
-            } catch (error) {
-                console.error(`Error fetching block at height ${height}:`, error);
-                return null;
-            }
-        }
-
-        async function analyzeBlock(block, searchPattern) {
-            let html = '<div class="block-info">';
-            html += `<div class="block-header">Block: ${block.header.hash}</div>`;
-            html += `<div>Timestamp: ${new Date(Number(block.header.timestamp)).toLocaleString()}</div>`;
-            html += `<div>DAA Score: ${block.header.daaScore}</div>`;
-            html += `<div>Blue Score: ${block.header.blueScore}</div>`;
-            html += `<div>Transaction Count: ${block.transactions?.length || 0}</div>`;
-            
-            let foundPayloads = 0;
-            let matchingPayloads = 0;
-            
-            if (block.transactions && block.transactions.length > 0) {
-                for (const tx of block.transactions) {
-                    const txId = tx.verboseData?.transactionId || tx.id || 'Unknown';
-                    const payload = tx.payload;
-                    
-                    if (payload && payload !== '00' && payload.length > 2) {
-                        foundPayloads++;
-                        
-                        let matches = !searchPattern;
-                        if (searchPattern) {
-                            const payloadLower = payload.toLowerCase();
-                            const patternLower = searchPattern.toLowerCase();
-                            matches = payloadLower.includes(patternLower);
-                            if (matches) matchingPayloads++;
-                        }
-                        
-                        if (matches) {
-                            html += '<div class="tx-info">';
-                            html += `<div><strong>TxID:</strong> ${txId}</div>`;
-                            html += `<div><strong>Payload Size:</strong> ${payload.length / 2} bytes</div>`;
-                            html += `<div class="payload-data">${payload}</div>`;
-                            
-                            try {
-                                // Try to decode as text
-                                const decoded = hexToText(payload);
-                                if (decoded && isPrintable(decoded)) {
-                                    html += `<div style="margin-top: 5px;"><strong>Decoded:</strong> <pre>${decoded}</pre></div>`;
-                                }
-                            } catch (e) {
-                                // Ignore decode errors
-                            }
-                            
-                            html += '</div>';
-                        }
-                    }
-                }
-            }
-            
-            html += `<div style="margin-top: 10px;"><strong>Summary:</strong> Found ${foundPayloads} transactions with payloads`;
-            if (searchPattern) {
-                html += `, ${matchingPayloads} matching search pattern`;
-            }
-            html += '</div>';
-            html += '</div>';
-            
-            addResult(html);
-            return foundPayloads > 0;
-        }
-
-        function hexToText(hex) {
-            let text = '';
-            for (let i = 0; i < hex.length; i += 2) {
-                text += String.fromCharCode(parseInt(hex.substr(i, 2), 16));
-            }
-            return text;
-        }
-
-        function isPrintable(str) {
-            // Check if string contains mostly printable characters
-            let printableCount = 0;
-            for (let i = 0; i < str.length; i++) {
-                const code = str.charCodeAt(i);
-                if ((code >= 32 && code <= 126) || code === 9 || code === 10 || code === 13) {
-                    printableCount++;
-                }
-            }
-            return printableCount / str.length > 0.8;
-        }
-
-        window.startBlockTest = async function() {
-            if (isRunning) {
-                updateStatus('Test already running', 'error');
-                return;
-            }
-            
-            const nodeUrl = document.getElementById('nodeUrl').value;
-            const blockRange = document.getElementById('blockRange').value;
-            const searchPattern = document.getElementById('searchPattern').value;
-            
-            if (!nodeUrl || !blockRange) {
-                updateStatus('Please enter node URL and block range', 'error');
-                return;
-            }
-            
-            isRunning = true;
-            document.getElementById('testBtn').disabled = true;
-            document.getElementById('results').innerHTML = '';
+        // Initialize Kaspa module
+        async function initializeKaspa() {
+            const btn = document.getElementById('initBtn');
+            const status = document.getElementById('initStatus');
+            btn.disabled = true;
             
             try {
-                // Connect to node
-                if (!await connectToNode(nodeUrl)) {
-                    return;
-                }
+                log('Starting Kaspa module initialization...');
                 
-                // Parse block range
-                let blocksToTest = [];
+                // Import kaspa-core module
+                log('Importing kaspa-core.js...');
+                kaspa = await import('./kaspa-core.js');
+                log('kaspa-core.js imported successfully', 'success');
                 
-                if (blockRange.includes('-')) {
-                    // Range of block heights
-                    const [start, end] = blockRange.split('-').map(n => parseInt(n.trim()));
-                    updateStatus(`Testing blocks ${start} to ${end}...`, 'info');
-                    
-                    // For height-based queries, we need block hashes
-                    // This is a limitation - we'll inform the user
-                    updateStatus('Block height ranges not supported. Please use block hashes.', 'error');
-                    return;
-                } else if (blockRange.length === 64) {
-                    // Single block hash
-                    blocksToTest.push(blockRange);
-                } else {
-                    // Multiple block hashes (comma-separated)
-                    blocksToTest = blockRange.split(',').map(h => h.trim()).filter(h => h.length === 64);
-                }
+                // Initialize WASM
+                log('Initializing WASM module...');
+                await kaspa.default('./kaspa-core_bg.wasm');
+                log('WASM initialized successfully', 'success');
                 
-                if (blocksToTest.length === 0) {
-                    updateStatus('No valid block hashes found', 'error');
-                    return;
-                }
-                
-                updateStatus(`Testing ${blocksToTest.length} blocks...`, 'info');
-                
-                let blocksWithData = 0;
-                let totalBlocks = 0;
-                
-                for (const blockHash of blocksToTest) {
-                    totalBlocks++;
-                    updateStatus(`Fetching block ${totalBlocks}/${blocksToTest.length}: ${blockHash.substring(0, 16)}...`, 'info');
-                    
-                    const block = await getBlockByHash(blockHash);
-                    
-                    if (block) {
-                        const hasData = await analyzeBlock(block, searchPattern);
-                        if (hasData) blocksWithData++;
+                // Check available functions
+                log('Checking available functions...');
+                const functions = ['RpcClient', 'PrivateKey', 'Address', 'createTransactions'];
+                for (const func of functions) {
+                    if (kaspa[func]) {
+                        log(`✓ ${func} is available`, 'success');
                     } else {
-                        addResult(`<div class="block-info error">Failed to retrieve block: ${blockHash}</div>`);
+                        log(`✗ ${func} is NOT available`, 'error');
                     }
-                    
-                    // Small delay to prevent overwhelming the node
-                    await new Promise(resolve => setTimeout(resolve, 100));
                 }
                 
-                updateStatus(`Test complete. Found data in ${blocksWithData}/${totalBlocks} blocks.`, 'success');
+                // Test creating a dummy address
+                log('Testing address creation...');
+                // Use test private key (same as main app)
+                const testPrivateKey = 'b7e151628aed2a6abf7158809cf4f3c762e7160f38b4da56a784d9045190cfef';
+                const privateKey = new kaspa.PrivateKey(testPrivateKey);
+                const publicKey = privateKey.toPublicKey();
+                const address = publicKey.toAddress('testnet-10');
+                log(`Test address created: ${address}`, 'success');
+                
+                isInitialized = true;
+                status.innerHTML = '<div class="success">✓ Kaspa module initialized successfully</div>';
+                document.getElementById('testBtn').disabled = false;
+                document.getElementById('testAllBtn').disabled = false;
                 
             } catch (error) {
-                updateStatus(`Test failed: ${error.message}`, 'error');
-                console.error('Test error:', error);
-            } finally {
-                isRunning = false;
-                document.getElementById('testBtn').disabled = false;
-                
-                if (rpcClient) {
-                    await rpcClient.disconnect();
-                }
+                log(`Initialization error: ${error.message}`, 'error');
+                log(`Error stack: ${error.stack}`, 'error');
+                status.innerHTML = `<div class="error">✗ Initialization failed: ${error.message}</div>`;
+                btn.disabled = false;
             }
-        };
-        
-        window.clearResults = function() {
-            document.getElementById('results').innerHTML = '';
-            document.getElementById('status').style.display = 'none';
-        };
+        }
+
+        // Test single node connection
+        async function testSingleNode() {
+            if (!isInitialized) {
+                log('Kaspa module not initialized', 'error');
+                return;
+            }
+            
+            const url = document.getElementById('nodeUrl').value.trim();
+            const resultDiv = document.getElementById('testResult');
+            
+            if (!url) {
+                log('Please enter a node URL', 'warning');
+                return;
+            }
+            
+            log(`Testing connection to: ${url}`);
+            resultDiv.innerHTML = '<div class="info">Testing...</div>';
+            
+            const startTime = Date.now();
+            
+            try {
+                // Create RPC client
+                log('Creating RPC client...');
+                log(`RpcClient constructor: ${typeof kaspa.RpcClient}`);
+                log(`URL: ${url}`);
+                log(`Network ID: testnet-10`);
+                
+                let client;
+                try {
+                    // Test 1: Try with only resolver (like main app)
+                    log('Test 1: Creating RPC client with resolver only...');
+                    try {
+                        const resolver = new kaspa.Resolver();
+                        client = new kaspa.RpcClient({
+                            resolver: resolver,
+                            networkId: 'testnet-10'
+                        });
+                        log('RPC client created with resolver only');
+                    } catch (e1) {
+                        log(`Test 1 failed: ${e1?.message || e1}`, 'warning');
+                        
+                        // Test 2: Try with direct URL
+                        log('Test 2: Creating RPC client with direct URL...');
+                        client = new kaspa.RpcClient({
+                            url: url,
+                            networkId: 'testnet-10'
+                        });
+                        log('RPC client created with direct URL');
+                    }
+                } catch (e) {
+                    throw new Error(`Failed to create RPC client: ${e?.message || e}`);
+                }
+                
+                // Set connection timeout
+                const timeoutPromise = new Promise((_, reject) => {
+                    setTimeout(() => reject(new Error('Connection timeout (10s)')), 10000);
+                });
+                
+                // Connect
+                log('Attempting to connect...');
+                try {
+                    // Try connect with URL parameter
+                    log(`Connecting to: ${url}`);
+                    await Promise.race([client.connect(url), timeoutPromise]);
+                } catch (e) {
+                    // If that fails, try without URL
+                    log(`Connect with URL failed: ${e?.message || e}`, 'warning');
+                    log('Trying connect without URL parameter...');
+                    try {
+                        await Promise.race([client.connect(), timeoutPromise]);
+                    } catch (e2) {
+                        throw new Error(`Connection failed: ${e2?.message || e2}`);
+                    }
+                }
+                log('Connected successfully!', 'success');
+                
+                // Get server info
+                log('Getting server info...');
+                const info = await client.getServerInfo();
+                const responseTime = Date.now() - startTime;
+                
+                log(`Server info received in ${responseTime}ms`, 'success');
+                log(`Server version: ${info.serverVersion || 'Unknown'}`);
+                log(`Network ID: ${info.networkId || 'Unknown'}`);
+                log(`Is synced: ${info.isSynced}`);
+                
+                // Try to get block count
+                try {
+                    log('Getting block count...');
+                    const blockCount = await client.getBlockCount();
+                    log(`Block count: ${blockCount.blockCount || blockCount}`, 'success');
+                } catch (e) {
+                    log(`Block count not available: ${e.message}`, 'warning');
+                }
+                
+                // Disconnect
+                await client.disconnect();
+                log('Disconnected successfully', 'success');
+                
+                resultDiv.innerHTML = `
+                    <div class="test-result success">
+                        <strong>✓ Connection successful!</strong><br>
+                        Response time: ${responseTime}ms<br>
+                        Server: ${info.serverVersion || 'Unknown'}<br>
+                        Network: ${info.networkId || 'Unknown'}<br>
+                        Synced: ${info.isSynced}
+                    </div>
+                `;
+                
+            } catch (error) {
+                const responseTime = Date.now() - startTime;
+                log(`Connection failed: ${error?.message || error || 'Unknown error'}`, 'error');
+                log(`Error type: ${error?.constructor?.name || typeof error}`, 'error');
+                log(`Error details: ${error?.stack || JSON.stringify(error)}`, 'error');
+                
+                resultDiv.innerHTML = `
+                    <div class="test-result error">
+                        <strong>✗ Connection failed</strong><br>
+                        Time: ${responseTime}ms<br>
+                        Error: ${error?.message || error || 'Unknown error'}<br>
+                        Type: ${error?.constructor?.name || typeof error}
+                    </div>
+                `;
+            }
+        }
+
+        // Test all known nodes
+        async function testAllNodes() {
+            if (!isInitialized) {
+                log('Kaspa module not initialized', 'error');
+                return;
+            }
+            
+            const resultsDiv = document.getElementById('allTestResults');
+            resultsDiv.innerHTML = '<div class="info">Testing all nodes...</div>';
+            
+            const nodes = [
+                // Known working endpoints
+                { name: 'fermion-10 (Borsh path)', url: 'wss://fermion-10.kaspa.green/kaspa/testnet-10/wrpc/borsh' },
+                { name: 'testnet10.kaspa.app', url: 'https://testnet10.kaspa.app:443' },
+                
+                // Test different formats
+                { name: 'fermion (17210)', url: 'wss://fermion.kaspa.green:17210' },
+                { name: 'fermion (18210)', url: 'wss://fermion.kaspa.green:18210' },
+                
+                // Other nodes
+                { name: 'tau-10 (Borsh path)', url: 'wss://tau-10.kaspa.blue/kaspa/testnet-10/wrpc/borsh' },
+                { name: 'tau (17210)', url: 'wss://tau.kaspa.blue:17210' },
+                
+                // Stream nodes
+                { name: 'eric (17210)', url: 'wss://eric.kaspa.stream:17210' },
+                { name: 'maxim (17210)', url: 'wss://maxim.kaspa.stream:17210' },
+                
+                // Test localhost
+                { name: 'localhost', url: 'ws://127.0.0.1:17210' }
+            ];
+            
+            const results = [];
+            
+            for (const node of nodes) {
+                log(`\n--- Testing ${node.name} ---`);
+                const result = await testNode(node.url, node.name);
+                results.push(result);
+                updateResults(resultsDiv, results);
+            }
+            
+            // Summary
+            const successful = results.filter(r => r.status === 'success').length;
+            const failed = results.filter(r => r.status === 'failed').length;
+            
+            log(`\n=== Test Summary ===`, 'info');
+            log(`Total nodes tested: ${results.length}`);
+            log(`Successful: ${successful}`, 'success');
+            log(`Failed: ${failed}`, 'error');
+        }
+
+        // Test individual node
+        async function testNode(url, name) {
+            const startTime = Date.now();
+            
+            try {
+                let client;
+                try {
+                    // Try creating client with resolver first
+                    try {
+                        const resolver = new kaspa.Resolver();
+                        client = new kaspa.RpcClient({
+                            resolver: resolver,
+                            networkId: 'testnet-10'
+                        });
+                    } catch (e1) {
+                        // Fallback to direct URL
+                        client = new kaspa.RpcClient({
+                            url: url,
+                            networkId: 'testnet-10'
+                        });
+                    }
+                } catch (e) {
+                    throw new Error(`RPC client creation failed: ${e?.message || e}`);
+                }
+                
+                const timeoutPromise = new Promise((_, reject) => {
+                    setTimeout(() => reject(new Error('Timeout')), 5000);
+                });
+                
+                try {
+                    // Try connect with URL first
+                    await Promise.race([client.connect(url), timeoutPromise]);
+                } catch (e) {
+                    // Try without URL
+                    try {
+                        await Promise.race([client.connect(), timeoutPromise]);
+                    } catch (e2) {
+                        throw new Error(`Connection error: ${e2?.message || e2}`);
+                    }
+                }
+                const info = await client.getServerInfo();
+                await client.disconnect();
+                
+                const responseTime = Date.now() - startTime;
+                log(`${name}: SUCCESS (${responseTime}ms)`, 'success');
+                
+                return {
+                    name,
+                    url,
+                    status: 'success',
+                    responseTime,
+                    info
+                };
+                
+            } catch (error) {
+                const responseTime = Date.now() - startTime;
+                log(`${name}: FAILED - ${error?.message || error || 'Unknown error'}`, 'error');
+                
+                return {
+                    name,
+                    url,
+                    status: 'failed',
+                    responseTime,
+                    error: error?.message || error || 'Unknown error'
+                };
+            }
+        }
+
+        // Update results display
+        function updateResults(container, results) {
+            let html = '<h3>Results:</h3>';
+            
+            results.forEach(result => {
+                const statusClass = result.status === 'success' ? 'success' : 'error';
+                html += `
+                    <div class="test-result ${statusClass}">
+                        <strong>${result.name}</strong><br>
+                        URL: ${result.url}<br>
+                        Status: ${result.status}<br>
+                        Time: ${result.responseTime}ms<br>
+                        ${result.error ? `Error: ${result.error}` : ''}
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+
+        // Auto-initialize on load
+        window.addEventListener('DOMContentLoaded', () => {
+            log('Page loaded. Click "Initialize Kaspa" to begin.', 'info');
+        });
     </script>
 </body>
 </html>

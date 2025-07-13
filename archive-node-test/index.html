@@ -149,8 +149,11 @@
                 
                 // Test creating a dummy address
                 log('Testing address creation...');
-                const privateKey = new kaspa.PrivateKey();
-                const address = privateKey.toAddress('testnet-10');
+                // Use test private key (same as main app)
+                const testPrivateKey = 'b7e151628aed2a6abf7158809cf4f3c762e7160f38b4da56a784d9045190cfef';
+                const privateKey = new kaspa.PrivateKey(testPrivateKey);
+                const publicKey = privateKey.toPublicKey();
+                const address = publicKey.toAddress('testnet-10');
                 log(`Test address created: ${address}`, 'success');
                 
                 isInitialized = true;

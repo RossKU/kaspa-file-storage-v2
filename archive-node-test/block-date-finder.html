@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kaspa Block Date Finder</title>
+    <style>
+        body {
+            font-family: monospace;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #e0e0e0;
+        }
+        .container {
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        button:disabled {
+            background: #666;
+            cursor: not-allowed;
+        }
+        input {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            background: #333;
+            color: #e0e0e0;
+            border: 1px solid #555;
+            border-radius: 4px;
+        }
+        .result {
+            margin: 10px 0;
+            padding: 10px;
+            background: #333;
+            border-radius: 4px;
+            font-family: monospace;
+            word-break: break-all;
+        }
+        .success { border-left: 4px solid #4CAF50; }
+        .error { border-left: 4px solid #f44336; }
+        .info { border-left: 4px solid #2196F3; }
+        .warning { border-left: 4px solid #ff9800; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        th, td {
+            padding: 8px;
+            text-align: left;
+            border-bottom: 1px solid #555;
+        }
+        th {
+            background: #333;
+            font-weight: bold;
+        }
+        .clickable {
+            color: #4CAF50;
+            cursor: pointer;
+            text-decoration: underline;
+        }
+        .clickable:hover {
+            color: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 Kaspa Block Date Finder</h1>
+    
+    <div class="container">
+        <h2>Block Explorer API</h2>
+        <p>Use the official Kaspa testnet-10 explorer API to find blocks by date</p>
+        <input type="date" id="targetDate" value="2025-05-07">
+        <button onclick="searchBlocksByDate()">Search Blocks</button>
+        <div id="apiResult"></div>
+    </div>
+
+    <div class="container">
+        <h2>Block Height Calculator</h2>
+        <p>Calculate approximate block height based on date and current block info</p>
+        <input type="number" id="currentHeight" placeholder="Current block height" value="1274055">
+        <input type="datetime-local" id="currentTime" placeholder="Current block time">
+        <input type="date" id="calcDate" value="2025-05-07">
+        <button onclick="calculateBlockHeight()">Calculate Height</button>
+        <div id="calcResult"></div>
+    </div>
+
+    <div class="container">
+        <h2>Recent Blocks with Data</h2>
+        <p>Find recent blocks that contain transaction data</p>
+        <button onclick="findRecentDataBlocks()">Find Recent Data Blocks</button>
+        <div id="recentResult"></div>
+    </div>
+
+    <script>
+        // Set current time to now
+        document.getElementById('currentTime').value = new Date().toISOString().slice(0, 16);
+
+        async function searchBlocksByDate() {
+            const targetDate = document.getElementById('targetDate').value;
+            const resultDiv = document.getElementById('apiResult');
+            
+            resultDiv.innerHTML = '<div class="result info">Searching for blocks from ' + targetDate + '...</div>';
+            
+            try {
+                // Try the official API
+                const apiUrl = 'https://api-tn10.kaspa.org';
+                resultDiv.innerHTML += '<div class="result info">Connecting to ' + apiUrl + '...</div>';
+                
+                // Note: Direct API calls might be blocked by CORS
+                // In production, you'd need to use a proxy or backend service
+                const response = await fetch(`${apiUrl}/blocks?date=${targetDate}`, {
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`API returned ${response.status}`);
+                }
+                
+                const data = await response.json();
+                displayBlocks(data, resultDiv);
+                
+            } catch (error) {
+                resultDiv.innerHTML += `<div class="result error">API Error: ${error.message}<br><br>
+                    Note: Direct API calls may be blocked by CORS policy.<br>
+                    Alternative methods:<br>
+                    1. Use the Kaspa Explorer directly: <a href="https://explorer-tn10.kaspa.org" target="_blank" style="color: #4CAF50">https://explorer-tn10.kaspa.org</a><br>
+                    2. Use the calculator below to estimate block heights<br>
+                    3. Use a backend proxy service
+                </div>`;
+            }
+        }
+
+        function calculateBlockHeight() {
+            const currentHeight = parseInt(document.getElementById('currentHeight').value);
+            const currentTime = new Date(document.getElementById('currentTime').value);
+            const targetDate = new Date(document.getElementById('calcDate').value);
+            const resultDiv = document.getElementById('calcResult');
+            
+            if (!currentHeight || !currentTime || !targetDate) {
+                resultDiv.innerHTML = '<div class="result error">Please fill in all fields</div>';
+                return;
+            }
+            
+            // Calculate time difference in seconds
+            const timeDiff = (currentTime - targetDate) / 1000;
+            
+            // Kaspa generates ~1 block per second
+            const estimatedHeight = Math.max(0, currentHeight - Math.floor(timeDiff));
+            
+            // Calculate when the chain started
+            const chainStartTime = new Date(currentTime - (currentHeight * 1000));
+            
+            resultDiv.innerHTML = `<div class="result ${estimatedHeight > 0 ? 'success' : 'warning'}">
+                <strong>Calculation Results:</strong><br>
+                Current Height: ${currentHeight.toLocaleString()}<br>
+                Current Time: ${currentTime.toLocaleString()}<br>
+                Target Date: ${targetDate.toLocaleDateString()}<br>
+                Time Difference: ${Math.floor(timeDiff / 86400)} days (${Math.floor(timeDiff).toLocaleString()} seconds)<br>
+                <br>
+                <strong>Estimated Block Height: ${estimatedHeight > 0 ? estimatedHeight.toLocaleString() : 'N/A - Before chain start'}</strong><br>
+                <br>
+                Chain Start Time (estimated): ${chainStartTime.toLocaleString()}<br>
+                ${estimatedHeight === 0 ? '<br><span style="color: #ff9800">⚠️ The target date is before the testnet started!</span>' : ''}
+            </div>`;
+            
+            if (estimatedHeight > 0) {
+                // Create a table of nearby blocks
+                resultDiv.innerHTML += `<div class="result info">
+                    <strong>Suggested blocks to check:</strong>
+                    <table>
+                        <tr>
+                            <th>Offset</th>
+                            <th>Block Height</th>
+                            <th>Approximate Time</th>
+                        </tr>`;
+                
+                for (let offset = -3600; offset <= 3600; offset += 1200) {
+                    const height = estimatedHeight + offset;
+                    const time = new Date(targetDate.getTime() + (offset * 1000));
+                    resultDiv.innerHTML += `
+                        <tr>
+                            <td>${offset > 0 ? '+' : ''}${offset}s</td>
+                            <td class="clickable" onclick="copyToClipboard('${height}')">${height.toLocaleString()}</td>
+                            <td>${time.toLocaleTimeString()}</td>
+                        </tr>`;
+                }
+                
+                resultDiv.innerHTML += `</table></div>`;
+            }
+        }
+
+        async function findRecentDataBlocks() {
+            const resultDiv = document.getElementById('recentResult');
+            const currentHeight = parseInt(document.getElementById('currentHeight').value) || 1274055;
+            
+            resultDiv.innerHTML = '<div class="result info">Looking for recent blocks with transaction data...</div>';
+            
+            // Generate some example block hashes from your project
+            const knownDataBlocks = [
+                {
+                    hash: "0854aee48b7b7bd829a1ff0a40c1a305ce528e897e10a51639da26746a3f0c4f",
+                    height: "~1274055",
+                    date: "2025-07-14",
+                    description: "Recent block with 1 transaction"
+                }
+            ];
+            
+            resultDiv.innerHTML = `<div class="result success">
+                <strong>Known blocks with data:</strong>
+                <table>
+                    <tr>
+                        <th>Date</th>
+                        <th>Height</th>
+                        <th>Block Hash</th>
+                        <th>Description</th>
+                    </tr>`;
+            
+            knownDataBlocks.forEach(block => {
+                resultDiv.innerHTML += `
+                    <tr>
+                        <td>${block.date}</td>
+                        <td>${block.height}</td>
+                        <td class="clickable" onclick="copyToClipboard('${block.hash}')" style="font-size: 11px">${block.hash}</td>
+                        <td>${block.description}</td>
+                    </tr>`;
+            });
+            
+            resultDiv.innerHTML += `</table></div>`;
+            
+            // Add search suggestions
+            resultDiv.innerHTML += `<div class="result info">
+                <strong>To find more blocks with data:</strong><br>
+                1. Use the Archive Node Test page to connect to a node<br>
+                2. Try recent block hashes (current height - 100 to current height)<br>
+                3. Look for blocks with transaction count > 1<br>
+                4. Search for specific payload patterns
+            </div>`;
+        }
+
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                // Create temporary notification
+                const notification = document.createElement('div');
+                notification.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #4CAF50; color: white; padding: 10px; border-radius: 4px; z-index: 1000';
+                notification.textContent = 'Copied to clipboard!';
+                document.body.appendChild(notification);
+                setTimeout(() => notification.remove(), 2000);
+            });
+        }
+
+        function displayBlocks(blocks, container) {
+            // This would display the blocks if the API call succeeds
+            container.innerHTML += '<div class="result success">Found blocks:</div>';
+            // ... display logic
+        }
+        
+        // Auto-calculate on load
+        window.addEventListener('DOMContentLoaded', () => {
+            calculateBlockHeight();
+        });
+    </script>
+</body>
+</html>

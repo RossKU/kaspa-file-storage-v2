@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.3.14 - Optimized kprogress Format</title>
+    <title>Kaspa P2P File Storage v5.3.15 - Enable Parallel Download for Standard Chunks</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -3671,6 +3671,190 @@
             log('レジュームをキャンセルしました', 'info');
         };
 
+        // Add new methods to ParallelDownloader prototype
+        ParallelDownloader.prototype.downloadChunksRaw = async function(txIds, blockIds, progressCallback) {
+            this.startTime = Date.now();
+            this.queue = txIds.map((txId, index) => ({ 
+                txId, 
+                blockId: blockIds[index],
+                index, 
+                retries: 0 
+            }));
+            this.results = new Map();
+            this.errors = new Map();
+            this.completedCount = 0;
+            this.totalBytes = 0;
+            this.totalChunks = txIds.length;
+            
+            log(`[ParallelDownloader] 暗号化チャンクの並列ダウンロード開始: ${txIds.length}チャンク, ${this.concurrency}並列`, 'info');
+            
+            try {
+                const workers = [];
+                for (let i = 0; i < this.concurrency; i++) {
+                    workers.push(this.workerRaw(progressCallback));
+                }
+                
+                await Promise.all(workers);
+                
+                if (this.errors.size > 0) {
+                    const errorRate = (this.errors.size / this.totalChunks) * 100;
+                    if (errorRate > 10) {
+                        const errorMsg = Array.from(this.errors.entries())
+                            .map(([idx, err]) => `チャンク${idx}: ${err}`)
+                            .join(', ');
+                        throw new Error(`ダウンロードエラー率が高すぎます (${errorRate.toFixed(1)}%): ${errorMsg}`);
+                    }
+                }
+                
+                const sortedChunks = [];
+                for (let i = 0; i < this.totalChunks; i++) {
+                    if (!this.results.has(i)) {
+                        if (this.errors.has(i)) {
+                            throw new Error(`チャンク${i}のダウンロードに失敗: ${this.errors.get(i)}`);
+                        } else {
+                            throw new Error(`チャンク${i}が見つかりません`);
+                        }
+                    }
+                    sortedChunks.push(this.results.get(i));
+                }
+                
+                const elapsed = (Date.now() - this.startTime) / 1000;
+                const throughput = (this.totalBytes / 1024 / 1024) / elapsed;
+                log(`[ParallelDownloader] 並列ダウンロード完了: ${elapsed.toFixed(1)}秒, ${throughput.toFixed(1)} MB/秒`, 'success');
+                
+                return sortedChunks;
+            } catch (error) {
+                log(`[ParallelDownloader] 並列ダウンロードエラー: ${error.message}`, 'error');
+                throw error;
+            }
+        };
+        
+        ParallelDownloader.prototype.workerRaw = async function(progressCallback) {
+            while (true) {
+                let work = null;
+                
+                while (this.queueLock) {
+                    await new Promise(resolve => setTimeout(resolve, 10));
+                }
+                
+                this.queueLock = true;
+                try {
+                    if (this.queue.length > 0) {
+                        work = this.queue.shift();
+                        this.active++;
+                    }
+                } finally {
+                    this.queueLock = false;
+                }
+                
+                if (!work && this.active === 0) {
+                    break;
+                }
+                
+                if (!work) {
+                    await new Promise(resolve => setTimeout(resolve, 50));
+                    continue;
+                }
+                
+                try {
+                    const { txId, blockId, index } = work;
+                    
+                    let payload = null;
+                    let lastError = null;
+                    
+                    for (let retry = 0; retry <= this.maxRetries; retry++) {
+                        try {
+                            // Try RPC first if we have blockId
+                            if (blockId && rpcClient) {
+                                const response = await rpcClient.getBlock({
+                                    hash: blockId,
+                                    includeTransactions: true
+                                });
+                                
+                                const block = response?.block?.block || response?.block;
+                                if (block && block.transactions) {
+                                    for (const tx of block.transactions) {
+                                        const txHash = tx.verboseData?.transactionId || tx.id || tx.transactionId;
+                                        if (txHash === txId) {
+                                            if (tx.payload && tx.payload !== '') {
+                                                payload = safeHexDecode(tx.payload, 'chunk payload');
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            // Fallback to REST API if RPC failed
+                            if (!payload) {
+                                const networkApiUrl = config.network === 'testnet-10' ? 
+                                    'https://api-tn10.kaspa.org' : 'https://api.kaspa.org';
+                                const url = `${networkApiUrl}/transactions/${txId}`;
+                                const response = await fetchWithTimeout(url, {}, 5000, 1);
+                                const data = await response.json();
+                                
+                                if (data.payload) {
+                                    payload = fromBase64(data.payload);
+                                }
+                            }
+                            
+                            if (payload) {
+                                break;
+                            }
+                        } catch (error) {
+                            lastError = error;
+                            if (retry < this.maxRetries) {
+                                log(`チャンク${index}の取得に失敗 (リトライ ${retry + 1}/${this.maxRetries})`, 'warning');
+                                await new Promise(resolve => setTimeout(resolve, 1000 * (retry + 1)));
+                            }
+                        }
+                    }
+                    
+                    if (!payload) {
+                        throw lastError || new Error('ペイロードが見つかりません');
+                    }
+                    
+                    // 暗号化されたデータをそのまま返す（復号化は呼び出し側で行う）
+                    this.results.set(index, payload);
+                    this.completedCount++;
+                    this.totalBytes += payload.length;
+                    
+                    const elapsed = (Date.now() - this.startTime) / 1000;
+                    const speed = this.completedCount / elapsed;
+                    const throughput = (this.totalBytes / 1024 / 1024) / elapsed;
+                    
+                    if (progressCallback) {
+                        progressCallback({
+                            completed: this.completedCount,
+                            total: this.totalChunks,
+                            speed: speed,
+                            throughput: throughput
+                        });
+                    }
+                    
+                } catch (error) {
+                    work.retries++;
+                    if (work.retries <= this.maxRetries) {
+                        while (this.queueLock) {
+                            await new Promise(resolve => setTimeout(resolve, 10));
+                        }
+                        this.queueLock = true;
+                        try {
+                            this.queue.push(work);
+                        } finally {
+                            this.queueLock = false;
+                        }
+                        log(`チャンク${work.index}を再試行キューに追加 (${work.retries}/${this.maxRetries})`, 'warning');
+                    } else {
+                        log(`ワーカーエラー (チャンク${work.index}): ${error.message}`, 'error');
+                        this.errors.set(work.index, error.message);
+                    }
+                } finally {
+                    this.active--;
+                }
+            }
+        };
+
         // Minimal Download Manager Class
         class DownloadManager {
             constructor() {
@@ -4118,21 +4302,82 @@
                             const chunks = [];
                             const totalChunks = metadata.chunks.length;
                             
-                            for (let i = 0; i < totalChunks; i++) {
-                                const txId = metadata.chunks[i];
-                                const blockId = metadata.chunkBlockIds[i];
+                            // v5.3.15: Enable parallel download for standard chunks
+                            const useParallel = window.parallelDownloadEnabled && totalChunks >= 2;
+                            
+                            if (useParallel) {
+                                // Use parallel download
+                                log(`[DownloadManager] 並列ダウンロードモードを使用 (${totalChunks}チャンク)`, 'info');
                                 
-                                // Progress callback
-                                if (onProgress) {
-                                    onProgress({
-                                        current: i + 1,
-                                        total: totalChunks,
-                                        percent: ((i + 1) / totalChunks * 100).toFixed(0)
-                                    });
+                                try {
+                                    const downloader = new ParallelDownloader(rpcClient, 8);
+                                    
+                                    // Download encrypted chunks in parallel
+                                    const parallelChunks = await downloader.downloadChunksRaw(
+                                        metadata.chunks,
+                                        metadata.chunkBlockIds,
+                                        (progress) => {
+                                            if (onProgress) {
+                                                onProgress({
+                                                    current: progress.completed,
+                                                    total: progress.total,
+                                                    percent: ((progress.completed / progress.total) * 100).toFixed(0),
+                                                    speed: progress.speed,
+                                                    throughput: progress.throughput
+                                                });
+                                            }
+                                        }
+                                    );
+                                    
+                                    // Decrypt each chunk
+                                    for (let i = 0; i < parallelChunks.length; i++) {
+                                        const decrypted = await decryptChunk(parallelChunks[i], key, i);
+                                        const original = metadata.file?.compression?.enabled ? 
+                                            lzDecompress(decrypted) : decrypted;
+                                        chunks.push(original);
+                                    }
+                                    
+                                } catch (error) {
+                                    log(`[DownloadManager] 並列ダウンロードエラー、シーケンシャルにフォールバック: ${error.message}`, 'warning');
+                                    
+                                    // Fallback to sequential download
+                                    chunks.length = 0; // Clear any partial downloads
+                                    for (let i = 0; i < totalChunks; i++) {
+                                        const txId = metadata.chunks[i];
+                                        const blockId = metadata.chunkBlockIds[i];
+                                        
+                                        if (onProgress) {
+                                            onProgress({
+                                                current: i + 1,
+                                                total: totalChunks,
+                                                percent: ((i + 1) / totalChunks * 100).toFixed(0)
+                                            });
+                                        }
+                                        
+                                        const chunk = await this.downloadChunk(txId, blockId, key, i, metadata);
+                                        chunks.push(chunk);
+                                    }
                                 }
+                            } else {
+                                // Sequential download (original logic)
+                                log('[DownloadManager] シーケンシャルダウンロードモードを使用', 'info');
                                 
-                                const chunk = await this.downloadChunk(txId, blockId, key, i, metadata);
-                                chunks.push(chunk);
+                                for (let i = 0; i < totalChunks; i++) {
+                                    const txId = metadata.chunks[i];
+                                    const blockId = metadata.chunkBlockIds[i];
+                                    
+                                    // Progress callback
+                                    if (onProgress) {
+                                        onProgress({
+                                            current: i + 1,
+                                            total: totalChunks,
+                                            percent: ((i + 1) / totalChunks * 100).toFixed(0)
+                                        });
+                                    }
+                                    
+                                    const chunk = await this.downloadChunk(txId, blockId, key, i, metadata);
+                                    chunks.push(chunk);
+                                }
                             }
                             
                             // Combine chunks

@@ -96,6 +96,16 @@
     </div>
 
     <div class="container">
+        <h2>Step 4: Block Retrieval Test</h2>
+        <input type="text" id="blockHash" placeholder="Enter block hash (64 characters)" 
+               style="margin-bottom: 10px;">
+        <input type="text" id="searchPattern" placeholder="Search pattern in payloads (optional)" 
+               style="margin-bottom: 10px;">
+        <button onclick="testBlockRetrieval()" id="blockTestBtn" disabled>Test Block Retrieval</button>
+        <div id="blockTestResult"></div>
+    </div>
+
+    <div class="container">
         <h2>Debug Log</h2>
         <div class="log" id="debugLog"></div>
     </div>
@@ -104,6 +114,7 @@
         // Global variables
         let kaspa = null;
         let isInitialized = false;
+        let currentClient = null;
 
         // Logging function
         function log(message, type = 'info') {
@@ -160,6 +171,7 @@
                 status.innerHTML = '<div class="success">✓ Kaspa module initialized successfully</div>';
                 document.getElementById('testBtn').disabled = false;
                 document.getElementById('testAllBtn').disabled = false;
+                document.getElementById('blockTestBtn').disabled = false;
                 
             } catch (error) {
                 log(`Initialization error: ${error.message}`, 'error');
@@ -245,6 +257,9 @@
                 }
                 log('Connected successfully!', 'success');
                 
+                // Store client for block test
+                currentClient = client;
+                
                 // Get server info
                 log('Getting server info...');
                 const info = await client.getServerInfo();
@@ -264,9 +279,8 @@
                     log(`Block count not available: ${e.message}`, 'warning');
                 }
                 
-                // Disconnect
-                await client.disconnect();
-                log('Disconnected successfully', 'success');
+                // Keep connection alive for block test
+                log('Connection kept alive for block testing', 'info');
                 
                 resultDiv.innerHTML = `
                     <div class="test-result success">
@@ -431,6 +445,142 @@
             });
             
             container.innerHTML = html;
+        }
+
+        // Block retrieval test function
+        async function testBlockRetrieval() {
+            if (!isInitialized) {
+                log('Kaspa module not initialized', 'error');
+                return;
+            }
+            
+            if (!currentClient) {
+                log('No active connection. Please test a node connection first.', 'error');
+                return;
+            }
+            
+            const blockHash = document.getElementById('blockHash').value.trim();
+            const searchPattern = document.getElementById('searchPattern').value.trim();
+            const resultDiv = document.getElementById('blockTestResult');
+            
+            if (!blockHash || blockHash.length !== 64) {
+                log('Please enter a valid 64-character block hash', 'warning');
+                return;
+            }
+            
+            log(`Testing block retrieval for: ${blockHash}`);
+            resultDiv.innerHTML = '<div class="info">Retrieving block...</div>';
+            
+            try {
+                // Get block with transactions
+                log('Calling getBlock with includeTransactions: true');
+                const response = await currentClient.getBlock({
+                    hash: blockHash,
+                    includeTransactions: true
+                });
+                
+                const block = response?.block?.block || response?.block || response;
+                
+                if (!block) {
+                    throw new Error('No block data received');
+                }
+                
+                log(`Block retrieved successfully`, 'success');
+                log(`Block timestamp: ${new Date(Number(block.header?.timestamp || 0)).toLocaleString()}`);
+                log(`DAA Score: ${block.header?.daaScore || 'Unknown'}`);
+                log(`Blue Score: ${block.header?.blueScore || 'Unknown'}`);
+                log(`Transaction count: ${block.transactions?.length || 0}`);
+                
+                let html = '<div class="test-result success">';
+                html += `<strong>✓ Block retrieved successfully</strong><br>`;
+                html += `Hash: ${blockHash}<br>`;
+                html += `Timestamp: ${new Date(Number(block.header?.timestamp || 0)).toLocaleString()}<br>`;
+                html += `Transactions: ${block.transactions?.length || 0}<br><br>`;
+                
+                // Analyze transactions
+                let foundPayloads = 0;
+                let matchingPayloads = 0;
+                
+                if (block.transactions && block.transactions.length > 0) {
+                    html += '<strong>Transactions with payloads:</strong><br>';
+                    
+                    for (const tx of block.transactions) {
+                        const txId = tx.verboseData?.transactionId || tx.id || tx.transactionId || 'Unknown';
+                        const payload = tx.payload;
+                        
+                        if (payload && payload !== '00' && payload.length > 2) {
+                            foundPayloads++;
+                            
+                            let matches = !searchPattern;
+                            if (searchPattern) {
+                                matches = payload.toLowerCase().includes(searchPattern.toLowerCase());
+                                if (matches) matchingPayloads++;
+                            }
+                            
+                            if (matches) {
+                                html += `<div style="margin: 10px 0; padding: 10px; background: #444; border-radius: 4px;">`;
+                                html += `<strong>TxID:</strong> ${txId}<br>`;
+                                html += `<strong>Payload size:</strong> ${payload.length / 2} bytes<br>`;
+                                html += `<div style="background: #333; padding: 5px; margin-top: 5px; border-radius: 4px; word-break: break-all; font-family: monospace; font-size: 11px;">`;
+                                html += payload.substring(0, 200);
+                                if (payload.length > 200) html += '...';
+                                html += '</div>';
+                                
+                                // Try to decode as text
+                                try {
+                                    let decoded = '';
+                                    for (let i = 0; i < Math.min(payload.length, 100); i += 2) {
+                                        const code = parseInt(payload.substr(i, 2), 16);
+                                        if (code >= 32 && code <= 126) {
+                                            decoded += String.fromCharCode(code);
+                                        } else {
+                                            decoded += '.';
+                                        }
+                                    }
+                                    if (decoded.length > 0) {
+                                        html += `<div style="margin-top: 5px;"><strong>Decoded preview:</strong> ${decoded}</div>`;
+                                    }
+                                } catch (e) {
+                                    // Ignore decode errors
+                                }
+                                
+                                html += '</div>';
+                            }
+                        }
+                    }
+                    
+                    html += `<br><strong>Summary:</strong> Found ${foundPayloads} transactions with payloads`;
+                    if (searchPattern) {
+                        html += `, ${matchingPayloads} matching search pattern`;
+                    }
+                } else {
+                    html += 'No transactions found in this block';
+                }
+                
+                html += '</div>';
+                resultDiv.innerHTML = html;
+                
+            } catch (error) {
+                log(`Block retrieval failed: ${error?.message || error}`, 'error');
+                resultDiv.innerHTML = `
+                    <div class="test-result error">
+                        <strong>✗ Block retrieval failed</strong><br>
+                        Error: ${error?.message || error}<br>
+                        <br>
+                        Note: Make sure you're connected to an archive node for historical blocks,<br>
+                        or that the block exists and is within the pruning window.
+                    </div>
+                `;
+            }
+        }
+
+        // Helper function to convert hex to text
+        function hexToText(hex) {
+            let text = '';
+            for (let i = 0; i < hex.length; i += 2) {
+                text += String.fromCharCode(parseInt(hex.substr(i, 2), 16));
+            }
+            return text;
         }
 
         // Auto-initialize on load

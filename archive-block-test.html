@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kaspa Archive Block Test</title>
+    <script src="https://unpkg.com/kaspa-wasm@latest/web/kaspa-wasm.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .input-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .status {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .results {
+            margin-top: 20px;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        .block-info {
+            background-color: #f8f9fa;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            border: 1px solid #dee2e6;
+        }
+        .block-header {
+            font-weight: bold;
+            color: #495057;
+            margin-bottom: 10px;
+        }
+        .tx-info {
+            background-color: #fff;
+            padding: 10px;
+            margin-top: 10px;
+            border-radius: 4px;
+            border: 1px solid #e9ecef;
+        }
+        .payload-data {
+            background-color: #f1f3f4;
+            padding: 10px;
+            margin-top: 5px;
+            border-radius: 4px;
+            font-family: monospace;
+            word-break: break-all;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Kaspa Archive Block Test</h1>
+        
+        <div class="input-group">
+            <label for="nodeUrl">Node URL (Archive Node Recommended):</label>
+            <input type="text" id="nodeUrl" value="wss://archive-tn10.kaspa.org:17210" placeholder="wss://archive-tn10.kaspa.org:17210">
+        </div>
+        
+        <div class="input-group">
+            <label for="blockRange">Block Range:</label>
+            <input type="text" id="blockRange" placeholder="e.g., 3000000-3000010 or single block hash">
+        </div>
+        
+        <div class="input-group">
+            <label for="searchPattern">Search Pattern (optional):</label>
+            <input type="text" id="searchPattern" placeholder="Search for specific content in payloads">
+        </div>
+        
+        <button onclick="startBlockTest()" id="testBtn">Start Block Test</button>
+        <button onclick="clearResults()">Clear Results</button>
+        
+        <div id="status" class="status info" style="display: none;"></div>
+        <div id="results" class="results"></div>
+    </div>
+
+    <script type="module">
+        let kaspa;
+        let rpcClient;
+        let isRunning = false;
+
+        window.addEventListener('load', async () => {
+            try {
+                kaspa = await import('https://unpkg.com/kaspa-wasm@latest/web/kaspa-wasm.js');
+                await kaspa.default();
+                updateStatus('Kaspa WASM initialized', 'success');
+            } catch (error) {
+                updateStatus('Failed to initialize Kaspa WASM: ' + error.message, 'error');
+            }
+        });
+
+        function updateStatus(message, type = 'info') {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.className = `status ${type}`;
+            statusEl.style.display = 'block';
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+
+        function addResult(html) {
+            const resultsEl = document.getElementById('results');
+            resultsEl.innerHTML += html;
+            resultsEl.scrollTop = resultsEl.scrollHeight;
+        }
+
+        async function connectToNode(url) {
+            try {
+                rpcClient = new kaspa.RpcClient({
+                    url: url,
+                    encoding: kaspa.Encoding.Borsh,
+                    networkId: "testnet-10"
+                });
+                
+                await rpcClient.connect();
+                updateStatus(`Connected to ${url}`, 'success');
+                return true;
+            } catch (error) {
+                updateStatus(`Failed to connect: ${error.message}`, 'error');
+                return false;
+            }
+        }
+
+        async function getBlockByHash(blockHash) {
+            try {
+                const response = await rpcClient.getBlock({
+                    hash: blockHash,
+                    includeTransactions: true
+                });
+                
+                return response?.block?.block || response?.block || null;
+            } catch (error) {
+                console.error(`Error fetching block ${blockHash}:`, error);
+                return null;
+            }
+        }
+
+        async function getBlockByHeight(height) {
+            try {
+                // First get the block hash from DAG info
+                const dagInfo = await rpcClient.getBlockDagInfo();
+                const virtualDaaScore = dagInfo.virtualDaaScore;
+                
+                // This is a simplified approach - in reality you'd need to traverse the DAG
+                // For now, we'll try to estimate block hash or skip this method
+                updateStatus(`Block height lookup not directly supported, use block hash instead`, 'error');
+                return null;
+            } catch (error) {
+                console.error(`Error fetching block at height ${height}:`, error);
+                return null;
+            }
+        }
+
+        async function analyzeBlock(block, searchPattern) {
+            let html = '<div class="block-info">';
+            html += `<div class="block-header">Block: ${block.header.hash}</div>`;
+            html += `<div>Timestamp: ${new Date(Number(block.header.timestamp)).toLocaleString()}</div>`;
+            html += `<div>DAA Score: ${block.header.daaScore}</div>`;
+            html += `<div>Blue Score: ${block.header.blueScore}</div>`;
+            html += `<div>Transaction Count: ${block.transactions?.length || 0}</div>`;
+            
+            let foundPayloads = 0;
+            let matchingPayloads = 0;
+            
+            if (block.transactions && block.transactions.length > 0) {
+                for (const tx of block.transactions) {
+                    const txId = tx.verboseData?.transactionId || tx.id || 'Unknown';
+                    const payload = tx.payload;
+                    
+                    if (payload && payload !== '00' && payload.length > 2) {
+                        foundPayloads++;
+                        
+                        let matches = !searchPattern;
+                        if (searchPattern) {
+                            const payloadLower = payload.toLowerCase();
+                            const patternLower = searchPattern.toLowerCase();
+                            matches = payloadLower.includes(patternLower);
+                            if (matches) matchingPayloads++;
+                        }
+                        
+                        if (matches) {
+                            html += '<div class="tx-info">';
+                            html += `<div><strong>TxID:</strong> ${txId}</div>`;
+                            html += `<div><strong>Payload Size:</strong> ${payload.length / 2} bytes</div>`;
+                            html += `<div class="payload-data">${payload}</div>`;
+                            
+                            try {
+                                // Try to decode as text
+                                const decoded = hexToText(payload);
+                                if (decoded && isPrintable(decoded)) {
+                                    html += `<div style="margin-top: 5px;"><strong>Decoded:</strong> <pre>${decoded}</pre></div>`;
+                                }
+                            } catch (e) {
+                                // Ignore decode errors
+                            }
+                            
+                            html += '</div>';
+                        }
+                    }
+                }
+            }
+            
+            html += `<div style="margin-top: 10px;"><strong>Summary:</strong> Found ${foundPayloads} transactions with payloads`;
+            if (searchPattern) {
+                html += `, ${matchingPayloads} matching search pattern`;
+            }
+            html += '</div>';
+            html += '</div>';
+            
+            addResult(html);
+            return foundPayloads > 0;
+        }
+
+        function hexToText(hex) {
+            let text = '';
+            for (let i = 0; i < hex.length; i += 2) {
+                text += String.fromCharCode(parseInt(hex.substr(i, 2), 16));
+            }
+            return text;
+        }
+
+        function isPrintable(str) {
+            // Check if string contains mostly printable characters
+            let printableCount = 0;
+            for (let i = 0; i < str.length; i++) {
+                const code = str.charCodeAt(i);
+                if ((code >= 32 && code <= 126) || code === 9 || code === 10 || code === 13) {
+                    printableCount++;
+                }
+            }
+            return printableCount / str.length > 0.8;
+        }
+
+        window.startBlockTest = async function() {
+            if (isRunning) {
+                updateStatus('Test already running', 'error');
+                return;
+            }
+            
+            const nodeUrl = document.getElementById('nodeUrl').value;
+            const blockRange = document.getElementById('blockRange').value;
+            const searchPattern = document.getElementById('searchPattern').value;
+            
+            if (!nodeUrl || !blockRange) {
+                updateStatus('Please enter node URL and block range', 'error');
+                return;
+            }
+            
+            isRunning = true;
+            document.getElementById('testBtn').disabled = true;
+            document.getElementById('results').innerHTML = '';
+            
+            try {
+                // Connect to node
+                if (!await connectToNode(nodeUrl)) {
+                    return;
+                }
+                
+                // Parse block range
+                let blocksToTest = [];
+                
+                if (blockRange.includes('-')) {
+                    // Range of block heights
+                    const [start, end] = blockRange.split('-').map(n => parseInt(n.trim()));
+                    updateStatus(`Testing blocks ${start} to ${end}...`, 'info');
+                    
+                    // For height-based queries, we need block hashes
+                    // This is a limitation - we'll inform the user
+                    updateStatus('Block height ranges not supported. Please use block hashes.', 'error');
+                    return;
+                } else if (blockRange.length === 64) {
+                    // Single block hash
+                    blocksToTest.push(blockRange);
+                } else {
+                    // Multiple block hashes (comma-separated)
+                    blocksToTest = blockRange.split(',').map(h => h.trim()).filter(h => h.length === 64);
+                }
+                
+                if (blocksToTest.length === 0) {
+                    updateStatus('No valid block hashes found', 'error');
+                    return;
+                }
+                
+                updateStatus(`Testing ${blocksToTest.length} blocks...`, 'info');
+                
+                let blocksWithData = 0;
+                let totalBlocks = 0;
+                
+                for (const blockHash of blocksToTest) {
+                    totalBlocks++;
+                    updateStatus(`Fetching block ${totalBlocks}/${blocksToTest.length}: ${blockHash.substring(0, 16)}...`, 'info');
+                    
+                    const block = await getBlockByHash(blockHash);
+                    
+                    if (block) {
+                        const hasData = await analyzeBlock(block, searchPattern);
+                        if (hasData) blocksWithData++;
+                    } else {
+                        addResult(`<div class="block-info error">Failed to retrieve block: ${blockHash}</div>`);
+                    }
+                    
+                    // Small delay to prevent overwhelming the node
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                }
+                
+                updateStatus(`Test complete. Found data in ${blocksWithData}/${totalBlocks} blocks.`, 'success');
+                
+            } catch (error) {
+                updateStatus(`Test failed: ${error.message}`, 'error');
+                console.error('Test error:', error);
+            } finally {
+                isRunning = false;
+                document.getElementById('testBtn').disabled = false;
+                
+                if (rpcClient) {
+                    await rpcClient.disconnect();
+                }
+            }
+        };
+        
+        window.clearResults = function() {
+            document.getElementById('results').innerHTML = '';
+            document.getElementById('status').style.display = 'none';
+        };
+    </script>
+</body>
+</html>

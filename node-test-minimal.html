@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kaspa Node Connection Test - Minimal</title>
+    <style>
+        body {
+            font-family: monospace;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #e0e0e0;
+        }
+        .container {
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        button:disabled {
+            background: #666;
+            cursor: not-allowed;
+        }
+        .log {
+            background: #000;
+            padding: 10px;
+            border-radius: 4px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-size: 12px;
+            white-space: pre-wrap;
+        }
+        .success { color: #4CAF50; }
+        .error { color: #f44336; }
+        .warning { color: #ff9800; }
+        .info { color: #2196F3; }
+        input {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            background: #333;
+            color: #e0e0e0;
+            border: 1px solid #555;
+            border-radius: 4px;
+        }
+        .test-result {
+            margin: 10px 0;
+            padding: 10px;
+            background: #333;
+            border-radius: 4px;
+            border-left: 4px solid #666;
+        }
+        .test-result.success {
+            border-left-color: #4CAF50;
+        }
+        .test-result.error {
+            border-left-color: #f44336;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔌 Kaspa Node Connection Test - Minimal Version</h1>
+    
+    <div class="container">
+        <h2>Step 1: Initialize Kaspa Module</h2>
+        <button onclick="initializeKaspa()" id="initBtn">Initialize Kaspa</button>
+        <div id="initStatus"></div>
+    </div>
+
+    <div class="container">
+        <h2>Step 2: Test Single Node Connection</h2>
+        <input type="text" id="nodeUrl" placeholder="wss://fermion-10.kaspa.green/kaspa/testnet-10/wrpc/borsh" 
+               value="wss://fermion-10.kaspa.green/kaspa/testnet-10/wrpc/borsh">
+        <button onclick="testSingleNode()" id="testBtn" disabled>Test Connection</button>
+        <div id="testResult"></div>
+    </div>
+
+    <div class="container">
+        <h2>Step 3: Test Multiple Nodes</h2>
+        <button onclick="testAllNodes()" id="testAllBtn" disabled>Test All Known Nodes</button>
+        <div id="allTestResults"></div>
+    </div>
+
+    <div class="container">
+        <h2>Debug Log</h2>
+        <div class="log" id="debugLog"></div>
+    </div>
+
+    <script>
+        // Global variables
+        let kaspa = null;
+        let isInitialized = false;
+
+        // Logging function
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logDiv = document.getElementById('debugLog');
+            const logEntry = document.createElement('div');
+            logEntry.className = type;
+            logEntry.textContent = `[${timestamp}] ${message}`;
+            logDiv.appendChild(logEntry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+
+        // Initialize Kaspa module
+        async function initializeKaspa() {
+            const btn = document.getElementById('initBtn');
+            const status = document.getElementById('initStatus');
+            btn.disabled = true;
+            
+            try {
+                log('Starting Kaspa module initialization...');
+                
+                // Import kaspa-core module
+                log('Importing kaspa-core.js...');
+                kaspa = await import('./kaspa-core.js');
+                log('kaspa-core.js imported successfully', 'success');
+                
+                // Initialize WASM
+                log('Initializing WASM module...');
+                await kaspa.default('./kaspa-core_bg.wasm');
+                log('WASM initialized successfully', 'success');
+                
+                // Check available functions
+                log('Checking available functions...');
+                const functions = ['RpcClient', 'PrivateKey', 'Address', 'createTransactions'];
+                for (const func of functions) {
+                    if (kaspa[func]) {
+                        log(`✓ ${func} is available`, 'success');
+                    } else {
+                        log(`✗ ${func} is NOT available`, 'error');
+                    }
+                }
+                
+                // Test creating a dummy address
+                log('Testing address creation...');
+                const privateKey = new kaspa.PrivateKey();
+                const address = privateKey.toAddress('testnet-10');
+                log(`Test address created: ${address}`, 'success');
+                
+                isInitialized = true;
+                status.innerHTML = '<div class="success">✓ Kaspa module initialized successfully</div>';
+                document.getElementById('testBtn').disabled = false;
+                document.getElementById('testAllBtn').disabled = false;
+                
+            } catch (error) {
+                log(`Initialization error: ${error.message}`, 'error');
+                log(`Error stack: ${error.stack}`, 'error');
+                status.innerHTML = `<div class="error">✗ Initialization failed: ${error.message}</div>`;
+                btn.disabled = false;
+            }
+        }
+
+        // Test single node connection
+        async function testSingleNode() {
+            if (!isInitialized) {
+                log('Kaspa module not initialized', 'error');
+                return;
+            }
+            
+            const url = document.getElementById('nodeUrl').value.trim();
+            const resultDiv = document.getElementById('testResult');
+            
+            if (!url) {
+                log('Please enter a node URL', 'warning');
+                return;
+            }
+            
+            log(`Testing connection to: ${url}`);
+            resultDiv.innerHTML = '<div class="info">Testing...</div>';
+            
+            const startTime = Date.now();
+            
+            try {
+                // Create RPC client
+                log('Creating RPC client...');
+                const client = new kaspa.RpcClient({
+                    url: url,
+                    resolver: null,
+                    networkId: 'testnet-10'
+                });
+                
+                // Set connection timeout
+                const timeoutPromise = new Promise((_, reject) => {
+                    setTimeout(() => reject(new Error('Connection timeout (10s)')), 10000);
+                });
+                
+                // Connect
+                log('Attempting to connect...');
+                await Promise.race([client.connect(), timeoutPromise]);
+                log('Connected successfully!', 'success');
+                
+                // Get server info
+                log('Getting server info...');
+                const info = await client.getServerInfo();
+                const responseTime = Date.now() - startTime;
+                
+                log(`Server info received in ${responseTime}ms`, 'success');
+                log(`Server version: ${info.serverVersion || 'Unknown'}`);
+                log(`Network ID: ${info.networkId || 'Unknown'}`);
+                log(`Is synced: ${info.isSynced}`);
+                
+                // Try to get block count
+                try {
+                    log('Getting block count...');
+                    const blockCount = await client.getBlockCount();
+                    log(`Block count: ${blockCount.blockCount || blockCount}`, 'success');
+                } catch (e) {
+                    log(`Block count not available: ${e.message}`, 'warning');
+                }
+                
+                // Disconnect
+                await client.disconnect();
+                log('Disconnected successfully', 'success');
+                
+                resultDiv.innerHTML = `
+                    <div class="test-result success">
+                        <strong>✓ Connection successful!</strong><br>
+                        Response time: ${responseTime}ms<br>
+                        Server: ${info.serverVersion || 'Unknown'}<br>
+                        Network: ${info.networkId || 'Unknown'}<br>
+                        Synced: ${info.isSynced}
+                    </div>
+                `;
+                
+            } catch (error) {
+                const responseTime = Date.now() - startTime;
+                log(`Connection failed: ${error.message}`, 'error');
+                log(`Error details: ${error.stack}`, 'error');
+                
+                resultDiv.innerHTML = `
+                    <div class="test-result error">
+                        <strong>✗ Connection failed</strong><br>
+                        Time: ${responseTime}ms<br>
+                        Error: ${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        // Test all known nodes
+        async function testAllNodes() {
+            if (!isInitialized) {
+                log('Kaspa module not initialized', 'error');
+                return;
+            }
+            
+            const resultsDiv = document.getElementById('allTestResults');
+            resultsDiv.innerHTML = '<div class="info">Testing all nodes...</div>';
+            
+            const nodes = [
+                // Known working endpoints
+                { name: 'fermion-10 (Borsh path)', url: 'wss://fermion-10.kaspa.green/kaspa/testnet-10/wrpc/borsh' },
+                { name: 'testnet10.kaspa.app', url: 'https://testnet10.kaspa.app:443' },
+                
+                // Test different formats
+                { name: 'fermion (17210)', url: 'wss://fermion.kaspa.green:17210' },
+                { name: 'fermion (18210)', url: 'wss://fermion.kaspa.green:18210' },
+                
+                // Other nodes
+                { name: 'tau-10 (Borsh path)', url: 'wss://tau-10.kaspa.blue/kaspa/testnet-10/wrpc/borsh' },
+                { name: 'tau (17210)', url: 'wss://tau.kaspa.blue:17210' },
+                
+                // Stream nodes
+                { name: 'eric (17210)', url: 'wss://eric.kaspa.stream:17210' },
+                { name: 'maxim (17210)', url: 'wss://maxim.kaspa.stream:17210' },
+                
+                // Test localhost
+                { name: 'localhost', url: 'ws://127.0.0.1:17210' }
+            ];
+            
+            const results = [];
+            
+            for (const node of nodes) {
+                log(`\n--- Testing ${node.name} ---`);
+                const result = await testNode(node.url, node.name);
+                results.push(result);
+                updateResults(resultsDiv, results);
+            }
+            
+            // Summary
+            const successful = results.filter(r => r.status === 'success').length;
+            const failed = results.filter(r => r.status === 'failed').length;
+            
+            log(`\n=== Test Summary ===`, 'info');
+            log(`Total nodes tested: ${results.length}`);
+            log(`Successful: ${successful}`, 'success');
+            log(`Failed: ${failed}`, 'error');
+        }
+
+        // Test individual node
+        async function testNode(url, name) {
+            const startTime = Date.now();
+            
+            try {
+                const client = new kaspa.RpcClient({
+                    url: url,
+                    resolver: null,
+                    networkId: 'testnet-10'
+                });
+                
+                const timeoutPromise = new Promise((_, reject) => {
+                    setTimeout(() => reject(new Error('Timeout')), 5000);
+                });
+                
+                await Promise.race([client.connect(), timeoutPromise]);
+                const info = await client.getServerInfo();
+                await client.disconnect();
+                
+                const responseTime = Date.now() - startTime;
+                log(`${name}: SUCCESS (${responseTime}ms)`, 'success');
+                
+                return {
+                    name,
+                    url,
+                    status: 'success',
+                    responseTime,
+                    info
+                };
+                
+            } catch (error) {
+                const responseTime = Date.now() - startTime;
+                log(`${name}: FAILED - ${error.message}`, 'error');
+                
+                return {
+                    name,
+                    url,
+                    status: 'failed',
+                    responseTime,
+                    error: error.message
+                };
+            }
+        }
+
+        // Update results display
+        function updateResults(container, results) {
+            let html = '<h3>Results:</h3>';
+            
+            results.forEach(result => {
+                const statusClass = result.status === 'success' ? 'success' : 'error';
+                html += `
+                    <div class="test-result ${statusClass}">
+                        <strong>${result.name}</strong><br>
+                        URL: ${result.url}<br>
+                        Status: ${result.status}<br>
+                        Time: ${result.responseTime}ms<br>
+                        ${result.error ? `Error: ${result.error}` : ''}
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+
+        // Auto-initialize on load
+        window.addEventListener('DOMContentLoaded', () => {
+            log('Page loaded. Click "Initialize Kaspa" to begin.', 'info');
+        });
+    </script>
+</body>
+</html>

@@ -270,11 +270,24 @@
                 log(`Network ID: ${info.networkId || 'Unknown'}`);
                 log(`Is synced: ${info.isSynced}`);
                 
-                // Try to get block count
+                // Try to get block count and check if archive node
                 try {
                     log('Getting block count...');
                     const blockCount = await client.getBlockCount();
-                    log(`Block count: ${blockCount.blockCount || blockCount}`, 'success');
+                    const count = blockCount.blockCount || blockCount;
+                    log(`Block count: ${count}`, 'success');
+                    
+                    // Check if this might be an archive node
+                    const archiveThreshold = 15000000; // 15 million blocks
+                    if (count > archiveThreshold) {
+                        log(`⚡ This appears to be an ARCHIVE NODE! (>${archiveThreshold} blocks)`, 'success');
+                        log(`Archive nodes store full blockchain history`, 'success');
+                    } else {
+                        const blocksPerDay = 864000;
+                        const daysOfData = count / blocksPerDay;
+                        log(`This node has ${daysOfData.toFixed(2)} days of data`, 'info');
+                        log(`Regular nodes typically prune data older than 30 hours`, 'info');
+                    }
                 } catch (e) {
                     log(`Block count not available: ${e.message}`, 'warning');
                 }
@@ -282,13 +295,23 @@
                 // Keep connection alive for block test
                 log('Connection kept alive for block testing', 'info');
                 
+                // Update result display with archive node info
+                const blockCount = await client.getBlockCount().catch(() => null);
+                const count = blockCount ? (blockCount.blockCount || blockCount) : 0;
+                const isArchive = count > 15000000;
+                const blocksPerDay = 864000;
+                const daysOfData = count / blocksPerDay;
+                
                 resultDiv.innerHTML = `
                     <div class="test-result success">
                         <strong>✓ Connection successful!</strong><br>
                         Response time: ${responseTime}ms<br>
                         Server: ${info.serverVersion || 'Unknown'}<br>
                         Network: ${info.networkId || 'Unknown'}<br>
-                        Synced: ${info.isSynced}
+                        Synced: ${info.isSynced}<br>
+                        Block Count: ${count.toLocaleString()}<br>
+                        <strong>${isArchive ? '⚡ ARCHIVE NODE' : '📦 Regular Node'}</strong> (${daysOfData.toFixed(2)} days of data)<br>
+                        ${isArchive ? 'Full blockchain history available!' : 'Limited to recent blocks (pruning enabled)'}
                     </div>
                 `;
                 
@@ -323,6 +346,9 @@
                 // Known working endpoints
                 { name: 'fermion-10 (Borsh path)', url: 'wss://fermion-10.kaspa.green/kaspa/testnet-10/wrpc/borsh' },
                 { name: 'testnet10.kaspa.app', url: 'https://testnet10.kaspa.app:443' },
+                
+                // Archive node
+                { name: 'Archive Node (tn10)', url: 'wss://archive-tn10.kaspa.org:17210' },
                 
                 // Test different formats
                 { name: 'fermion (17210)', url: 'wss://fermion.kaspa.green:17210' },
@@ -405,12 +431,23 @@
                 const responseTime = Date.now() - startTime;
                 log(`${name}: SUCCESS (${responseTime}ms)`, 'success');
                 
+                // Get block count to check if archive
+                let blockCount = 0;
+                try {
+                    const bc = await client.getBlockCount();
+                    blockCount = bc.blockCount || bc || 0;
+                } catch (e) {
+                    // Ignore
+                }
+                
                 return {
                     name,
                     url,
                     status: 'success',
                     responseTime,
-                    info
+                    info,
+                    blockCount,
+                    isArchive: blockCount > 15000000
                 };
                 
             } catch (error) {
@@ -435,10 +472,11 @@
                 const statusClass = result.status === 'success' ? 'success' : 'error';
                 html += `
                     <div class="test-result ${statusClass}">
-                        <strong>${result.name}</strong><br>
+                        <strong>${result.name}</strong>${result.isArchive ? ' <span style="color: #4CAF50">⚡ ARCHIVE</span>' : ''}<br>
                         URL: ${result.url}<br>
                         Status: ${result.status}<br>
                         Time: ${result.responseTime}ms<br>
+                        ${result.blockCount ? `Blocks: ${result.blockCount.toLocaleString()}` : ''}<br>
                         ${result.error ? `Error: ${result.error}` : ''}
                     </div>
                 `;

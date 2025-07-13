@@ -277,14 +277,17 @@
                     const count = blockCount.blockCount || blockCount;
                     log(`Block count: ${count}`, 'success');
                     
+                    // Convert BigInt to number for calculations
+                    const countNum = typeof count === 'bigint' ? Number(count) : count;
+                    
                     // Check if this might be an archive node
                     const archiveThreshold = 15000000; // 15 million blocks
-                    if (count > archiveThreshold) {
+                    if (countNum > archiveThreshold) {
                         log(`⚡ This appears to be an ARCHIVE NODE! (>${archiveThreshold} blocks)`, 'success');
                         log(`Archive nodes store full blockchain history`, 'success');
                     } else {
                         const blocksPerDay = 864000;
-                        const daysOfData = count / blocksPerDay;
+                        const daysOfData = countNum / blocksPerDay;
                         log(`This node has ${daysOfData.toFixed(2)} days of data`, 'info');
                         log(`Regular nodes typically prune data older than 30 hours`, 'info');
                     }
@@ -298,9 +301,10 @@
                 // Update result display with archive node info
                 const blockCount = await client.getBlockCount().catch(() => null);
                 const count = blockCount ? (blockCount.blockCount || blockCount) : 0;
-                const isArchive = count > 15000000;
+                const countNum = typeof count === 'bigint' ? Number(count) : count;
+                const isArchive = countNum > 15000000;
                 const blocksPerDay = 864000;
-                const daysOfData = count / blocksPerDay;
+                const daysOfData = countNum / blocksPerDay;
                 
                 resultDiv.innerHTML = `
                     <div class="test-result success">
@@ -309,7 +313,7 @@
                         Server: ${info.serverVersion || 'Unknown'}<br>
                         Network: ${info.networkId || 'Unknown'}<br>
                         Synced: ${info.isSynced}<br>
-                        Block Count: ${count.toLocaleString()}<br>
+                        Block Count: ${countNum.toLocaleString()}<br>
                         <strong>${isArchive ? '⚡ ARCHIVE NODE' : '📦 Regular Node'}</strong> (${daysOfData.toFixed(2)} days of data)<br>
                         ${isArchive ? 'Full blockchain history available!' : 'Limited to recent blocks (pruning enabled)'}
                     </div>
@@ -435,7 +439,8 @@
                 let blockCount = 0;
                 try {
                     const bc = await client.getBlockCount();
-                    blockCount = bc.blockCount || bc || 0;
+                    const count = bc.blockCount || bc || 0;
+                    blockCount = typeof count === 'bigint' ? Number(count) : count;
                 } catch (e) {
                     // Ignore
                 }

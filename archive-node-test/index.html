@@ -86,7 +86,6 @@
         <input type="text" id="nodeUrl" placeholder="wss://fermion-10.kaspa.green/kaspa/testnet-10/wrpc/borsh" 
                value="wss://fermion-10.kaspa.green/kaspa/testnet-10/wrpc/borsh">
         <button onclick="testSingleNode()" id="testBtn" disabled>Test Connection</button>
-        <button onclick="testArchiveNode()" id="archiveBtn" disabled>Test Archive Node</button>
         <div id="testResult"></div>
     </div>
 
@@ -171,7 +170,6 @@
                 isInitialized = true;
                 status.innerHTML = '<div class="success">✓ Kaspa module initialized successfully</div>';
                 document.getElementById('testBtn').disabled = false;
-                document.getElementById('archiveBtn').disabled = false;
                 document.getElementById('testAllBtn').disabled = false;
                 document.getElementById('blockTestBtn').disabled = false;
                 
@@ -583,126 +581,6 @@
                 text += String.fromCharCode(parseInt(hex.substr(i, 2), 16));
             }
             return text;
-        }
-
-        // Test archive node connection
-        async function testArchiveNode() {
-            if (!isInitialized) {
-                log('Kaspa module not initialized', 'error');
-                return;
-            }
-            
-            const archiveUrl = 'wss://archive-tn10.kaspa.org:17210';
-            const resultDiv = document.getElementById('testResult');
-            
-            log(`Testing archive node connection to: ${archiveUrl}`);
-            resultDiv.innerHTML = '<div class="info">Testing archive node...</div>';
-            
-            const startTime = Date.now();
-            
-            try {
-                // Create RPC client for archive node
-                log('Creating RPC client for archive node...');
-                
-                let client;
-                try {
-                    client = new kaspa.RpcClient({
-                        url: archiveUrl,
-                        networkId: 'testnet-10'
-                    });
-                    log('RPC client created for archive node');
-                } catch (e) {
-                    throw new Error(`Failed to create archive RPC client: ${e?.message || e}`);
-                }
-                
-                // Connect
-                log('Attempting to connect to archive node...');
-                const timeoutPromise = new Promise((_, reject) => {
-                    setTimeout(() => reject(new Error('Connection timeout (10s)')), 10000);
-                });
-                
-                try {
-                    await Promise.race([client.connect(), timeoutPromise]);
-                } catch (e) {
-                    throw new Error(`Archive node connection failed: ${e?.message || e}`);
-                }
-                
-                log('Connected to archive node!', 'success');
-                currentClient = client;
-                
-                // Get server info
-                const info = await client.getServerInfo();
-                const responseTime = Date.now() - startTime;
-                
-                log(`Archive node info received in ${responseTime}ms`, 'success');
-                log(`Server version: ${info.serverVersion || 'Unknown'}`);
-                log(`Network ID: ${info.networkId || 'Unknown'}`);
-                log(`Is synced: ${info.isSynced}`);
-                
-                // Test retrieving an old block (block 1000)
-                log('Testing archive capability by retrieving block 1000...');
-                try {
-                    const oldBlockResponse = await client.getBlock({
-                        hash: await getBlockHashByHeight(client, 1000),
-                        includeTransactions: true
-                    });
-                    
-                    if (oldBlockResponse) {
-                        log('✓ Archive node successfully retrieved old block!', 'success');
-                        log('This is a true archive node with full history', 'success');
-                    }
-                } catch (e) {
-                    log('Unable to retrieve old blocks - might not be a true archive node', 'warning');
-                }
-                
-                // Get block count
-                try {
-                    const blockCount = await client.getBlockCount();
-                    log(`Block count: ${blockCount.blockCount || blockCount}`, 'success');
-                    
-                    // Calculate chain age
-                    const blocksPerDay = 864000; // 10 blocks/second * 86400 seconds
-                    const chainAgeDays = (blockCount.blockCount || blockCount) / blocksPerDay;
-                    log(`Chain age: approximately ${chainAgeDays.toFixed(2)} days`, 'info');
-                } catch (e) {
-                    log(`Block count not available: ${e.message}`, 'warning');
-                }
-                
-                resultDiv.innerHTML = `
-                    <div class="test-result success">
-                        <strong>✓ Archive node connection successful!</strong><br>
-                        URL: ${archiveUrl}<br>
-                        Response time: ${responseTime}ms<br>
-                        Server: ${info.serverVersion || 'Unknown'}<br>
-                        Network: ${info.networkId || 'Unknown'}<br>
-                        <br>
-                        <strong>Archive node ready for historical block retrieval</strong>
-                    </div>
-                `;
-                
-            } catch (error) {
-                const responseTime = Date.now() - startTime;
-                log(`Archive node connection failed: ${error?.message || error}`, 'error');
-                
-                resultDiv.innerHTML = `
-                    <div class="test-result error">
-                        <strong>✗ Archive node connection failed</strong><br>
-                        URL: ${archiveUrl}<br>
-                        Time: ${responseTime}ms<br>
-                        Error: ${error?.message || error}<br>
-                        <br>
-                        Note: Archive node might not be available or accessible
-                    </div>
-                `;
-            }
-        }
-        
-        // Helper function to get block hash by height (simplified)
-        async function getBlockHashByHeight(client, height) {
-            // This is a placeholder - in reality, you'd need to traverse the DAG
-            // For now, we'll return a dummy hash
-            log(`Note: Block height to hash conversion not implemented`, 'warning');
-            return '0000000000000000000000000000000000000000000000000000000000000000';
         }
 
         // Auto-initialize on load

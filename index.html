@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.4.6 - Node Connection Test</title>
+    <title>Kaspa P2P File Storage v5.4.7 - Node Connection Test Fix</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -10486,30 +10486,27 @@
         function populatePublicNodesList() {
             const publicNodes = [
                 // kaspa.green group
-                { name: 'fermion-10.kaspa.green', url: 'wss://fermion-10.kaspa.green/kaspa/testnet-10/wrpc/borsh', group: 'green' },
-                { name: 'jake-10.kaspa.green', url: 'wss://jake-10.kaspa.green:18210', group: 'green' },
-                { name: 'mark-10.kaspa.green', url: 'wss://mark-10.kaspa.green:18210', group: 'green' },
-                { name: 'adam-10.kaspa.green', url: 'wss://adam-10.kaspa.green:18210', group: 'green' },
-                { name: 'liam-10.kaspa.green', url: 'wss://liam-10.kaspa.green:18210', group: 'green' },
+                { name: 'fermion-10.kaspa.green (Borsh)', url: 'wss://fermion-10.kaspa.green/kaspa/testnet-10/wrpc/borsh', group: 'green' },
                 
-                // kaspa.blue group
-                { name: 'tau-10.kaspa.blue', url: 'wss://tau-10.kaspa.blue/kaspa/testnet-10/wrpc/borsh', group: 'blue' },
-                { name: 'noah-10.kaspa.blue', url: 'wss://noah-10.kaspa.blue:18210', group: 'blue' },
-                { name: 'ryan-10.kaspa.blue', url: 'wss://ryan-10.kaspa.blue:18210', group: 'blue' },
-                { name: 'jack-10.kaspa.blue', url: 'wss://jack-10.kaspa.blue:18210', group: 'blue' },
-                { name: 'luke-10.kaspa.blue', url: 'wss://luke-10.kaspa.blue:18210', group: 'blue' },
+                // Alternative formats to test
+                { name: 'testnet10.kaspa.app (Default)', url: 'https://testnet10.kaspa.app:443', group: 'default' },
                 
-                // kaspa.stream group
-                { name: 'eric-10.kaspa.stream', url: 'wss://eric-10.kaspa.stream:18210', group: 'stream' },
-                { name: 'maxim-10.kaspa.stream', url: 'wss://maxim-10.kaspa.stream:18210', group: 'stream' },
-                { name: 'sean-10.kaspa.stream', url: 'wss://sean-10.kaspa.stream:18210', group: 'stream' },
-                { name: 'troy-10.kaspa.stream', url: 'wss://troy-10.kaspa.stream:18210', group: 'stream' },
+                // Try without explicit testnet-10 suffix
+                { name: 'eric.kaspa.stream', url: 'wss://eric.kaspa.stream:17210', group: 'stream' },
+                { name: 'maxim.kaspa.stream', url: 'wss://maxim.kaspa.stream:17210', group: 'stream' },
+                { name: 'sean.kaspa.stream', url: 'wss://sean.kaspa.stream:17210', group: 'stream' },
+                { name: 'troy.kaspa.stream', url: 'wss://troy.kaspa.stream:17210', group: 'stream' },
                 
-                // kaspa.red group
-                { name: 'john-10.kaspa.red', url: 'wss://john-10.kaspa.red:18210', group: 'red' },
-                { name: 'mike-10.kaspa.red', url: 'wss://mike-10.kaspa.red:18210', group: 'red' },
-                { name: 'paul-10.kaspa.red', url: 'wss://paul-10.kaspa.red:18210', group: 'red' },
-                { name: 'alex-10.kaspa.red', url: 'wss://alex-10.kaspa.red:18210', group: 'red' }
+                // Try different ports
+                { name: 'jake.kaspa.green (17210)', url: 'wss://jake.kaspa.green:17210', group: 'green' },
+                { name: 'mark.kaspa.green (17210)', url: 'wss://mark.kaspa.green:17210', group: 'green' },
+                
+                // tau nodes
+                { name: 'tau-10.kaspa.blue (Path)', url: 'wss://tau-10.kaspa.blue/kaspa/testnet-10/wrpc/borsh', group: 'blue' },
+                { name: 'tau.kaspa.blue (17210)', url: 'wss://tau.kaspa.blue:17210', group: 'blue' },
+                
+                // Test with custom node format
+                { name: 'Custom Test (localhost)', url: 'ws://127.0.0.1:17210', group: 'test' }
             ];
             
             const container = document.getElementById('publicNodesList');
@@ -10519,7 +10516,9 @@
                 green: '#4CAF50',
                 blue: '#2196F3',
                 stream: '#00BCD4',
-                red: '#F44336'
+                red: '#F44336',
+                default: '#9C27B0',
+                test: '#FF9800'
             };
             
             publicNodes.forEach((node, index) => {
@@ -10615,9 +10614,13 @@
             };
             
             try {
+                // Ensure kaspa is initialized
+                if (!kaspa || !kaspa.RpcClient) {
+                    throw new Error('Kaspa module not initialized');
+                }
+                
                 // Create temporary RPC client for testing
-                const { RpcClient } = kaspa;
-                const testClient = new RpcClient({
+                const testClient = new kaspa.RpcClient({
                     url: url,
                     resolver: null,
                     networkId: 'testnet-10'
@@ -10634,16 +10637,17 @@
                 const info = await testClient.getServerInfo();
                 result.responseTime = Date.now() - startTime;
                 result.status = 'connected';
-                result.serverVersion = info.serverVersion;
-                result.networkId = info.networkId;
-                result.isSynced = info.isSynced;
+                result.serverVersion = info.serverVersion || 'Unknown';
+                result.networkId = info.networkId || 'Unknown';
+                result.isSynced = info.isSynced !== undefined ? info.isSynced : null;
                 
                 // Try to get block count
                 try {
-                    const blockCount = await testClient.getBlockCount();
-                    result.blockCount = blockCount;
+                    const blockCountResponse = await testClient.getBlockCount();
+                    result.blockCount = blockCountResponse.blockCount || blockCountResponse;
                 } catch (e) {
                     // Some nodes might not support this method
+                    console.log(`Block count not available for ${name}: ${e.message}`);
                 }
                 
                 await testClient.disconnect();
@@ -10651,7 +10655,8 @@
             } catch (error) {
                 result.status = 'failed';
                 result.responseTime = Date.now() - startTime;
-                result.error = error.message;
+                result.error = error.message || 'Unknown error';
+                console.error(`Connection test failed for ${name}:`, error);
             }
             
             return result;
@@ -10725,7 +10730,7 @@
         }
 
         // Update the onNodeTypeChange function
-        function onNodeTypeChange() {
+        window.onNodeTypeChange = function() {
             const nodeType = document.getElementById('nodeTypeSelect').value;
             const customSection = document.getElementById('customEndpointSection');
             
@@ -10752,7 +10757,7 @@
         }
 
         // Save custom endpoint
-        function saveCustomEndpoint() {
+        window.saveCustomEndpoint = function() {
             const input = document.getElementById('customRpcEndpoint');
             const endpoint = input.value.trim();
             
@@ -10762,6 +10767,85 @@
                 log(`[設定] カスタムエンドポイントを保存: ${endpoint}`, 'info');
             }
         }
+
+        // Create RPC client helper function
+        async function createRpcClient() {
+            if (!kaspa) {
+                throw new Error('Kaspa module not initialized');
+            }
+            
+            let endpoint = null;
+            
+            if (config.nodeType === 'custom' && config.customEndpoint) {
+                endpoint = config.customEndpoint;
+            } else if (config.nodeType === 'archive') {
+                endpoint = config.archiveEndpoints[config.network] || config.endpoints[config.network];
+            } else {
+                endpoint = config.endpoints[config.network];
+            }
+            
+            config.currentEndpoint = endpoint;
+            
+            return new kaspa.RpcClient({
+                url: endpoint,
+                resolver: null,
+                networkId: config.network
+            });
+        }
+
+        // Helper function to update node connection status
+        function updateNodeConnectionStatus(nodeType, endpoint) {
+            const statusDiv = document.getElementById('nodeConnectionStatus');
+            const infoSpan = document.getElementById('nodeConnectionInfo');
+            
+            if (statusDiv && infoSpan) {
+                statusDiv.style.display = 'block';
+                let typeText = nodeType === 'auto' ? '自動' : 
+                             nodeType === 'standard' ? '通常' : 
+                             nodeType === 'archive' ? 'アーカイブ' : 
+                             nodeType === 'custom' ? 'カスタム' : nodeType;
+                
+                infoSpan.innerHTML = `<span style="color: #4CAF50;">接続中</span> - ${typeText}ノード<br><small style="color: #888;">${endpoint}</small>`;
+            }
+        }
+
+        // Switch to archive node
+        async function switchToArchiveNode() {
+            if (config.nodeType === 'archive') {
+                return false; // Already using archive node
+            }
+            
+            const archiveEndpoint = config.archiveEndpoints[config.network];
+            if (!archiveEndpoint) {
+                log(`[RPC] アーカイブノードエンドポイントが設定されていません`, 'error');
+                return false;
+            }
+            
+            try {
+                if (rpcClient) {
+                    await rpcClient.disconnect();
+                }
+                
+                config.nodeType = 'archive';
+                config.currentEndpoint = archiveEndpoint;
+                
+                rpcClient = new kaspa.RpcClient({
+                    url: archiveEndpoint,
+                    resolver: null,
+                    networkId: config.network
+                });
+                
+                await rpcClient.connect();
+                updateNodeConnectionStatus('archive', archiveEndpoint);
+                
+                log(`[RPC] アーカイブノードに切り替えました: ${archiveEndpoint}`, 'success');
+                return true;
+                
+            } catch (error) {
+                log(`[RPC] アーカイブノード接続エラー: ${error.message}`, 'error');
+                return false;
+            }
+        }
     </script>
 </body>
-</html><!-- Force GitHub Pages update: Mon Jul 13 2025 - v5.4.6: Node Connection Test -->
+</html><!-- Force GitHub Pages update: Mon Jul 13 2025 - v5.4.7: Node Connection Test Fix -->

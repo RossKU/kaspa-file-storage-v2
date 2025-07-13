@@ -192,11 +192,21 @@
             try {
                 // Create RPC client
                 log('Creating RPC client...');
-                const client = new kaspa.RpcClient({
-                    url: url,
-                    resolver: null,
-                    networkId: 'testnet-10'
-                });
+                log(`RpcClient constructor: ${typeof kaspa.RpcClient}`);
+                log(`URL: ${url}`);
+                log(`Network ID: testnet-10`);
+                
+                let client;
+                try {
+                    client = new kaspa.RpcClient({
+                        url: url,
+                        resolver: null,
+                        networkId: 'testnet-10'
+                    });
+                    log('RPC client created successfully');
+                } catch (e) {
+                    throw new Error(`Failed to create RPC client: ${e?.message || e}`);
+                }
                 
                 // Set connection timeout
                 const timeoutPromise = new Promise((_, reject) => {
@@ -205,7 +215,11 @@
                 
                 // Connect
                 log('Attempting to connect...');
-                await Promise.race([client.connect(), timeoutPromise]);
+                try {
+                    await Promise.race([client.connect(), timeoutPromise]);
+                } catch (e) {
+                    throw new Error(`Connection failed: ${e?.message || e}`);
+                }
                 log('Connected successfully!', 'success');
                 
                 // Get server info
@@ -243,14 +257,16 @@
                 
             } catch (error) {
                 const responseTime = Date.now() - startTime;
-                log(`Connection failed: ${error.message}`, 'error');
-                log(`Error details: ${error.stack}`, 'error');
+                log(`Connection failed: ${error?.message || error || 'Unknown error'}`, 'error');
+                log(`Error type: ${error?.constructor?.name || typeof error}`, 'error');
+                log(`Error details: ${error?.stack || JSON.stringify(error)}`, 'error');
                 
                 resultDiv.innerHTML = `
                     <div class="test-result error">
                         <strong>✗ Connection failed</strong><br>
                         Time: ${responseTime}ms<br>
-                        Error: ${error.message}
+                        Error: ${error?.message || error || 'Unknown error'}<br>
+                        Type: ${error?.constructor?.name || typeof error}
                     </div>
                 `;
             }
@@ -311,17 +327,26 @@
             const startTime = Date.now();
             
             try {
-                const client = new kaspa.RpcClient({
-                    url: url,
-                    resolver: null,
-                    networkId: 'testnet-10'
-                });
+                let client;
+                try {
+                    client = new kaspa.RpcClient({
+                        url: url,
+                        resolver: null,
+                        networkId: 'testnet-10'
+                    });
+                } catch (e) {
+                    throw new Error(`RPC client creation failed: ${e?.message || e}`);
+                }
                 
                 const timeoutPromise = new Promise((_, reject) => {
                     setTimeout(() => reject(new Error('Timeout')), 5000);
                 });
                 
-                await Promise.race([client.connect(), timeoutPromise]);
+                try {
+                    await Promise.race([client.connect(), timeoutPromise]);
+                } catch (e) {
+                    throw new Error(`Connection error: ${e?.message || e}`);
+                }
                 const info = await client.getServerInfo();
                 await client.disconnect();
                 
@@ -338,14 +363,14 @@
                 
             } catch (error) {
                 const responseTime = Date.now() - startTime;
-                log(`${name}: FAILED - ${error.message}`, 'error');
+                log(`${name}: FAILED - ${error?.message || error || 'Unknown error'}`, 'error');
                 
                 return {
                     name,
                     url,
                     status: 'failed',
                     responseTime,
-                    error: error.message
+                    error: error?.message || error || 'Unknown error'
                 };
             }
         }

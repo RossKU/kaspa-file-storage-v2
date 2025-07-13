@@ -92,6 +92,7 @@
     <div class="container">
         <h2>Step 3: Test Multiple Nodes</h2>
         <button onclick="testAllNodes()" id="testAllBtn" disabled>Test All Known Nodes</button>
+        <button onclick="findArchiveNodes()" id="findArchiveBtn" disabled>Find Archive Nodes Only</button>
         <div id="allTestResults"></div>
     </div>
 
@@ -171,6 +172,7 @@
                 status.innerHTML = '<div class="success">✓ Kaspa module initialized successfully</div>';
                 document.getElementById('testBtn').disabled = false;
                 document.getElementById('testAllBtn').disabled = false;
+                document.getElementById('findArchiveBtn').disabled = false;
                 document.getElementById('blockTestBtn').disabled = false;
                 
             } catch (error) {
@@ -624,6 +626,100 @@
                 text += String.fromCharCode(parseInt(hex.substr(i, 2), 16));
             }
             return text;
+        }
+
+        // Find archive nodes only
+        async function findArchiveNodes() {
+            if (!isInitialized) {
+                log('Kaspa module not initialized', 'error');
+                return;
+            }
+            
+            const resultsDiv = document.getElementById('allTestResults');
+            resultsDiv.innerHTML = '<div class="info">Searching for archive nodes...</div>';
+            
+            const nodes = [
+                // Known endpoints
+                { name: 'Archive Node (tn10)', url: 'wss://archive-tn10.kaspa.org:17210' },
+                { name: 'fermion-10 (Borsh)', url: 'wss://fermion-10.kaspa.green/kaspa/testnet-10/wrpc/borsh' },
+                { name: 'testnet10.kaspa.app', url: 'https://testnet10.kaspa.app:443' },
+                { name: 'fermion (17210)', url: 'wss://fermion.kaspa.green:17210' },
+                { name: 'fermion (18210)', url: 'wss://fermion.kaspa.green:18210' },
+                { name: 'tau-10 (Borsh)', url: 'wss://tau-10.kaspa.blue/kaspa/testnet-10/wrpc/borsh' },
+                { name: 'tau (17210)', url: 'wss://tau.kaspa.blue:17210' },
+                { name: 'eric (17210)', url: 'wss://eric.kaspa.stream:17210' },
+                { name: 'maxim (17210)', url: 'wss://maxim.kaspa.stream:17210' },
+                
+                // Additional potential archive nodes
+                { name: 'archive-testnet', url: 'wss://archive-testnet.kaspa.org:17210' },
+                { name: 'archive-tn', url: 'wss://archive-tn.kaspa.org:17210' },
+                { name: 'kaspa-archive', url: 'wss://kaspa-archive.org:17210' },
+                { name: 'testnet-archive', url: 'wss://testnet-archive.kaspa.org:17210' }
+            ];
+            
+            const results = [];
+            const archiveNodes = [];
+            
+            log(`\n=== Searching ${nodes.length} nodes for archive nodes ===`, 'info');
+            
+            for (const node of nodes) {
+                log(`\nTesting ${node.name}...`);
+                const result = await testNode(node.url, node.name);
+                results.push(result);
+                
+                if (result.status === 'success' && result.isArchive) {
+                    archiveNodes.push(result);
+                    log(`⚡ FOUND ARCHIVE NODE: ${node.name} with ${result.blockCount.toLocaleString()} blocks!`, 'success');
+                }
+                
+                // Update display with progress
+                updateArchiveResults(resultsDiv, results, archiveNodes);
+            }
+            
+            // Final summary
+            log(`\n=== Archive Node Search Complete ===`, 'info');
+            log(`Total nodes tested: ${results.length}`);
+            log(`Archive nodes found: ${archiveNodes.length}`, archiveNodes.length > 0 ? 'success' : 'warning');
+            
+            if (archiveNodes.length > 0) {
+                log(`\nArchive nodes available:`, 'success');
+                archiveNodes.forEach(node => {
+                    log(`- ${node.name}: ${node.url}`, 'success');
+                });
+            }
+        }
+        
+        // Update archive search results
+        function updateArchiveResults(container, allResults, archiveNodes) {
+            let html = '<h3>Archive Node Search Results:</h3>';
+            
+            if (archiveNodes.length > 0) {
+                html += '<div class="test-result success" style="margin-bottom: 20px;">';
+                html += `<strong>⚡ Found ${archiveNodes.length} Archive Node(s)!</strong><br><br>`;
+                archiveNodes.forEach(node => {
+                    html += `<strong>${node.name}</strong><br>`;
+                    html += `URL: ${node.url}<br>`;
+                    html += `Blocks: ${node.blockCount.toLocaleString()}<br>`;
+                    html += `Response: ${node.responseTime}ms<br><br>`;
+                });
+                html += '</div>';
+            }
+            
+            html += `<h4>All Results (${allResults.length} nodes tested):</h4>`;
+            allResults.forEach(result => {
+                const statusClass = result.status === 'success' ? 'success' : 'error';
+                const isArchive = result.status === 'success' && result.isArchive;
+                html += `
+                    <div class="test-result ${statusClass}" style="opacity: ${isArchive ? '1' : '0.6'}">
+                        <strong>${result.name}</strong>${isArchive ? ' <span style="color: #4CAF50">⚡ ARCHIVE</span>' : ''}<br>
+                        Status: ${result.status}<br>
+                        ${result.blockCount ? `Blocks: ${result.blockCount.toLocaleString()}` : ''}<br>
+                        ${result.error ? `Error: ${result.error}` : ''}
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
         }
 
         // Auto-initialize on load

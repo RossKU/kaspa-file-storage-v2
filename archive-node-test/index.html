@@ -280,17 +280,40 @@
                     // Convert BigInt to number for calculations
                     const countNum = typeof count === 'bigint' ? Number(count) : count;
                     
+                    // Calculate detailed block statistics
+                    const blocksPerSecond = 10;
+                    const blocksPerMinute = blocksPerSecond * 60; // 600
+                    const blocksPerHour = blocksPerMinute * 60; // 36,000
+                    const blocksPerDay = blocksPerHour * 24; // 864,000
+                    
+                    const daysOfData = countNum / blocksPerDay;
+                    const hoursOfData = countNum / blocksPerHour;
+                    
+                    log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`, 'info');
+                    log(`Block Statistics:`, 'info');
+                    log(`• Total blocks: ${countNum.toLocaleString()}`, 'info');
+                    log(`• Data coverage: ${daysOfData.toFixed(2)} days (${hoursOfData.toFixed(1)} hours)`, 'info');
+                    log(`• Block generation rate: ${blocksPerSecond} blocks/second`, 'info');
+                    
                     // Check if this might be an archive node
                     const archiveThreshold = 15000000; // 15 million blocks
+                    const pruneThreshold = 30; // 30 hours
+                    const hoursThreshold = pruneThreshold * blocksPerHour; // 1,080,000 blocks
+                    
                     if (countNum > archiveThreshold) {
-                        log(`⚡ This appears to be an ARCHIVE NODE! (>${archiveThreshold} blocks)`, 'success');
-                        log(`Archive nodes store full blockchain history`, 'success');
+                        log(`⚡ ARCHIVE NODE DETECTED! (>${(archiveThreshold/1000000).toFixed(0)}M blocks)`, 'success');
+                        log(`• Full blockchain history available`, 'success');
+                        log(`• No pruning - all historical data preserved`, 'success');
+                    } else if (hoursOfData > pruneThreshold) {
+                        log(`📦 Extended node (>${pruneThreshold} hours of data)`, 'warning');
+                        log(`• More data than typical pruned nodes`, 'warning');
+                        log(`• May have custom pruning settings`, 'warning');
                     } else {
-                        const blocksPerDay = 864000;
-                        const daysOfData = countNum / blocksPerDay;
-                        log(`This node has ${daysOfData.toFixed(2)} days of data`, 'info');
-                        log(`Regular nodes typically prune data older than 30 hours`, 'info');
+                        log(`📦 Regular pruned node`, 'info');
+                        log(`• Limited to recent blocks (typically ${pruneThreshold} hours)`, 'info');
+                        log(`• Oldest accessible block: ~${(countNum - hoursThreshold).toLocaleString()}`, 'info');
                     }
+                    log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`, 'info');
                 } catch (e) {
                     log(`Block count not available: ${e.message}`, 'warning');
                 }
@@ -373,20 +396,39 @@
             const results = [];
             
             for (const node of nodes) {
-                log(`\n--- Testing ${node.name} ---`);
+                log(`\n━━━ Testing ${node.name} ━━━`);
                 const result = await testNode(node.url, node.name);
                 results.push(result);
+                
+                // Log block count for successful connections
+                if (result.status === 'success' && result.blockCount) {
+                    const daysOfData = result.blockCount / 864000;
+                    log(`→ Blocks: ${result.blockCount.toLocaleString()} (${daysOfData.toFixed(2)} days)`, 
+                        result.isArchive ? 'success' : 'info');
+                }
+                
                 updateResults(resultsDiv, results);
             }
             
             // Summary
             const successful = results.filter(r => r.status === 'success').length;
             const failed = results.filter(r => r.status === 'failed').length;
+            const archiveCount = results.filter(r => r.status === 'success' && r.isArchive).length;
             
-            log(`\n=== Test Summary ===`, 'info');
-            log(`Total nodes tested: ${results.length}`);
-            log(`Successful: ${successful}`, 'success');
-            log(`Failed: ${failed}`, 'error');
+            log(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`, 'info');
+            log(`Test Summary:`, 'info');
+            log(`• Total nodes tested: ${results.length}`);
+            log(`• Successful connections: ${successful}`, successful > 0 ? 'success' : 'error');
+            log(`• Failed connections: ${failed}`, failed > 0 ? 'error' : 'success');
+            log(`• Archive nodes found: ${archiveCount}`, archiveCount > 0 ? 'success' : 'warning');
+            
+            if (archiveCount > 0) {
+                log(`\nArchive nodes:`, 'success');
+                results.filter(r => r.isArchive).forEach(r => {
+                    log(`• ${r.name}: ${r.blockCount.toLocaleString()} blocks`, 'success');
+                });
+            }
+            log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`, 'info');
         }
 
         // Test individual node

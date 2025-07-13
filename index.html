@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.3.15 - Enable Parallel Download for Standard Chunks</title>
+    <title>Kaspa P2P File Storage v5.3.16 - Debug Parallel Download</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -850,16 +850,21 @@
         
         // Parallel download settings (v3.6.2)
         let parallelDownloadEnabled = false; // Default OFF for v3.5.0 compatibility
+        window.parallelDownloadEnabled = false; // v5.3.16: Initialize window variable
         
         // Load parallel download setting from localStorage
         function loadParallelSetting() {
             const saved = localStorage.getItem('kaspaParallelDownload');
             if (saved !== null) {
                 parallelDownloadEnabled = saved === 'true';
+                window.parallelDownloadEnabled = parallelDownloadEnabled; // v5.3.16: Set window variable
                 const toggle = document.getElementById('parallelDownloadToggle');
                 if (toggle) {
                     toggle.checked = parallelDownloadEnabled;
                 }
+            } else {
+                // v5.3.16: Ensure window variable is set even when no saved setting
+                window.parallelDownloadEnabled = parallelDownloadEnabled;
             }
         }
         
@@ -4059,6 +4064,10 @@
                     log(`[DownloadManager DEBUG] chunks配列長: ${metadata.chunks?.length}`, 'debug');
                     log(`[DownloadManager DEBUG] chunkStructure.type: ${metadata.chunkStructure?.type}`, 'debug');
                     
+                    // v5.3.16: Debug logs
+                    log(`[DownloadManager v5.3.16] parallelDownloadEnabled: ${window.parallelDownloadEnabled}`, 'debug');
+                    log(`[DownloadManager v5.3.16] metadata.metadata?.payloadSplit: ${metadata.metadata?.payloadSplit}`, 'debug');
+                    
                     // Derive encryption key
                     const salt = fromBase64(metadata.encryption.pbkdf2.salt);
                     const iterations = metadata.encryption.pbkdf2.iterations || 
@@ -4078,29 +4087,56 @@
                         // v4.7.45: Check if parallel download should be used
                         const useParallel = window.parallelDownloadEnabled && totalPayloads >= 2;
                         
+                        // v5.3.16: Debug log
+                        log(`[DownloadManager v5.3.16] payloadSplit path - useParallel: ${useParallel}, totalPayloads: ${totalPayloads}`, 'debug');
+                        
                         if (useParallel) {
                             // Parallel download for payload split
                             log(`[DownloadManager] 並列ダウンロードモードを使用 (${totalPayloads}ペイロード)`, 'info');
                             
                             const downloader = new ParallelDownloader(rpcClient, 8);
-                            const parallelPayloads = await downloader.downloadPayloads(
-                                metadata.chunks,
-                                metadata.chunkBlockIds,
-                                (progress) => {
-                                    if (onProgress) {
-                                        onProgress({
-                                            current: progress.completed,
-                                            total: progress.total,
-                                            percent: ((progress.completed / progress.total) * 100).toFixed(0),
-                                            speed: progress.speed,
-                                            throughput: progress.throughput
-                                        });
+                            
+                            // v5.3.16: Use downloadChunksRaw for payload split too
+                            try {
+                                const parallelPayloads = await downloader.downloadChunksRaw(
+                                    metadata.chunks,
+                                    metadata.chunkBlockIds,
+                                    (progress) => {
+                                        if (onProgress) {
+                                            onProgress({
+                                                current: progress.completed,
+                                                total: progress.total,
+                                                percent: ((progress.completed / progress.total) * 100).toFixed(0),
+                                                speed: progress.speed,
+                                                throughput: progress.throughput
+                                            });
+                                        }
                                     }
-                                }
-                            );
-                            payloads.push(...parallelPayloads);
+                                );
+                                payloads.push(...parallelPayloads);
+                            } catch (error) {
+                                // Fallback to downloadPayloads if available
+                                log(`[DownloadManager v5.3.16] downloadChunksRaw failed, trying downloadPayloads: ${error.message}`, 'warning');
+                                const parallelPayloads = await downloader.downloadPayloads(
+                                    metadata.chunks,
+                                    metadata.chunkBlockIds,
+                                    (progress) => {
+                                        if (onProgress) {
+                                            onProgress({
+                                                current: progress.completed,
+                                                total: progress.total,
+                                                percent: ((progress.completed / progress.total) * 100).toFixed(0),
+                                                speed: progress.speed,
+                                                throughput: progress.throughput
+                                            });
+                                        }
+                                    }
+                                );
+                                payloads.push(...parallelPayloads);
+                            }
                         } else {
                             // Sequential download
+                            log(`[DownloadManager v5.3.16] payloadSplit path - Sequential download (parallel disabled or < 2 payloads)`, 'debug');
                             for (let i = 0; i < totalPayloads; i++) {
                                 const txId = metadata.chunks[i];
                                 const blockId = metadata.chunkBlockIds[i];
@@ -8983,6 +9019,7 @@
         // Toggle parallel download
         window.toggleParallelDownload = function() {
             parallelDownloadEnabled = document.getElementById('parallelDownloadToggle').checked;
+            window.parallelDownloadEnabled = parallelDownloadEnabled; // v5.3.16: Fix window variable
             localStorage.setItem('kaspaParallelDownload', parallelDownloadEnabled.toString());
             
             if (parallelDownloadEnabled) {

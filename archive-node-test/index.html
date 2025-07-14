@@ -472,12 +472,8 @@
                     }
                 }
                 const info = await client.getServerInfo();
-                await client.disconnect();
                 
-                const responseTime = Date.now() - startTime;
-                log(`${name}: SUCCESS (${responseTime}ms)`, 'success');
-                
-                // Get block count to check if archive
+                // Get block count to check if archive (before disconnecting)
                 let blockCount = 0;
                 try {
                     const bc = await client.getBlockCount();
@@ -486,6 +482,11 @@
                 } catch (e) {
                     // Ignore
                 }
+                
+                await client.disconnect();
+                
+                const responseTime = Date.now() - startTime;
+                log(`${name}: SUCCESS (${responseTime}ms)`, 'success');
                 
                 return {
                     name,

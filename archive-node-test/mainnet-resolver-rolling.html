@@ -170,7 +170,7 @@
             </div>
             <div>
                 <label>Test Interval (seconds):</label>
-                <input type="number" id="testInterval" value="5" min="1" max="60">
+                <input type="number" id="testInterval" value="2" min="1" max="60">
             </div>
             <div>
                 <label>Max Nodes to Test:</label>
@@ -401,41 +401,20 @@
             log(`Max nodes to test: ${maxNodes}`, 'info');
             log(`Test interval: ${testInterval/1000}s`, 'info');
             
-            // Main discovery loop with parallel execution
-            const parallelCount = 10; // Test 10 nodes in parallel
-            let activePromises = [];
-            
+            // Main discovery loop - back to sequential for stability
             while (isDiscovering && stats.totalTested < maxNodes) {
                 try {
-                    // Fill up to parallelCount concurrent tests
-                    while (activePromises.length < parallelCount && isDiscovering && stats.totalTested < maxNodes) {
-                        const promise = discoverNextNode().catch(error => {
-                            log(`Discovery error: ${error.message}`, 'error');
-                        });
-                        activePromises.push(promise);
-                        
-                        // Small delay between starting each parallel test
-                        await new Promise(resolve => setTimeout(resolve, 200));
-                    }
+                    await discoverNextNode();
                     
-                    // Wait for at least one to complete
-                    if (activePromises.length > 0) {
-                        await Promise.race(activePromises);
-                        // Remove completed promises
-                        activePromises = activePromises.filter(p => p && p.constructor.name === 'Promise');
-                        
-                        // Small delay between batches
+                    // Wait before next node
+                    if (isDiscovering && stats.totalTested < maxNodes) {
+                        log(`Waiting ${testInterval/1000}s before next node...`, 'rolling');
                         await new Promise(resolve => setTimeout(resolve, testInterval));
                     }
                 } catch (error) {
-                    log(`Discovery batch error: ${error.message}`, 'error');
+                    log(`Discovery error: ${error.message}`, 'error');
+                    await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5s on error
                 }
-            }
-            
-            // Wait for remaining promises
-            if (activePromises.length > 0) {
-                log(`Waiting for ${activePromises.length} remaining tests...`, 'info');
-                await Promise.allSettled(activePromises);
             }
             
             log('Rolling discovery complete!', 'success');
@@ -905,10 +884,35 @@
                     // Test 1: Get recent block
                     const recentHeight = nodeInfo.blockHeight - 1000;
                     log(`Getting recent block at height ${recentHeight}...`);
-                    const recentBlock = await client.getBlock({
-                        height: recentHeight,
-                        includeTransactions: true
-                    });
+                    
+                    // Debug: Check available methods
+                    log(`Client methods: ${Object.getOwnPropertyNames(Object.getPrototypeOf(client)).join(', ')}`, 'debug');
+                    
+                    // Try different methods to get block
+                    let recentBlock = null;
+                    
+                    // Method 1: Try getBlockByHeight if available
+                    if (client.getBlockByHeight) {
+                        try {
+                            log(`Using getBlockByHeight...`, 'debug');
+                            recentBlock = await client.getBlockByHeight(recentHeight);
+                        } catch (e) {
+                            log(`getBlockByHeight failed: ${e.message}`, 'debug');
+                        }
+                    }
+                    
+                    // Method 2: Try getBlock with height
+                    if (!recentBlock && client.getBlock) {
+                        try {
+                            log(`Using getBlock with height...`, 'debug');
+                            recentBlock = await client.getBlock({
+                                height: recentHeight,
+                                includeTransactions: true
+                            });
+                        } catch (e) {
+                            log(`getBlock with height failed: ${e.message}`, 'debug');
+                        }
+                    }
                     
                     if (recentBlock) {
                         const block = recentBlock.block || recentBlock;
@@ -954,7 +958,20 @@
                     log(`  Difficulty: ${dagInfo.difficulty || 'N/A'}`, 'debug');
                     
                 } catch (error) {
-                    log(`✗ Block test failed: ${error.message}`, 'error');
+                    log(`✗ Block test failed: ${error.message || error}`, 'error');
+                    log(`Error type: ${error.constructor?.name}`, 'debug');
+                    log(`Error stack: ${error.stack}`, 'debug');
+                    
+                    // Check if client is still connected
+                    try {
+                        const info = await client.getServerInfo();
+                        log(`Client is still connected to ${info.serverVersion}`, 'info');
+                    } catch (e) {
+                        log(`Client appears to be disconnected`, 'error');
+                        // Remove from active connections
+                        activeArchiveConnections.delete(nodeId);
+                        updateStats();
+                    }
                 }
             }
             
@@ -965,7 +982,6 @@
         window.addEventListener('DOMContentLoaded', () => {
             log('Kaspa Resolver Rolling Discovery Ready', 'info');
             log('This tool uses Resolver to automatically discover and test Kaspa mainnet nodes', 'info');
-            log('Now with 10x parallel testing for faster discovery!', 'info');
         });
     </script>
 </body>

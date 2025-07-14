@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Kaspa Mainnet Archive Node P2P Discovery</title>
-    <script src="https://unpkg.com/kaspa-wasm@latest/web/kaspa-wasm.js"></script>
+    <!-- Kaspa WASM will be loaded dynamically -->
     <style>
         body {
             font-family: monospace;
@@ -241,9 +241,14 @@ maxim.kaspa.stream</textarea>
             try {
                 log('Initializing Kaspa WASM module for mainnet P2P...');
                 
-                // Import kaspa module
-                kaspa = await import('https://unpkg.com/kaspa-wasm@latest/web/kaspa-wasm.js');
-                await kaspa.default();
+                // Import kaspa module from local files (same as testnet version)
+                log('Importing kaspa-core.js from local directory...');
+                kaspa = await import('./kaspa-core.js');
+                log('kaspa-core.js imported successfully', 'success');
+                
+                // Initialize WASM
+                log('Initializing WASM module...');
+                await kaspa.default('./kaspa-core_bg.wasm');
                 log('Kaspa WASM initialized successfully', 'success');
                 
                 // Check available functions
@@ -381,7 +386,6 @@ maxim.kaspa.stream</textarea>
                 // Create RPC client
                 const client = new kaspa.RpcClient({
                     url: node.url,
-                    encoding: kaspa.Encoding.Borsh,
                     networkId: 'mainnet'
                 });
                 

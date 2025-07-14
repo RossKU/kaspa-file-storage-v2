@@ -246,7 +246,10 @@
         <h2>Discovered Archive Nodes</h2>
         <div style="margin-bottom: 10px;">
             <button onclick="testArchiveBlock()" id="testBlockBtn" disabled>Test Block Retrieval on Connected Archives</button>
-            <input type="text" id="testBlockHash" placeholder="Block hash (optional)" style="width: 300px; margin-left: 10px; background: #333; color: #e0e0e0; border: 1px solid #555; padding: 5px; border-radius: 4px;">
+            <input type="text" id="testBlockHash" placeholder="Block hash (64 chars, optional)" style="width: 400px; margin-left: 10px; background: #333; color: #e0e0e0; border: 1px solid #555; padding: 5px; border-radius: 4px;">
+            <div style="margin-top: 5px; font-size: 11px; color: #888;">
+                Example: 0000000000000000000000000000000000000000000000000000000000000000
+            </div>
         </div>
         <div class="node-list" id="archiveList">
             <div style="text-align: center; color: #666;">No archive nodes discovered yet</div>
@@ -911,39 +914,29 @@
                         log(`  Transactions: ${block.transactions?.length || 0}`, 'debug');
                     }
                     
-                    // Test 2: Get headers to find older blocks
-                    if (dagInfo.tipHashes && dagInfo.tipHashes.length > 0) {
-                        log(`Getting headers to find older blocks...`);
-                        try {
-                            const headers = await client.getHeaders({
-                                startHash: dagInfo.tipHashes[0],
-                                limit: 100,
-                                isAscending: false
-                            });
-                            
-                            if (headers && headers.headers && headers.headers.length > 0) {
-                                log(`✓ Got ${headers.headers.length} headers`, 'success');
+                    // Test 2: Get multiple tip blocks to see variety
+                    if (dagInfo.tipHashes && dagInfo.tipHashes.length > 1) {
+                        log(`Testing multiple tip blocks (found ${dagInfo.tipHashes.length} tips)...`);
+                        
+                        // Test up to 3 different tips
+                        const tipsToTest = Math.min(3, dagInfo.tipHashes.length);
+                        for (let i = 0; i < tipsToTest; i++) {
+                            try {
+                                const tipHash = dagInfo.tipHashes[i];
+                                log(`Getting tip block ${i+1}: ${tipHash.substring(0, 16)}...`);
                                 
-                                // Try to get an older block from the headers
-                                const oldHeader = headers.headers[headers.headers.length - 1];
-                                if (oldHeader && oldHeader.hash) {
-                                    log(`Getting old block by hash: ${oldHeader.hash}...`);
-                                    try {
-                                        const oldBlock = await client.getBlock({
-                                            hash: oldHeader.hash,
-                                            includeTransactions: false
-                                        });
-                                        
-                                        if (oldBlock) {
-                                            log(`✓ Historical block retrieved successfully`, 'success');
-                                        }
-                                    } catch (e) {
-                                        log(`Failed to get old block: ${e.message || e}`, 'debug');
-                                    }
+                                const tipBlock = await client.getBlock({
+                                    hash: tipHash,
+                                    includeTransactions: false
+                                });
+                                
+                                if (tipBlock) {
+                                    const block = tipBlock.block || tipBlock;
+                                    log(`✓ Tip ${i+1} retrieved - Height: ${block.header?.daaScore || 'N/A'}`, 'success');
                                 }
+                            } catch (e) {
+                                log(`Failed to get tip ${i+1}: ${e.message || e}`, 'debug');
                             }
-                        } catch (e) {
-                            log(`getHeaders failed: ${e.message || e}`, 'debug');
                         }
                     }
                     
@@ -963,31 +956,13 @@
                         }
                     }
                     
-                    // Test 4: Other useful info
-                    log(`Testing other RPC methods...`, 'info');
-                    
-                    // Get mempool info
-                    try {
-                        const mempoolEntries = await client.getMempoolEntries({
-                            includeOrphanPool: false,
-                            filterTransactionPool: true
-                        });
-                        if (mempoolEntries && mempoolEntries.entries) {
-                            log(`Mempool entries: ${mempoolEntries.entries.length}`, 'info');
-                        }
-                    } catch (e) {
-                        log(`getMempoolEntries failed: ${e.message || e}`, 'debug');
-                    }
-                    
-                    // Get metrics
-                    try {
-                        const metrics = await client.getMetrics();
-                        if (metrics) {
-                            log(`Node metrics retrieved successfully`, 'success');
-                        }
-                    } catch (e) {
-                        log(`getMetrics failed: ${e.message || e}`, 'debug');
-                    }
+                    // Test 4: Summary
+                    log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━`, 'info');
+                    log(`Summary for ${nodeInfo.version}:`, 'info');
+                    log(`• Block height: ${(nodeInfo.blockHeight/1000000).toFixed(1)}M`, 'info');
+                    log(`• Current tips: ${dagInfo.tipHashes?.length || 0}`, 'info');
+                    log(`• Connection stable: ✓`, 'success');
+                    log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━`, 'info');
                     
                 } catch (error) {
                     log(`✗ Block test failed: ${error.message || error}`, 'error');

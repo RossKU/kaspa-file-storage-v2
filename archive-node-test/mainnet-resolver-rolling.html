@@ -222,6 +222,10 @@
                 <div class="stat-value" id="currentSpeed">0</div>
                 <div class="stat-label">Nodes/min</div>
             </div>
+            <div class="stat-card">
+                <div class="stat-value" id="activeConnections">0</div>
+                <div class="stat-label">Active Archives</div>
+            </div>
         </div>
     </div>
 
@@ -262,6 +266,7 @@
         // Discovery state
         let testedNodes = new Map(); // url -> node info
         let archiveNodes = new Map(); // url -> archive node info
+        let activeArchiveConnections = new Map(); // nodeId -> client
         let discoveryStartTime = null;
         let totalAttempts = 0;
         let currentNodeUrl = null;
@@ -293,6 +298,7 @@
             document.getElementById('totalTested').textContent = stats.totalTested;
             document.getElementById('uniqueNodes').textContent = stats.uniqueNodes;
             document.getElementById('archiveCount').textContent = stats.archiveCount;
+            document.getElementById('activeConnections').textContent = activeArchiveConnections.size;
             
             // Calculate nodes per minute
             if (stats.startTime) {
@@ -493,8 +499,8 @@
                 const blockCount = dagInfo.blockCount || dagInfo.virtualDaaScore || 0;
                 const blockCountNum = typeof blockCount === 'bigint' ? Number(blockCount) : blockCount;
                 
-                // Extract node identifier from connection info
-                const nodeId = `${info.serverVersion || 'Unknown'}_${blockCountNum}`;
+                // Extract node identifier from connection info - make it more unique
+                const nodeId = `${info.serverVersion || 'Unknown'}_${blockCountNum}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
                 currentNodeUrl = nodeId;
                 
                 log(`Connected to: ${info.serverVersion || 'Unknown'}`, 'success');
@@ -572,7 +578,22 @@
                     archiveNodes.set(nodeId, nodeInfo);
                     stats.archiveCount = archiveNodes.size;
                     log(`🎉 Archive node #${stats.archiveCount} found!`, 'archive');
+                    
+                    // Keep connection alive for archive nodes
+                    if (activeArchiveConnections.size < 5) {  // Keep up to 5 archive connections
+                        activeArchiveConnections.set(nodeId, client);
+                        nodeInfo.client = client;
+                        log(`📌 Maintaining connection to archive node #${stats.archiveCount}`, 'archive');
+                        currentClient = null;  // Don't disconnect this client
+                    } else {
+                        log(`Maximum archive connections reached (5), will disconnect`, 'info');
+                        await client.disconnect();
+                    }
+                    
                     updateArchiveList();
+                } else {
+                    // Disconnect from non-archive nodes
+                    await client.disconnect();
                 }
                 
                 // Update displays
@@ -583,8 +604,6 @@
                     status: isArchive ? 'ARCHIVE NODE' : 'Regular Node'
                 });
                 
-                // Disconnect
-                await client.disconnect();
                 currentClient = null;
                 
             } catch (error) {
@@ -638,13 +657,21 @@
             
             let html = '';
             for (const [id, node] of archiveNodes) {
+                const isActive = activeArchiveConnections.has(id);
+                const connectionStatus = isActive ? 
+                    '<span style="color: #4CAF50;">🟢 Connected</span>' : 
+                    '<span style="color: #666;">⚫ Disconnected</span>';
+                
                 html += `
                     <div class="node-item archive">
                         <div>
                             <strong>${node.version}</strong><br>
                             <small>Blocks: ${(node.blockHeight/1000000).toFixed(1)}M | Time: ${node.connectionTime}ms</small>
                         </div>
-                        <span class="archive">ARCHIVE</span>
+                        <div style="text-align: right;">
+                            <span class="archive">ARCHIVE</span><br>
+                            <small>${connectionStatus}</small>
+                        </div>
                     </div>
                 `;
             }
@@ -697,6 +724,21 @@
                 } catch (e) {}
             }
             
+            // Close all active archive connections
+            if (activeArchiveConnections.size > 0) {
+                log(`Closing ${activeArchiveConnections.size} active archive connections...`, 'warning');
+                for (const [nodeId, client] of activeArchiveConnections) {
+                    try {
+                        await client.disconnect();
+                        log(`Disconnected from archive: ${nodeId.split('_')[0]}`, 'info');
+                    } catch (e) {
+                        log(`Error disconnecting from ${nodeId}: ${e.message}`, 'error');
+                    }
+                }
+                activeArchiveConnections.clear();
+                updateStats();
+            }
+            
             const duration = Math.round((Date.now() - discoveryStartTime) / 1000);
             log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`, 'info');
             log(`Discovery Summary:`, 'info');
@@ -704,6 +746,7 @@
             log(`• Total attempts: ${totalAttempts}`, 'info');
             log(`• Unique nodes: ${stats.uniqueNodes}`, 'info');
             log(`• Archive nodes: ${stats.archiveCount}`, 'info');
+            log(`• Active connections kept: ${activeArchiveConnections.size}`, 'info');
             log(`• Failed connections: ${stats.failedConnections}`, 'info');
             log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`, 'info');
         }

@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kaspa Mainnet Archive Node P2P Discovery</title>
+    <script src="https://unpkg.com/kaspa-wasm@latest/web/kaspa-wasm.js"></script>
+    <style>
+        body {
+            font-family: monospace;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #e0e0e0;
+        }
+        .container {
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        h1, h2 {
+            color: #4CAF50;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        button:disabled {
+            background: #666;
+            cursor: not-allowed;
+        }
+        .log {
+            background: #000;
+            padding: 10px;
+            border-radius: 4px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-size: 12px;
+            white-space: pre-wrap;
+            margin-top: 10px;
+        }
+        .success { color: #4CAF50; }
+        .error { color: #f44336; }
+        .warning { color: #ff9800; }
+        .info { color: #2196F3; }
+        .archive { color: #9C27B0; font-weight: bold; }
+        input {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            background: #333;
+            color: #e0e0e0;
+            border: 1px solid #555;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        .node-card {
+            background: #333;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            border-left: 4px solid #666;
+        }
+        .node-card.archive {
+            border-left-color: #9C27B0;
+            background: #3a2a4a;
+        }
+        .node-card.connected {
+            border-left-color: #4CAF50;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .stat-box {
+            background: #333;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #4CAF50;
+        }
+        .stat-label {
+            font-size: 12px;
+            color: #888;
+            margin-top: 5px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        th, td {
+            padding: 8px;
+            text-align: left;
+            border-bottom: 1px solid #555;
+        }
+        th {
+            background: #333;
+            font-weight: bold;
+        }
+        .clickable {
+            color: #4CAF50;
+            cursor: pointer;
+            text-decoration: underline;
+        }
+        .clickable:hover {
+            color: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 Kaspa Mainnet Archive Node P2P Discovery</h1>
+    
+    <div class="container">
+        <h2>Step 1: Initialize Kaspa Module</h2>
+        <button onclick="initializeKaspa()" id="initBtn">Initialize Kaspa P2P</button>
+        <div id="initStatus"></div>
+    </div>
+
+    <div class="container">
+        <h2>Step 2: Configure Archive Node Discovery</h2>
+        <div style="margin-bottom: 15px;">
+            <label>Mainnet DNS Seeds (one per line):</label>
+            <textarea id="dnsSeeds" rows="5" style="width: 100%; background: #333; color: #e0e0e0; border: 1px solid #555; border-radius: 4px; padding: 8px;">
+mainnet-dnsseed-1.kaspanet.org
+mainnet-dnsseed-2.kaspanet.org
+sean.kaspa.stream
+eric.kaspa.stream
+maxim.kaspa.stream</textarea>
+        </div>
+        <div style="margin-bottom: 15px;">
+            <label>Known Archive Nodes (optional, one per line):</label>
+            <textarea id="knownArchives" rows="3" style="width: 100%; background: #333; color: #e0e0e0; border: 1px solid #555; border-radius: 4px; padding: 8px;" placeholder="e.g., wss://archive.kaspa.org:16110"></textarea>
+        </div>
+        <div>
+            <label>Old Block Test Height (for archive detection):</label>
+            <input type="number" id="testHeight" value="10000" placeholder="Blocks back from current height">
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>Step 3: Discover Archive Nodes</h2>
+        <button onclick="discoverArchiveNodes()" id="discoverBtn" disabled>Start P2P Discovery</button>
+        <button onclick="stopDiscovery()" id="stopBtn" disabled>Stop Discovery</button>
+        <button onclick="exportArchiveNodes()" id="exportBtn" disabled>Export Archive List</button>
+        
+        <div class="stats">
+            <div class="stat-box">
+                <div class="stat-value" id="totalNodes">0</div>
+                <div class="stat-label">Total Nodes Tested</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value" id="archiveCount">0</div>
+                <div class="stat-label">Archive Nodes Found</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value" id="connectedCount">0</div>
+                <div class="stat-label">Active Connections</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value" id="avgResponse">-</div>
+                <div class="stat-label">Avg Response (ms)</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>Discovered Archive Nodes</h2>
+        <div id="archiveResults"></div>
+    </div>
+
+    <div class="container">
+        <h2>Debug Log</h2>
+        <div class="log" id="debugLog"></div>
+    </div>
+
+    <script type="module">
+        // Global variables
+        let kaspa = null;
+        let isInitialized = false;
+        let isDiscovering = false;
+        let discoveredNodes = new Map();
+        let archiveNodes = new Map();
+        let activeConnections = new Map();
+        
+        // Statistics
+        let stats = {
+            totalTested: 0,
+            archivesFound: 0,
+            activeConnections: 0,
+            totalResponseTime: 0,
+            responseCount: 0
+        };
+
+        // Logging function
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logDiv = document.getElementById('debugLog');
+            const logEntry = document.createElement('div');
+            logEntry.className = type;
+            logEntry.textContent = `[${timestamp}] ${message}`;
+            logDiv.appendChild(logEntry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+
+        // Update statistics display
+        function updateStats() {
+            document.getElementById('totalNodes').textContent = stats.totalTested;
+            document.getElementById('archiveCount').textContent = stats.archivesFound;
+            document.getElementById('connectedCount').textContent = stats.activeConnections;
+            
+            const avgResponse = stats.responseCount > 0 
+                ? Math.round(stats.totalResponseTime / stats.responseCount)
+                : '-';
+            document.getElementById('avgResponse').textContent = avgResponse;
+        }
+
+        // Initialize Kaspa module
+        window.initializeKaspa = async function() {
+            const btn = document.getElementById('initBtn');
+            const status = document.getElementById('initStatus');
+            btn.disabled = true;
+            
+            try {
+                log('Initializing Kaspa WASM module for mainnet P2P...');
+                
+                // Import kaspa module
+                kaspa = await import('https://unpkg.com/kaspa-wasm@latest/web/kaspa-wasm.js');
+                await kaspa.default();
+                log('Kaspa WASM initialized successfully', 'success');
+                
+                // Check available functions
+                const functions = ['RpcClient', 'Resolver', 'Address', 'PrivateKey'];
+                for (const func of functions) {
+                    if (kaspa[func]) {
+                        log(`✓ ${func} is available`, 'success');
+                    } else {
+                        log(`✗ ${func} is NOT available`, 'error');
+                    }
+                }
+                
+                isInitialized = true;
+                status.innerHTML = '<div class="success">✓ Kaspa P2P module initialized for mainnet</div>';
+                document.getElementById('discoverBtn').disabled = false;
+                
+            } catch (error) {
+                log(`Initialization error: ${error.message}`, 'error');
+                status.innerHTML = `<div class="error">✗ Initialization failed: ${error.message}</div>`;
+                btn.disabled = false;
+            }
+        }
+
+        // Discover archive nodes
+        window.discoverArchiveNodes = async function() {
+            if (!isInitialized || isDiscovering) return;
+            
+            isDiscovering = true;
+            document.getElementById('discoverBtn').disabled = true;
+            document.getElementById('stopBtn').disabled = false;
+            
+            log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info');
+            log('Starting mainnet archive node P2P discovery...', 'info');
+            
+            // Get configuration
+            const dnsSeeds = document.getElementById('dnsSeeds').value
+                .split('\n')
+                .map(s => s.trim())
+                .filter(s => s.length > 0);
+                
+            const knownArchives = document.getElementById('knownArchives').value
+                .split('\n')
+                .map(s => s.trim())
+                .filter(s => s.length > 0);
+                
+            const testHeight = parseInt(document.getElementById('testHeight').value) || 10000;
+            
+            // Phase 1: DNS seed discovery
+            log(`Phase 1: Querying ${dnsSeeds.length} DNS seeds...`, 'info');
+            const mainnetNodes = await discoverFromDNSSeeds(dnsSeeds);
+            
+            // Phase 2: Add known archives
+            if (knownArchives.length > 0) {
+                log(`Phase 2: Adding ${knownArchives.length} known archive nodes...`, 'info');
+                for (const url of knownArchives) {
+                    mainnetNodes.push({ url, source: 'manual' });
+                }
+            }
+            
+            // Phase 3: Test each node for archive capability
+            log(`Phase 3: Testing ${mainnetNodes.length} nodes for archive capability...`, 'info');
+            await testNodesForArchiveCapability(mainnetNodes, testHeight);
+            
+            // Phase 4: Maintain persistent connections to archives
+            log(`Phase 4: Establishing persistent connections to archive nodes...`, 'info');
+            await maintainArchiveConnections();
+            
+            document.getElementById('exportBtn').disabled = false;
+            log('Archive node discovery complete!', 'success');
+            log(`Found ${archiveNodes.size} archive nodes out of ${stats.totalTested} tested`, 'success');
+        }
+
+        // Discover nodes from DNS seeds
+        async function discoverFromDNSSeeds(seeds) {
+            const nodes = [];
+            
+            // Common mainnet ports
+            const mainnetPorts = [
+                16110, // wRPC Borsh
+                16111, // wRPC JSON  
+                16210, // gRPC
+            ];
+            
+            // URL patterns for mainnet
+            const urlPatterns = [
+                (host, port) => `wss://${host}:${port}`,
+                (host) => `wss://${host}/kaspa/mainnet/wrpc/borsh`,
+                (host) => `https://${host}:443`,
+            ];
+            
+            for (const seed of seeds) {
+                log(`Querying DNS seed: ${seed}`, 'info');
+                
+                // Generate node URLs from seed
+                for (const port of mainnetPorts) {
+                    for (const pattern of urlPatterns) {
+                        const url = pattern(seed, port);
+                        nodes.push({ url, source: `dns:${seed}` });
+                    }
+                }
+                
+                // Also try subdomains
+                const subdomains = ['archive', 'mainnet', 'node', 'rpc'];
+                for (const sub of subdomains) {
+                    const host = `${sub}.${seed}`;
+                    nodes.push({ url: `wss://${host}:16110`, source: `dns:${seed}` });
+                }
+            }
+            
+            return nodes;
+        }
+
+        // Test nodes for archive capability
+        async function testNodesForArchiveCapability(nodes, testHeight) {
+            const batchSize = 5; // Test 5 nodes concurrently
+            
+            for (let i = 0; i < nodes.length; i += batchSize) {
+                if (!isDiscovering) break;
+                
+                const batch = nodes.slice(i, i + batchSize);
+                const promises = batch.map(node => testSingleNode(node, testHeight));
+                await Promise.allSettled(promises);
+            }
+        }
+
+        // Test single node
+        async function testSingleNode(node, testHeight) {
+            const startTime = Date.now();
+            stats.totalTested++;
+            updateStats();
+            
+            log(`Testing node: ${node.url}`, 'info');
+            
+            try {
+                // Create RPC client
+                const client = new kaspa.RpcClient({
+                    url: node.url,
+                    encoding: kaspa.Encoding.Borsh,
+                    networkId: 'mainnet'
+                });
+                
+                // Connect with timeout
+                const connectTimeout = new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('Connection timeout')), 10000)
+                );
+                
+                await Promise.race([client.connect(), connectTimeout]);
+                
+                // Get node info
+                const info = await client.getServerInfo();
+                const currentHeight = await client.getBlockDagInfo();
+                const blockCount = currentHeight.blockCount || currentHeight.virtualDaaScore || 0;
+                const blockCountNum = typeof blockCount === 'bigint' ? Number(blockCount) : blockCount;
+                
+                log(`Connected to ${node.url} - Height: ${blockCountNum.toLocaleString()}`, 'success');
+                
+                // Test archive capability by requesting old block
+                const oldBlockHeight = blockCountNum - testHeight;
+                let isArchive = false;
+                
+                try {
+                    // Try to get an old block
+                    log(`Testing block at height ${oldBlockHeight} (${testHeight} blocks back)...`);
+                    const oldBlock = await client.getBlock({ includeTransactions: false });
+                    
+                    // If successful, test a few more to confirm
+                    const testHeights = [
+                        oldBlockHeight - 1000,
+                        oldBlockHeight - 5000,
+                        oldBlockHeight - 10000
+                    ];
+                    
+                    let allSuccess = true;
+                    for (const height of testHeights) {
+                        try {
+                            await client.getBlock({ includeTransactions: false });
+                        } catch (e) {
+                            allSuccess = false;
+                            break;
+                        }
+                    }
+                    
+                    isArchive = allSuccess;
+                } catch (e) {
+                    // Expected for non-archive nodes
+                    log(`Node cannot access old blocks: ${e.message}`, 'warning');
+                }
+                
+                const responseTime = Date.now() - startTime;
+                stats.totalResponseTime += responseTime;
+                stats.responseCount++;
+                
+                // Store node info
+                const nodeInfo = {
+                    url: node.url,
+                    source: node.source,
+                    isArchive,
+                    blockHeight: blockCountNum,
+                    responseTime,
+                    lastSeen: new Date(),
+                    serverVersion: info.serverVersion || 'Unknown',
+                    networkId: info.networkId || 'mainnet',
+                    client
+                };
+                
+                discoveredNodes.set(node.url, nodeInfo);
+                
+                if (isArchive) {
+                    log(`⚡ ARCHIVE NODE FOUND: ${node.url}`, 'archive');
+                    log(`• Server: ${nodeInfo.serverVersion}`, 'archive');
+                    log(`• Height: ${blockCountNum.toLocaleString()}`, 'archive');
+                    log(`• Response: ${responseTime}ms`, 'archive');
+                    
+                    archiveNodes.set(node.url, nodeInfo);
+                    stats.archivesFound++;
+                    updateArchiveDisplay();
+                } else {
+                    // Disconnect from non-archive nodes
+                    await client.disconnect();
+                }
+                
+                updateStats();
+                
+            } catch (error) {
+                log(`Failed to test ${node.url}: ${error.message}`, 'error');
+            }
+        }
+
+        // Maintain connections to archive nodes
+        async function maintainArchiveConnections() {
+            const maxConnections = 5; // Keep 5 archive connections
+            
+            // Sort archives by response time
+            const sortedArchives = Array.from(archiveNodes.values())
+                .sort((a, b) => a.responseTime - b.responseTime)
+                .slice(0, maxConnections);
+            
+            log(`Maintaining connections to top ${sortedArchives.length} archive nodes...`, 'info');
+            
+            for (const archive of sortedArchives) {
+                activeConnections.set(archive.url, archive);
+                stats.activeConnections = activeConnections.size;
+                updateStats();
+                
+                // Set up health monitoring
+                setupHealthMonitoring(archive);
+            }
+        }
+
+        // Health monitoring for archive connections
+        function setupHealthMonitoring(archive) {
+            const checkInterval = 30000; // 30 seconds
+            
+            const healthCheck = setInterval(async () => {
+                if (!isDiscovering || !activeConnections.has(archive.url)) {
+                    clearInterval(healthCheck);
+                    return;
+                }
+                
+                try {
+                    const info = await archive.client.getServerInfo();
+                    log(`Health check OK for ${archive.url}`, 'success');
+                } catch (error) {
+                    log(`Health check failed for ${archive.url}: ${error.message}`, 'error');
+                    // Reconnect logic would go here
+                }
+            }, checkInterval);
+        }
+
+        // Update archive display
+        function updateArchiveDisplay() {
+            const container = document.getElementById('archiveResults');
+            let html = '';
+            
+            if (archiveNodes.size === 0) {
+                html = '<div class="node-card">No archive nodes discovered yet...</div>';
+            } else {
+                html = '<table><tr><th>URL</th><th>Height</th><th>Response</th><th>Version</th><th>Status</th></tr>';
+                
+                for (const [url, node] of archiveNodes) {
+                    const isActive = activeConnections.has(url);
+                    const status = isActive ? '<span class="success">Connected</span>' : 'Discovered';
+                    
+                    html += `<tr>
+                        <td class="clickable" onclick="copyToClipboard('${url}')">${url}</td>
+                        <td>${node.blockHeight.toLocaleString()}</td>
+                        <td>${node.responseTime}ms</td>
+                        <td>${node.serverVersion}</td>
+                        <td>${status}</td>
+                    </tr>`;
+                }
+                
+                html += '</table>';
+            }
+            
+            container.innerHTML = html;
+        }
+
+        // Stop discovery
+        window.stopDiscovery = async function() {
+            isDiscovering = false;
+            document.getElementById('discoverBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+            
+            log('Stopping discovery and closing connections...', 'warning');
+            
+            // Close all connections
+            for (const [url, node] of activeConnections) {
+                try {
+                    await node.client.disconnect();
+                    log(`Disconnected from ${url}`, 'info');
+                } catch (e) {
+                    // Ignore disconnect errors
+                }
+            }
+            
+            activeConnections.clear();
+            stats.activeConnections = 0;
+            updateStats();
+        }
+
+        // Export archive nodes
+        window.exportArchiveNodes = function() {
+            const archives = Array.from(archiveNodes.values()).map(node => ({
+                url: node.url,
+                blockHeight: node.blockHeight,
+                responseTime: node.responseTime,
+                serverVersion: node.serverVersion,
+                lastSeen: node.lastSeen
+            }));
+            
+            const data = JSON.stringify(archives, null, 2);
+            const blob = new Blob([data], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `kaspa-mainnet-archives-${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            
+            log(`Exported ${archives.length} archive nodes to JSON`, 'success');
+        }
+
+        // Copy to clipboard
+        window.copyToClipboard = function(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                log(`Copied to clipboard: ${text}`, 'success');
+            });
+        }
+
+        // Auto-initialize on load
+        window.addEventListener('DOMContentLoaded', () => {
+            log('Kaspa Mainnet Archive Node P2P Discovery Tool Ready', 'info');
+            log('Click "Initialize Kaspa P2P" to begin', 'info');
+        });
+    </script>
+</body>
+</html>

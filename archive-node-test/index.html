@@ -296,7 +296,8 @@
                     log(`• Block generation rate: ${blocksPerSecond} blocks/second`, 'info');
                     
                     // Check if this might be an archive node
-                    const archiveThreshold = 15000000; // 15 million blocks
+                    // For testnet-10 running since March, expect ~112M blocks for archive nodes
+                    const archiveThreshold = 100000000; // 100 million blocks for true archive nodes
                     const pruneThreshold = 30; // 30 hours
                     const hoursThreshold = pruneThreshold * blocksPerHour; // 1,080,000 blocks
                     
@@ -325,7 +326,7 @@
                 const blockCount = await client.getBlockCount().catch(() => null);
                 const count = blockCount ? (blockCount.blockCount || blockCount) : 0;
                 const countNum = typeof count === 'bigint' ? Number(count) : count;
-                const isArchive = countNum > 15000000;
+                const isArchive = countNum > 100000000; // 100M blocks for true archive
                 const blocksPerDay = 864000;
                 const daysOfData = countNum / blocksPerDay;
                 
@@ -374,8 +375,12 @@
                 { name: 'fermion-10 (Borsh path)', url: 'wss://fermion-10.kaspa.green/kaspa/testnet-10/wrpc/borsh' },
                 { name: 'testnet10.kaspa.app', url: 'https://testnet10.kaspa.app:443' },
                 
-                // Archive node
+                // Potential archive nodes - trying different ports and paths
                 { name: 'Archive Node (tn10)', url: 'wss://archive-tn10.kaspa.org:17210' },
+                { name: 'Archive (16210)', url: 'wss://archive-tn10.kaspa.org:16210' },
+                { name: 'Archive (16110)', url: 'wss://archive-tn10.kaspa.org:16110' },
+                { name: 'Kaspa Archive', url: 'wss://archive.kaspa.org:17210' },
+                { name: 'TN10 Archive', url: 'wss://tn10-archive.kaspa.org:17210' },
                 
                 // kaspa.stream group (testnet-10 with Borsh path)
                 { name: 'eric-10 (stream)', url: 'wss://eric-10.kaspa.stream/kaspa/testnet-10/wrpc/borsh' },
@@ -515,7 +520,7 @@
                     responseTime,
                     info,
                     blockCount,
-                    isArchive: blockCount > 15000000
+                    isArchive: blockCount > 100000000 // 100M blocks threshold
                 };
                 
             } catch (error) {

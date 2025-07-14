@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kaspa P2P Node Scanner</title>
+    <style>
+        body {
+            font-family: monospace;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #e0e0e0;
+        }
+        .container {
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        h1, h2 {
+            color: #4CAF50;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        button:disabled {
+            background: #666;
+            cursor: not-allowed;
+        }
+        .log {
+            background: #000;
+            padding: 10px;
+            border-radius: 4px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-size: 12px;
+            white-space: pre-wrap;
+            margin-top: 10px;
+        }
+        .success { color: #4CAF50; }
+        .error { color: #f44336; }
+        .warning { color: #ff9800; }
+        .info { color: #2196F3; }
+        .archive { color: #9C27B0; font-weight: bold; }
+        textarea {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            background: #333;
+            color: #e0e0e0;
+            border: 1px solid #555;
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-family: monospace;
+        }
+        .results-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        .results-table th,
+        .results-table td {
+            padding: 8px;
+            text-align: left;
+            border-bottom: 1px solid #555;
+        }
+        .results-table th {
+            background: #333;
+            font-weight: bold;
+        }
+        .results-table tr:hover {
+            background: #333;
+        }
+        .archive-row {
+            background: #3a2a4a;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            background: #333;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #4CAF50;
+        }
+        .stat-label {
+            font-size: 12px;
+            color: #888;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 Kaspa P2P Node Scanner</h1>
+    
+    <div class="container">
+        <h2>Node Configuration</h2>
+        <p>Enter node endpoints to scan. Common patterns:</p>
+        <ul style="font-size: 12px; color: #888;">
+            <li>RPC endpoints: wss://[node].[provider]/kaspa/mainnet/wrpc/borsh</li>
+            <li>Direct ports: [node].[provider]:16110 (will try multiple protocols)</li>
+            <li>Known archives: john.kaspa.red, alex.kaspa.red</li>
+        </ul>
+        <textarea id="nodeList" rows="15" placeholder="Enter nodes to scan (one per line)...">
+# Known working mainnet endpoints
+eric.kaspa.stream/kaspa/mainnet/wrpc/borsh
+maxim.kaspa.stream/kaspa/mainnet/wrpc/borsh
+sean.kaspa.stream/kaspa/mainnet/wrpc/borsh
+troy.kaspa.stream/kaspa/mainnet/wrpc/borsh
+
+# Kaspa.red nodes (archives found here)
+john.kaspa.red/kaspa/mainnet/wrpc/borsh
+mike.kaspa.red/kaspa/mainnet/wrpc/borsh
+paul.kaspa.red/kaspa/mainnet/wrpc/borsh
+alex.kaspa.red/kaspa/mainnet/wrpc/borsh
+
+# Kaspa.green nodes
+jake.kaspa.green/kaspa/mainnet/wrpc/borsh
+mark.kaspa.green/kaspa/mainnet/wrpc/borsh
+adam.kaspa.green/kaspa/mainnet/wrpc/borsh
+liam.kaspa.green/kaspa/mainnet/wrpc/borsh
+
+# Kaspa.blue nodes  
+noah.kaspa.blue/kaspa/mainnet/wrpc/borsh
+ryan.kaspa.blue/kaspa/mainnet/wrpc/borsh
+jack.kaspa.blue/kaspa/mainnet/wrpc/borsh
+luke.kaspa.blue/kaspa/mainnet/wrpc/borsh
+
+# Additional potential nodes
+api.kaspanet.io/kaspa/mainnet/wrpc/borsh
+mainnet.kaspa.org/kaspa/mainnet/wrpc/borsh</textarea>
+        
+        <div style="margin-top: 10px;">
+            <label>
+                <input type="checkbox" id="tryMultipleProtocols" checked>
+                Try multiple protocols (wss, https) if connection fails
+            </label>
+        </div>
+        <div>
+            <label>
+                <input type="checkbox" id="parallelScan" checked>
+                Parallel scanning (5 nodes at once)
+            </label>
+        </div>
+        <div>
+            <label>
+                Archive threshold (blocks): 
+                <input type="number" id="archiveThreshold" value="50000000" style="width: 100px; background: #333; color: #e0e0e0; border: 1px solid #555;">
+            </label>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>Scanner Controls</h2>
+        <button onclick="initializeKaspa()" id="initBtn">Initialize Kaspa</button>
+        <button onclick="startScan()" id="scanBtn" disabled>Start Scan</button>
+        <button onclick="stopScan()" id="stopBtn" disabled>Stop Scan</button>
+        <button onclick="exportResults()" id="exportBtn" disabled>Export Results</button>
+        <button onclick="clearResults()">Clear Results</button>
+        
+        <div class="stats-grid" style="margin-top: 20px;">
+            <div class="stat-card">
+                <div class="stat-value" id="totalNodes">0</div>
+                <div class="stat-label">Total Nodes</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="onlineNodes">0</div>
+                <div class="stat-label">Online</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="archiveNodes">0</div>
+                <div class="stat-label">Archives</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="scanProgress">0%</div>
+                <div class="stat-label">Progress</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>Scan Results</h2>
+        <table class="results-table">
+            <thead>
+                <tr>
+                    <th>Node</th>
+                    <th>Status</th>
+                    <th>Blocks</th>
+                    <th>Type</th>
+                    <th>Response</th>
+                    <th>Version</th>
+                </tr>
+            </thead>
+            <tbody id="resultsBody">
+                <tr><td colspan="6" style="text-align: center; color: #666;">No results yet. Start a scan to discover nodes.</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="container">
+        <h2>Debug Log</h2>
+        <div class="log" id="debugLog"></div>
+    </div>
+
+    <script type="module">
+        let kaspa = null;
+        let isInitialized = false;
+        let isScanning = false;
+        let scanResults = [];
+        let stats = {
+            total: 0,
+            online: 0,
+            archives: 0,
+            scanned: 0
+        };
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logDiv = document.getElementById('debugLog');
+            const logEntry = document.createElement('div');
+            logEntry.className = type;
+            logEntry.textContent = `[${timestamp}] ${message}`;
+            logDiv.appendChild(logEntry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+
+        function updateStats() {
+            document.getElementById('totalNodes').textContent = stats.total;
+            document.getElementById('onlineNodes').textContent = stats.online;
+            document.getElementById('archiveNodes').textContent = stats.archives;
+            const progress = stats.total > 0 ? Math.round((stats.scanned / stats.total) * 100) : 0;
+            document.getElementById('scanProgress').textContent = `${progress}%`;
+        }
+
+        window.initializeKaspa = async function() {
+            const btn = document.getElementById('initBtn');
+            btn.disabled = true;
+            
+            try {
+                log('Initializing Kaspa WASM module...');
+                kaspa = await import('./kaspa-core.js');
+                await kaspa.default('./kaspa-core_bg.wasm');
+                log('Kaspa WASM initialized successfully', 'success');
+                
+                isInitialized = true;
+                document.getElementById('scanBtn').disabled = false;
+                
+            } catch (error) {
+                log(`Initialization error: ${error.message}`, 'error');
+                btn.disabled = false;
+            }
+        }
+
+        window.startScan = async function() {
+            if (!isInitialized || isScanning) return;
+            
+            isScanning = true;
+            scanResults = [];
+            stats = { total: 0, online: 0, archives: 0, scanned: 0 };
+            
+            document.getElementById('scanBtn').disabled = true;
+            document.getElementById('stopBtn').disabled = false;
+            document.getElementById('resultsBody').innerHTML = '';
+            
+            // Parse node list
+            const nodeText = document.getElementById('nodeList').value;
+            const nodes = nodeText.split('\n')
+                .map(line => line.trim())
+                .filter(line => line && !line.startsWith('#'))
+                .map(line => {
+                    // Clean up the node address
+                    return line.replace(/\s+#.*$/, '').trim();
+                });
+            
+            stats.total = nodes.length;
+            updateStats();
+            
+            log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`, 'info');
+            log(`Starting scan of ${nodes.length} nodes...`, 'info');
+            
+            const parallel = document.getElementById('parallelScan').checked;
+            const batchSize = parallel ? 5 : 1;
+            
+            for (let i = 0; i < nodes.length && isScanning; i += batchSize) {
+                const batch = nodes.slice(i, i + batchSize);
+                await Promise.all(batch.map(node => scanNode(node)));
+            }
+            
+            document.getElementById('stopBtn').disabled = true;
+            document.getElementById('exportBtn').disabled = scanResults.length > 0;
+            
+            log(`Scan complete! Found ${stats.online} online nodes, ${stats.archives} archives`, 'success');
+        }
+
+        async function scanNode(nodeAddress) {
+            if (!isScanning) return;
+            
+            const tryMultiple = document.getElementById('tryMultipleProtocols').checked;
+            const archiveThreshold = parseInt(document.getElementById('archiveThreshold').value);
+            
+            log(`Scanning ${nodeAddress}...`);
+            
+            // Build URLs to try
+            const urls = [];
+            
+            if (nodeAddress.includes('/')) {
+                // Already has path
+                urls.push(`wss://${nodeAddress}`);
+                if (tryMultiple) {
+                    urls.push(`https://${nodeAddress}`);
+                }
+            } else {
+                // Just hostname, try common patterns
+                urls.push(`wss://${nodeAddress}/kaspa/mainnet/wrpc/borsh`);
+                if (tryMultiple) {
+                    urls.push(`https://${nodeAddress}/kaspa/mainnet/wrpc/borsh`);
+                    urls.push(`wss://${nodeAddress}:16110`);
+                }
+            }
+            
+            let result = {
+                node: nodeAddress,
+                status: 'offline',
+                blocks: 0,
+                type: 'unknown',
+                responseTime: 0,
+                version: '-',
+                url: ''
+            };
+            
+            // Try each URL
+            for (const url of urls) {
+                try {
+                    const startTime = Date.now();
+                    
+                    const client = new kaspa.RpcClient({
+                        url: url,
+                        networkId: 'mainnet'
+                    });
+                    
+                    const connectTimeout = new Promise((_, reject) => 
+                        setTimeout(() => reject(new Error('Connection timeout')), 10000)
+                    );
+                    
+                    await Promise.race([client.connect(), connectTimeout]);
+                    
+                    const info = await client.getServerInfo();
+                    const dagInfo = await client.getBlockDagInfo();
+                    const blockCount = dagInfo.blockCount || dagInfo.virtualDaaScore || 0;
+                    const blockCountNum = typeof blockCount === 'bigint' ? Number(blockCount) : blockCount;
+                    
+                    result.status = 'online';
+                    result.blocks = blockCountNum;
+                    result.type = blockCountNum > archiveThreshold ? 'archive' : 'pruned';
+                    result.responseTime = Date.now() - startTime;
+                    result.version = info.serverVersion || 'Unknown';
+                    result.url = url;
+                    
+                    stats.online++;
+                    if (result.type === 'archive') {
+                        stats.archives++;
+                        log(`⚡ ARCHIVE NODE FOUND: ${nodeAddress} (${(blockCountNum/1000000).toFixed(1)}M blocks)`, 'archive');
+                    } else {
+                        log(`✓ Online: ${nodeAddress} (${(blockCountNum/1000000).toFixed(1)}M blocks)`, 'success');
+                    }
+                    
+                    await client.disconnect();
+                    break; // Success, don't try other URLs
+                    
+                } catch (error) {
+                    // Try next URL
+                    continue;
+                }
+            }
+            
+            if (result.status === 'offline') {
+                log(`✗ Failed: ${nodeAddress}`, 'error');
+            }
+            
+            scanResults.push(result);
+            stats.scanned++;
+            updateStats();
+            updateResultsTable(result);
+        }
+
+        function updateResultsTable(result) {
+            const tbody = document.getElementById('resultsBody');
+            
+            // Remove placeholder if exists
+            if (tbody.querySelector('td[colspan="6"]')) {
+                tbody.innerHTML = '';
+            }
+            
+            const row = document.createElement('tr');
+            if (result.type === 'archive') {
+                row.className = 'archive-row';
+            }
+            
+            row.innerHTML = `
+                <td>${result.node}</td>
+                <td style="color: ${result.status === 'online' ? '#4CAF50' : '#f44336'}">${result.status}</td>
+                <td>${result.blocks > 0 ? (result.blocks/1000000).toFixed(1) + 'M' : '-'}</td>
+                <td style="color: ${result.type === 'archive' ? '#9C27B0' : '#888'}">${result.type}</td>
+                <td>${result.responseTime > 0 ? result.responseTime + 'ms' : '-'}</td>
+                <td>${result.version}</td>
+            `;
+            
+            tbody.appendChild(row);
+        }
+
+        window.stopScan = function() {
+            isScanning = false;
+            document.getElementById('stopBtn').disabled = true;
+            log('Scan stopped by user', 'warning');
+        }
+
+        window.exportResults = function() {
+            const data = {
+                scanDate: new Date().toISOString(),
+                stats: stats,
+                results: scanResults
+            };
+            
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `kaspa-node-scan-${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            
+            log(`Exported ${scanResults.length} results`, 'success');
+        }
+
+        window.clearResults = function() {
+            scanResults = [];
+            stats = { total: 0, online: 0, archives: 0, scanned: 0 };
+            updateStats();
+            document.getElementById('resultsBody').innerHTML = '<tr><td colspan="6" style="text-align: center; color: #666;">No results yet. Start a scan to discover nodes.</td></tr>';
+            log('Results cleared', 'info');
+        }
+
+        // Initialize on load
+        window.addEventListener('DOMContentLoaded', () => {
+            log('Kaspa P2P Node Scanner Ready', 'info');
+        });
+    </script>
+</body>
+</html>

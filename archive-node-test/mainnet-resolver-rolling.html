@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kaspa Mainnet Resolver Rolling Discovery</title>
+    <style>
+        body {
+            font-family: monospace;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #e0e0e0;
+        }
+        .container {
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        h1, h2 {
+            color: #4CAF50;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        button:disabled {
+            background: #666;
+            cursor: not-allowed;
+        }
+        .log {
+            background: #000;
+            padding: 10px;
+            border-radius: 4px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-size: 12px;
+            white-space: pre-wrap;
+            margin-top: 10px;
+        }
+        .success { color: #4CAF50; }
+        .error { color: #f44336; }
+        .warning { color: #ff9800; }
+        .info { color: #2196F3; }
+        .archive { color: #9C27B0; font-weight: bold; }
+        .rolling { color: #FFC107; }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            background: #333;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #4CAF50;
+        }
+        .stat-label {
+            font-size: 12px;
+            color: #888;
+            margin-top: 5px;
+        }
+        .node-list {
+            max-height: 300px;
+            overflow-y: auto;
+            background: #1a1a1a;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+        .node-item {
+            padding: 8px;
+            margin: 4px 0;
+            background: #2a2a2a;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-left: 4px solid #666;
+        }
+        .node-item.archive {
+            background: #3a2a4a;
+            border-left-color: #9C27B0;
+        }
+        .node-item.testing {
+            border-left-color: #FFC107;
+            opacity: 0.8;
+        }
+        .current-node {
+            background: #333;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            border: 2px solid #4CAF50;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #333;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4CAF50, #8BC34A);
+            transition: width 0.3s ease;
+        }
+        input[type="number"] {
+            background: #333;
+            color: #e0e0e0;
+            border: 1px solid #555;
+            padding: 5px 10px;
+            border-radius: 4px;
+            width: 100px;
+        }
+        .resolver-config {
+            background: #333;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+        .resolver-config label {
+            display: inline-block;
+            width: 200px;
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔄 Kaspa Mainnet Resolver Rolling Discovery</h1>
+    
+    <div class="container">
+        <h2>Step 1: Initialize Kaspa Module</h2>
+        <button onclick="initializeKaspa()" id="initBtn">Initialize Kaspa with Resolver</button>
+        <div id="initStatus"></div>
+    </div>
+
+    <div class="container">
+        <h2>Step 2: Configure Rolling Discovery</h2>
+        <div class="resolver-config">
+            <div>
+                <label>Resolver URL:</label>
+                <input type="text" id="resolverUrl" value="https://resolver.kaspa.org/v1" style="width: 300px; background: #333; color: #e0e0e0; border: 1px solid #555; padding: 5px; border-radius: 4px;">
+            </div>
+            <div>
+                <label>Test Interval (seconds):</label>
+                <input type="number" id="testInterval" value="5" min="1" max="60">
+            </div>
+            <div>
+                <label>Max Nodes to Test:</label>
+                <input type="number" id="maxNodes" value="50" min="10" max="1000">
+            </div>
+            <div>
+                <label>Archive Threshold (blocks):</label>
+                <input type="number" id="archiveThreshold" value="50000000" min="1000000">
+            </div>
+            <div style="margin-top: 10px;">
+                <label>
+                    <input type="checkbox" id="autoSwitch" checked>
+                    Auto-switch to new nodes from Resolver
+                </label>
+            </div>
+            <div>
+                <label>
+                    <input type="checkbox" id="testOldBlocks" checked>
+                    Test historical block access (slower but accurate)
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>Step 3: Start Rolling Discovery</h2>
+        <button onclick="startRollingDiscovery()" id="startBtn" disabled>Start Rolling Discovery</button>
+        <button onclick="stopRollingDiscovery()" id="stopBtn" disabled>Stop Discovery</button>
+        <button onclick="exportResults()" id="exportBtn" disabled>Export Archive Nodes</button>
+        
+        <div class="progress-bar">
+            <div class="progress-fill" id="progressBar" style="width: 0%"></div>
+        </div>
+        
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value" id="totalTested">0</div>
+                <div class="stat-label">Nodes Tested</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="uniqueNodes">0</div>
+                <div class="stat-label">Unique Nodes</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="archiveCount">0</div>
+                <div class="stat-label">Archives Found</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="currentSpeed">0</div>
+                <div class="stat-label">Nodes/min</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>Current Node</h2>
+        <div class="current-node" id="currentNode">
+            <div>Waiting to start...</div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>Discovered Archive Nodes</h2>
+        <div class="node-list" id="archiveList">
+            <div style="text-align: center; color: #666;">No archive nodes discovered yet</div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>All Tested Nodes</h2>
+        <div class="node-list" id="nodeList">
+            <div style="text-align: center; color: #666;">No nodes tested yet</div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>Debug Log</h2>
+        <div class="log" id="debugLog"></div>
+    </div>
+
+    <script type="module">
+        // Global variables
+        let kaspa = null;
+        let isInitialized = false;
+        let isDiscovering = false;
+        let currentClient = null;
+        let resolver = null;
+        
+        // Discovery state
+        let testedNodes = new Map(); // url -> node info
+        let archiveNodes = new Map(); // url -> archive node info
+        let discoveryStartTime = null;
+        let totalAttempts = 0;
+        let currentNodeUrl = null;
+        
+        // Statistics
+        let stats = {
+            totalTested: 0,
+            uniqueNodes: 0,
+            archiveCount: 0,
+            failedConnections: 0,
+            averageBlockHeight: 0,
+            startTime: null
+        };
+
+        // Logging function
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logDiv = document.getElementById('debugLog');
+            const logEntry = document.createElement('div');
+            logEntry.className = type;
+            logEntry.textContent = `[${timestamp}] ${message}`;
+            logDiv.appendChild(logEntry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(`[${type.toUpperCase()}] ${message}`)
+        }
+
+        // Update statistics
+        function updateStats() {
+            document.getElementById('totalTested').textContent = stats.totalTested;
+            document.getElementById('uniqueNodes').textContent = stats.uniqueNodes;
+            document.getElementById('archiveCount').textContent = stats.archiveCount;
+            
+            // Calculate nodes per minute
+            if (stats.startTime) {
+                const elapsed = (Date.now() - stats.startTime) / 1000 / 60; // minutes
+                const speed = elapsed > 0 ? Math.round(stats.totalTested / elapsed) : 0;
+                document.getElementById('currentSpeed').textContent = speed;
+            }
+            
+            // Update progress bar
+            const maxNodes = parseInt(document.getElementById('maxNodes').value);
+            const progress = Math.min((stats.totalTested / maxNodes) * 100, 100);
+            document.getElementById('progressBar').style.width = `${progress}%`;
+        }
+
+        // Initialize Kaspa with Resolver
+        window.initializeKaspa = async function() {
+            const btn = document.getElementById('initBtn');
+            const status = document.getElementById('initStatus');
+            btn.disabled = true;
+            
+            try {
+                log('Initializing Kaspa WASM module with Resolver support...');
+                
+                // Import kaspa module
+                log('Importing kaspa-core.js...');
+                kaspa = await import('./kaspa-core.js');
+                log('kaspa-core.js imported successfully', 'success');
+                
+                // Initialize WASM
+                log('Initializing WASM module...');
+                await kaspa.default('./kaspa-core_bg.wasm');
+                log('WASM initialized successfully', 'success');
+                
+                // Check Resolver availability
+                if (kaspa.Resolver) {
+                    log('✓ Resolver class is available', 'success');
+                } else {
+                    log('✗ Resolver class is NOT available', 'error');
+                    throw new Error('Resolver not available in Kaspa module');
+                }
+                
+                // Test creating resolver
+                const resolverUrl = document.getElementById('resolverUrl').value;
+                log(`Testing Resolver with URL: ${resolverUrl}`);
+                
+                resolver = new kaspa.Resolver({
+                    urls: [resolverUrl]
+                });
+                log('Resolver created successfully', 'success');
+                
+                isInitialized = true;
+                status.innerHTML = '<div class="success">✓ Kaspa module with Resolver initialized</div>';
+                document.getElementById('startBtn').disabled = false;
+                
+            } catch (error) {
+                log(`Initialization error: ${error.message}`, 'error');
+                status.innerHTML = `<div class="error">✗ Initialization failed: ${error.message}</div>`;
+                btn.disabled = false;
+            }
+        }
+
+        // Start rolling discovery
+        window.startRollingDiscovery = async function() {
+            if (!isInitialized || isDiscovering) return;
+            
+            isDiscovering = true;
+            stats.startTime = Date.now();
+            discoveryStartTime = Date.now();
+            
+            document.getElementById('startBtn').disabled = true;
+            document.getElementById('stopBtn').disabled = false;
+            
+            const maxNodes = parseInt(document.getElementById('maxNodes').value);
+            const testInterval = parseInt(document.getElementById('testInterval').value) * 1000;
+            
+            log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info');
+            log('Starting rolling discovery with Resolver...', 'info');
+            log(`Max nodes to test: ${maxNodes}`, 'info');
+            log(`Test interval: ${testInterval/1000}s`, 'info');
+            
+            // Main discovery loop
+            while (isDiscovering && stats.totalTested < maxNodes) {
+                try {
+                    await discoverNextNode();
+                    
+                    // Wait before next node
+                    if (isDiscovering && stats.totalTested < maxNodes) {
+                        log(`Waiting ${testInterval/1000}s before next node...`, 'rolling');
+                        await new Promise(resolve => setTimeout(resolve, testInterval));
+                    }
+                } catch (error) {
+                    log(`Discovery error: ${error.message}`, 'error');
+                    await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5s on error
+                }
+            }
+            
+            log('Rolling discovery complete!', 'success');
+            document.getElementById('exportBtn').disabled = archiveNodes.size === 0;
+        }
+
+        // Discover next node from Resolver
+        async function discoverNextNode() {
+            totalAttempts++;
+            
+            log(`\n━━━ Discovery Attempt #${totalAttempts} ━━━`, 'rolling');
+            
+            try {
+                // Create new RPC client with Resolver
+                log('Creating RPC client with Resolver...', 'info');
+                
+                const client = new kaspa.RpcClient({
+                    resolver: resolver,
+                    networkId: 'mainnet',
+                    encoding: kaspa.Encoding?.Borsh
+                });
+                
+                // Connect (Resolver will automatically select a node)
+                log('Connecting via Resolver (auto-selecting node)...', 'info');
+                const startTime = Date.now();
+                
+                const connectTimeout = new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('Connection timeout')), 15000)
+                );
+                
+                await Promise.race([client.connect(), connectTimeout]);
+                
+                const connectionTime = Date.now() - startTime;
+                log(`Connected in ${connectionTime}ms`, 'success');
+                
+                // Get node info
+                const info = await client.getServerInfo();
+                const dagInfo = await client.getBlockDagInfo();
+                const blockCount = dagInfo.blockCount || dagInfo.virtualDaaScore || 0;
+                const blockCountNum = typeof blockCount === 'bigint' ? Number(blockCount) : blockCount;
+                
+                // Extract node identifier from connection info
+                const nodeId = `${info.serverVersion || 'Unknown'}_${blockCountNum}`;
+                currentNodeUrl = nodeId;
+                
+                log(`Connected to: ${info.serverVersion || 'Unknown'}`, 'success');
+                log(`Network: ${info.networkId || 'mainnet'}`, 'info');
+                log(`Block height: ${blockCountNum.toLocaleString()}`, 'info');
+                
+                // Update current node display
+                updateCurrentNode({
+                    id: nodeId,
+                    version: info.serverVersion,
+                    blocks: blockCountNum,
+                    connectionTime: connectionTime,
+                    status: 'Testing...'
+                });
+                
+                // Check if we've already tested this node
+                if (testedNodes.has(nodeId)) {
+                    log(`Already tested this node, requesting new one...`, 'warning');
+                    await client.disconnect();
+                    return;
+                }
+                
+                // Test archive capability
+                const archiveThreshold = parseInt(document.getElementById('archiveThreshold').value);
+                const testOldBlocks = document.getElementById('testOldBlocks').checked;
+                let isArchive = false;
+                
+                if (testOldBlocks) {
+                    // Test historical block access
+                    log('Testing historical block access...', 'info');
+                    const pruningDepth = 244838;
+                    const testHeight = Math.max(0, blockCountNum - pruningDepth - 10000);
+                    
+                    try {
+                        // Try to get an old block
+                        log(`Attempting to retrieve block at height ${testHeight}...`);
+                        const oldBlock = await client.getBlock({
+                            height: testHeight,
+                            includeTransactions: false
+                        });
+                        
+                        if (oldBlock) {
+                            log(`✓ Can access historical block - ARCHIVE NODE!`, 'archive');
+                            isArchive = true;
+                        }
+                    } catch (error) {
+                        log(`Cannot access historical block - Regular node`, 'info');
+                    }
+                } else {
+                    // Simple threshold check
+                    isArchive = blockCountNum > archiveThreshold;
+                    if (isArchive) {
+                        log(`⚡ High block count (>${archiveThreshold}) - Likely archive node`, 'archive');
+                    }
+                }
+                
+                // Store node info
+                const nodeInfo = {
+                    id: nodeId,
+                    version: info.serverVersion,
+                    networkId: info.networkId,
+                    blockHeight: blockCountNum,
+                    isArchive: isArchive,
+                    connectionTime: connectionTime,
+                    timestamp: new Date(),
+                    isSynced: info.isSynced,
+                    hasUtxoIndex: info.hasUtxoIndex
+                };
+                
+                testedNodes.set(nodeId, nodeInfo);
+                stats.totalTested++;
+                stats.uniqueNodes = testedNodes.size;
+                
+                if (isArchive) {
+                    archiveNodes.set(nodeId, nodeInfo);
+                    stats.archiveCount = archiveNodes.size;
+                    log(`🎉 Archive node #${stats.archiveCount} found!`, 'archive');
+                    updateArchiveList();
+                }
+                
+                // Update displays
+                updateStats();
+                updateNodeList();
+                updateCurrentNode({
+                    ...nodeInfo,
+                    status: isArchive ? 'ARCHIVE NODE' : 'Regular Node'
+                });
+                
+                // Disconnect
+                await client.disconnect();
+                currentClient = null;
+                
+            } catch (error) {
+                log(`Connection failed: ${error.message}`, 'error');
+                stats.failedConnections++;
+                
+                updateCurrentNode({
+                    id: 'Unknown',
+                    status: 'Failed',
+                    error: error.message
+                });
+            }
+        }
+
+        // Update current node display
+        function updateCurrentNode(nodeInfo) {
+            const container = document.getElementById('currentNode');
+            
+            let html = '';
+            if (nodeInfo.error) {
+                html = `
+                    <div style="color: #f44336;">
+                        <strong>Connection Failed</strong><br>
+                        Error: ${nodeInfo.error}
+                    </div>
+                `;
+            } else {
+                const statusColor = nodeInfo.isArchive ? '#9C27B0' : '#4CAF50';
+                html = `
+                    <div>
+                        <strong style="color: ${statusColor};">${nodeInfo.status}</strong><br>
+                        Version: ${nodeInfo.version || 'Unknown'}<br>
+                        Blocks: ${nodeInfo.blocks ? nodeInfo.blocks.toLocaleString() : 'Unknown'}<br>
+                        Connection: ${nodeInfo.connectionTime}ms<br>
+                        ${nodeInfo.isArchive ? '<span class="archive">⚡ ARCHIVE NODE FOUND!</span>' : ''}
+                    </div>
+                `;
+            }
+            
+            container.innerHTML = html;
+        }
+
+        // Update archive list
+        function updateArchiveList() {
+            const container = document.getElementById('archiveList');
+            
+            if (archiveNodes.size === 0) {
+                container.innerHTML = '<div style="text-align: center; color: #666;">No archive nodes discovered yet</div>';
+                return;
+            }
+            
+            let html = '';
+            for (const [id, node] of archiveNodes) {
+                html += `
+                    <div class="node-item archive">
+                        <div>
+                            <strong>${node.version}</strong><br>
+                            <small>Blocks: ${(node.blockHeight/1000000).toFixed(1)}M | Time: ${node.connectionTime}ms</small>
+                        </div>
+                        <span class="archive">ARCHIVE</span>
+                    </div>
+                `;
+            }
+            
+            container.innerHTML = html;
+        }
+
+        // Update all nodes list
+        function updateNodeList() {
+            const container = document.getElementById('nodeList');
+            
+            if (testedNodes.size === 0) {
+                container.innerHTML = '<div style="text-align: center; color: #666;">No nodes tested yet</div>';
+                return;
+            }
+            
+            let html = '';
+            // Show last 10 tested nodes
+            const recentNodes = Array.from(testedNodes.values()).slice(-10).reverse();
+            
+            for (const node of recentNodes) {
+                const nodeClass = node.isArchive ? 'archive' : '';
+                html += `
+                    <div class="node-item ${nodeClass}">
+                        <div>
+                            <strong>${node.version}</strong><br>
+                            <small>Blocks: ${(node.blockHeight/1000000).toFixed(1)}M | ${new Date(node.timestamp).toLocaleTimeString()}</small>
+                        </div>
+                        <span style="color: ${node.isArchive ? '#9C27B0' : '#666'}">
+                            ${node.isArchive ? 'ARCHIVE' : 'Regular'}
+                        </span>
+                    </div>
+                `;
+            }
+            
+            container.innerHTML = html;
+        }
+
+        // Stop rolling discovery
+        window.stopRollingDiscovery = async function() {
+            isDiscovering = false;
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+            
+            log('Stopping rolling discovery...', 'warning');
+            
+            if (currentClient) {
+                try {
+                    await currentClient.disconnect();
+                } catch (e) {}
+            }
+            
+            const duration = Math.round((Date.now() - discoveryStartTime) / 1000);
+            log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`, 'info');
+            log(`Discovery Summary:`, 'info');
+            log(`• Duration: ${duration}s`, 'info');
+            log(`• Total attempts: ${totalAttempts}`, 'info');
+            log(`• Unique nodes: ${stats.uniqueNodes}`, 'info');
+            log(`• Archive nodes: ${stats.archiveCount}`, 'info');
+            log(`• Failed connections: ${stats.failedConnections}`, 'info');
+            log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`, 'info');
+        }
+
+        // Export results
+        window.exportResults = function() {
+            const data = {
+                discoveryDate: new Date().toISOString(),
+                stats: stats,
+                archiveNodes: Array.from(archiveNodes.values()),
+                allNodes: Array.from(testedNodes.values())
+            };
+            
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `kaspa-resolver-discovery-${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            
+            log(`Exported ${archiveNodes.size} archive nodes from ${testedNodes.size} tested`, 'success');
+        }
+
+        // Auto-initialize on load
+        window.addEventListener('DOMContentLoaded', () => {
+            log('Kaspa Resolver Rolling Discovery Ready', 'info');
+            log('This tool uses Resolver to automatically discover and test Kaspa mainnet nodes', 'info');
+        });
+    </script>
+</body>
+</html>

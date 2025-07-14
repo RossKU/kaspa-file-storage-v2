@@ -881,36 +881,25 @@
                 log(`\nTesting ${nodeInfo.version} (${(nodeInfo.blockHeight/1000000).toFixed(1)}M blocks)...`, 'info');
                 
                 try {
-                    // Test 1: Get recent block
-                    const recentHeight = nodeInfo.blockHeight - 1000;
-                    log(`Getting recent block at height ${recentHeight}...`);
+                    // Test 1: Get current block info
+                    log(`Getting current block info...`);
+                    const dagInfo = await client.getBlockDagInfo();
+                    log(`Current block count: ${dagInfo.blockCount}`, 'info');
+                    log(`Tip hashes: ${dagInfo.tipHashes?.length || 0}`, 'debug');
                     
-                    // Debug: Check available methods
-                    log(`Client methods: ${Object.getOwnPropertyNames(Object.getPrototypeOf(client)).join(', ')}`, 'debug');
-                    
-                    // Try different methods to get block
+                    // Get a tip hash to test block retrieval
                     let recentBlock = null;
-                    
-                    // Method 1: Try getBlockByHeight if available
-                    if (client.getBlockByHeight) {
+                    if (dagInfo.tipHashes && dagInfo.tipHashes.length > 0) {
+                        const tipHash = dagInfo.tipHashes[0];
+                        log(`Getting block by hash: ${tipHash}...`);
+                        
                         try {
-                            log(`Using getBlockByHeight...`, 'debug');
-                            recentBlock = await client.getBlockByHeight(recentHeight);
-                        } catch (e) {
-                            log(`getBlockByHeight failed: ${e.message}`, 'debug');
-                        }
-                    }
-                    
-                    // Method 2: Try getBlock with height
-                    if (!recentBlock && client.getBlock) {
-                        try {
-                            log(`Using getBlock with height...`, 'debug');
                             recentBlock = await client.getBlock({
-                                height: recentHeight,
+                                hash: tipHash,
                                 includeTransactions: true
                             });
                         } catch (e) {
-                            log(`getBlock with height failed: ${e.message}`, 'debug');
+                            log(`getBlock failed: ${e.message || e}`, 'debug');
                         }
                     }
                     
@@ -922,16 +911,40 @@
                         log(`  Transactions: ${block.transactions?.length || 0}`, 'debug');
                     }
                     
-                    // Test 2: Get old block (1 year ago)
-                    const oldHeight = Math.max(0, nodeInfo.blockHeight - 31536000); // ~1 year
-                    log(`Getting old block at height ${oldHeight} (~1 year ago)...`);
-                    const oldBlock = await client.getBlock({
-                        height: oldHeight,
-                        includeTransactions: false
-                    });
-                    
-                    if (oldBlock) {
-                        log(`✓ Historical block retrieved successfully`, 'success');
+                    // Test 2: Get headers to find older blocks
+                    if (dagInfo.tipHashes && dagInfo.tipHashes.length > 0) {
+                        log(`Getting headers to find older blocks...`);
+                        try {
+                            const headers = await client.getHeaders({
+                                startHash: dagInfo.tipHashes[0],
+                                limit: 100,
+                                isAscending: false
+                            });
+                            
+                            if (headers && headers.headers && headers.headers.length > 0) {
+                                log(`✓ Got ${headers.headers.length} headers`, 'success');
+                                
+                                // Try to get an older block from the headers
+                                const oldHeader = headers.headers[headers.headers.length - 1];
+                                if (oldHeader && oldHeader.hash) {
+                                    log(`Getting old block by hash: ${oldHeader.hash}...`);
+                                    try {
+                                        const oldBlock = await client.getBlock({
+                                            hash: oldHeader.hash,
+                                            includeTransactions: false
+                                        });
+                                        
+                                        if (oldBlock) {
+                                            log(`✓ Historical block retrieved successfully`, 'success');
+                                        }
+                                    } catch (e) {
+                                        log(`Failed to get old block: ${e.message || e}`, 'debug');
+                                    }
+                                }
+                            }
+                        } catch (e) {
+                            log(`getHeaders failed: ${e.message || e}`, 'debug');
+                        }
                     }
                     
                     // Test 3: Get specific block by hash if provided
@@ -950,12 +963,31 @@
                         }
                     }
                     
-                    // Test 4: Get block DAG info
-                    const dagInfo = await client.getBlockDagInfo();
-                    log(`Current DAG info:`, 'info');
-                    log(`  Virtual parent hashes: ${dagInfo.virtualParentHashes?.length || 0}`, 'debug');
-                    log(`  Tip hashes: ${dagInfo.tipHashes?.length || 0}`, 'debug');
-                    log(`  Difficulty: ${dagInfo.difficulty || 'N/A'}`, 'debug');
+                    // Test 4: Other useful info
+                    log(`Testing other RPC methods...`, 'info');
+                    
+                    // Get mempool info
+                    try {
+                        const mempoolEntries = await client.getMempoolEntries({
+                            includeOrphanPool: false,
+                            filterTransactionPool: true
+                        });
+                        if (mempoolEntries && mempoolEntries.entries) {
+                            log(`Mempool entries: ${mempoolEntries.entries.length}`, 'info');
+                        }
+                    } catch (e) {
+                        log(`getMempoolEntries failed: ${e.message || e}`, 'debug');
+                    }
+                    
+                    // Get metrics
+                    try {
+                        const metrics = await client.getMetrics();
+                        if (metrics) {
+                            log(`Node metrics retrieved successfully`, 'success');
+                        }
+                    } catch (e) {
+                        log(`getMetrics failed: ${e.message || e}`, 'debug');
+                    }
                     
                 } catch (error) {
                     log(`✗ Block test failed: ${error.message || error}`, 'error');

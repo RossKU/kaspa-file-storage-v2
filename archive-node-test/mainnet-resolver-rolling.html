@@ -244,6 +244,10 @@
 
     <div class="container">
         <h2>Discovered Archive Nodes</h2>
+        <div style="margin-bottom: 10px;">
+            <button onclick="testArchiveBlock()" id="testBlockBtn" disabled>Test Block Retrieval on Connected Archives</button>
+            <input type="text" id="testBlockHash" placeholder="Block hash (optional)" style="width: 300px; margin-left: 10px; background: #333; color: #e0e0e0; border: 1px solid #555; padding: 5px; border-radius: 4px;">
+        </div>
         <div class="node-list" id="archiveList">
             <div style="text-align: center; color: #666;">No archive nodes discovered yet</div>
         </div>
@@ -397,20 +401,41 @@
             log(`Max nodes to test: ${maxNodes}`, 'info');
             log(`Test interval: ${testInterval/1000}s`, 'info');
             
-            // Main discovery loop
+            // Main discovery loop with parallel execution
+            const parallelCount = 10; // Test 10 nodes in parallel
+            let activePromises = [];
+            
             while (isDiscovering && stats.totalTested < maxNodes) {
                 try {
-                    await discoverNextNode();
+                    // Fill up to parallelCount concurrent tests
+                    while (activePromises.length < parallelCount && isDiscovering && stats.totalTested < maxNodes) {
+                        const promise = discoverNextNode().catch(error => {
+                            log(`Discovery error: ${error.message}`, 'error');
+                        });
+                        activePromises.push(promise);
+                        
+                        // Small delay between starting each parallel test
+                        await new Promise(resolve => setTimeout(resolve, 200));
+                    }
                     
-                    // Wait before next node
-                    if (isDiscovering && stats.totalTested < maxNodes) {
-                        log(`Waiting ${testInterval/1000}s before next node...`, 'rolling');
+                    // Wait for at least one to complete
+                    if (activePromises.length > 0) {
+                        await Promise.race(activePromises);
+                        // Remove completed promises
+                        activePromises = activePromises.filter(p => p && p.constructor.name === 'Promise');
+                        
+                        // Small delay between batches
                         await new Promise(resolve => setTimeout(resolve, testInterval));
                     }
                 } catch (error) {
-                    log(`Discovery error: ${error.message}`, 'error');
-                    await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5s on error
+                    log(`Discovery batch error: ${error.message}`, 'error');
                 }
+            }
+            
+            // Wait for remaining promises
+            if (activePromises.length > 0) {
+                log(`Waiting for ${activePromises.length} remaining tests...`, 'info');
+                await Promise.allSettled(activePromises);
             }
             
             log('Rolling discovery complete!', 'success');
@@ -672,6 +697,9 @@
                         nodeInfo.client = client;
                         log(`📌 Maintaining connection to archive node #${stats.archiveCount}`, 'archive');
                         currentClient = null;  // Don't disconnect this client
+                        
+                        // Enable block test button when we have archive connections
+                        document.getElementById('testBlockBtn').disabled = false;
                     } else {
                         log(`Maximum archive connections reached (5), will disconnect`, 'info');
                         await client.disconnect();
@@ -857,10 +885,87 @@
             log(`Exported ${archiveNodes.size} archive nodes from ${testedNodes.size} tested`, 'success');
         }
 
+        // Test block retrieval on connected archive nodes
+        window.testArchiveBlock = async function() {
+            if (activeArchiveConnections.size === 0) {
+                log('No active archive connections available', 'error');
+                return;
+            }
+            
+            const blockHash = document.getElementById('testBlockHash').value.trim();
+            
+            log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info');
+            log(`Testing block retrieval on ${activeArchiveConnections.size} archive nodes...`, 'info');
+            
+            for (const [nodeId, client] of activeArchiveConnections) {
+                const nodeInfo = archiveNodes.get(nodeId);
+                log(`\nTesting ${nodeInfo.version} (${(nodeInfo.blockHeight/1000000).toFixed(1)}M blocks)...`, 'info');
+                
+                try {
+                    // Test 1: Get recent block
+                    const recentHeight = nodeInfo.blockHeight - 1000;
+                    log(`Getting recent block at height ${recentHeight}...`);
+                    const recentBlock = await client.getBlock({
+                        height: recentHeight,
+                        includeTransactions: true
+                    });
+                    
+                    if (recentBlock) {
+                        const block = recentBlock.block || recentBlock;
+                        log(`✓ Recent block retrieved successfully`, 'success');
+                        log(`  Hash: ${block.header?.hash || 'N/A'}`, 'debug');
+                        log(`  Timestamp: ${new Date(Number(block.header?.timestamp || 0)).toLocaleString()}`, 'debug');
+                        log(`  Transactions: ${block.transactions?.length || 0}`, 'debug');
+                    }
+                    
+                    // Test 2: Get old block (1 year ago)
+                    const oldHeight = Math.max(0, nodeInfo.blockHeight - 31536000); // ~1 year
+                    log(`Getting old block at height ${oldHeight} (~1 year ago)...`);
+                    const oldBlock = await client.getBlock({
+                        height: oldHeight,
+                        includeTransactions: false
+                    });
+                    
+                    if (oldBlock) {
+                        log(`✓ Historical block retrieved successfully`, 'success');
+                    }
+                    
+                    // Test 3: Get specific block by hash if provided
+                    if (blockHash && blockHash.length === 64) {
+                        log(`Getting block by hash: ${blockHash}...`);
+                        const hashBlock = await client.getBlock({
+                            hash: blockHash,
+                            includeTransactions: true
+                        });
+                        
+                        if (hashBlock) {
+                            const block = hashBlock.block || hashBlock;
+                            log(`✓ Block retrieved by hash successfully`, 'success');
+                            log(`  Height: ${block.header?.daaScore || 'N/A'}`, 'debug');
+                            log(`  Transactions: ${block.transactions?.length || 0}`, 'debug');
+                        }
+                    }
+                    
+                    // Test 4: Get block DAG info
+                    const dagInfo = await client.getBlockDagInfo();
+                    log(`Current DAG info:`, 'info');
+                    log(`  Virtual parent hashes: ${dagInfo.virtualParentHashes?.length || 0}`, 'debug');
+                    log(`  Tip hashes: ${dagInfo.tipHashes?.length || 0}`, 'debug');
+                    log(`  Difficulty: ${dagInfo.difficulty || 'N/A'}`, 'debug');
+                    
+                } catch (error) {
+                    log(`✗ Block test failed: ${error.message}`, 'error');
+                }
+            }
+            
+            log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info');
+        }
+
         // Auto-initialize on load
         window.addEventListener('DOMContentLoaded', () => {
             log('Kaspa Resolver Rolling Discovery Ready', 'info');
             log('This tool uses Resolver to automatically discover and test Kaspa mainnet nodes', 'info');
+            log('Now with 10x parallel testing for faster discovery!', 'info');
         });
     </script>
 </body>

@@ -157,7 +157,7 @@
         <div class="resolver-config">
             <div>
                 <label>Resolver URL:</label>
-                <input type="text" id="resolverUrl" value="https://resolver.kaspa.org/v1" style="width: 300px; background: #333; color: #e0e0e0; border: 1px solid #555; padding: 5px; border-radius: 4px;">
+                <input type="text" id="resolverUrl" value="https://kaspa.stream" style="width: 300px; background: #333; color: #e0e0e0; border: 1px solid #555; padding: 5px; border-radius: 4px;">
             </div>
             <div>
                 <label>Test Interval (seconds):</label>
@@ -329,10 +329,30 @@
                 const resolverUrl = document.getElementById('resolverUrl').value;
                 log(`Testing Resolver with URL: ${resolverUrl}`);
                 
-                resolver = new kaspa.Resolver({
-                    urls: [resolverUrl]
-                });
-                log('Resolver created successfully', 'success');
+                try {
+                    // Create resolver with multiple URLs
+                    const resolverUrls = [
+                        resolverUrl,
+                        'https://kaspa.stream',
+                        'https://api.kaspanet.io'
+                    ];
+                    
+                    log(`Creating Resolver with URLs: ${resolverUrls.join(', ')}`);
+                    resolver = new kaspa.Resolver({
+                        urls: resolverUrls
+                    });
+                    log('Resolver created successfully', 'success');
+                    
+                    // Test resolver by getting node list
+                    log('Testing Resolver.getNode()...');
+                    const testNode = await resolver.getNode();
+                    if (testNode) {
+                        log(`Resolver returned node: ${testNode}`, 'success');
+                    }
+                } catch (e) {
+                    log(`Resolver test warning: ${e.message}`, 'warning');
+                    // Continue anyway - resolver might work during connection
+                }
                 
                 isInitialized = true;
                 status.innerHTML = '<div class="success">✓ Kaspa module with Resolver initialized</div>';
@@ -391,24 +411,62 @@
             log(`\n━━━ Discovery Attempt #${totalAttempts} ━━━`, 'rolling');
             
             try {
-                // Create new RPC client with Resolver
-                log('Creating RPC client with Resolver...', 'info');
-                
-                const client = new kaspa.RpcClient({
-                    resolver: resolver,
-                    networkId: 'mainnet',
-                    encoding: kaspa.Encoding?.Borsh
-                });
-                
-                // Connect (Resolver will automatically select a node)
-                log('Connecting via Resolver (auto-selecting node)...', 'info');
+                // Try different connection methods
+                log('Attempting connection...', 'info');
                 const startTime = Date.now();
                 
-                const connectTimeout = new Promise((_, reject) => 
-                    setTimeout(() => reject(new Error('Connection timeout')), 15000)
-                );
+                let client;
+                let connected = false;
                 
-                await Promise.race([client.connect(), connectTimeout]);
+                // Method 1: Try with Resolver
+                try {
+                    log('Method 1: Creating RPC client with Resolver...', 'info');
+                    client = new kaspa.RpcClient({
+                        resolver: resolver,
+                        networkId: 'mainnet'
+                    });
+                    
+                    const connectTimeout = new Promise((_, reject) => 
+                        setTimeout(() => reject(new Error('Timeout')), 10000)
+                    );
+                    
+                    await Promise.race([client.connect(), connectTimeout]);
+                    connected = true;
+                    log('Connected via Resolver!', 'success');
+                } catch (e1) {
+                    log(`Resolver connection failed: ${e1.message}`, 'warning');
+                    
+                    // Method 2: Try direct URLs from known providers
+                    const directUrls = [
+                        'wss://john.kaspa.red/kaspa/mainnet/wrpc/borsh',
+                        'wss://alex.kaspa.red/kaspa/mainnet/wrpc/borsh',
+                        'wss://eric.kaspa.stream/kaspa/mainnet/wrpc/borsh',
+                        'wss://maxim.kaspa.stream/kaspa/mainnet/wrpc/borsh',
+                        'wss://jake.kaspa.green/kaspa/mainnet/wrpc/borsh',
+                        'wss://noah.kaspa.blue/kaspa/mainnet/wrpc/borsh'
+                    ];
+                    
+                    // Pick a random URL
+                    const randomUrl = directUrls[Math.floor(Math.random() * directUrls.length)];
+                    log(`Method 2: Trying direct URL: ${randomUrl}`, 'info');
+                    
+                    client = new kaspa.RpcClient({
+                        url: randomUrl,
+                        networkId: 'mainnet'
+                    });
+                    
+                    const connectTimeout2 = new Promise((_, reject) => 
+                        setTimeout(() => reject(new Error('Timeout')), 10000)
+                    );
+                    
+                    await Promise.race([client.connect(), connectTimeout2]);
+                    connected = true;
+                    log(`Connected via direct URL!`, 'success');
+                }
+                
+                if (!connected) {
+                    throw new Error('All connection methods failed');
+                }
                 
                 const connectionTime = Date.now() - startTime;
                 log(`Connected in ${connectionTime}ms`, 'success');

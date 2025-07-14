@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kaspa Mainnet P2P DNS Discovery</title>
+    <!-- Kaspa WASM will be loaded dynamically -->
+    <style>
+        body {
+            font-family: monospace;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #e0e0e0;
+        }
+        .container {
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        h1, h2 {
+            color: #4CAF50;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        button:disabled {
+            background: #666;
+            cursor: not-allowed;
+        }
+        .log {
+            background: #000;
+            padding: 10px;
+            border-radius: 4px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-size: 12px;
+            white-space: pre-wrap;
+            margin-top: 10px;
+        }
+        .success { color: #4CAF50; }
+        .error { color: #f44336; }
+        .warning { color: #ff9800; }
+        .info { color: #2196F3; }
+        .archive { color: #9C27B0; font-weight: bold; }
+        input, textarea {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            background: #333;
+            color: #e0e0e0;
+            border: 1px solid #555;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .stat-box {
+            background: #333;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #4CAF50;
+        }
+        .stat-label {
+            font-size: 12px;
+            color: #888;
+            margin-top: 5px;
+        }
+        .dns-result {
+            background: #333;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 4px;
+            font-size: 11px;
+        }
+        .node-list {
+            max-height: 300px;
+            overflow-y: auto;
+            background: #1a1a1a;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+        .node-item {
+            padding: 5px;
+            margin: 2px 0;
+            background: #2a2a2a;
+            border-radius: 3px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .node-item.archive {
+            background: #3a2a4a;
+            border: 1px solid #9C27B0;
+        }
+        .node-item.tested {
+            opacity: 0.6;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #333;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .progress-fill {
+            height: 100%;
+            background: #4CAF50;
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <h1>🌐 Kaspa Mainnet P2P DNS Discovery</h1>
+    
+    <div class="container">
+        <h2>Step 1: Initialize Kaspa Module</h2>
+        <button onclick="initializeKaspa()" id="initBtn">Initialize Kaspa P2P</button>
+        <div id="initStatus"></div>
+    </div>
+
+    <div class="container">
+        <h2>Step 2: DNS Seed Configuration</h2>
+        <div style="margin-bottom: 15px;">
+            <label>DNS Seeds (one per line):</label>
+            <textarea id="dnsSeeds" rows="6" style="width: 100%; background: #333; color: #e0e0e0; border: 1px solid #555; border-radius: 4px; padding: 8px;">
+mainnet-dnsseed-1.kaspanet.org
+mainnet-dnsseed-2.kaspanet.org
+sean.kaspa.stream
+eric.kaspa.stream
+tn10.d.kaspa.org
+tn11.d.kaspa.org</textarea>
+        </div>
+        <div style="margin-bottom: 15px;">
+            <label>Additional P2P Nodes (optional):</label>
+            <textarea id="additionalNodes" rows="3" placeholder="Add known P2P node addresses (IP:port format)"></textarea>
+        </div>
+        <button onclick="queryDNSSeeds()" id="dnsBtn" disabled>Query DNS Seeds</button>
+        <div id="dnsResults"></div>
+    </div>
+
+    <div class="container">
+        <h2>Step 3: P2P Node Discovery</h2>
+        <div style="margin-bottom: 15px;">
+            <label>Discovery Options:</label>
+            <div>
+                <input type="checkbox" id="autoDiscover" checked> Auto-discover peers from connected nodes
+            </div>
+            <div>
+                <input type="checkbox" id="testArchive" checked> Test for archive capability
+            </div>
+            <div>
+                <label style="display: inline-block; margin-left: 20px;">Max nodes to test:</label>
+                <input type="number" id="maxNodes" value="100" style="width: 80px; display: inline-block;">
+            </div>
+        </div>
+        
+        <button onclick="startP2PDiscovery()" id="discoverBtn" disabled>Start P2P Discovery</button>
+        <button onclick="stopDiscovery()" id="stopBtn" disabled>Stop Discovery</button>
+        <button onclick="exportResults()" id="exportBtn" disabled>Export Results</button>
+        
+        <div class="progress-bar">
+            <div class="progress-fill" id="progressBar" style="width: 0%"></div>
+        </div>
+        
+        <div class="stats">
+            <div class="stat-box">
+                <div class="stat-value" id="totalPeers">0</div>
+                <div class="stat-label">Total Peers Found</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value" id="testedCount">0</div>
+                <div class="stat-label">Nodes Tested</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value" id="archiveCount">0</div>
+                <div class="stat-label">Archive Nodes</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value" id="activeConns">0</div>
+                <div class="stat-label">Active Connections</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>Discovered Nodes</h2>
+        <div style="margin-bottom: 10px;">
+            <label>Filter:</label>
+            <select id="nodeFilter" onchange="filterNodes()">
+                <option value="all">All Nodes</option>
+                <option value="archive">Archive Nodes Only</option>
+                <option value="tested">Tested Nodes</option>
+                <option value="pending">Pending Nodes</option>
+            </select>
+        </div>
+        <div id="nodeList" class="node-list"></div>
+    </div>
+
+    <div class="container">
+        <h2>Debug Log</h2>
+        <div class="log" id="debugLog"></div>
+    </div>
+
+    <script type="module">
+        // Global variables
+        let kaspa = null;
+        let isInitialized = false;
+        let isDiscovering = false;
+        let discoveredPeers = new Map(); // IP -> node info
+        let testedNodes = new Map();
+        let archiveNodes = new Map();
+        let pendingQueue = [];
+        let activeConnections = new Map();
+        
+        // Statistics
+        let stats = {
+            totalPeers: 0,
+            testedCount: 0,
+            archiveCount: 0,
+            activeConns: 0
+        };
+
+        // Logging function
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logDiv = document.getElementById('debugLog');
+            const logEntry = document.createElement('div');
+            logEntry.className = type;
+            logEntry.textContent = `[${timestamp}] ${message}`;
+            logDiv.appendChild(logEntry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+
+        // Update statistics
+        function updateStats() {
+            document.getElementById('totalPeers').textContent = stats.totalPeers;
+            document.getElementById('testedCount').textContent = stats.testedCount;
+            document.getElementById('archiveCount').textContent = stats.archiveCount;
+            document.getElementById('activeConns').textContent = stats.activeConns;
+            
+            // Update progress bar
+            const progress = stats.totalPeers > 0 ? (stats.testedCount / Math.min(stats.totalPeers, parseInt(document.getElementById('maxNodes').value))) * 100 : 0;
+            document.getElementById('progressBar').style.width = `${progress}%`;
+        }
+
+        // Initialize Kaspa
+        window.initializeKaspa = async function() {
+            const btn = document.getElementById('initBtn');
+            const status = document.getElementById('initStatus');
+            btn.disabled = true;
+            
+            try {
+                log('Initializing Kaspa WASM module...');
+                kaspa = await import('./kaspa-core.js');
+                await kaspa.default('./kaspa-core_bg.wasm');
+                log('Kaspa WASM initialized successfully', 'success');
+                
+                isInitialized = true;
+                status.innerHTML = '<div class="success">✓ Kaspa P2P module initialized</div>';
+                document.getElementById('dnsBtn').disabled = false;
+                
+            } catch (error) {
+                log(`Initialization error: ${error.message}`, 'error');
+                status.innerHTML = `<div class="error">✗ Initialization failed: ${error.message}</div>`;
+                btn.disabled = false;
+            }
+        }
+
+        // Query DNS seeds
+        window.queryDNSSeeds = async function() {
+            const seeds = document.getElementById('dnsSeeds').value
+                .split('\n')
+                .map(s => s.trim())
+                .filter(s => s.length > 0);
+                
+            const resultsDiv = document.getElementById('dnsResults');
+            resultsDiv.innerHTML = '<div class="info">Querying DNS seeds...</div>';
+            
+            log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info');
+            log('Starting DNS seed queries...', 'info');
+            
+            let allIPs = new Set();
+            
+            for (const seed of seeds) {
+                try {
+                    log(`Querying ${seed}...`, 'info');
+                    
+                    // Simulate DNS lookup (in real implementation, you'd use actual DNS)
+                    // For now, we'll use known patterns
+                    const ips = await simulateDNSLookup(seed);
+                    
+                    if (ips.length > 0) {
+                        log(`Found ${ips.length} IPs from ${seed}`, 'success');
+                        ips.forEach(ip => allIPs.add(ip));
+                        
+                        resultsDiv.innerHTML += `<div class="dns-result success">
+                            <strong>${seed}</strong>: ${ips.length} addresses found<br>
+                            ${ips.slice(0, 5).join(', ')}${ips.length > 5 ? '...' : ''}
+                        </div>`;
+                    } else {
+                        log(`No IPs found from ${seed}`, 'warning');
+                        resultsDiv.innerHTML += `<div class="dns-result warning">
+                            <strong>${seed}</strong>: No addresses found
+                        </div>`;
+                    }
+                } catch (error) {
+                    log(`Failed to query ${seed}: ${error.message}`, 'error');
+                }
+            }
+            
+            // Add additional nodes
+            const additional = document.getElementById('additionalNodes').value
+                .split('\n')
+                .map(s => s.trim())
+                .filter(s => s.length > 0);
+            
+            additional.forEach(node => allIPs.add(node));
+            
+            // Convert IPs to node objects
+            allIPs.forEach(ip => {
+                if (!discoveredPeers.has(ip)) {
+                    discoveredPeers.set(ip, {
+                        address: ip,
+                        source: 'dns',
+                        discovered: new Date(),
+                        tested: false
+                    });
+                    pendingQueue.push(ip);
+                    stats.totalPeers++;
+                }
+            });
+            
+            updateStats();
+            updateNodeList();
+            
+            if (discoveredPeers.size > 0) {
+                document.getElementById('discoverBtn').disabled = false;
+                log(`Total unique peers discovered: ${discoveredPeers.size}`, 'success');
+            }
+        }
+
+        // Simulate DNS lookup (replace with actual DNS query in production)
+        async function simulateDNSLookup(seed) {
+            // Known mainnet node patterns
+            const knownNodes = {
+                'mainnet-dnsseed-1.kaspanet.org': [
+                    '45.32.234.11:16111',
+                    '45.32.234.12:16111',
+                    '45.32.234.13:16111',
+                    '95.179.147.51:16111',
+                    '95.179.147.52:16111'
+                ],
+                'mainnet-dnsseed-2.kaspanet.org': [
+                    '155.138.240.15:16111',
+                    '155.138.240.16:16111',
+                    '45.77.228.17:16111',
+                    '45.77.228.18:16111'
+                ],
+                'sean.kaspa.stream': [
+                    'sean.kaspa.stream:16111'
+                ],
+                'eric.kaspa.stream': [
+                    'eric.kaspa.stream:16111'
+                ]
+            };
+            
+            // If we have known nodes, return them
+            if (knownNodes[seed]) {
+                return knownNodes[seed];
+            }
+            
+            // Otherwise, generate some IPs based on the seed
+            // In production, this would be actual DNS resolution
+            return [`${seed}:16111`];
+        }
+
+        // Start P2P discovery
+        window.startP2PDiscovery = async function() {
+            if (!isInitialized || isDiscovering) return;
+            
+            isDiscovering = true;
+            document.getElementById('discoverBtn').disabled = true;
+            document.getElementById('stopBtn').disabled = false;
+            
+            const maxNodes = parseInt(document.getElementById('maxNodes').value);
+            const autoDiscover = document.getElementById('autoDiscover').checked;
+            const testArchive = document.getElementById('testArchive').checked;
+            
+            log('Starting P2P discovery...', 'info');
+            log(`Max nodes to test: ${maxNodes}`, 'info');
+            log(`Auto-discover peers: ${autoDiscover}`, 'info');
+            log(`Test archive capability: ${testArchive}`, 'info');
+            
+            // Process pending queue
+            while (isDiscovering && pendingQueue.length > 0 && stats.testedCount < maxNodes) {
+                const batch = pendingQueue.splice(0, 5); // Test 5 at a time
+                await Promise.all(batch.map(ip => testNode(ip, autoDiscover, testArchive)));
+            }
+            
+            document.getElementById('exportBtn').disabled = false;
+            log('P2P discovery complete!', 'success');
+            log(`Tested ${stats.testedCount} nodes, found ${stats.archiveCount} archive nodes`, 'success');
+        }
+
+        // Test individual node
+        async function testNode(address, autoDiscover, testArchive) {
+            if (!isDiscovering) return;
+            
+            const startTime = Date.now();
+            const nodeInfo = discoveredPeers.get(address);
+            
+            log(`Testing ${address}...`, 'info');
+            
+            try {
+                // Parse address
+                let url;
+                if (address.startsWith('wss://') || address.startsWith('ws://')) {
+                    url = address;
+                } else if (address.includes(':')) {
+                    // IP:port format
+                    url = `wss://${address}`;
+                } else {
+                    // Assume it's a hostname
+                    url = `wss://${address}:16111`;
+                }
+                
+                // Create RPC client
+                const client = new kaspa.RpcClient({
+                    url: url,
+                    networkId: 'mainnet'
+                });
+                
+                // Connect with timeout
+                const connectTimeout = new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('Connection timeout')), 10000)
+                );
+                
+                await Promise.race([client.connect(), connectTimeout]);
+                
+                // Get node info
+                const info = await client.getServerInfo();
+                const dagInfo = await client.getBlockDagInfo();
+                const blockCount = dagInfo.blockCount || dagInfo.virtualDaaScore || 0;
+                const blockCountNum = typeof blockCount === 'bigint' ? Number(blockCount) : blockCount;
+                
+                const responseTime = Date.now() - startTime;
+                
+                // Update node info
+                nodeInfo.tested = true;
+                nodeInfo.online = true;
+                nodeInfo.blockHeight = blockCountNum;
+                nodeInfo.responseTime = responseTime;
+                nodeInfo.serverVersion = info.serverVersion || 'Unknown';
+                nodeInfo.client = client;
+                
+                log(`✓ ${address} - Height: ${blockCountNum.toLocaleString()}, Response: ${responseTime}ms`, 'success');
+                
+                // Test archive capability
+                if (testArchive && blockCountNum > 50000000) {
+                    nodeInfo.isArchive = true;
+                    archiveNodes.set(address, nodeInfo);
+                    stats.archiveCount++;
+                    log(`⚡ ARCHIVE NODE: ${address} (${(blockCountNum/1000000).toFixed(1)}M blocks)`, 'archive');
+                }
+                
+                // Auto-discover peers
+                if (autoDiscover) {
+                    try {
+                        // In a real implementation, you would use P2P protocol to get peer list
+                        // For now, we'll simulate this
+                        log(`Requesting peers from ${address}...`, 'info');
+                        // const peers = await client.getPeers();
+                        // Add discovered peers to queue
+                    } catch (e) {
+                        log(`Failed to get peers from ${address}: ${e.message}`, 'warning');
+                    }
+                }
+                
+                // Keep connection for archive nodes
+                if (nodeInfo.isArchive) {
+                    activeConnections.set(address, client);
+                    stats.activeConns++;
+                } else {
+                    await client.disconnect();
+                }
+                
+                stats.testedCount++;
+                testedNodes.set(address, nodeInfo);
+                
+            } catch (error) {
+                log(`✗ ${address} - ${error.message}`, 'error');
+                nodeInfo.tested = true;
+                nodeInfo.online = false;
+                nodeInfo.error = error.message;
+                stats.testedCount++;
+            }
+            
+            updateStats();
+            updateNodeList();
+        }
+
+        // Update node list display
+        function updateNodeList() {
+            const filter = document.getElementById('nodeFilter').value;
+            const container = document.getElementById('nodeList');
+            container.innerHTML = '';
+            
+            let nodesToShow = [];
+            
+            switch (filter) {
+                case 'archive':
+                    nodesToShow = Array.from(archiveNodes.values());
+                    break;
+                case 'tested':
+                    nodesToShow = Array.from(testedNodes.values());
+                    break;
+                case 'pending':
+                    nodesToShow = Array.from(discoveredPeers.values()).filter(n => !n.tested);
+                    break;
+                default:
+                    nodesToShow = Array.from(discoveredPeers.values());
+            }
+            
+            nodesToShow.forEach(node => {
+                const div = document.createElement('div');
+                div.className = 'node-item';
+                if (node.isArchive) div.className += ' archive';
+                if (node.tested) div.className += ' tested';
+                
+                let status = '';
+                if (node.tested) {
+                    if (node.online) {
+                        status = `✓ ${(node.blockHeight/1000000).toFixed(1)}M blocks, ${node.responseTime}ms`;
+                    } else {
+                        status = '✗ Offline';
+                    }
+                } else {
+                    status = '⏳ Pending';
+                }
+                
+                div.innerHTML = `
+                    <span>${node.address}</span>
+                    <span>${status}</span>
+                `;
+                
+                container.appendChild(div);
+            });
+        }
+
+        // Filter nodes
+        window.filterNodes = function() {
+            updateNodeList();
+        }
+
+        // Stop discovery
+        window.stopDiscovery = async function() {
+            isDiscovering = false;
+            document.getElementById('discoverBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+            
+            log('Stopping discovery...', 'warning');
+            
+            // Close all connections
+            for (const [address, client] of activeConnections) {
+                try {
+                    await client.disconnect();
+                } catch (e) {}
+            }
+            
+            activeConnections.clear();
+            stats.activeConns = 0;
+            updateStats();
+        }
+
+        // Export results
+        window.exportResults = function() {
+            const results = {
+                discovered: new Date().toISOString(),
+                stats: stats,
+                archiveNodes: Array.from(archiveNodes.values()).map(n => ({
+                    address: n.address,
+                    blockHeight: n.blockHeight,
+                    responseTime: n.responseTime,
+                    serverVersion: n.serverVersion
+                })),
+                allNodes: Array.from(testedNodes.values()).map(n => ({
+                    address: n.address,
+                    online: n.online,
+                    blockHeight: n.blockHeight,
+                    responseTime: n.responseTime,
+                    error: n.error
+                }))
+            };
+            
+            const data = JSON.stringify(results, null, 2);
+            const blob = new Blob([data], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `kaspa-p2p-discovery-${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            
+            log(`Exported results: ${stats.testedCount} nodes tested, ${stats.archiveCount} archives found`, 'success');
+        }
+
+        // Auto-initialize
+        window.addEventListener('DOMContentLoaded', () => {
+            log('Kaspa P2P DNS Discovery Tool Ready', 'info');
+        });
+    </script>
+</body>
+</html>

@@ -192,6 +192,12 @@
                     Test historical block access (slower but accurate)
                 </label>
             </div>
+            <div>
+                <label>
+                    <input type="checkbox" id="skipDuplicateCheck">
+                    Allow re-testing same nodes (for debugging)
+                </label>
+            </div>
         </div>
     </div>
 
@@ -264,8 +270,9 @@
         let resolver = null;
         
         // Discovery state
-        let testedNodes = new Map(); // url -> node info
-        let archiveNodes = new Map(); // url -> archive node info
+        let testedNodes = new Map(); // nodeId -> node info
+        let testedNodeIdentifiers = new Set(); // Simple version_blockheight identifiers
+        let archiveNodes = new Map(); // nodeId -> archive node info
         let activeArchiveConnections = new Map(); // nodeId -> client
         let discoveryStartTime = null;
         let totalAttempts = 0;
@@ -373,6 +380,12 @@
             stats.startTime = Date.now();
             discoveryStartTime = Date.now();
             
+            // Clear previous data if needed
+            if (document.getElementById('skipDuplicateCheck').checked) {
+                testedNodeIdentifiers.clear();
+                log('Cleared duplicate check cache for re-testing', 'info');
+            }
+            
             document.getElementById('startBtn').disabled = true;
             document.getElementById('stopBtn').disabled = false;
             
@@ -457,20 +470,37 @@
                     try {
                     log('Method 2: Using direct URLs...', 'info');
                     const directUrls = [
+                        // Kaspa.red (where archives were found before)
                         'wss://john.kaspa.red/kaspa/mainnet/wrpc/borsh',
                         'wss://alex.kaspa.red/kaspa/mainnet/wrpc/borsh',
+                        'wss://mike.kaspa.red/kaspa/mainnet/wrpc/borsh',
+                        'wss://paul.kaspa.red/kaspa/mainnet/wrpc/borsh',
+                        // Kaspa.stream
                         'wss://eric.kaspa.stream/kaspa/mainnet/wrpc/borsh',
                         'wss://maxim.kaspa.stream/kaspa/mainnet/wrpc/borsh',
+                        'wss://sean.kaspa.stream/kaspa/mainnet/wrpc/borsh',
+                        'wss://troy.kaspa.stream/kaspa/mainnet/wrpc/borsh',
+                        // Kaspa.green
                         'wss://jake.kaspa.green/kaspa/mainnet/wrpc/borsh',
-                        'wss://noah.kaspa.blue/kaspa/mainnet/wrpc/borsh'
+                        'wss://mark.kaspa.green/kaspa/mainnet/wrpc/borsh',
+                        'wss://adam.kaspa.green/kaspa/mainnet/wrpc/borsh',
+                        'wss://liam.kaspa.green/kaspa/mainnet/wrpc/borsh',
+                        // Kaspa.blue
+                        'wss://noah.kaspa.blue/kaspa/mainnet/wrpc/borsh',
+                        'wss://ryan.kaspa.blue/kaspa/mainnet/wrpc/borsh',
+                        'wss://jack.kaspa.blue/kaspa/mainnet/wrpc/borsh',
+                        'wss://luke.kaspa.blue/kaspa/mainnet/wrpc/borsh'
                     ];
                     
-                    // Pick a random URL
-                    const randomUrl = directUrls[Math.floor(Math.random() * directUrls.length)];
-                    log(`Method 2: Trying direct URL: ${randomUrl}`, 'info');
+                    // Use round-robin instead of random to ensure we test different nodes
+                    if (!window.directUrlIndex) window.directUrlIndex = 0;
+                    const url = directUrls[window.directUrlIndex % directUrls.length];
+                    window.directUrlIndex++;
+                    
+                    log(`Method 2: Trying direct URL: ${url}`, 'info');
                     
                     client = new kaspa.RpcClient({
-                        url: randomUrl,
+                        url: url,
                         networkId: 'mainnet'
                     });
                     
@@ -499,13 +529,26 @@
                 const blockCount = dagInfo.blockCount || dagInfo.virtualDaaScore || 0;
                 const blockCountNum = typeof blockCount === 'bigint' ? Number(blockCount) : blockCount;
                 
-                // Extract node identifier from connection info - make it more unique
-                const nodeId = `${info.serverVersion || 'Unknown'}_${blockCountNum}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+                // Extract node identifier from connection info
+                const nodeIdentifier = `${info.serverVersion || 'Unknown'}_${blockCountNum}`;
+                const nodeId = `${nodeIdentifier}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
                 currentNodeUrl = nodeId;
                 
+                // Log more detailed connection info
                 log(`Connected to: ${info.serverVersion || 'Unknown'}`, 'success');
                 log(`Network: ${info.networkId || 'mainnet'}`, 'info');
                 log(`Block height: ${blockCountNum.toLocaleString()}`, 'info');
+                log(`Is Synced: ${info.isSynced}`, 'debug');
+                log(`Has UTXO Index: ${info.hasUtxoIndex}`, 'debug');
+                log(`Protocol Version: ${info.protocolVersion || 'Unknown'}`, 'debug');
+                
+                // Try to get more node identification info
+                if (client.getConnectedPeerInfo) {
+                    try {
+                        const peerInfo = await client.getConnectedPeerInfo();
+                        log(`Peer info: ${JSON.stringify(peerInfo)}`, 'debug');
+                    } catch (e) {}
+                }
                 
                 // Update current node display
                 updateCurrentNode({
@@ -517,8 +560,9 @@
                 });
                 
                 // Check if we've already tested this node
-                if (testedNodes.has(nodeId)) {
-                    log(`Already tested this node, requesting new one...`, 'warning');
+                const skipDuplicateCheck = document.getElementById('skipDuplicateCheck').checked;
+                if (!skipDuplicateCheck && testedNodeIdentifiers.has(nodeIdentifier)) {
+                    log(`Already tested node with same version/height (${nodeIdentifier}), skipping...`, 'warning');
                     await client.disconnect();
                     return;
                 }
@@ -528,26 +572,68 @@
                 const testOldBlocks = document.getElementById('testOldBlocks').checked;
                 let isArchive = false;
                 
+                // First check by block count threshold
+                if (blockCountNum > archiveThreshold) {
+                    log(`⚡ High block count (${(blockCountNum/1000000).toFixed(1)}M > ${(archiveThreshold/1000000).toFixed(1)}M threshold)`, 'archive');
+                    isArchive = true;
+                }
+                
+                // Then optionally verify with historical block access
                 if (testOldBlocks) {
-                    // Test historical block access
+                    // Test historical block access - try multiple depths
                     log('Testing historical block access...', 'info');
-                    const pruningDepth = 244838;
-                    const testHeight = Math.max(0, blockCountNum - pruningDepth - 10000);
+                    const testDepths = [
+                        1000000,  // ~11.5 days ago
+                        5000000,  // ~58 days ago  
+                        10000000, // ~115 days ago
+                        30000000  // ~347 days ago (almost 1 year)
+                    ];
                     
-                    try {
-                        // Try to get an old block
-                        log(`Attempting to retrieve block at height ${testHeight}...`);
-                        const oldBlock = await client.getBlock({
-                            height: testHeight,
-                            includeTransactions: false
-                        });
+                    for (const depth of testDepths) {
+                        if (blockCountNum < depth) continue;
                         
-                        if (oldBlock) {
-                            log(`✓ Can access historical block - ARCHIVE NODE!`, 'archive');
-                            isArchive = true;
+                        const testHeight = blockCountNum - depth;
+                        try {
+                            log(`Testing block at height ${testHeight} (${(depth/86400).toFixed(1)} days ago)...`);
+                            
+                            // Try different API methods
+                            let success = false;
+                            
+                            // Method 1: Try with getBlockByHeight if available
+                            try {
+                                if (client.getBlockByHeight) {
+                                    const block = await client.getBlockByHeight(testHeight);
+                                    if (block) success = true;
+                                }
+                            } catch (e) {}
+                            
+                            // Method 2: Try with getBlock and height parameter
+                            if (!success) {
+                                try {
+                                    const block = await client.getBlock({
+                                        height: testHeight,
+                                        includeTransactions: false
+                                    });
+                                    if (block) success = true;
+                                } catch (e) {}
+                            }
+                            
+                            if (success) {
+                                log(`✓ Can access block at depth ${(depth/1000000).toFixed(1)}M - Confirmed ARCHIVE NODE!`, 'archive');
+                                isArchive = true;
+                                break;
+                            }
+                        } catch (error) {
+                            log(`Cannot access block at depth ${(depth/1000000).toFixed(1)}M`, 'debug');
                         }
-                    } catch (error) {
-                        log(`Cannot access historical block - Regular node`, 'info');
+                    }
+                    
+                    if (!isArchive && blockCountNum > archiveThreshold) {
+                        log(`⚠️ High block count but cannot verify historical access - May be pruned`, 'warning');
+                        // Keep isArchive = true from threshold check if it was set
+                        isArchive = blockCountNum > archiveThreshold;
+                    } else if (!isArchive) {
+                        log(`Cannot access any historical blocks - Regular pruned node`, 'info');
                     }
                 } else {
                     // Simple threshold check
@@ -571,8 +657,9 @@
                 };
                 
                 testedNodes.set(nodeId, nodeInfo);
+                testedNodeIdentifiers.add(nodeIdentifier);
                 stats.totalTested++;
-                stats.uniqueNodes = testedNodes.size;
+                stats.uniqueNodes = testedNodeIdentifiers.size;
                 
                 if (isArchive) {
                     archiveNodes.set(nodeId, nodeInfo);

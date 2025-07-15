@@ -167,22 +167,35 @@ async function discoverNextNode() {
     try {
         // Initialize resolver if needed
         if (!resolver) {
-            if (!kaspa.Resolver) {
-                throw new Error('Kaspa.Resolver not available');
+            try {
+                sendLog('Creating Resolver...', 'debug');
+                if (!kaspa.Resolver) {
+                    throw new Error('Kaspa.Resolver not available');
+                }
+                resolver = new kaspa.Resolver();
+                sendLog('Resolver created', 'debug');
+                
+                // NetworkType might be an enum or object
+                sendLog(`NetworkType object: ${JSON.stringify(kaspa.NetworkType)}`, 'debug');
+                const networkType = kaspa.NetworkType?.Mainnet || 'mainnet';
+                sendLog(`Connecting to ${config.resolverUrl} with network: ${networkType}`, 'debug');
+                
+                await resolver.connect(networkType, config.resolverUrl);
+                sendLog('Resolver connected', 'success');
+            } catch (err) {
+                sendError(`Resolver init error: ${err.message}`, err);
+                throw err;
             }
-            resolver = new kaspa.Resolver();
-            
-            // NetworkType might be an enum or object
-            const networkType = kaspa.NetworkType?.Mainnet || 'mainnet';
-            await resolver.connect(networkType, config.resolverUrl);
         }
         
         // Get next node
+        sendLog(`Getting node at index ${currentIndex}...`, 'debug');
         const node = await resolver.getNode(currentIndex);
         if (!node) {
             sendLog(`No node at index ${currentIndex}`, 'debug');
             return;
         }
+        sendLog(`Got node: ${JSON.stringify(node)}`, 'debug');
         
         const nodeUrl = node.url;
         sendLog(`Testing node ${currentIndex}: ${nodeUrl}`, 'info');
@@ -228,7 +241,8 @@ async function discoverNextNode() {
         
     } catch (error) {
         state.stats.errors++;
-        sendError(`Node ${currentIndex} error: ${error.message}`);
+        sendError(`Node ${currentIndex} error: ${error.message}`, error);
+        sendLog(`Stack trace: ${error.stack}`, 'error');
     }
 }
 

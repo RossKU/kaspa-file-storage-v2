@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa Mainnet Archive Node Discovery v28 - Class-Based Architecture</title>
+    <title>Kaspa Mainnet Resolver Rolling Discovery V28 - Class-Based</title>
     <style>
         body {
             font-family: monospace;
@@ -30,9 +30,8 @@
             margin: 5px;
             border-radius: 4px;
             cursor: pointer;
-            font-family: monospace;
         }
-        button:hover:not(:disabled) {
+        button:hover {
             background: #45a049;
         }
         button:disabled {
@@ -49,27 +48,34 @@
             white-space: pre-wrap;
             margin-top: 10px;
         }
-        .error { color: #ff5252; }
         .success { color: #4CAF50; }
+        .error { color: #f44336; }
+        .warning { color: #ff9800; }
         .info { color: #2196F3; }
-        .warning { color: #FFC107; }
         .archive { color: #9C27B0; font-weight: bold; }
-        .stats {
+        .rolling { color: #FFC107; }
+        .debug { color: #9E9E9E; font-style: italic; }
+        .stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
             gap: 10px;
-            margin: 10px 0;
+            margin-bottom: 20px;
         }
-        .stat-item {
+        .stat-card {
             background: #333;
-            padding: 10px;
-            border-radius: 4px;
+            padding: 15px;
+            border-radius: 8px;
             text-align: center;
         }
         .stat-value {
             font-size: 24px;
             font-weight: bold;
             color: #4CAF50;
+        }
+        .stat-label {
+            font-size: 12px;
+            color: #888;
+            margin-top: 5px;
         }
         .node-list {
             max-height: 300px;
@@ -80,15 +86,29 @@
             margin-top: 10px;
         }
         .node-item {
-            padding: 5px;
-            margin: 2px 0;
-            background: #333;
-            border-radius: 3px;
-            font-size: 12px;
+            padding: 8px;
+            margin: 4px 0;
+            background: #2a2a2a;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-left: 4px solid #666;
         }
-        .archive-node {
-            background: #4a148c;
-            color: white;
+        .node-item.archive {
+            background: #3a2a4a;
+            border-left-color: #9C27B0;
+        }
+        .node-item.testing {
+            border-left-color: #FFC107;
+            opacity: 0.8;
+        }
+        .current-node {
+            background: #333;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            border: 2px solid #4CAF50;
         }
         .progress-bar {
             width: 100%;
@@ -103,446 +123,1078 @@
             background: linear-gradient(90deg, #4CAF50, #8BC34A);
             transition: width 0.3s ease;
         }
+        input[type="number"] {
+            background: #333;
+            color: #e0e0e0;
+            border: 1px solid #555;
+            padding: 5px 10px;
+            border-radius: 4px;
+            width: 100px;
+        }
+        .resolver-config {
+            background: #333;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+        .resolver-config label {
+            display: inline-block;
+            width: 200px;
+            margin: 5px 0;
+        }
+        .worker-indicator {
+            padding: 8px 16px;
+            background: #333;
+            border-radius: 5px;
+            font-size: 14px;
+            border: 2px solid #555;
+            transition: all 0.3s;
+        }
+        .worker-indicator.active {
+            background: #4CAF50;
+            border-color: #4CAF50;
+            color: white;
+            box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+        }
+        .worker-indicator.idle {
+            background: #666;
+            border-color: #666;
+            color: #ccc;
+        }
+        .worker-indicator.disabled {
+            background: #222;
+            border-color: #333;
+            color: #555;
+            opacity: 0.5;
+        }
     </style>
 </head>
 <body>
+    <h1>🔄 Kaspa Mainnet Resolver Rolling Discovery V28</h1>
+    <div style="text-align: center; margin-bottom: 20px; color: #9C27B0;">
+        <strong>Dynamic Worker System</strong> - 5 Workers → Archive Found → Worker Reduction → Auto-Recovery
+    </div>
+    
     <div class="container">
-        <h1>🔍 Kaspa Archive Node Discovery v28</h1>
-        <p>Class-based architecture with mainnet resolver integration</p>
-        
-        <div>
-            <button id="initBtn" onclick="app.initialize()">Initialize Kaspa Module</button>
-            <button id="startBtn" onclick="app.startDiscovery()" disabled>Start Discovery</button>
-            <button id="stopBtn" onclick="app.stopDiscovery()" disabled>Stop Discovery</button>
-            <button id="exportBtn" onclick="app.exportResults()" disabled>Export Results</button>
-            <button id="clearBtn" onclick="app.clearLogs()">Clear Logs</button>
-        </div>
+        <h2>Step 1: Initialize Kaspa Module</h2>
+        <button onclick="app.initializeKaspa()" id="initBtn">Initialize Kaspa with Resolver</button>
+        <div id="initStatus"></div>
+    </div>
 
-        <div class="container">
-            <h2>Discovery Options</h2>
-            <div>
-                <label>
-                    <input type="number" id="maxNodes" value="100" min="10" max="1000">
-                    Max Nodes to Test
-                </label>
-                <label style="margin-left: 20px;">
-                    <input type="number" id="concurrency" value="5" min="1" max="20">
-                    Concurrent Tests
-                </label>
-                <label style="margin-left: 20px;">
-                    <input type="checkbox" id="testOldBlocks" checked>
-                    Test Historical Blocks
-                </label>
-                <label style="margin-left: 20px;">
-                    <input type="checkbox" id="autoStop" checked>
-                    Auto-stop on Archive Found
-                </label>
-            </div>
-        </div>
-
-        <div class="container">
-            <h2>Statistics</h2>
-            <div class="stats">
-                <div class="stat-item">
-                    <div>Total Tested</div>
-                    <div class="stat-value" id="totalTested">0</div>
-                </div>
-                <div class="stat-item">
-                    <div>Archive Nodes</div>
-                    <div class="stat-value archive" id="archiveCount">0</div>
-                </div>
-                <div class="stat-item">
-                    <div>Active Tests</div>
-                    <div class="stat-value" id="activeTests">0</div>
-                </div>
-                <div class="stat-item">
-                    <div>Success Rate</div>
-                    <div class="stat-value" id="successRate">0%</div>
+    <div class="container">
+        <h2>Step 2: Configuration</h2>
+        <div style="background: #1a1a1a; padding: 15px; border-radius: 4px; font-size: 13px;">
+            <div style="color: #4CAF50; margin-bottom: 10px;"><strong>Fixed Configuration:</strong></div>
+            <div style="color: #bbb; line-height: 1.8;">
+                <div style="display: grid; grid-template-columns: 200px 1fr; gap: 8px;">
+                    <div style="color: #888;">Resolver:</div>
+                    <div>kaspa.stream</div>
+                    
+                    <div style="color: #888;">Test Interval:</div>
+                    <div>2 seconds</div>
+                    
+                    <div style="color: #888;">Max Nodes:</div>
+                    <div>10,000</div>
+                    
+                    <div style="color: #888;">Archive Threshold:</div>
+                    <div>50M blocks (~58 days)</div>
+                    
+                    <div style="color: #888;">Auto-switch:</div>
+                    <div style="color: #4CAF50;">✓ Enabled</div>
+                    
+                    <div style="color: #888;">Historical Test:</div>
+                    <div style="color: #4CAF50;">✓ Enabled (1 day + 50% depth)</div>
                 </div>
             </div>
-            <div class="progress-bar">
-                <div class="progress-fill" id="progressBar" style="width: 0%"></div>
-            </div>
-        </div>
-
-        <div class="container">
-            <h2>Archive Nodes Found</h2>
-            <div class="node-list" id="archiveNodeList">
-                <div class="info">No archive nodes discovered yet</div>
-            </div>
-        </div>
-
-        <div class="container">
-            <h2>Discovery Log</h2>
-            <div class="log" id="log"></div>
         </div>
     </div>
 
+    <div class="container">
+        <h2>Worker Status</h2>
+        <div style="display: flex; align-items: center; gap: 20px; margin-bottom: 20px;">
+            <div>
+                <strong>Active Workers:</strong> <span id="activeWorkerCount" style="color: #4CAF50; font-size: 20px;">0</span> / <span id="maxWorkerCount" style="font-size: 20px;">5</span>
+            </div>
+            <div>
+                <strong>Archive Nodes:</strong> <span id="archiveNodeCount" style="color: #9C27B0; font-size: 20px;">0</span> / 5
+            </div>
+        </div>
+        <div id="workerStatus" style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <div class="worker-indicator" id="worker1">Worker 1</div>
+            <div class="worker-indicator" id="worker2">Worker 2</div>
+            <div class="worker-indicator" id="worker3">Worker 3</div>
+            <div class="worker-indicator" id="worker4">Worker 4</div>
+            <div class="worker-indicator" id="worker5">Worker 5</div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>Step 3: Start Rolling Discovery</h2>
+        <button onclick="app.startRollingDiscovery()" id="startBtn" disabled>Start Rolling Discovery</button>
+        <button onclick="app.stopRollingDiscovery(false)" id="stopBtn" disabled>Stop & Disconnect All</button>
+        <button onclick="app.stopRollingDiscovery(true)" id="stopBtn2" disabled style="background: #9C27B0;">Stop & Keep Archives</button>
+        <button onclick="app.exportResults()" id="exportBtn" disabled>Export Archive Nodes</button>
+        
+        <div class="progress-bar">
+            <div class="progress-fill" id="progressBar" style="width: 0%"></div>
+        </div>
+        
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value" id="totalTested">0</div>
+                <div class="stat-label">Nodes Tested</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="uniqueNodes">0</div>
+                <div class="stat-label">Unique Nodes</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="archiveCount">0</div>
+                <div class="stat-label">Archives Found</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="currentSpeed">0</div>
+                <div class="stat-label">Nodes/min</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="activeConnections">0</div>
+                <div class="stat-label">Active Archives</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>Current Node</h2>
+        <div class="current-node" id="currentNode">
+            <div>Waiting to start...</div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>Discovered Archive Nodes</h2>
+        <div style="margin-bottom: 10px;">
+            <button onclick="app.testArchiveBlock()" id="testBlockBtn" disabled>Test Block Retrieval on Connected Archives</button>
+            <input type="text" id="testBlockHash" placeholder="Block hash (64 chars, optional)" style="width: 400px; margin-left: 10px; background: #333; color: #e0e0e0; border: 1px solid #555; padding: 5px; border-radius: 4px;">
+            <div style="margin-top: 5px; font-size: 11px; color: #888;">
+                Example: 0000000000000000000000000000000000000000000000000000000000000000
+            </div>
+        </div>
+        <div class="node-list" id="archiveList">
+            <div style="text-align: center; color: #666;">No archive nodes discovered yet</div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>All Tested Nodes</h2>
+        <div class="node-list" id="nodeList">
+            <div style="text-align: center; color: #666;">No nodes tested yet</div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>Debug Log</h2>
+        <div class="log" id="debugLog"></div>
+    </div>
+
     <script type="module">
-        // Archive Node Discovery Class - Encapsulates all discovery logic
+        // ArchiveNodeDiscovery class - minimal encapsulation of v18 logic
         class ArchiveNodeDiscovery {
             constructor() {
+                // Global variables from v18
                 this.kaspa = null;
-                this.isRunning = false;
-                this.discoveredNodes = new Map();
+                this.isInitialized = false;
+                this.isDiscovering = false;
+                this.maintainArchives = false;
+                this.currentClient = null;
+                this.resolver = null;
+                
+                // Fixed configuration (from v18)
+                this.CONFIG = {
+                    resolverUrl: 'https://kaspa.stream',
+                    testInterval: 2,
+                    maxNodes: 10000,
+                    archiveThreshold: 50000000,
+                    autoSwitch: true,
+                    testOldBlocks: true,
+                    skipDuplicateCheck: false
+                };
+                
+                // Discovery state (from v18)
+                this.testedNodes = new Map();
+                this.testedNodeIdentifiers = new Set();
                 this.archiveNodes = new Map();
+                this.activeArchiveConnections = new Map();
+                this.discoveryStartTime = null;
+                this.totalAttempts = 0;
+                this.currentNodeUrl = null;
+                this.keepAliveInterval = null;
+                
+                // Worker management (from v18)
+                this.workers = new Map();
+                this.activeWorkerCount = 0;
+                this.workerIdCounter = 1;
+                this.maxConcurrentWorkers = 5;
+                this.workerRestartQueue = [];
+                
+                // Statistics (from v18)
                 this.stats = {
                     totalTested: 0,
+                    uniqueNodes: 0,
                     archiveCount: 0,
-                    activeTasks: 0,
-                    successCount: 0
+                    failedConnections: 0,
+                    averageBlockHeight: 0,
+                    startTime: null
                 };
-                this.config = {
-                    maxNodes: 100,
-                    concurrency: 5,
-                    testOldBlocks: true,
-                    autoStop: true,
-                    archiveThreshold: 8000000,
-                    blocksPerDay: 24 * 60 * 60, // 1 BPS
-                    medianDepth: 1209600 // ~14 days
-                };
-                this.abortController = null;
             }
 
-            async initialize() {
-                try {
-                    this.log('Initializing Kaspa WASM module...', 'info');
-                    
-                    // Dynamic import of Kaspa module
-                    const module = await import('./kaspa-core.js');
-                    await module.default('./kaspa-core_bg.wasm');
-                    this.kaspa = module;
-                    
-                    // Test basic functionality
-                    const testResolver = new this.kaspa.Resolver();
-                    this.log('✅ Kaspa module initialized successfully', 'success');
-                    
-                    return true;
-                } catch (error) {
-                    this.log(`❌ Initialization failed: ${error.message}`, 'error');
-                    return false;
-                }
+            // All methods below are copied from v18 with minimal changes
+            log(message, type = 'info') {
+                const timestamp = new Date().toLocaleTimeString();
+                const logDiv = document.getElementById('debugLog');
+                const logEntry = document.createElement('div');
+                logEntry.className = type;
+                logEntry.textContent = `[${timestamp}] ${message}`;
+                logDiv.appendChild(logEntry);
+                logDiv.scrollTop = logDiv.scrollHeight;
+                console.log(`[${type.toUpperCase()}] ${message}`)
             }
 
-            async startDiscovery() {
-                if (this.isRunning) {
-                    this.log('Discovery already running', 'warning');
-                    return;
-                }
-
-                this.isRunning = true;
-                this.abortController = new AbortController();
-                this.updateConfig();
+            calculateActiveWorkers() {
+                return Math.max(0, 5 - this.activeArchiveConnections.size);
+            }
+            
+            updateWorkerDisplay() {
+                const targetWorkers = this.calculateActiveWorkers();
+                document.getElementById('activeWorkerCount').textContent = this.activeWorkerCount;
+                document.getElementById('maxWorkerCount').textContent = targetWorkers;
+                document.getElementById('archiveNodeCount').textContent = this.activeArchiveConnections.size;
                 
-                this.log('🚀 Starting archive node discovery...', 'info');
-                this.log(`Configuration: Max nodes: ${this.config.maxNodes}, Concurrency: ${this.config.concurrency}`, 'info');
-                
-                try {
-                    await this.discoverNodes();
-                } catch (error) {
-                    if (error.name !== 'AbortError') {
-                        this.log(`Discovery error: ${error.message}`, 'error');
+                for (let i = 1; i <= 5; i++) {
+                    const indicator = document.getElementById(`worker${i}`);
+                    if (i <= targetWorkers && this.workers.has(i) && this.workers.get(i).status === 'active') {
+                        indicator.className = 'worker-indicator active';
+                    } else if (i <= targetWorkers) {
+                        indicator.className = 'worker-indicator idle';
+                    } else {
+                        indicator.className = 'worker-indicator disabled';
                     }
-                } finally {
-                    this.isRunning = false;
-                    this.log('Discovery process completed', 'info');
                 }
             }
-
-            async discoverNodes() {
-                const nodeQueue = [];
-                let processedCount = 0;
+            
+            cacheNodeInfo(nodeInfo) {
+                try {
+                    const cache = JSON.parse(localStorage.getItem('kaspaNodeCache') || '{}');
+                    const identifier = `${nodeInfo.version}_${nodeInfo.blockHeight}`;
+                    cache[identifier] = {
+                        version: nodeInfo.version,
+                        blockHeight: nodeInfo.blockHeight,
+                        isArchive: nodeInfo.isArchive,
+                        timestamp: Date.now()
+                    };
+                    localStorage.setItem('kaspaNodeCache', JSON.stringify(cache));
+                    this.log(`Cached node info: ${identifier}`, 'debug');
+                } catch (e) {
+                    this.log(`Failed to cache node info: ${e.message}`, 'error');
+                }
+            }
+            
+            getCachedNodes() {
+                try {
+                    const cache = JSON.parse(localStorage.getItem('kaspaNodeCache') || '{}');
+                    return Object.keys(cache).filter(id => !this.testedNodeIdentifiers.has(id));
+                } catch (e) {
+                    return [];
+                }
+            }
+            
+            startKeepAlive() {
+                if (this.keepAliveInterval) return;
                 
-                // Create a pool of concurrent discovery tasks
-                const discoveryPool = [];
+                this.log('Starting keepalive mechanism for archive connections', 'info');
                 
-                while (this.isRunning && processedCount < this.config.maxNodes) {
-                    // Maintain concurrent discovery tasks
-                    while (discoveryPool.length < this.config.concurrency && 
-                           processedCount + discoveryPool.length < this.config.maxNodes &&
-                           this.isRunning) {
-                        
-                        const taskPromise = this.discoverSingleNode(processedCount + discoveryPool.length)
-                            .then(result => {
-                                if (result && result.isArchive && this.config.autoStop) {
-                                    this.log('🎯 Archive node found! Auto-stopping discovery...', 'archive');
-                                    this.stopDiscovery();
-                                }
-                                return result;
-                            })
-                            .catch(error => {
-                                this.log(`Task error: ${error.message}`, 'error');
-                                return null;
-                            });
-                        
-                        discoveryPool.push(taskPromise);
+                this.keepAliveInterval = setInterval(async () => {
+                    if (this.activeArchiveConnections.size === 0) {
+                        this.stopKeepAlive();
+                        return;
                     }
                     
-                    // Wait for at least one task to complete
-                    if (discoveryPool.length > 0) {
-                        const completedTask = await Promise.race(discoveryPool);
-                        const index = discoveryPool.findIndex(p => p === completedTask || 
-                            p.then ? false : true);
-                        if (index !== -1) {
-                            discoveryPool.splice(index, 1);
-                            processedCount++;
-                            this.updateProgress(processedCount);
+                    for (const [nodeId, client] of this.activeArchiveConnections) {
+                        try {
+                            await client.getServerInfo();
+                            if (Math.random() < 0.2) {
+                                this.log(`Keepalive: ${this.activeArchiveConnections.size} archive connections active`, 'debug');
+                            }
+                        } catch (e) {
+                            this.log(`Archive connection lost: ${nodeId.split('_')[0]}`, 'error');
+                            this.activeArchiveConnections.delete(nodeId);
+                            this.updateStats();
+                            this.updateArchiveList();
+                            this.updateWorkerDisplay();
+                            
+                            if (this.isDiscovering || this.maintainArchives) {
+                                this.log(`Scheduling worker restart in 3 seconds...`, 'info');
+                                setTimeout(() => {
+                                    if ((this.isDiscovering || this.maintainArchives) && this.calculateActiveWorkers() > this.activeWorkerCount) {
+                                        this.spawnWorker();
+                                    }
+                                }, 3000);
+                            }
+                            
+                            if (this.activeArchiveConnections.size === 0) {
+                                this.stopKeepAlive();
+                            }
                         }
                     }
-                    
-                    // Check abort signal
-                    if (this.abortController?.signal.aborted) {
+                }, 20000);
+            }
+            
+            stopKeepAlive() {
+                if (this.keepAliveInterval) {
+                    clearInterval(this.keepAliveInterval);
+                    this.keepAliveInterval = null;
+                    this.log('Stopped keepalive mechanism', 'info');
+                }
+            }
+            
+            updateStats() {
+                document.getElementById('totalTested').textContent = this.stats.totalTested;
+                document.getElementById('uniqueNodes').textContent = this.stats.uniqueNodes;
+                document.getElementById('archiveCount').textContent = this.stats.archiveCount;
+                document.getElementById('activeConnections').textContent = this.activeArchiveConnections.size;
+                
+                if (this.stats.startTime) {
+                    const elapsed = (Date.now() - this.stats.startTime) / 1000 / 60;
+                    const speed = elapsed > 0 ? Math.round(this.stats.totalTested / elapsed) : 0;
+                    document.getElementById('currentSpeed').textContent = speed;
+                }
+                
+                const maxNodes = this.CONFIG.maxNodes;
+                const progress = Math.min((this.stats.totalTested / maxNodes) * 100, 100);
+                document.getElementById('progressBar').style.width = `${progress}%`;
+                
+                this.updateWorkerDisplay();
+            }
+
+            async spawnWorker() {
+                const targetWorkers = this.calculateActiveWorkers();
+                if (this.activeWorkerCount >= targetWorkers) {
+                    this.log(`Worker limit reached (${this.activeWorkerCount}/${targetWorkers})`, 'debug');
+                    return;
+                }
+                
+                let workerId = null;
+                for (let i = 1; i <= 5; i++) {
+                    if (!this.workers.has(i) || this.workers.get(i).status !== 'active') {
+                        workerId = i;
                         break;
                     }
                 }
                 
-                // Wait for remaining tasks
-                if (discoveryPool.length > 0) {
-                    this.log('Waiting for remaining tasks to complete...', 'info');
-                    await Promise.allSettled(discoveryPool);
+                if (!workerId) return;
+                
+                this.log(`Spawning worker ${workerId}`, 'info');
+                this.activeWorkerCount++;
+                
+                const workerPromise = this.runWorker(workerId);
+                this.workers.set(workerId, { status: 'active', promise: workerPromise });
+                this.updateWorkerDisplay();
+                
+                workerPromise.finally(() => {
+                    this.activeWorkerCount--;
+                    this.workers.set(workerId, { status: 'idle' });
+                    this.updateWorkerDisplay();
+                    this.log(`Worker ${workerId} completed`, 'debug');
+                    
+                    if ((this.isDiscovering || this.maintainArchives) && this.calculateActiveWorkers() > this.activeWorkerCount) {
+                        if (this.maintainArchives && !this.isDiscovering) {
+                            setTimeout(() => this.spawnWorker(), 1000);
+                        } else if (this.stats.totalTested < this.CONFIG.maxNodes) {
+                            setTimeout(() => this.spawnWorker(), 1000);
+                        }
+                    }
+                });
+            }
+            
+            async runWorker(workerId) {
+                try {
+                    await this.discoverNextNode(workerId);
+                    
+                    const testInterval = this.CONFIG.testInterval * 1000;
+                    await new Promise(resolve => setTimeout(resolve, testInterval));
+                } catch (error) {
+                    this.log(`Worker ${workerId} error: ${error.message}`, 'error');
+                }
+            }
+            
+            stopAllWorkers() {
+                this.log('Stopping all workers...', 'warning');
+                for (const [workerId, worker] of this.workers) {
+                    if (worker.status === 'active') {
+                        worker.status = 'stopping';
+                    }
+                }
+                this.activeWorkerCount = 0;
+                this.workers.clear();
+                this.updateWorkerDisplay();
+            }
+            
+            async initializeKaspa() {
+                const btn = document.getElementById('initBtn');
+                const status = document.getElementById('initStatus');
+                btn.disabled = true;
+                
+                try {
+                    this.log('Initializing Kaspa WASM module with Resolver support...');
+                    
+                    this.log('Importing kaspa-core.js...');
+                    this.kaspa = await import('./kaspa-core.js');
+                    this.log('kaspa-core.js imported successfully', 'success');
+                    
+                    this.log('Initializing WASM module...');
+                    await this.kaspa.default('./kaspa-core_bg.wasm');
+                    this.log('WASM initialized successfully', 'success');
+                    
+                    this.log('Checking available Kaspa classes...', 'info');
+                    const availableClasses = ['RpcClient', 'Resolver', 'Encoding', 'PrivateKey', 'Address'];
+                    for (const cls of availableClasses) {
+                        if (this.kaspa[cls]) {
+                            this.log(`✓ ${cls} is available`, 'success');
+                        } else {
+                            this.log(`✗ ${cls} is NOT available`, 'error');
+                        }
+                    }
+                    
+                    try {
+                        this.log('Testing Resolver creation...', 'info');
+                        const testResolver = new this.kaspa.Resolver();
+                        this.log('✓ Resolver created successfully', 'success');
+                        this.log(`Resolver type: ${typeof testResolver}`, 'debug');
+                        this.log(`Resolver methods: ${Object.getOwnPropertyNames(Object.getPrototypeOf(testResolver)).join(', ')}`, 'debug');
+                    } catch (resolverError) {
+                        this.log(`Resolver creation error: ${resolverError.message}`, 'error');
+                    }
+                    
+                    this.isInitialized = true;
+                    status.innerHTML = '<div class="success">✓ Kaspa module with Resolver initialized</div>';
+                    document.getElementById('startBtn').disabled = false;
+                    
+                } catch (error) {
+                    this.log(`Initialization error: ${error.message}`, 'error');
+                    status.innerHTML = `<div class="error">✗ Initialization failed: ${error.message}</div>`;
+                    btn.disabled = false;
                 }
             }
 
-            async discoverSingleNode(nodeIndex) {
-                this.stats.activeTasks++;
-                this.updateStats();
+            async startRollingDiscovery() {
+                if (!this.isInitialized || this.isDiscovering) return;
+                
+                this.isDiscovering = true;
+                this.maintainArchives = true;
+                this.stats.startTime = Date.now();
+                this.discoveryStartTime = Date.now();
+                
+                this.workers.clear();
+                this.activeWorkerCount = 0;
+                
+                if (this.CONFIG.skipDuplicateCheck) {
+                    this.testedNodeIdentifiers.clear();
+                    this.log('Cleared duplicate check cache for re-testing', 'info');
+                }
+                
+                document.getElementById('startBtn').disabled = true;
+                document.getElementById('stopBtn').disabled = false;
+                document.getElementById('stopBtn2').disabled = false;
+                
+                const maxNodes = this.CONFIG.maxNodes;
+                const testInterval = this.CONFIG.testInterval * 1000;
+                
+                this.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info');
+                this.log('Starting Dynamic Worker Discovery System', 'info');
+                this.log(`Max nodes to test: ${maxNodes}`, 'info');
+                this.log(`Test interval: ${testInterval/1000}s`, 'info');
+                this.log(`Initial workers: ${this.calculateActiveWorkers()}`, 'info');
+                
+                this.updateWorkerDisplay();
+                
+                const initialWorkers = this.calculateActiveWorkers();
+                for (let i = 0; i < initialWorkers; i++) {
+                    await this.spawnWorker();
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                }
+                
+                while (this.isDiscovering || this.maintainArchives) {
+                    if (!this.maintainArchives && this.stats.totalTested >= maxNodes) break;
+                    if (!this.isDiscovering && !this.maintainArchives) break;
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    
+                    const targetWorkers = this.calculateActiveWorkers();
+                    if (this.activeWorkerCount < targetWorkers) {
+                        this.spawnWorker();
+                    }
+                    
+                    if (this.activeArchiveConnections.size >= 5 && this.activeWorkerCount === 0) {
+                        if (this.isDiscovering) {
+                            this.log('🎯 5 archive nodes found! Switching to maintenance mode...', 'success');
+                            this.log('Workers will automatically restart if any archive connection is lost', 'info');
+                            this.isDiscovering = false;
+                        }
+                        
+                        await new Promise(resolve => setTimeout(resolve, 5000));
+                    }
+                }
+                
+                if (!this.maintainArchives || (this.maintainArchives && this.activeArchiveConnections.size >= 5)) {
+                    let waitCount = 0;
+                    while (this.activeWorkerCount > 0 && waitCount < 30) {
+                        this.log(`Waiting for ${this.activeWorkerCount} workers to finish...`, 'info');
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                        waitCount++;
+                    }
+                    
+                    this.log('Rolling discovery complete!', 'success');
+                    document.getElementById('exportBtn').disabled = this.archiveNodes.size === 0;
+                    
+                    await this.stopRollingDiscovery(true);
+                } else {
+                    this.log('Continuing in maintenance mode to find more archive nodes...', 'info');
+                }
+                
+                if (this.maintainArchives && this.activeArchiveConnections.size < 5) {
+                    this.log(`Maintenance mode active: Need ${5 - this.activeArchiveConnections.size} more archive nodes`, 'info');
+                    const neededWorkers = this.calculateActiveWorkers();
+                    for (let i = 0; i < neededWorkers; i++) {
+                        await this.spawnWorker();
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                    }
+                }
+            }
+
+            async discoverNextNode(workerId = 0) {
+                this.totalAttempts++;
+                
+                const workerPrefix = workerId > 0 ? `[Worker ${workerId}] ` : '';
+                this.log(`\n━━━ ${workerPrefix}Discovery Attempt #${this.totalAttempts} ━━━`, 'rolling');
                 
                 try {
-                    // Create new RPC client with resolver
-                    const client = new this.kaspa.RpcClient({
-                        resolver: new this.kaspa.Resolver(),
-                        networkId: 'mainnet'
+                    this.log(`${workerPrefix}Attempting connection...`, 'info');
+                    const startTime = Date.now();
+                    
+                    let client;
+                    let connected = false;
+                    
+                    try {
+                        this.log('Creating RPC client with Resolver...', 'info');
+                        client = new this.kaspa.RpcClient({
+                            resolver: new this.kaspa.Resolver(),
+                            networkId: 'mainnet'
+                        });
+                        
+                        this.log('Connecting to mainnet via Resolver...');
+                        
+                        this.log(`Client object created: ${typeof client}`, 'debug');
+                        this.log(`Client.connect method: ${typeof client.connect}`, 'debug');
+                        
+                        const connectTimeout = new Promise((_, reject) => 
+                            setTimeout(() => reject(new Error('Connection timeout after 15s')), 15000)
+                        );
+                        
+                        try {
+                            await Promise.race([client.connect(), connectTimeout]);
+                            connected = true;
+                            this.log('Connected via Resolver!', 'success');
+                        } catch (connectError) {
+                            this.log(`Connect error details: ${connectError.message}`, 'error');
+                            this.log(`Error stack: ${connectError.stack}`, 'debug');
+                            throw connectError;
+                        }
+                    } catch (e1) {
+                        this.log(`Resolver connection failed: ${e1.message}`, 'warning');
+                        connected = false;
+                    }
+                    
+                    if (!connected) {
+                        throw new Error('Resolver connection failed');
+                    }
+                    
+                    const connectionTime = Date.now() - startTime;
+                    this.log(`${workerPrefix}Connected in ${connectionTime}ms`, 'success');
+                    
+                    const info = await client.getServerInfo();
+                    const dagInfo = await client.getBlockDagInfo();
+                    const blockCount = dagInfo.blockCount || dagInfo.virtualDaaScore || 0;
+                    const blockCountNum = typeof blockCount === 'bigint' ? Number(blockCount) : blockCount;
+                    
+                    const nodeIdentifier = `${info.serverVersion || 'Unknown'}_${blockCountNum}`;
+                    const nodeId = `${nodeIdentifier}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+                    this.currentNodeUrl = nodeId;
+                    
+                    this.log(`Connected to: ${info.serverVersion || 'Unknown'}`, 'success');
+                    this.log(`Network: ${info.networkId || 'mainnet'}`, 'info');
+                    this.log(`Block height: ${blockCountNum.toLocaleString()}`, 'info');
+                    this.log(`Is Synced: ${info.isSynced}`, 'debug');
+                    this.log(`Has UTXO Index: ${info.hasUtxoIndex}`, 'debug');
+                    this.log(`Protocol Version: ${info.protocolVersion || 'Unknown'}`, 'debug');
+                    
+                    if (client.getConnectedPeerInfo) {
+                        try {
+                            const peerInfo = await client.getConnectedPeerInfo();
+                            this.log(`Peer info: ${JSON.stringify(peerInfo)}`, 'debug');
+                        } catch (e) {}
+                    }
+                    
+                    this.updateCurrentNode({
+                        id: nodeId,
+                        version: info.serverVersion,
+                        blocks: blockCountNum,
+                        connectionTime: connectionTime,
+                        status: 'Testing...'
                     });
                     
-                    await client.connect();
-                    const selectedNode = client.url;
-                    
-                    this.log(`[${nodeIndex}] Connected to: ${selectedNode}`, 'info');
-                    
-                    // Get node information
-                    const info = await client.getInfo();
-                    const dagInfo = await client.getBlockDagInfo();
-                    const blockCount = parseInt(dagInfo.blockCount);
-                    
-                    // Test if archive node
-                    const isArchive = await this.testArchiveCapability(client, blockCount);
-                    
-                    // Store result
-                    const nodeInfo = {
-                        url: selectedNode,
-                        blockCount,
-                        isArchive,
-                        isSynced: info.isSynced,
-                        serverVersion: info.serverVersion,
-                        timestamp: new Date().toISOString()
-                    };
-                    
-                    this.discoveredNodes.set(selectedNode, nodeInfo);
-                    if (isArchive) {
-                        this.archiveNodes.set(selectedNode, nodeInfo);
-                        this.stats.archiveCount++;
-                        this.displayArchiveNode(nodeInfo);
+                    const skipDuplicateCheck = this.CONFIG.skipDuplicateCheck;
+                    if (!skipDuplicateCheck && this.testedNodeIdentifiers.has(nodeIdentifier)) {
+                        this.log(`Already tested node with same version/height (${nodeIdentifier}), skipping...`, 'warning');
+                        await client.disconnect();
+                        return;
                     }
                     
-                    this.stats.totalTested++;
-                    this.stats.successCount++;
+                    const archiveThreshold = this.CONFIG.archiveThreshold;
+                    const testOldBlocks = this.CONFIG.testOldBlocks;
+                    let isArchive = false;
                     
-                    await client.disconnect();
-                    return nodeInfo;
+                    if (blockCountNum > archiveThreshold) {
+                        this.log(`⚡ High block count (${(blockCountNum/1000000).toFixed(1)}M > ${(archiveThreshold/1000000).toFixed(1)}M threshold)`, 'archive');
+                        isArchive = true;
+                    }
                     
-                } catch (error) {
-                    this.log(`[${nodeIndex}] Connection failed: ${error.message}`, 'error');
-                    this.stats.totalTested++;
-                    return null;
-                } finally {
-                    this.stats.activeTasks--;
-                    this.updateStats();
-                }
-            }
-
-            async testArchiveCapability(client, blockCount) {
-                // First check: block count threshold
-                if (blockCount < this.config.archiveThreshold) {
-                    return false;
-                }
-                
-                // Second check: test historical block access
-                if (this.config.testOldBlocks) {
-                    try {
-                        // Test 1-day old blocks
-                        const testDepth = this.config.blocksPerDay;
-                        const testHash = await this.getBlockHashAtDepth(client, testDepth);
+                    if (testOldBlocks) {
+                        this.log('Testing historical block access...', 'info');
                         
-                        if (testHash) {
-                            const block = await client.getBlock(testHash);
-                            if (block) {
-                                this.log(`✅ Archive node confirmed - can access ${testDepth} blocks deep`, 'archive');
-                                return true;
+                        const oneDayBlocks = 864000;
+                        const medianDepth = Math.floor(blockCountNum / 2);
+                        
+                        const testDepths = [
+                            oneDayBlocks,
+                            medianDepth
+                        ];
+                        
+                        this.log(`Test depths: 1 day (${oneDayBlocks} blocks) and median (${(medianDepth/1000000).toFixed(1)}M blocks)`, 'info');
+                        
+                        for (const depth of testDepths) {
+                            if (blockCountNum < depth) continue;
+                            
+                            const testHeight = blockCountNum - depth;
+                            try {
+                                this.log(`Testing block at height ${testHeight} (${(depth/864000).toFixed(1)} days ago)...`);
+                                
+                                let success = false;
+                                
+                                try {
+                                    if (client.getBlockByHeight) {
+                                        const block = await client.getBlockByHeight(testHeight);
+                                        if (block) success = true;
+                                    }
+                                } catch (e) {}
+                                
+                                if (!success) {
+                                    try {
+                                        const block = await client.getBlock({
+                                            height: testHeight,
+                                            includeTransactions: false
+                                        });
+                                        if (block) success = true;
+                                    } catch (e) {}
+                                }
+                                
+                                if (success) {
+                                    const depthPercent = ((depth / blockCountNum) * 100).toFixed(1);
+                                    const depthDays = (depth / 864000).toFixed(1);
+                                    this.log(`✓ Can access block at depth ${(depth/1000000).toFixed(1)}M blocks (${depthPercent}% of chain, ~${depthDays} days) - Confirmed ARCHIVE NODE!`, 'archive');
+                                    isArchive = true;
+                                    break;
+                                }
+                            } catch (error) {
+                                const depthPercent = ((depth / blockCountNum) * 100).toFixed(1);
+                                this.log(`Cannot access block at depth ${(depth/1000000).toFixed(1)}M blocks (${depthPercent}% of chain)`, 'debug');
                             }
                         }
-                    } catch (error) {
-                        // Not an archive node if historical access fails
-                        return false;
+                        
+                        if (!isArchive && blockCountNum > archiveThreshold) {
+                            this.log(`⚠️ High block count but cannot verify historical access - May be pruned`, 'warning');
+                            isArchive = blockCountNum > archiveThreshold;
+                        } else if (!isArchive) {
+                            this.log(`Cannot access any historical blocks - Regular pruned node`, 'info');
+                        }
+                    } else {
+                        isArchive = blockCountNum > archiveThreshold;
+                        if (isArchive) {
+                            this.log(`⚡ High block count (>${archiveThreshold}) - Likely archive node`, 'archive');
+                        }
                     }
+                    
+                    const nodeInfo = {
+                        id: nodeId,
+                        version: info.serverVersion,
+                        networkId: info.networkId,
+                        blockHeight: blockCountNum,
+                        isArchive: isArchive,
+                        connectionTime: connectionTime,
+                        timestamp: new Date(),
+                        isSynced: info.isSynced,
+                        hasUtxoIndex: info.hasUtxoIndex
+                    };
+                    
+                    this.testedNodes.set(nodeId, nodeInfo);
+                    this.testedNodeIdentifiers.add(nodeIdentifier);
+                    this.stats.totalTested++;
+                    this.stats.uniqueNodes = this.testedNodeIdentifiers.size;
+                    
+                    this.cacheNodeInfo(nodeInfo);
+                    
+                    if (isArchive) {
+                        this.archiveNodes.set(nodeId, nodeInfo);
+                        this.stats.archiveCount = this.archiveNodes.size;
+                        this.log(`${workerPrefix}🎉 Archive node #${this.stats.archiveCount} found!`, 'archive');
+                        this.log(`Active workers will be reduced to ${this.calculateActiveWorkers()}`, 'info');
+                        
+                        if (this.activeArchiveConnections.size < 5) {
+                            this.activeArchiveConnections.set(nodeId, client);
+                            nodeInfo.client = client;
+                            this.log(`${workerPrefix}📌 Maintaining connection to archive node #${this.stats.archiveCount}`, 'archive');
+                            this.currentClient = null;
+                            
+                            document.getElementById('testBlockBtn').disabled = false;
+                            
+                            if (this.activeArchiveConnections.size === 1 && !this.keepAliveInterval) {
+                                this.startKeepAlive();
+                            }
+                            
+                            this.cacheNodeInfo(nodeInfo);
+                            
+                            this.updateWorkerDisplay();
+                        } else {
+                            this.log(`Maximum archive connections reached (5), will disconnect`, 'info');
+                            await client.disconnect();
+                        }
+                        
+                        this.updateArchiveList();
+                    } else {
+                        await client.disconnect();
+                    }
+                    
+                    this.updateStats();
+                    this.updateNodeList();
+                    this.updateCurrentNode({
+                        ...nodeInfo,
+                        status: isArchive ? 'ARCHIVE NODE' : 'Regular Node'
+                    });
+                    
+                    this.currentClient = null;
+                    
+                } catch (error) {
+                    this.log(`Connection failed: ${error.message}`, 'error');
+                    this.stats.failedConnections++;
+                    
+                    this.updateCurrentNode({
+                        id: 'Unknown',
+                        status: 'Failed',
+                        error: error.message
+                    });
+                }
+            }
+
+            updateCurrentNode(nodeInfo) {
+                const container = document.getElementById('currentNode');
+                
+                let html = '';
+                if (nodeInfo.error) {
+                    html = `
+                        <div style="color: #f44336;">
+                            <strong>Connection Failed</strong><br>
+                            Error: ${nodeInfo.error}
+                        </div>
+                    `;
+                } else {
+                    const statusColor = nodeInfo.isArchive ? '#9C27B0' : '#4CAF50';
+                    html = `
+                        <div>
+                            <strong style="color: ${statusColor};">${nodeInfo.status}</strong><br>
+                            Version: ${nodeInfo.version || 'Unknown'}<br>
+                            Blocks: ${nodeInfo.blocks ? nodeInfo.blocks.toLocaleString() : 'Unknown'}<br>
+                            Connection: ${nodeInfo.connectionTime}ms<br>
+                            ${nodeInfo.isArchive ? '<span class="archive">⚡ ARCHIVE NODE FOUND!</span>' : ''}
+                        </div>
+                    `;
                 }
                 
-                return blockCount > this.config.archiveThreshold;
+                container.innerHTML = html;
             }
 
-            async getBlockHashAtDepth(client, depth) {
-                try {
-                    const currentSelected = await client.getVirtualSelectedParentChainFromBlock(
-                        '0000000000000000000000000000000000000000000000000000000000000000',
-                        true
-                    );
+            updateArchiveList() {
+                const container = document.getElementById('archiveList');
+                
+                if (this.archiveNodes.size === 0) {
+                    container.innerHTML = '<div style="text-align: center; color: #666;">No archive nodes discovered yet</div>';
+                    return;
+                }
+                
+                let html = '';
+                for (const [id, node] of this.archiveNodes) {
+                    const isActive = this.activeArchiveConnections.has(id);
+                    const connectionStatus = isActive ? 
+                        '<span style="color: #4CAF50;">🟢 Connected</span>' : 
+                        '<span style="color: #666;">⚫ Disconnected</span>';
                     
-                    if (currentSelected && currentSelected.hashes && currentSelected.hashes.length > depth) {
-                        return currentSelected.hashes[currentSelected.hashes.length - depth - 1];
-                    }
-                } catch (error) {
-                    // Fallback method or return null
+                    html += `
+                        <div class="node-item archive">
+                            <div>
+                                <strong>${node.version}</strong><br>
+                                <small>Blocks: ${(node.blockHeight/1000000).toFixed(1)}M | Time: ${node.connectionTime}ms</small>
+                            </div>
+                            <div style="text-align: right;">
+                                <span class="archive">ARCHIVE</span><br>
+                                <small>${connectionStatus}</small>
+                            </div>
+                        </div>
+                    `;
                 }
-                return null;
+                
+                container.innerHTML = html;
             }
 
-            stopDiscovery() {
-                if (this.isRunning) {
-                    this.isRunning = false;
-                    this.abortController?.abort();
-                    this.log('🛑 Stopping discovery...', 'warning');
+            updateNodeList() {
+                const container = document.getElementById('nodeList');
+                
+                if (this.testedNodes.size === 0) {
+                    container.innerHTML = '<div style="text-align: center; color: #666;">No nodes tested yet</div>';
+                    return;
                 }
+                
+                let html = '';
+                const recentNodes = Array.from(this.testedNodes.values()).slice(-10).reverse();
+                
+                for (const node of recentNodes) {
+                    const nodeClass = node.isArchive ? 'archive' : '';
+                    html += `
+                        <div class="node-item ${nodeClass}">
+                            <div>
+                                <strong>${node.version}</strong><br>
+                                <small>Blocks: ${(node.blockHeight/1000000).toFixed(1)}M | ${new Date(node.timestamp).toLocaleTimeString()}</small>
+                            </div>
+                            <span style="color: ${node.isArchive ? '#9C27B0' : '#666'}">
+                                ${node.isArchive ? 'ARCHIVE' : 'Regular'}
+                            </span>
+                        </div>
+                    `;
+                }
+                
+                container.innerHTML = html;
+            }
+
+            async stopRollingDiscovery(keepArchiveConnections = false) {
+                this.isDiscovering = false;
+                
+                if (!keepArchiveConnections) {
+                    this.maintainArchives = false;
+                }
+                
+                document.getElementById('startBtn').disabled = false;
+                document.getElementById('stopBtn').disabled = true;
+                document.getElementById('stopBtn2').disabled = true;
+                
+                this.log('Stopping rolling discovery...', 'warning');
+                if (keepArchiveConnections && this.maintainArchives) {
+                    this.log('Archive maintenance mode remains active', 'info');
+                }
+                
+                if (!keepArchiveConnections) {
+                    this.stopAllWorkers();
+                }
+                
+                if (this.currentClient) {
+                    try {
+                        await this.currentClient.disconnect();
+                    } catch (e) {}
+                }
+                
+                if (!keepArchiveConnections && this.activeArchiveConnections.size > 0) {
+                    this.log(`Closing ${this.activeArchiveConnections.size} active archive connections...`, 'warning');
+                    this.stopKeepAlive();
+                    
+                    for (const [nodeId, client] of this.activeArchiveConnections) {
+                        try {
+                            await client.disconnect();
+                            this.log(`Disconnected from archive: ${nodeId.split('_')[0]}`, 'info');
+                        } catch (e) {
+                            this.log(`Error disconnecting from ${nodeId}: ${e.message}`, 'error');
+                        }
+                    }
+                    this.activeArchiveConnections.clear();
+                    this.updateStats();
+                } else if (this.activeArchiveConnections.size > 0) {
+                    this.log(`📌 Keeping ${this.activeArchiveConnections.size} archive connections active`, 'archive');
+                    this.log(`⏱️ Keepalive mechanism will maintain connections every 20 seconds`, 'info');
+                }
+                
+                const duration = Math.round((Date.now() - this.discoveryStartTime) / 1000);
+                this.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`, 'info');
+                this.log(`Discovery Summary:`, 'info');
+                this.log(`• Duration: ${duration}s`, 'info');
+                this.log(`• Total attempts: ${this.totalAttempts}`, 'info');
+                this.log(`• Unique nodes: ${this.stats.uniqueNodes}`, 'info');
+                this.log(`• Archive nodes: ${this.stats.archiveCount}`, 'info');
+                this.log(`• Active connections kept: ${this.activeArchiveConnections.size}`, 'info');
+                this.log(`• Failed connections: ${this.stats.failedConnections}`, 'info');
+                this.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`, 'info');
             }
 
             exportResults() {
-                const results = {
-                    timestamp: new Date().toISOString(),
+                const data = {
+                    discoveryDate: new Date().toISOString(),
                     stats: this.stats,
                     archiveNodes: Array.from(this.archiveNodes.values()),
-                    allNodes: Array.from(this.discoveredNodes.values())
+                    allNodes: Array.from(this.testedNodes.values())
                 };
                 
-                const blob = new Blob([JSON.stringify(results, null, 2)], 
-                    { type: 'application/json' });
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = `kaspa-archive-nodes-${Date.now()}.json`;
+                a.download = `kaspa-resolver-discovery-${new Date().toISOString().split('T')[0]}.json`;
                 a.click();
-                URL.revokeObjectURL(url);
                 
-                this.log(`📄 Exported ${this.archiveNodes.size} archive nodes`, 'success');
+                this.log(`Exported ${this.archiveNodes.size} archive nodes from ${this.testedNodes.size} tested`, 'success');
             }
 
-            updateConfig() {
-                this.config.maxNodes = parseInt(document.getElementById('maxNodes').value) || 100;
-                this.config.concurrency = parseInt(document.getElementById('concurrency').value) || 5;
-                this.config.testOldBlocks = document.getElementById('testOldBlocks').checked;
-                this.config.autoStop = document.getElementById('autoStop').checked;
-            }
-
-            updateStats() {
-                document.getElementById('totalTested').textContent = this.stats.totalTested;
-                document.getElementById('archiveCount').textContent = this.stats.archiveCount;
-                document.getElementById('activeTests').textContent = this.stats.activeTasks;
-                
-                const rate = this.stats.totalTested > 0 
-                    ? ((this.stats.successCount / this.stats.totalTested) * 100).toFixed(1)
-                    : 0;
-                document.getElementById('successRate').textContent = `${rate}%`;
-            }
-
-            updateProgress(processed) {
-                const progress = (processed / this.config.maxNodes) * 100;
-                document.getElementById('progressBar').style.width = `${progress}%`;
-            }
-
-            displayArchiveNode(nodeInfo) {
-                const list = document.getElementById('archiveNodeList');
-                if (list.querySelector('.info')) {
-                    list.innerHTML = '';
+            async testArchiveBlock() {
+                if (this.activeArchiveConnections.size === 0) {
+                    this.log('No active archive connections available', 'error');
+                    return;
                 }
                 
-                const item = document.createElement('div');
-                item.className = 'node-item archive-node';
-                item.innerHTML = `
-                    <strong>🎯 Archive Node</strong><br>
-                    URL: ${nodeInfo.url}<br>
-                    Blocks: ${nodeInfo.blockCount.toLocaleString()}<br>
-                    Version: ${nodeInfo.serverVersion}<br>
-                    Found: ${new Date(nodeInfo.timestamp).toLocaleTimeString()}
-                `;
-                list.appendChild(item);
-            }
-
-            log(message, type = 'info') {
-                const logElement = document.getElementById('log');
-                const timestamp = new Date().toLocaleTimeString();
-                const span = document.createElement('span');
-                span.className = type;
-                span.textContent = `[${timestamp}] ${message}\n`;
-                logElement.appendChild(span);
-                logElement.scrollTop = logElement.scrollHeight;
-            }
-
-            clearLogs() {
-                document.getElementById('log').innerHTML = '';
-                this.log('Logs cleared', 'info');
-            }
-        }
-
-        // Application Controller
-        class App {
-            constructor() {
-                this.discovery = new ArchiveNodeDiscovery();
-                this.setupEventListeners();
-            }
-
-            setupEventListeners() {
-                // Update button states based on discovery status
-                setInterval(() => {
-                    const isInitialized = this.discovery.kaspa !== null;
-                    const isRunning = this.discovery.isRunning;
+                const blockHash = document.getElementById('testBlockHash').value.trim();
+                
+                this.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info');
+                this.log(`Testing block retrieval on ${this.activeArchiveConnections.size} archive nodes...`, 'info');
+                
+                for (const [nodeId, client] of this.activeArchiveConnections) {
+                    const nodeInfo = this.archiveNodes.get(nodeId);
+                    this.log(`\nTesting ${nodeInfo.version} (${(nodeInfo.blockHeight/1000000).toFixed(1)}M blocks)...`, 'info');
                     
-                    document.getElementById('initBtn').disabled = isInitialized;
-                    document.getElementById('startBtn').disabled = !isInitialized || isRunning;
-                    document.getElementById('stopBtn').disabled = !isRunning;
-                    document.getElementById('exportBtn').disabled = 
-                        this.discovery.archiveNodes.size === 0;
-                }, 100);
-            }
-
-            async initialize() {
-                const success = await this.discovery.initialize();
-                if (success) {
-                    document.getElementById('initBtn').disabled = true;
-                    document.getElementById('startBtn').disabled = false;
+                    try {
+                        this.log(`Getting current block info...`);
+                        const dagInfo = await client.getBlockDagInfo();
+                        this.log(`Current block count: ${dagInfo.blockCount}`, 'info');
+                        this.log(`Tip hashes: ${dagInfo.tipHashes?.length || 0}`, 'debug');
+                        
+                        let recentBlock = null;
+                        if (dagInfo.tipHashes && dagInfo.tipHashes.length > 0) {
+                            const tipHash = dagInfo.tipHashes[0];
+                            this.log(`Getting block by hash: ${tipHash}...`);
+                            
+                            try {
+                                recentBlock = await client.getBlock({
+                                    hash: tipHash,
+                                    includeTransactions: true
+                                });
+                            } catch (e) {
+                                this.log(`getBlock failed: ${e.message || e}`, 'debug');
+                            }
+                        }
+                        
+                        if (recentBlock) {
+                            const block = recentBlock.block || recentBlock;
+                            this.log(`✓ Recent block retrieved successfully`, 'success');
+                            this.log(`  Hash: ${block.header?.hash || 'N/A'}`, 'debug');
+                            this.log(`  Timestamp: ${new Date(Number(block.header?.timestamp || 0)).toLocaleString()}`, 'debug');
+                            this.log(`  Transactions: ${block.transactions?.length || 0}`, 'debug');
+                        }
+                        
+                        if (dagInfo.tipHashes && dagInfo.tipHashes.length > 1) {
+                            this.log(`Testing multiple tip blocks (found ${dagInfo.tipHashes.length} tips)...`);
+                            
+                            const tipsToTest = Math.min(3, dagInfo.tipHashes.length);
+                            for (let i = 0; i < tipsToTest; i++) {
+                                try {
+                                    const tipHash = dagInfo.tipHashes[i];
+                                    this.log(`Getting tip block ${i+1}: ${tipHash.substring(0, 16)}...`);
+                                    
+                                    const tipBlock = await client.getBlock({
+                                        hash: tipHash,
+                                        includeTransactions: false
+                                    });
+                                    
+                                    if (tipBlock) {
+                                        const block = tipBlock.block || tipBlock;
+                                        this.log(`✓ Tip ${i+1} retrieved - Height: ${block.header?.daaScore || 'N/A'}`, 'success');
+                                    }
+                                } catch (e) {
+                                    this.log(`Failed to get tip ${i+1}: ${e.message || e}`, 'debug');
+                                }
+                            }
+                        }
+                        
+                        if (blockHash && blockHash.length === 64) {
+                            this.log(`Getting block by hash: ${blockHash}...`);
+                            const hashBlock = await client.getBlock({
+                                hash: blockHash,
+                                includeTransactions: true
+                            });
+                            
+                            if (hashBlock) {
+                                const block = hashBlock.block || hashBlock;
+                                this.log(`✓ Block retrieved by hash successfully`, 'success');
+                                this.log(`  Height: ${block.header?.daaScore || 'N/A'}`, 'debug');
+                                this.log(`  Transactions: ${block.transactions?.length || 0}`, 'debug');
+                            }
+                        }
+                        
+                        this.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━`, 'info');
+                        this.log(`Summary for ${nodeInfo.version}:`, 'info');
+                        this.log(`• Block height: ${(nodeInfo.blockHeight/1000000).toFixed(1)}M`, 'info');
+                        this.log(`• Current tips: ${dagInfo.tipHashes?.length || 0}`, 'info');
+                        this.log(`• Connection stable: ✓`, 'success');
+                        this.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━`, 'info');
+                        
+                    } catch (error) {
+                        this.log(`✗ Block test failed: ${error.message || error}`, 'error');
+                        this.log(`Error type: ${error.constructor?.name}`, 'debug');
+                        this.log(`Error stack: ${error.stack}`, 'debug');
+                        
+                        try {
+                            const info = await client.getServerInfo();
+                            this.log(`Client is still connected to ${info.serverVersion}`, 'info');
+                        } catch (e) {
+                            this.log(`Client appears to be disconnected`, 'error');
+                            this.activeArchiveConnections.delete(nodeId);
+                            this.updateStats();
+                        }
+                    }
                 }
-            }
-
-            async startDiscovery() {
-                await this.discovery.startDiscovery();
-            }
-
-            stopDiscovery() {
-                this.discovery.stopDiscovery();
-            }
-
-            exportResults() {
-                this.discovery.exportResults();
-            }
-
-            clearLogs() {
-                this.discovery.clearLogs();
+                
+                this.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info');
             }
         }
 
-        // Initialize application
-        window.app = new App();
+        // Create global app instance
+        window.app = new ArchiveNodeDiscovery();
+
+        // Window event listeners
+        window.addEventListener('DOMContentLoaded', () => {
+            localStorage.removeItem('kaspaNodeCache');
+            
+            app.log('Kaspa Resolver Rolling Discovery V28 - Class-Based Architecture', 'info');
+            app.log('Minimal refactoring from V18 - All features preserved', 'info');
+            app.log('Dynamic Worker System: 5 Workers → Archive Found → Worker Reduction → Auto-Recovery', 'info');
+            app.log('Node cache cleared (F5 reset)', 'debug');
+        });
         
-        // Auto-initialize on page load
-        window.addEventListener('load', () => {
-            app.discovery.log('🎯 Kaspa Archive Node Discovery v28 - Ready', 'info');
-            app.discovery.log('Class-based architecture with resolver integration', 'info');
+        window.addEventListener('beforeunload', () => {
+            app.stopKeepAlive();
+            for (const [nodeId, client] of app.activeArchiveConnections) {
+                try {
+                    client.disconnect();
+                } catch (e) {}
+            }
         });
     </script>
 </body>

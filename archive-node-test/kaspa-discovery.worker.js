@@ -89,6 +89,23 @@ async function handleInit(scriptUrl) {
             }
         }
         
+        // Test basic kaspa operations
+        try {
+            sendLog('Testing basic kaspa operations...', 'debug');
+            
+            // Test creating a private key
+            const testPrivKey = new kaspa.PrivateKey('b7e151628aed2a6abf7158809cf4f3c762e7160f38b4da56a784d9045190cfef');
+            sendLog('✓ PrivateKey creation works', 'success');
+            
+            // Test creating an address
+            const pubKey = testPrivKey.toPublicKey();
+            const address = pubKey.toAddress('testnet-10');
+            sendLog(`✓ Address creation works: ${address.toString()}`, 'success');
+            
+        } catch (testError) {
+            sendLog(`Basic operations error: ${testError?.message || JSON.stringify(testError)}`, 'error');
+        }
+        
         sendLog('Kaspa module initialized', 'success');
         sendMessage('INITIALIZED', { success: true });
     } catch (error) {
@@ -160,10 +177,27 @@ async function discoverNextNode() {
         // Create RpcClient with Resolver for each discovery attempt
         sendLog(`Creating RPC client with Resolver...`, 'debug');
         
-        client = new kaspa.RpcClient({
-            resolver: new kaspa.Resolver(),
-            networkId: 'mainnet'
-        });
+        try {
+            // Test if we can create a Resolver first
+            sendLog('Testing Resolver creation...', 'debug');
+            const testResolver = new kaspa.Resolver();
+            sendLog('Resolver created successfully', 'debug');
+            
+            // Now try creating RpcClient
+            sendLog('Creating RpcClient...', 'debug');
+            client = new kaspa.RpcClient({
+                resolver: testResolver,
+                networkId: 'mainnet'
+            });
+            sendLog('RpcClient created successfully', 'debug');
+        } catch (createError) {
+            // Enhanced error logging
+            sendLog(`Creation error type: ${typeof createError}`, 'error');
+            sendLog(`Creation error: ${JSON.stringify(createError)}`, 'error');
+            sendLog(`Creation error message: ${createError?.message || 'No message'}`, 'error');
+            sendLog(`Creation error stack: ${createError?.stack || 'No stack'}`, 'error');
+            throw createError;
+        }
         
         sendLog('Connecting to mainnet via Resolver...', 'debug');
         const startTime = Date.now();
@@ -256,7 +290,12 @@ async function discoverNextNode() {
         
     } catch (error) {
         state.stats.errors++;
-        sendError(`Discovery ${currentIndex} error: ${error.message}`, error);
+        // Enhanced error logging
+        sendLog(`Main error type: ${typeof error}`, 'error');
+        sendLog(`Main error: ${JSON.stringify(error)}`, 'error');
+        sendLog(`Main error message: ${error?.message || 'No message'}`, 'error');
+        sendLog(`Main error stack: ${error?.stack || 'No stack'}`, 'error');
+        sendError(`Discovery ${currentIndex} error: ${error?.message || JSON.stringify(error)}`, error);
     } finally {
         // Always disconnect
         if (client) {

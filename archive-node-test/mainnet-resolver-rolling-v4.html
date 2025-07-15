@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kaspa Archive Node Discovery V4 - Simplified Integration</title>
+    <style>
+        body {
+            font-family: monospace;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #e0e0e0;
+        }
+        .container {
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #4CAF50;
+            font-size: 24px;
+        }
+        .status {
+            font-size: 18px;
+            margin: 20px 0;
+        }
+        .archive-count {
+            color: #9C27B0;
+            font-weight: bold;
+            font-size: 24px;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        button:disabled {
+            background: #666;
+            cursor: not-allowed;
+        }
+        .log {
+            background: #000;
+            padding: 10px;
+            border-radius: 4px;
+            height: 200px;
+            overflow-y: auto;
+            font-size: 12px;
+            white-space: pre-wrap;
+            margin-top: 20px;
+        }
+        .success { color: #4CAF50; }
+        .error { color: #f44336; }
+        .warning { color: #ff9800; }
+        .info { color: #2196F3; }
+        .archive { color: #9C27B0; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Kaspa Archive Node Discovery</h1>
+        
+        <div class="status">
+            Active Archive Nodes: <span class="archive-count" id="archiveCount">0</span> / 5
+        </div>
+        
+        <div>
+            <button id="initBtn" onclick="initialize()">Initialize</button>
+            <button id="startBtn" onclick="startDiscovery()" disabled>Start</button>
+            <button id="stopBtn" onclick="stopDiscovery()" disabled>Stop</button>
+        </div>
+        
+        <div id="initStatus"></div>
+        
+        <div class="log" id="log"></div>
+    </div>
+
+    <script>
+        // === Configuration (Fixed Values) ===
+        const CONFIG = {
+            MAX_ARCHIVE_NODES: 5,
+            MAX_NODES_TO_TEST: Infinity,  // 上限なし（すべてのノードを探査）
+            TEST_INTERVAL_MS: 5000,
+            KEEPALIVE_INTERVAL_MS: 20000,
+            CACHE_KEY: 'kaspa_archive_nodes',
+            RESOLVER_URL: 'mainnet',
+            TEST_DEPTHS: [864000, 2592000, 8640000, 25920000] // 1, 3, 10, 30 days
+        };
+
+        // === Global State ===
+        let kaspa = null;
+        let isInitialized = false;
+        let isDiscovering = false;
+        let maintainArchives = false;
+        
+        const activeArchiveConnections = new Map();
+        const testedNodes = new Set();
+        const workers = new Map();
+        let activeWorkerCount = 0;
+        let keepAliveInterval = null;
+
+        // === Event System ===
+        const events = new EventTarget();
+        
+        function emitEvent(type, detail) {
+            events.dispatchEvent(new CustomEvent(type, { detail }));
+        }
+
+        // === Logging ===
+        function log(message, level = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = `[${timestamp}] ${message}`;
+            
+            // Console log
+            console.log(`[${level.toUpperCase()}] ${logEntry}`);
+            
+            // UI log
+            const logElement = document.getElementById('log');
+            const span = document.createElement('span');
+            span.className = level;
+            span.textContent = logEntry + '\n';
+            logElement.appendChild(span);
+            logElement.scrollTop = logElement.scrollHeight;
+            
+            // Emit log event for external consumption
+            emitEvent('log', { message, level, timestamp });
+        }
+
+        // === Cache Management ===
+        function loadCachedNodes() {
+            try {
+                const cached = localStorage.getItem(CONFIG.CACHE_KEY);
+                if (cached) {
+                    const data = JSON.parse(cached);
+                    log(`Loaded ${data.length} cached nodes`, 'info');
+                    return data;
+                }
+            } catch (e) {
+                log('Failed to load cache', 'warning');
+            }
+            return [];
+        }
+
+        function saveCachedNodes() {
+            try {
+                const nodes = Array.from(activeArchiveConnections.entries()).map(([id, node]) => ({
+                    id,
+                    url: node.url,
+                    lastSeen: Date.now()
+                }));
+                localStorage.setItem(CONFIG.CACHE_KEY, JSON.stringify(nodes));
+            } catch (e) {
+                log('Failed to save cache', 'warning');
+            }
+        }
+
+        function clearCache() {
+            localStorage.removeItem(CONFIG.CACHE_KEY);
+            log('Cache cleared', 'info');
+        }
+
+        // === UI Updates ===
+        function updateArchiveCount() {
+            document.getElementById('archiveCount').textContent = activeArchiveConnections.size;
+        }
+
+        // === Archive Node Management ===
+        async function testArchiveNode(client, nodeUrl) {
+            const currentBlock = await client.getBlockDagInfo();
+            const currentHeight = currentBlock.virtualDaaScore;
+            
+            for (const depth of CONFIG.TEST_DEPTHS) {
+                const testHeight = currentHeight - depth;
+                if (testHeight < 0) continue;
+                
+                try {
+                    const testBlock = await client.getBlockByDaaScore(testHeight);
+                    if (!testBlock || !testBlock.block) {
+                        return null;
+                    }
+                } catch (e) {
+                    return null;
+                }
+            }
+            
+            return {
+                url: nodeUrl,
+                currentHeight,
+                oldestDepth: CONFIG.TEST_DEPTHS[CONFIG.TEST_DEPTHS.length - 1]
+            };
+        }
+
+        function startKeepAlive() {
+            if (keepAliveInterval) return;
+            
+            keepAliveInterval = setInterval(async () => {
+                for (const [nodeId, connection] of activeArchiveConnections) {
+                    try {
+                        await connection.client.getServerInfo();
+                    } catch (e) {
+                        log(`Archive node ${nodeId} disconnected`, 'warning');
+                        activeArchiveConnections.delete(nodeId);
+                        updateArchiveCount();
+                        emitEvent('archive-lost', { nodeId });
+                        
+                        // Restart worker if needed
+                        if (maintainArchives && activeArchiveConnections.size < CONFIG.MAX_ARCHIVE_NODES) {
+                            spawnWorker();
+                        }
+                    }
+                }
+            }, CONFIG.KEEPALIVE_INTERVAL_MS);
+        }
+
+        function stopKeepAlive() {
+            if (keepAliveInterval) {
+                clearInterval(keepAliveInterval);
+                keepAliveInterval = null;
+            }
+        }
+
+        // === Worker Management ===
+        function calculateActiveWorkers() {
+            const archiveCount = activeArchiveConnections.size;
+            return Math.max(0, CONFIG.MAX_ARCHIVE_NODES - archiveCount);
+        }
+
+        async function spawnWorker() {
+            const targetWorkers = calculateActiveWorkers();
+            if (activeWorkerCount >= targetWorkers) return;
+            
+            const workerId = activeWorkerCount + 1;
+            activeWorkerCount++;
+            
+            const workerPromise = runWorker(workerId);
+            workers.set(workerId, workerPromise);
+            
+            workerPromise.finally(() => {
+                activeWorkerCount--;
+                workers.delete(workerId);
+                
+                if ((isDiscovering || maintainArchives) && calculateActiveWorkers() > activeWorkerCount) {
+                    setTimeout(() => spawnWorker(), 1000);
+                }
+            });
+        }
+
+        async function runWorker(workerId) {
+            try {
+                await discoverNextNode(workerId);
+                await new Promise(resolve => setTimeout(resolve, CONFIG.TEST_INTERVAL_MS));
+            } catch (error) {
+                log(`Worker ${workerId} error: ${error.message}`, 'error');
+                emitEvent('worker-error', { workerId, error: error.message });
+            }
+        }
+
+        async function discoverNextNode(workerId) {
+            const resolver = new kaspa.Resolver();
+            const urls = await resolver.getUrls(0, CONFIG.RESOLVER_URL);
+            
+            if (!urls || urls.length === 0) {
+                throw new Error('No URLs from resolver');
+            }
+            
+            // Find untested node
+            let nodeUrl = null;
+            for (const url of urls) {
+                if (!testedNodes.has(url)) {
+                    nodeUrl = url;
+                    testedNodes.add(url);
+                    break;
+                }
+            }
+            
+            if (!nodeUrl) {
+                log('All nodes tested', 'info');
+                return;
+            }
+            
+            // Test node
+            const client = new kaspa.RpcClient({
+                url: nodeUrl,
+                resolver: false,
+                networkId: "mainnet"
+            });
+            
+            try {
+                await client.connect();
+                const archiveInfo = await testArchiveNode(client, nodeUrl);
+                
+                if (archiveInfo) {
+                    const nodeId = `archive_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+                    activeArchiveConnections.set(nodeId, {
+                        client,
+                        url: nodeUrl,
+                        info: archiveInfo
+                    });
+                    
+                    log(`Found archive node: ${nodeUrl}`, 'archive');
+                    updateArchiveCount();
+                    saveCachedNodes();
+                    emitEvent('archive-found', { nodeId, url: nodeUrl, info: archiveInfo });
+                } else {
+                    await client.disconnect();
+                }
+            } catch (e) {
+                try {
+                    await client.disconnect();
+                } catch {}
+            }
+        }
+
+        // === Main Functions ===
+        async function initialize() {
+            const btn = document.getElementById('initBtn');
+            const status = document.getElementById('initStatus');
+            btn.disabled = true;
+            
+            try {
+                log('Initializing Kaspa WASM module...');
+                
+                kaspa = await import('./kaspa-core.js');
+                await kaspa.default('./kaspa-core_bg.wasm');
+                
+                isInitialized = true;
+                status.innerHTML = '<div class="success">✓ Initialized</div>';
+                document.getElementById('startBtn').disabled = false;
+                log('Initialization complete', 'success');
+                
+            } catch (error) {
+                log(`Initialization failed: ${error.message}`, 'error');
+                status.innerHTML = `<div class="error">✗ Failed: ${error.message}</div>`;
+                btn.disabled = false;
+                emitEvent('init-error', { error: error.message });
+            }
+        }
+
+        async function startDiscovery() {
+            if (!isInitialized || isDiscovering) return;
+            
+            isDiscovering = true;
+            maintainArchives = true;
+            
+            document.getElementById('startBtn').disabled = true;
+            document.getElementById('stopBtn').disabled = false;
+            
+            log('Starting archive node discovery...', 'info');
+            updateArchiveCount();
+            startKeepAlive();
+            
+            // Spawn initial workers
+            const initialWorkers = calculateActiveWorkers();
+            for (let i = 0; i < initialWorkers; i++) {
+                await spawnWorker();
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+            
+            // Monitor loop
+            while (isDiscovering || maintainArchives) {
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                if (activeArchiveConnections.size >= CONFIG.MAX_ARCHIVE_NODES && activeWorkerCount === 0) {
+                    if (isDiscovering) {
+                        log('5 archive nodes found! Entering maintenance mode...', 'success');
+                        isDiscovering = false;
+                    }
+                }
+            }
+        }
+
+        async function stopDiscovery() {
+            isDiscovering = false;
+            maintainArchives = false;
+            
+            log('Stopping discovery...', 'warning');
+            
+            // Stop keepalive
+            stopKeepAlive();
+            
+            // Disconnect all archive nodes
+            for (const [nodeId, connection] of activeArchiveConnections) {
+                try {
+                    await connection.client.disconnect();
+                } catch {}
+            }
+            activeArchiveConnections.clear();
+            updateArchiveCount();
+            
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+            
+            log('Discovery stopped', 'info');
+        }
+
+        // === Page Load ===
+        window.addEventListener('load', () => {
+            updateArchiveCount();
+            const cached = loadCachedNodes();
+            if (cached.length > 0) {
+                log(`Found ${cached.length} cached nodes (will verify on start)`, 'info');
+            }
+        });
+    </script>
+</body>
+</html>

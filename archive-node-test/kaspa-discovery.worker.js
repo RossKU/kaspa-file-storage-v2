@@ -59,9 +59,27 @@ self.onmessage = async (e) => {
                 sendError(`Unknown message type: ${type}`);
         }
     } catch (error) {
-        sendError(`Worker error: ${error.message}`, error);
+        sendLog(`Worker message handler error type: ${typeof error}`, 'error');
+        sendLog(`Worker message handler error: ${JSON.stringify(error)}`, 'error');
+        sendLog(`Worker message handler error message: ${error?.message || 'No message'}`, 'error');
+        sendLog(`Worker message handler error stack: ${error?.stack || 'No stack'}`, 'error');
+        sendError(`Worker error: ${error?.message || JSON.stringify(error)}`, error);
     }
 };
+
+// Global error handler for uncaught errors in Worker
+self.addEventListener('error', (event) => {
+    sendLog(`Uncaught Worker error: ${event.message}`, 'error');
+    sendLog(`Error filename: ${event.filename}`, 'error');
+    sendLog(`Error line: ${event.lineno}:${event.colno}`, 'error');
+    sendError(`Uncaught Worker error: ${event.message}`);
+});
+
+// Global handler for unhandled promise rejections
+self.addEventListener('unhandledrejection', (event) => {
+    sendLog(`Unhandled promise rejection: ${event.reason}`, 'error');
+    sendError(`Unhandled promise rejection: ${event.reason}`);
+});
 
 // Initialize Kaspa module
 async function handleInit(scriptUrl) {
@@ -200,14 +218,37 @@ async function discoverNextNode() {
         }
         
         sendLog('Connecting to mainnet via Resolver...', 'debug');
+        
+        // Check if connect method exists
+        sendLog(`client type: ${typeof client}`, 'debug');
+        sendLog(`client.connect type: ${typeof client.connect}`, 'debug');
+        
+        if (!client.connect) {
+            throw new Error('client.connect method not found');
+        }
+        
         const startTime = Date.now();
         
         try {
-            await client.connect();
+            sendLog('Calling client.connect()...', 'debug');
+            const connectResult = client.connect();
+            sendLog(`connect() returned: ${typeof connectResult}`, 'debug');
+            
+            if (connectResult && typeof connectResult.then === 'function') {
+                sendLog('connect() returned a Promise, awaiting...', 'debug');
+                await connectResult;
+            } else {
+                sendLog('connect() did not return a Promise', 'warning');
+            }
+            
             const connectionTime = Date.now() - startTime;
             sendLog(`Connected via Resolver in ${connectionTime}ms!`, 'success');
         } catch (connectError) {
-            sendError(`Connect error: ${connectError.message}`, connectError);
+            sendLog(`Connect error caught: ${typeof connectError}`, 'error');
+            sendLog(`Connect error details: ${JSON.stringify(connectError)}`, 'error');
+            sendLog(`Connect error message: ${connectError?.message || 'No message'}`, 'error');
+            sendLog(`Connect error stack: ${connectError?.stack || 'No stack'}`, 'error');
+            sendError(`Connect error: ${connectError?.message || JSON.stringify(connectError)}`, connectError);
             throw connectError;
         }
         

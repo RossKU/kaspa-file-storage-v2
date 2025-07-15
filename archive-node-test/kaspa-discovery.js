@@ -46,8 +46,8 @@ class KaspaDiscovery extends EventTarget {
         
         return new Promise((resolve, reject) => {
             try {
-                // Create Worker
-                this.worker = new Worker(this.config.workerPath);
+                // Create Worker with module type to support import()
+                this.worker = new Worker(this.config.workerPath, { type: 'module' });
                 
                 // Setup message handler
                 this.worker.onmessage = (e) => {

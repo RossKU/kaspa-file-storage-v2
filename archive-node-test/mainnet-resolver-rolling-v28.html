@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kaspa Mainnet Archive Node Discovery v28 - Class-Based Architecture</title>
+    <style>
+        body {
+            font-family: monospace;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #e0e0e0;
+        }
+        .container {
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        h1, h2 {
+            color: #4CAF50;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: monospace;
+        }
+        button:hover:not(:disabled) {
+            background: #45a049;
+        }
+        button:disabled {
+            background: #666;
+            cursor: not-allowed;
+        }
+        .log {
+            background: #000;
+            padding: 10px;
+            border-radius: 4px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-size: 12px;
+            white-space: pre-wrap;
+            margin-top: 10px;
+        }
+        .error { color: #ff5252; }
+        .success { color: #4CAF50; }
+        .info { color: #2196F3; }
+        .warning { color: #FFC107; }
+        .archive { color: #9C27B0; font-weight: bold; }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin: 10px 0;
+        }
+        .stat-item {
+            background: #333;
+            padding: 10px;
+            border-radius: 4px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #4CAF50;
+        }
+        .node-list {
+            max-height: 300px;
+            overflow-y: auto;
+            background: #1a1a1a;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+        .node-item {
+            padding: 5px;
+            margin: 2px 0;
+            background: #333;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+        .archive-node {
+            background: #4a148c;
+            color: white;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #333;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4CAF50, #8BC34A);
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Kaspa Archive Node Discovery v28</h1>
+        <p>Class-based architecture with mainnet resolver integration</p>
+        
+        <div>
+            <button id="initBtn" onclick="app.initialize()">Initialize Kaspa Module</button>
+            <button id="startBtn" onclick="app.startDiscovery()" disabled>Start Discovery</button>
+            <button id="stopBtn" onclick="app.stopDiscovery()" disabled>Stop Discovery</button>
+            <button id="exportBtn" onclick="app.exportResults()" disabled>Export Results</button>
+            <button id="clearBtn" onclick="app.clearLogs()">Clear Logs</button>
+        </div>
+
+        <div class="container">
+            <h2>Discovery Options</h2>
+            <div>
+                <label>
+                    <input type="number" id="maxNodes" value="100" min="10" max="1000">
+                    Max Nodes to Test
+                </label>
+                <label style="margin-left: 20px;">
+                    <input type="number" id="concurrency" value="5" min="1" max="20">
+                    Concurrent Tests
+                </label>
+                <label style="margin-left: 20px;">
+                    <input type="checkbox" id="testOldBlocks" checked>
+                    Test Historical Blocks
+                </label>
+                <label style="margin-left: 20px;">
+                    <input type="checkbox" id="autoStop" checked>
+                    Auto-stop on Archive Found
+                </label>
+            </div>
+        </div>
+
+        <div class="container">
+            <h2>Statistics</h2>
+            <div class="stats">
+                <div class="stat-item">
+                    <div>Total Tested</div>
+                    <div class="stat-value" id="totalTested">0</div>
+                </div>
+                <div class="stat-item">
+                    <div>Archive Nodes</div>
+                    <div class="stat-value archive" id="archiveCount">0</div>
+                </div>
+                <div class="stat-item">
+                    <div>Active Tests</div>
+                    <div class="stat-value" id="activeTests">0</div>
+                </div>
+                <div class="stat-item">
+                    <div>Success Rate</div>
+                    <div class="stat-value" id="successRate">0%</div>
+                </div>
+            </div>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressBar" style="width: 0%"></div>
+            </div>
+        </div>
+
+        <div class="container">
+            <h2>Archive Nodes Found</h2>
+            <div class="node-list" id="archiveNodeList">
+                <div class="info">No archive nodes discovered yet</div>
+            </div>
+        </div>
+
+        <div class="container">
+            <h2>Discovery Log</h2>
+            <div class="log" id="log"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        // Archive Node Discovery Class - Encapsulates all discovery logic
+        class ArchiveNodeDiscovery {
+            constructor() {
+                this.kaspa = null;
+                this.isRunning = false;
+                this.discoveredNodes = new Map();
+                this.archiveNodes = new Map();
+                this.stats = {
+                    totalTested: 0,
+                    archiveCount: 0,
+                    activeTasks: 0,
+                    successCount: 0
+                };
+                this.config = {
+                    maxNodes: 100,
+                    concurrency: 5,
+                    testOldBlocks: true,
+                    autoStop: true,
+                    archiveThreshold: 8000000,
+                    blocksPerDay: 24 * 60 * 60, // 1 BPS
+                    medianDepth: 1209600 // ~14 days
+                };
+                this.abortController = null;
+            }
+
+            async initialize() {
+                try {
+                    this.log('Initializing Kaspa WASM module...', 'info');
+                    
+                    // Dynamic import of Kaspa module
+                    const module = await import('./kaspa-core.js');
+                    await module.default('./kaspa-core_bg.wasm');
+                    this.kaspa = module;
+                    
+                    // Test basic functionality
+                    const testResolver = new this.kaspa.Resolver();
+                    this.log('✅ Kaspa module initialized successfully', 'success');
+                    
+                    return true;
+                } catch (error) {
+                    this.log(`❌ Initialization failed: ${error.message}`, 'error');
+                    return false;
+                }
+            }
+
+            async startDiscovery() {
+                if (this.isRunning) {
+                    this.log('Discovery already running', 'warning');
+                    return;
+                }
+
+                this.isRunning = true;
+                this.abortController = new AbortController();
+                this.updateConfig();
+                
+                this.log('🚀 Starting archive node discovery...', 'info');
+                this.log(`Configuration: Max nodes: ${this.config.maxNodes}, Concurrency: ${this.config.concurrency}`, 'info');
+                
+                try {
+                    await this.discoverNodes();
+                } catch (error) {
+                    if (error.name !== 'AbortError') {
+                        this.log(`Discovery error: ${error.message}`, 'error');
+                    }
+                } finally {
+                    this.isRunning = false;
+                    this.log('Discovery process completed', 'info');
+                }
+            }
+
+            async discoverNodes() {
+                const nodeQueue = [];
+                let processedCount = 0;
+                
+                // Create a pool of concurrent discovery tasks
+                const discoveryPool = [];
+                
+                while (this.isRunning && processedCount < this.config.maxNodes) {
+                    // Maintain concurrent discovery tasks
+                    while (discoveryPool.length < this.config.concurrency && 
+                           processedCount + discoveryPool.length < this.config.maxNodes &&
+                           this.isRunning) {
+                        
+                        const taskPromise = this.discoverSingleNode(processedCount + discoveryPool.length)
+                            .then(result => {
+                                if (result && result.isArchive && this.config.autoStop) {
+                                    this.log('🎯 Archive node found! Auto-stopping discovery...', 'archive');
+                                    this.stopDiscovery();
+                                }
+                                return result;
+                            })
+                            .catch(error => {
+                                this.log(`Task error: ${error.message}`, 'error');
+                                return null;
+                            });
+                        
+                        discoveryPool.push(taskPromise);
+                    }
+                    
+                    // Wait for at least one task to complete
+                    if (discoveryPool.length > 0) {
+                        const completedTask = await Promise.race(discoveryPool);
+                        const index = discoveryPool.findIndex(p => p === completedTask || 
+                            p.then ? false : true);
+                        if (index !== -1) {
+                            discoveryPool.splice(index, 1);
+                            processedCount++;
+                            this.updateProgress(processedCount);
+                        }
+                    }
+                    
+                    // Check abort signal
+                    if (this.abortController?.signal.aborted) {
+                        break;
+                    }
+                }
+                
+                // Wait for remaining tasks
+                if (discoveryPool.length > 0) {
+                    this.log('Waiting for remaining tasks to complete...', 'info');
+                    await Promise.allSettled(discoveryPool);
+                }
+            }
+
+            async discoverSingleNode(nodeIndex) {
+                this.stats.activeTasks++;
+                this.updateStats();
+                
+                try {
+                    // Create new RPC client with resolver
+                    const client = new this.kaspa.RpcClient({
+                        resolver: new this.kaspa.Resolver(),
+                        networkId: 'mainnet'
+                    });
+                    
+                    await client.connect();
+                    const selectedNode = client.url;
+                    
+                    this.log(`[${nodeIndex}] Connected to: ${selectedNode}`, 'info');
+                    
+                    // Get node information
+                    const info = await client.getInfo();
+                    const dagInfo = await client.getBlockDagInfo();
+                    const blockCount = parseInt(dagInfo.blockCount);
+                    
+                    // Test if archive node
+                    const isArchive = await this.testArchiveCapability(client, blockCount);
+                    
+                    // Store result
+                    const nodeInfo = {
+                        url: selectedNode,
+                        blockCount,
+                        isArchive,
+                        isSynced: info.isSynced,
+                        serverVersion: info.serverVersion,
+                        timestamp: new Date().toISOString()
+                    };
+                    
+                    this.discoveredNodes.set(selectedNode, nodeInfo);
+                    if (isArchive) {
+                        this.archiveNodes.set(selectedNode, nodeInfo);
+                        this.stats.archiveCount++;
+                        this.displayArchiveNode(nodeInfo);
+                    }
+                    
+                    this.stats.totalTested++;
+                    this.stats.successCount++;
+                    
+                    await client.disconnect();
+                    return nodeInfo;
+                    
+                } catch (error) {
+                    this.log(`[${nodeIndex}] Connection failed: ${error.message}`, 'error');
+                    this.stats.totalTested++;
+                    return null;
+                } finally {
+                    this.stats.activeTasks--;
+                    this.updateStats();
+                }
+            }
+
+            async testArchiveCapability(client, blockCount) {
+                // First check: block count threshold
+                if (blockCount < this.config.archiveThreshold) {
+                    return false;
+                }
+                
+                // Second check: test historical block access
+                if (this.config.testOldBlocks) {
+                    try {
+                        // Test 1-day old blocks
+                        const testDepth = this.config.blocksPerDay;
+                        const testHash = await this.getBlockHashAtDepth(client, testDepth);
+                        
+                        if (testHash) {
+                            const block = await client.getBlock(testHash);
+                            if (block) {
+                                this.log(`✅ Archive node confirmed - can access ${testDepth} blocks deep`, 'archive');
+                                return true;
+                            }
+                        }
+                    } catch (error) {
+                        // Not an archive node if historical access fails
+                        return false;
+                    }
+                }
+                
+                return blockCount > this.config.archiveThreshold;
+            }
+
+            async getBlockHashAtDepth(client, depth) {
+                try {
+                    const currentSelected = await client.getVirtualSelectedParentChainFromBlock(
+                        '0000000000000000000000000000000000000000000000000000000000000000',
+                        true
+                    );
+                    
+                    if (currentSelected && currentSelected.hashes && currentSelected.hashes.length > depth) {
+                        return currentSelected.hashes[currentSelected.hashes.length - depth - 1];
+                    }
+                } catch (error) {
+                    // Fallback method or return null
+                }
+                return null;
+            }
+
+            stopDiscovery() {
+                if (this.isRunning) {
+                    this.isRunning = false;
+                    this.abortController?.abort();
+                    this.log('🛑 Stopping discovery...', 'warning');
+                }
+            }
+
+            exportResults() {
+                const results = {
+                    timestamp: new Date().toISOString(),
+                    stats: this.stats,
+                    archiveNodes: Array.from(this.archiveNodes.values()),
+                    allNodes: Array.from(this.discoveredNodes.values())
+                };
+                
+                const blob = new Blob([JSON.stringify(results, null, 2)], 
+                    { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `kaspa-archive-nodes-${Date.now()}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+                
+                this.log(`📄 Exported ${this.archiveNodes.size} archive nodes`, 'success');
+            }
+
+            updateConfig() {
+                this.config.maxNodes = parseInt(document.getElementById('maxNodes').value) || 100;
+                this.config.concurrency = parseInt(document.getElementById('concurrency').value) || 5;
+                this.config.testOldBlocks = document.getElementById('testOldBlocks').checked;
+                this.config.autoStop = document.getElementById('autoStop').checked;
+            }
+
+            updateStats() {
+                document.getElementById('totalTested').textContent = this.stats.totalTested;
+                document.getElementById('archiveCount').textContent = this.stats.archiveCount;
+                document.getElementById('activeTests').textContent = this.stats.activeTasks;
+                
+                const rate = this.stats.totalTested > 0 
+                    ? ((this.stats.successCount / this.stats.totalTested) * 100).toFixed(1)
+                    : 0;
+                document.getElementById('successRate').textContent = `${rate}%`;
+            }
+
+            updateProgress(processed) {
+                const progress = (processed / this.config.maxNodes) * 100;
+                document.getElementById('progressBar').style.width = `${progress}%`;
+            }
+
+            displayArchiveNode(nodeInfo) {
+                const list = document.getElementById('archiveNodeList');
+                if (list.querySelector('.info')) {
+                    list.innerHTML = '';
+                }
+                
+                const item = document.createElement('div');
+                item.className = 'node-item archive-node';
+                item.innerHTML = `
+                    <strong>🎯 Archive Node</strong><br>
+                    URL: ${nodeInfo.url}<br>
+                    Blocks: ${nodeInfo.blockCount.toLocaleString()}<br>
+                    Version: ${nodeInfo.serverVersion}<br>
+                    Found: ${new Date(nodeInfo.timestamp).toLocaleTimeString()}
+                `;
+                list.appendChild(item);
+            }
+
+            log(message, type = 'info') {
+                const logElement = document.getElementById('log');
+                const timestamp = new Date().toLocaleTimeString();
+                const span = document.createElement('span');
+                span.className = type;
+                span.textContent = `[${timestamp}] ${message}\n`;
+                logElement.appendChild(span);
+                logElement.scrollTop = logElement.scrollHeight;
+            }
+
+            clearLogs() {
+                document.getElementById('log').innerHTML = '';
+                this.log('Logs cleared', 'info');
+            }
+        }
+
+        // Application Controller
+        class App {
+            constructor() {
+                this.discovery = new ArchiveNodeDiscovery();
+                this.setupEventListeners();
+            }
+
+            setupEventListeners() {
+                // Update button states based on discovery status
+                setInterval(() => {
+                    const isInitialized = this.discovery.kaspa !== null;
+                    const isRunning = this.discovery.isRunning;
+                    
+                    document.getElementById('initBtn').disabled = isInitialized;
+                    document.getElementById('startBtn').disabled = !isInitialized || isRunning;
+                    document.getElementById('stopBtn').disabled = !isRunning;
+                    document.getElementById('exportBtn').disabled = 
+                        this.discovery.archiveNodes.size === 0;
+                }, 100);
+            }
+
+            async initialize() {
+                const success = await this.discovery.initialize();
+                if (success) {
+                    document.getElementById('initBtn').disabled = true;
+                    document.getElementById('startBtn').disabled = false;
+                }
+            }
+
+            async startDiscovery() {
+                await this.discovery.startDiscovery();
+            }
+
+            stopDiscovery() {
+                this.discovery.stopDiscovery();
+            }
+
+            exportResults() {
+                this.discovery.exportResults();
+            }
+
+            clearLogs() {
+                this.discovery.clearLogs();
+            }
+        }
+
+        // Initialize application
+        window.app = new App();
+        
+        // Auto-initialize on page load
+        window.addEventListener('load', () => {
+            app.discovery.log('🎯 Kaspa Archive Node Discovery v28 - Ready', 'info');
+            app.discovery.log('Class-based architecture with resolver integration', 'info');
+        });
+    </script>
+</body>
+</html>

@@ -1022,6 +1022,200 @@
             },
         };
         
+        // ============= ERROR HANDLING SYSTEM =============
+        // Centralized error handling and retry logic
+        
+        // Error categories
+        const ERROR_TYPES = {
+            NETWORK: 'NETWORK',
+            VALIDATION: 'VALIDATION',
+            FILESYSTEM: 'FILESYSTEM',
+            CRYPTO: 'CRYPTO',
+            TRANSACTION: 'TRANSACTION',
+            SYSTEM: 'SYSTEM',
+            USER: 'USER'
+        };
+        
+        // Error Handler Class
+        class ErrorHandler {
+            static handle(error, context, options = {}) {
+                const {
+                    type = ERROR_TYPES.SYSTEM,
+                    showAlert = false,
+                    showLog = true,
+                    rethrow = false,
+                    userMessage = null
+                } = options;
+                
+                // Format error message
+                const timestamp = new Date().toISOString();
+                const errorMessage = error?.message || String(error);
+                const fullMessage = `[${context}] ${errorMessage}`;
+                
+                // Log error if enabled
+                if (showLog) {
+                    log(fullMessage, 'error');
+                    // Also log to console for debugging
+                    console.error(`[${timestamp}] ${fullMessage}`, error);
+                }
+                
+                // Show alert if requested
+                if (showAlert) {
+                    const alertMessage = userMessage || this.getUserFriendlyMessage(type, errorMessage);
+                    alert(alertMessage);
+                }
+                
+                // Update UI if applicable
+                this.updateErrorUI(context, errorMessage);
+                
+                // Rethrow if requested
+                if (rethrow) {
+                    throw error;
+                }
+                
+                return { success: false, error: errorMessage };
+            }
+            
+            static getUserFriendlyMessage(type, errorMessage) {
+                const messages = {
+                    [ERROR_TYPES.NETWORK]: 'ネットワーク接続エラーが発生しました。接続を確認してください。',
+                    [ERROR_TYPES.VALIDATION]: '入力内容に誤りがあります。',
+                    [ERROR_TYPES.FILESYSTEM]: 'ファイル操作中にエラーが発生しました。',
+                    [ERROR_TYPES.CRYPTO]: '暗号化処理中にエラーが発生しました。',
+                    [ERROR_TYPES.TRANSACTION]: 'トランザクション処理中にエラーが発生しました。',
+                    [ERROR_TYPES.SYSTEM]: 'システムエラーが発生しました。',
+                    [ERROR_TYPES.USER]: errorMessage
+                };
+                return messages[type] || messages[ERROR_TYPES.SYSTEM];
+            }
+            
+            static updateErrorUI(context, message) {
+                // Update status elements based on context
+                const contextMap = {
+                    'upload': 'uploadStatus',
+                    'download': 'downloadStatus',
+                    'chunk': 'chunkStatus',
+                    'network': 'networkStatus'
+                };
+                
+                const elementId = contextMap[context.toLowerCase().split('-')[0]];
+                if (elementId) {
+                    const element = document.getElementById(elementId);
+                    if (element) {
+                        element.textContent = `エラー: ${message}`;
+                        element.className = 'error';
+                    }
+                }
+            }
+        }
+        
+        // Retry utility with exponential backoff
+        async function retryWithBackoff(operation, options = {}) {
+            const {
+                maxRetries = CONFIG.RETRY.DEFAULT_COUNT,
+                baseDelay = CONFIG.RETRY.EXPONENTIAL_BASE,
+                context = 'Operation',
+                onRetry = null
+            } = options;
+            
+            let lastError;
+            
+            for (let attempt = 0; attempt <= maxRetries; attempt++) {
+                try {
+                    return await operation();
+                } catch (error) {
+                    lastError = error;
+                    
+                    if (attempt < maxRetries) {
+                        const delay = baseDelay * Math.pow(2, attempt);
+                        log(`${context} 失敗 (試行 ${attempt + 1}/${maxRetries}): ${error.message}`, 'warning');
+                        log(`${delay}ms 後にリトライします...`, 'info');
+                        
+                        if (onRetry) {
+                            onRetry(attempt + 1, maxRetries, error);
+                        }
+                        
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                    }
+                }
+            }
+            
+            // All retries failed
+            ErrorHandler.handle(lastError, context, {
+                type: ERROR_TYPES.NETWORK,
+                showLog: true,
+                userMessage: `${context}が${maxRetries}回の試行後も失敗しました。`
+            });
+            
+            throw lastError;
+        }
+        
+        // Wrapper for async operations with error handling
+        async function safeExecute(operation, context, options = {}) {
+            try {
+                return await operation();
+            } catch (error) {
+                return ErrorHandler.handle(error, context, options);
+            }
+        }
+        
+        // Network-specific error handler
+        async function handleNetworkError(error, context) {
+            // Check if it's a connection error
+            if (error.message?.includes('Failed to fetch') || 
+                error.message?.includes('NetworkError') ||
+                error.message?.includes('ERR_NETWORK')) {
+                
+                updateNetworkStatus('offline', 'ネットワークエラー');
+                
+                return ErrorHandler.handle(error, context, {
+                    type: ERROR_TYPES.NETWORK,
+                    showAlert: true,
+                    userMessage: 'ネットワーク接続を確認してください。'
+                });
+            }
+            
+            // For other errors, use general handler
+            return ErrorHandler.handle(error, context, {
+                type: ERROR_TYPES.SYSTEM
+            });
+        }
+        
+        // Transaction-specific error handler with retry
+        async function executeTransaction(txOperation, context) {
+            return retryWithBackoff(
+                txOperation,
+                {
+                    maxRetries: CONFIG.RETRY.DEFAULT_COUNT,
+                    context: `Transaction ${context}`,
+                    onRetry: (attempt, max) => {
+                        const statusEl = document.getElementById('transactionStatus');
+                        if (statusEl) {
+                            statusEl.textContent = `トランザクション送信中... (${attempt}/${max})`;
+                        }
+                    }
+                }
+            );
+        }
+        
+        // File operation error handler
+        function handleFileError(error, operation) {
+            const fileErrors = {
+                'NotAllowedError': 'ファイルアクセスが許可されていません。',
+                'NotFoundError': 'ファイルが見つかりません。',
+                'SecurityError': 'セキュリティ制限によりアクセスできません。',
+                'AbortError': '操作がキャンセルされました。'
+            };
+            
+            const userMessage = fileErrors[error.name] || `ファイル${operation}中にエラーが発生しました。`;
+            
+            return ErrorHandler.handle(error, `File ${operation}`, {
+                type: ERROR_TYPES.FILESYSTEM,
+                showAlert: true,
+                userMessage
+            });
+        }
+        
         // Legacy constants for backward compatibility (will be removed in future)
         const CHUNKS_PER_META = CONFIG.CHUNKS_PER_META;
         const MAX_CHUNKS_SUPPORTED = CONFIG.MAX_CHUNKS_SUPPORTED;
@@ -1082,8 +1276,10 @@
                         log('[UploadHistoryManager] ワークスペースハンドルが存在しません', 'info');
                     }
                 } catch (error) {
-                    log(`[UploadHistoryManager] 初期化エラー: ${error.message}`, 'error');
-                    throw error;
+                    ErrorHandler.handle(error, 'UploadHistoryManager-Initialize', {
+                        type: ERROR_TYPES.SYSTEM,
+                        rethrow: true
+                    });
                 }
             }
             
@@ -2742,8 +2938,11 @@
                         localStorage.setItem('kaspa-upload-metadata', JSON.stringify(metadata));
                         // v4.7.25: Remove save notifications
                     } catch (err) {
-                        // v4.7.25: Remove error log for localStorage
-                        console.error(`localStorage保存エラー: ${err.message}`);
+                        // v4.7.25: Use centralized error handler
+                        ErrorHandler.handle(err, 'Progress-LocalStorage', {
+                            type: ERROR_TYPES.SYSTEM,
+                            showLog: true
+                        });
                     }
                     
                     // Save to file if workspace is available
@@ -2759,8 +2958,11 @@
                             
                             // v4.7.25: Remove save notifications and status update
                         } catch (err) {
-                            // v4.7.25: Remove error log for file save
-                        console.error(`ファイル保存エラー: ${err.message}`);
+                            // v4.7.25: Use centralized error handler
+                        ErrorHandler.handle(err, 'Progress-FileSave', {
+                            type: ERROR_TYPES.FILESYSTEM,
+                            showLog: true
+                        });
                         }
                     } else {
                         // No workspace - localStorage only, no automatic downloads
@@ -2932,28 +3134,26 @@
                     try {
                         const { txId, blockId, index } = work;
                         
-                        let response = null;
-                        let lastError = null;
-                        
-                        for (let retry = 0; retry <= this.maxRetries; retry++) {
-                            try {
-                                response = await this.rpcClient.getBlock({
+                        // Use centralized retry logic
+                        const response = await retryWithBackoff(
+                            async () => {
+                                return await this.rpcClient.getBlock({
                                     hash: blockId,
                                     includeTransactions: true
                                 });
-                                break;
-                            } catch (error) {
-                                lastError = error;
-                                if (retry < this.maxRetries) {
-                                    log(`チャンク${index}の取得に失敗 (リトライ ${retry + 1}/${this.maxRetries}): ${error.message}`, 'warning');
-                                    await new Promise(resolve => setTimeout(resolve, 1000 * (retry + 1)));
+                            },
+                            {
+                                maxRetries: this.maxRetries,
+                                context: `チャンク${index}取得`,
+                                onRetry: (attempt, max) => {
+                                    // Update UI if needed
+                                    const chunkStatus = document.getElementById(`chunk-status-${index}`);
+                                    if (chunkStatus) {
+                                        chunkStatus.textContent = `リトライ ${attempt}/${max}`;
+                                    }
                                 }
                             }
-                        }
-                        
-                        if (!response) {
-                            throw lastError || new Error('ブロック取得に失敗');
-                        }
+                        );
                         
                         const block = response?.block?.block || response?.block;
                         if (!block) {
@@ -3439,8 +3639,11 @@
                 window.directoryManager.updateUI();
                 
             } catch (error) {
-                log(`ディレクトリ作成エラー: ${error.message}`, 'error');
-                alert(`エラー: ${error.message}`);
+                ErrorHandler.handle(error, 'Directory-Create', {
+                    type: ERROR_TYPES.FILESYSTEM,
+                    showAlert: true,
+                    showLog: true
+                });
             }
         };
 

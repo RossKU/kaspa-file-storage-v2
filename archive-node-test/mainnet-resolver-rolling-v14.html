@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa Mainnet Resolver Rolling Discovery V13 - Fixed Config</title>
+    <title>Kaspa Mainnet Resolver Rolling Discovery V14 - Minimal Changes</title>
     <style>
         body {
             font-family: monospace;
@@ -182,16 +182,44 @@
     </div>
 
     <div class="container">
-        <h2>Step 2: Configuration</h2>
-        <div style="background: #1a1a1a; padding: 15px; border-radius: 4px; font-size: 13px;">
-            <div style="color: #4CAF50; margin-bottom: 8px;"><strong>Fixed Configuration:</strong></div>
-            <div style="color: #888; line-height: 1.8;">
-                • Resolver: kaspa.stream<br>
-                • Test Interval: 2 seconds<br>
-                • Max Nodes: 10,000<br>
-                • Archive Threshold: 50M blocks (~58 days)<br>
-                • Auto-switch: Enabled<br>
-                • Historical Test: Enabled (1 day + 50% depth)
+        <h2>Step 2: Configure Rolling Discovery</h2>
+        <div class="resolver-config">
+            <div style="margin-top: 10px;">
+                <label>Resolver URL:</label>
+                <input type="text" id="resolverUrl" value="https://kaspa.stream" style="width: 300px; background: #333; color: #e0e0e0; border: 1px solid #555; padding: 5px; border-radius: 4px;">
+            </div>
+            <div>
+                <label>Test Interval (seconds):</label>
+                <input type="number" id="testInterval" value="2" min="1" max="60">
+            </div>
+            <div>
+                <label>Max Nodes to Test:</label>
+                <input type="number" id="maxNodes" value="50" min="10" max="1000">
+            </div>
+            <div>
+                <label>Archive Threshold (blocks):</label>
+                <input type="number" id="archiveThreshold" value="50000000" min="1000000">
+                <div style="font-size: 11px; color: #888; margin-top: 5px;">
+                    50M blocks = ~58 days of history (Kaspa: 10 BPS = 864,000 blocks/day)
+                </div>
+            </div>
+            <div style="margin-top: 10px;">
+                <label>
+                    <input type="checkbox" id="autoSwitch" checked>
+                    Auto-switch to new nodes from Resolver
+                </label>
+            </div>
+            <div>
+                <label>
+                    <input type="checkbox" id="testOldBlocks" checked>
+                    Test historical block access (slower but accurate)
+                </label>
+            </div>
+            <div>
+                <label>
+                    <input type="checkbox" id="skipDuplicateCheck">
+                    Allow re-testing same nodes (for debugging)
+                </label>
             </div>
         </div>
     </div>
@@ -292,11 +320,11 @@
         let currentClient = null;
         let resolver = null;
         
-        // Fixed configuration values
+        // Fixed configuration values (not used yet)
         const CONFIG = {
             resolverUrl: 'https://kaspa.stream',
             testInterval: 2,  // seconds
-            maxNodes: 10000,  // max nodes to test
+            maxNodes: 50,  // SAME AS UI DEFAULT
             archiveThreshold: 50000000,  // 50M blocks (~58 days)
             autoSwitch: true,  // auto-switch to new nodes
             testOldBlocks: true,  // test historical block access
@@ -466,7 +494,7 @@
             }
             
             // Update progress bar
-            const maxNodes = CONFIG.maxNodes;
+            const maxNodes = parseInt(document.getElementById('maxNodes').value);
             const progress = Math.min((stats.totalTested / maxNodes) * 100, 100);
             document.getElementById('progressBar').style.width = `${progress}%`;
             
@@ -512,7 +540,7 @@
                     // In maintenance mode, ignore max nodes limit
                     if (maintainArchives && !isDiscovering) {
                         setTimeout(() => spawnWorker(), 1000);
-                    } else if (stats.totalTested < CONFIG.maxNodes) {
+                    } else if (stats.totalTested < parseInt(document.getElementById('maxNodes').value)) {
                         setTimeout(() => spawnWorker(), 1000);
                     }
                 }
@@ -525,7 +553,7 @@
                 await discoverNextNode(workerId);
                 
                 // Wait before next discovery
-                const testInterval = CONFIG.testInterval * 1000;
+                const testInterval = parseInt(document.getElementById('testInterval').value) * 1000;
                 await new Promise(resolve => setTimeout(resolve, testInterval));
             } catch (error) {
                 log(`Worker ${workerId} error: ${error.message}`, 'error');
@@ -611,7 +639,7 @@
             activeWorkerCount = 0;
             
             // Clear previous data if needed
-            if (CONFIG.skipDuplicateCheck) {
+            if (document.getElementById('skipDuplicateCheck').checked) {
                 testedNodeIdentifiers.clear();
                 log('Cleared duplicate check cache for re-testing', 'info');
             }
@@ -620,7 +648,7 @@
             document.getElementById('stopBtn').disabled = false;
             document.getElementById('stopBtn2').disabled = false;
             
-            const maxNodes = CONFIG.maxNodes;
+            const maxNodes = parseInt(document.getElementById('maxNodes').value);
             const testInterval = parseInt(document.getElementById('testInterval').value) * 1000;
             
             log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info');
@@ -786,7 +814,7 @@
                 });
                 
                 // Check if we've already tested this node
-                const skipDuplicateCheck = CONFIG.skipDuplicateCheck;
+                const skipDuplicateCheck = document.getElementById('skipDuplicateCheck').checked;
                 if (!skipDuplicateCheck && testedNodeIdentifiers.has(nodeIdentifier)) {
                     log(`Already tested node with same version/height (${nodeIdentifier}), skipping...`, 'warning');
                     await client.disconnect();
@@ -794,8 +822,8 @@
                 }
                 
                 // Test archive capability
-                const archiveThreshold = CONFIG.archiveThreshold;
-                const testOldBlocks = CONFIG.testOldBlocks;
+                const archiveThreshold = parseInt(document.getElementById('archiveThreshold').value);
+                const testOldBlocks = document.getElementById('testOldBlocks').checked;
                 let isArchive = false;
                 
                 // First check by block count threshold
@@ -1253,7 +1281,7 @@
             // Clear node cache on page load (F5 reset)
             localStorage.removeItem('kaspaNodeCache');
             
-            log('Kaspa Resolver Rolling Discovery V13 Ready', 'info');
+            log('Kaspa Resolver Rolling Discovery V14 Ready - Testing minimal changes', 'info');
             log('Dynamic Worker System: 5 Workers → Archive Found → Worker Reduction → Auto-Recovery', 'info');
             log('Node cache cleared (F5 reset)', 'debug');
         });

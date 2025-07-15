@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.4.0 - Archive Node Support</title>
+    <title>Kaspa P2P File Storage v5.4.8 - Refactored Edition</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -458,7 +458,7 @@
 </head>
 <body>
     <div class="header">
-        <h1 id="appTitle">🚀 Kaspa P2P File Storage v5.3.11 - Loading...</h1>
+        <h1 id="appTitle">🚀 Kaspa P2P File Storage v5.4.8 - Loading...</h1>
         <p>実ネットワーク接続による完全なP2Pファイル共有システム（用語修正）</p>
         <p id="appSubtitle" style="font-size: 12px; color: #49EACB; margin-top: 5px;">📋 Loading version...</p>
         <div id="networkStatus" style="margin-top: 10px;">
@@ -872,7 +872,10 @@
     </div>
 
     <script type="module">
-        // v5.3.14: Optimized kprogress format
+        // v5.4.8: Refactored Edition
+        // - Centralized configuration (CONFIG object)
+        // - Unified error handling system
+        // - Progress update consolidation (next)
         // - Removed duplicate chunks/chunkBlockIds arrays from root level
         // - All chunk information now stored only in _progress.chunkDetails
         // - Reduces kprogress file size by eliminating redundant data
@@ -1214,6 +1217,152 @@
                 showAlert: true,
                 userMessage
             });
+        }
+        
+        // ============= PROGRESS UPDATE SYSTEM =============
+        // Unified progress update management
+        
+        /**
+         * Unified progress update function for all progress bars
+         * @param {Object} options - Progress update options
+         * @param {string} options.type - 'upload' or 'download'
+         * @param {number} options.current - Current progress value
+         * @param {number} options.total - Total value
+         * @param {number} [options.percent] - Pre-calculated percentage
+         * @param {string} [options.statusText] - Status message
+         * @param {boolean} [options.showProgress] - Show/hide progress container
+         * @param {number} [options.decimals=0] - Number of decimal places
+         * @param {string} [options.customStatus] - Custom status element ID
+         */
+        function updateProgress(options) {
+            const {
+                type,
+                current,
+                total,
+                percent,
+                statusText,
+                showProgress,
+                decimals = 0,
+                customStatus
+            } = options;
+            
+            // Calculate percentage if not provided
+            const percentage = percent !== undefined ? percent : 
+                (total > 0 ? ((current / total) * 100).toFixed(decimals) : 0);
+            
+            // Get element IDs based on type
+            const progressId = `${type}Progress`;
+            const progressBarId = `${type}ProgressBar`;
+            const statusId = customStatus || `${type}Status`;
+            
+            // Handle show/hide
+            if (showProgress !== undefined) {
+                const progressElement = document.getElementById(progressId);
+                if (progressElement) {
+                    progressElement.style.display = showProgress ? 'block' : 'none';
+                }
+            }
+            
+            // Update progress bar
+            const progressBar = document.getElementById(progressBarId);
+            if (progressBar) {
+                progressBar.style.width = percentage + '%';
+                
+                // Set text content based on context
+                if (statusText && type === 'upload' && current !== undefined && total !== undefined) {
+                    progressBar.textContent = `${percentage}% - ${statusText}`;
+                } else {
+                    progressBar.textContent = percentage + '%';
+                }
+            }
+            
+            // Update status text
+            if (statusText) {
+                const statusElement = document.getElementById(statusId);
+                if (statusElement) {
+                    statusElement.textContent = statusText;
+                }
+            }
+            
+            // Log progress for debugging
+            if (CONFIG.UI.PROGRESS_UPDATE_INTERVAL && current % CONFIG.UI.PROGRESS_UPDATE_INTERVAL === 0) {
+                log(`[Progress] ${type}: ${percentage}% (${current}/${total})`, 'debug');
+            }
+        }
+        
+        /**
+         * Helper function to update chunk progress display
+         * @param {number} index - Chunk index
+         * @param {string} status - Status text or HTML
+         * @param {string} [className] - CSS class for styling
+         */
+        function updateChunkStatus(index, status, className) {
+            const element = document.getElementById(`chunk-status-${index}`);
+            if (element) {
+                element.innerHTML = status;
+                if (className) {
+                    element.className = className;
+                }
+            }
+        }
+        
+        /**
+         * Show/hide progress container with optional initialization
+         * @param {string} type - 'upload' or 'download'
+         * @param {boolean} show - Show or hide
+         * @param {Object} [initOptions] - Initial progress options
+         */
+        function toggleProgress(type, show, initOptions = {}) {
+            updateProgress({
+                type,
+                showProgress: show,
+                ...initOptions
+            });
+            
+            // Reset progress bar if hiding
+            if (!show) {
+                updateProgress({
+                    type,
+                    current: 0,
+                    total: 100,
+                    statusText: ''
+                });
+            }
+        }
+        
+        /**
+         * Calculate and format file size progress
+         * @param {number} loaded - Bytes loaded
+         * @param {number} total - Total bytes
+         * @returns {string} Formatted progress string
+         */
+        function formatSizeProgress(loaded, total) {
+            const loadedMB = (loaded / CONFIG.CONVERSION.MB).toFixed(2);
+            const totalMB = (total / CONFIG.CONVERSION.MB).toFixed(2);
+            return `${loadedMB} / ${totalMB} MB`;
+        }
+        
+        /**
+         * Calculate throughput and ETA
+         * @param {number} bytesProcessed - Bytes processed so far
+         * @param {number} startTime - Start timestamp
+         * @param {number} totalBytes - Total bytes to process
+         * @returns {Object} Throughput and ETA information
+         */
+        function calculateThroughput(bytesProcessed, startTime, totalBytes) {
+            const elapsed = (Date.now() - startTime) / 1000; // seconds
+            const throughput = bytesProcessed / elapsed; // bytes per second
+            const throughputMBps = (throughput / CONFIG.CONVERSION.MB).toFixed(2);
+            
+            const remainingBytes = totalBytes - bytesProcessed;
+            const etaSeconds = remainingBytes / throughput;
+            const etaMinutes = Math.ceil(etaSeconds / 60);
+            
+            return {
+                throughputMBps,
+                etaMinutes,
+                elapsed: elapsed.toFixed(1)
+            };
         }
         
         // Legacy constants for backward compatibility (will be removed in future)
@@ -5299,7 +5448,7 @@
             }
             
             document.getElementById('uploadBtn').disabled = true;
-            document.getElementById('uploadProgress').style.display = 'block';
+            toggleProgress('upload', true, { current: 0, total: 100, statusText: 'ファイルを処理中...' });
             
             try {
                 const files = window.selectedDirectory.files;
@@ -5378,10 +5527,13 @@
                         });
                     }
                     
-                    // Update progress
-                    const progressPercent = Math.round(((i + 1) / files.length) * 100);
-                    document.getElementById('uploadProgressBar').style.width = progressPercent + '%';
-                    document.getElementById('uploadProgressBar').textContent = `${progressPercent}% - ${i + 1}/${files.length} ファイル`;
+                    // Update progress using unified function
+                    updateProgress({
+                        type: 'upload',
+                        current: i + 1,
+                        total: files.length,
+                        statusText: `${i + 1}/${files.length} ファイル`
+                    });
                 }
                 
                 // Create directory metadata
@@ -6896,7 +7048,7 @@
                     }
                     
                     // Update status
-                    document.getElementById(`chunk-status-${i}`).innerHTML = '<span class="uploading">アップロード中...</span>';
+                    updateChunkStatus(i, '<span class="uploading">アップロード中...</span>');
                     
                     // Upload to blockchain with retry
                     let txid = null;
@@ -8260,9 +8412,11 @@
                         
                         await window.downloadManager.executeDownload(metadata, password, {
                             onProgress: (progress) => {
-                                const percent = ((completedFiles + progress.current/progress.total) / totalFiles * 100).toFixed(0);
-                                document.getElementById('downloadProgressBar').style.width = percent + '%';
-                                document.getElementById('downloadProgressBar').textContent = percent + '%';
+                                const percent = ((completedFiles + progress.current/progress.total) / totalFiles * 100);
+                                updateProgress({
+                                    type: 'download',
+                                    percent: percent.toFixed(0)
+                                });
                             },
                             folderStructure: folderStructureOption
                         });
@@ -10734,4 +10888,4 @@
         });
     </script>
 </body>
-</html><!-- Force GitHub Pages update: Mon Jul 13 2025 - v5.4.0: Archive Node Support -->
+</html><!-- Force GitHub Pages update: Wed Jul 16 2025 - v5.4.8: Refactored Edition -->

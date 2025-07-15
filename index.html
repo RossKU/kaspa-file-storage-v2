@@ -10401,6 +10401,36 @@
         }
 
         // UI用の関数
+        function onNodeTypeChange() {
+            const nodeTypeSelect = document.getElementById('nodeTypeSelect');
+            const customEndpointSection = document.getElementById('customEndpointSection');
+            
+            if (nodeTypeSelect && customEndpointSection) {
+                if (nodeTypeSelect.value === 'custom') {
+                    customEndpointSection.style.display = 'block';
+                } else {
+                    customEndpointSection.style.display = 'none';
+                }
+                
+                // Update config
+                config.nodeType = nodeTypeSelect.value;
+                log(`[Config] ノードタイプ変更: ${config.nodeType}`, 'info');
+            }
+        }
+        
+        function saveCustomEndpoint() {
+            const customEndpointInput = document.getElementById('customRpcEndpoint');
+            if (customEndpointInput && customEndpointInput.value.trim()) {
+                config.customEndpoint = customEndpointInput.value.trim();
+                log(`[Config] カスタムエンドポイント保存: ${config.customEndpoint}`, 'info');
+                
+                // If currently using custom node type, update connection
+                if (config.nodeType === 'custom') {
+                    log('[Config] 次回接続時にカスタムエンドポイントが使用されます', 'info');
+                }
+            }
+        }
+        
         function runPhase1Test() {
             const statusEl = document.getElementById('phase1TestStatus');
             statusEl.style.display = 'block';

@@ -515,11 +515,46 @@
             }
         }
 
-        window.D = new Discovery();
+        // Create instance with proper namespace
+        const discovery = new Discovery();
+        
+        // Legacy support
+        window.D = discovery;
+        
+        // Proper namespace for index.html integration
+        window.KaspaModules = window.KaspaModules || {};
+        window.KaspaModules.archiveDiscovery = discovery;
+        
+        // Add public API methods to Discovery class
+        Discovery.prototype.getActiveArchiveNodes = function() {
+            return Array.from(this.connections.entries()).map(([id, client]) => {
+                const node = this.archives.get(id);
+                return {
+                    id,
+                    url: client.url || client._url,
+                    version: node?.version,
+                    height: node?.height,
+                    client
+                };
+            });
+        };
+        
+        Discovery.prototype.getRandomArchiveNode = function() {
+            if (this.connections.size === 0) return null;
+            const nodes = Array.from(this.connections.entries());
+            const randomIndex = Math.floor(Math.random() * nodes.length);
+            const [id, client] = nodes[randomIndex];
+            return {
+                id,
+                client,
+                node: this.archives.get(id)
+            };
+        };
         
         window.addEventListener('DOMContentLoaded', () => {
             localStorage.removeItem('kaspaNodeCache');
             console.log('Kaspa Discovery v29 - Compact Edition');
+            console.log('Archive Discovery API available at: window.KaspaModules.archiveDiscovery');
         });
         
         window.addEventListener('beforeunload', () => {

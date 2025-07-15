@@ -421,16 +421,22 @@
                 }
                 
                 const hash = document.getElementById('testBlockHash').value.trim();
+                this.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info');
+                this.log(`Testing ${this.connections.size} archive nodes...`, 'info');
                 
                 for (const [id, client] of this.connections) {
                     const node = this.archives.get(id);
-                    this.log(`Testing ${node?.version}...`);
+                    this.log(`\nTesting ${node?.version || 'Unknown'} (${((node?.height || 0)/1e6).toFixed(1)}M blocks)...`, 'info');
                     
                     try {
+                        // Get DAG info
                         const dag = await client.getBlockDagInfo();
-                        this.log(`Block count: ${dag.blockCount}`, 'info');
+                        this.log(`Current block count: ${dag.blockCount}`, 'info');
+                        this.log(`Tip hashes: ${dag.tipHashes?.length || 0}`, 'debug');
                         
+                        // Test with custom hash if provided
                         if (hash && hash.length === 64) {
+                            this.log(`Getting block by hash: ${hash}...`);
                             const hashBlock = await client.getBlock({ 
                                 hash: hash,
                                 includeTransactions: true 
@@ -441,15 +447,35 @@
                                 this.log(`  Height: ${block.header?.daaScore || 'N/A'}`, 'info');
                                 this.log(`  Transactions: ${block.transactions?.length || 0}`, 'info');
                             }
+                        } else if (dag.tipHashes && dag.tipHashes.length > 0) {
+                            // Test with tip hash
+                            const tipHash = dag.tipHashes[0];
+                            this.log(`Getting tip block: ${tipHash}...`);
+                            try {
+                                const tipBlock = await client.getBlock({
+                                    hash: tipHash,
+                                    includeTransactions: true
+                                });
+                                if (tipBlock) {
+                                    const block = tipBlock.block || tipBlock;
+                                    this.log('✓ Tip block retrieved', 'success');
+                                    this.log(`  Transactions: ${block.transactions?.length || 0}`, 'info');
+                                }
+                            } catch (blockErr) {
+                                this.log(`getBlock failed: ${blockErr?.message || blockErr}`, 'error');
+                            }
                         }
                         
-                        this.log('✓ Test passed', 'success');
+                        this.log('✓ Connection test passed', 'success');
                     } catch (e) {
-                        this.log(`Test failed: ${e.message}`, 'error');
-                        this.log(`Error type: ${e.constructor?.name}`, 'debug');
-                        console.error('Full error:', e);
+                        const errorMsg = e?.message || e?.toString() || 'Unknown error';
+                        this.log(`Test failed: ${errorMsg}`, 'error');
+                        if (e?.stack) {
+                            console.error('Stack trace:', e.stack);
+                        }
                     }
                 }
+                this.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info');
             }
 
             updateUI() {

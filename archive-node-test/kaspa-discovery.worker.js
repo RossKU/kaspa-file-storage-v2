@@ -175,10 +175,10 @@ async function discoverNextNode() {
                 resolver = new kaspa.Resolver();
                 sendLog('Resolver created', 'debug');
                 
-                // NetworkType might be an enum or object
+                // NetworkType is an enum - use the numeric value
                 sendLog(`NetworkType object: ${JSON.stringify(kaspa.NetworkType)}`, 'debug');
-                const networkType = kaspa.NetworkType?.Mainnet || 'mainnet';
-                sendLog(`Connecting to ${config.resolverUrl} with network: ${networkType}`, 'debug');
+                const networkType = kaspa.NetworkType.Mainnet; // This is 0
+                sendLog(`Connecting to ${config.resolverUrl} with network type: ${networkType}`, 'debug');
                 
                 await resolver.connect(networkType, config.resolverUrl);
                 sendLog('Resolver connected', 'success');
@@ -255,10 +255,10 @@ async function testNode(url) {
     let client = null;
     
     try {
-        // Create worker client
+        // Create worker client with resolver instance
         client = new kaspa.RpcClient({
             resolver: resolver,
-            networkType: 'mainnet'
+            networkId: 'mainnet'  // Use networkId, not networkType
         });
         
         // Connect with timeout

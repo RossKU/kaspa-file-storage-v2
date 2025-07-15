@@ -73,9 +73,8 @@ async function handleInit(scriptUrl) {
         // Import Kaspa module dynamically
         kaspa = await import(scriptUrl || './kaspa-core.js');
         
-        // Initialize WASM framework
-        await kaspa.init();
-        await kaspa.Wallet.setWorkerLogLevel('none');
+        // Initialize WASM by calling the default export
+        await kaspa.default('./kaspa-core_bg.wasm');
         
         sendLog('Kaspa module initialized', 'success');
         sendMessage('INITIALIZED', { success: true });

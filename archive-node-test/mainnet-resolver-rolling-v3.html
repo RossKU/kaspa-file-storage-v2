@@ -660,7 +660,10 @@
             }
             
             // Monitor discovery progress
-            while ((isDiscovering || maintainArchives) && stats.totalTested < maxNodes) {
+            while (isDiscovering || maintainArchives) {
+                // Exit conditions
+                if (!maintainArchives && stats.totalTested >= maxNodes) break;
+                if (!isDiscovering && !maintainArchives) break;
                 await new Promise(resolve => setTimeout(resolve, 1000));
                 
                 // Check if we need to spawn more workers

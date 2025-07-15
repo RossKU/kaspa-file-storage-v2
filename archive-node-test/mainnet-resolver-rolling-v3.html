@@ -207,6 +207,9 @@
             <div>
                 <label>Archive Threshold (blocks):</label>
                 <input type="number" id="archiveThreshold" value="50000000" min="1000000">
+                <div style="font-size: 11px; color: #888; margin-top: 5px;">
+                    50M blocks = ~58 days of history (Kaspa: 10 BPS = 864,000 blocks/day)
+                </div>
             </div>
             <div style="margin-top: 10px;">
                 <label>
@@ -886,10 +889,10 @@
                     // Test historical block access - try multiple depths
                     log('Testing historical block access...', 'info');
                     const testDepths = [
-                        1000000,  // ~11.5 days ago
-                        5000000,  // ~58 days ago  
-                        10000000, // ~115 days ago
-                        30000000  // ~347 days ago (almost 1 year)
+                        864000,   // 1 day ago
+                        2592000,  // 3 days ago (pruning threshold)
+                        8640000,  // 10 days ago
+                        25920000  // 30 days ago
                     ];
                     
                     for (const depth of testDepths) {
@@ -897,7 +900,7 @@
                         
                         const testHeight = blockCountNum - depth;
                         try {
-                            log(`Testing block at height ${testHeight} (${(depth/86400).toFixed(1)} days ago)...`);
+                            log(`Testing block at height ${testHeight} (${(depth/864000).toFixed(1)} days ago)...`);
                             
                             // Try different API methods
                             let success = false;
@@ -922,12 +925,12 @@
                             }
                             
                             if (success) {
-                                log(`✓ Can access block at depth ${(depth/1000000).toFixed(1)}M - Confirmed ARCHIVE NODE!`, 'archive');
+                                log(`✓ Can access block at depth ${(depth/1000000).toFixed(1)}M blocks (${(depth/864000).toFixed(1)} days) - Confirmed ARCHIVE NODE!`, 'archive');
                                 isArchive = true;
                                 break;
                             }
                         } catch (error) {
-                            log(`Cannot access block at depth ${(depth/1000000).toFixed(1)}M`, 'debug');
+                            log(`Cannot access block at depth ${(depth/1000000).toFixed(1)}M blocks (${(depth/864000).toFixed(1)} days)`, 'debug');
                         }
                     }
                     

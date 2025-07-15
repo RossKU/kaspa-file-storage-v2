@@ -2,10 +2,8 @@
 // All discovery logic runs in this isolated Worker thread
 
 let kaspa = null;
-let resolver = null;
 let isRunning = false;
 let nodeIndex = 0;
-let workers = [];
 
 // Configuration (received from main thread)
 let config = {
@@ -123,15 +121,6 @@ async function handleStart() {
 // Stop discovery process
 function handleStop() {
     isRunning = false;
-    
-    // Close all workers
-    workers.forEach(worker => {
-        if (worker && !worker.isClosed()) {
-            worker.close();
-        }
-    });
-    workers = [];
-    
     sendMessage('STOPPED');
     sendLog('Discovery stopped', 'info');
 }
@@ -163,52 +152,77 @@ async function discoverLoop() {
 // Discover next node
 async function discoverNextNode() {
     const currentIndex = nodeIndex++;
+    let client = null;
     
     try {
-        // Initialize resolver if needed
-        if (!resolver) {
-            try {
-                sendLog('Creating Resolver...', 'debug');
-                if (!kaspa.Resolver) {
-                    throw new Error('Kaspa.Resolver not available');
-                }
-                resolver = new kaspa.Resolver();
-                sendLog('Resolver created', 'debug');
-                
-                // NetworkType is an enum - use the numeric value
-                sendLog(`NetworkType object: ${JSON.stringify(kaspa.NetworkType)}`, 'debug');
-                const networkType = kaspa.NetworkType.Mainnet; // This is 0
-                sendLog(`Connecting to ${config.resolverUrl} with network type: ${networkType}`, 'debug');
-                
-                await resolver.connect(networkType, config.resolverUrl);
-                sendLog('Resolver connected', 'success');
-            } catch (err) {
-                sendError(`Resolver init error: ${err.message}`, err);
-                throw err;
-            }
+        sendLog(`\n━━━ Discovery Attempt #${currentIndex + 1} ━━━`, 'info');
+        
+        // Create RpcClient with Resolver for each discovery attempt
+        sendLog(`Creating RPC client with Resolver...`, 'debug');
+        
+        client = new kaspa.RpcClient({
+            resolver: new kaspa.Resolver(),
+            networkId: 'mainnet'
+        });
+        
+        sendLog('Connecting to mainnet via Resolver...', 'debug');
+        const startTime = Date.now();
+        
+        try {
+            await client.connect();
+            const connectionTime = Date.now() - startTime;
+            sendLog(`Connected via Resolver in ${connectionTime}ms!`, 'success');
+        } catch (connectError) {
+            sendError(`Connect error: ${connectError.message}`, connectError);
+            throw connectError;
         }
         
-        // Get next node
-        sendLog(`Getting node at index ${currentIndex}...`, 'debug');
-        const node = await resolver.getNode(currentIndex);
-        if (!node) {
-            sendLog(`No node at index ${currentIndex}`, 'debug');
-            return;
-        }
-        sendLog(`Got node: ${JSON.stringify(node)}`, 'debug');
+        // Get node info
+        const info = await client.getServerInfo();
+        const dagInfo = await client.getBlockDagInfo();
+        const blockCount = dagInfo.blockCount || dagInfo.virtualDaaScore || 0;
+        const blockCountNum = typeof blockCount === 'bigint' ? Number(blockCount) : blockCount;
         
-        const nodeUrl = node.url;
-        sendLog(`Testing node ${currentIndex}: ${nodeUrl}`, 'info');
+        // Create node identifier
+        const nodeIdentifier = `${info.serverVersion || 'Unknown'}_${blockCountNum}`;
+        const nodeUrl = nodeIdentifier; // Use identifier as URL for tracking
+        
+        sendLog(`Connected to: ${info.serverVersion || 'Unknown'}`, 'info');
+        sendLog(`Block height: ${blockCountNum.toLocaleString()}`, 'info');
         
         // Skip if already tested
         if (!config.skipDuplicateCheck && state.nodes.tested.has(nodeUrl)) {
             state.stats.skipped++;
             sendLog(`Skipping duplicate: ${nodeUrl}`, 'debug');
+            await client.disconnect();
             return;
         }
         
-        // Test node
-        const result = await testNode(nodeUrl);
+        // Test archive capability
+        const isArchive = blockCountNum >= config.archiveThreshold;
+        let historicalTest = { passed: true };
+        
+        if (isArchive) {
+            sendLog(`⚡ High block count (${(blockCountNum/1000000).toFixed(1)}M > ${(config.archiveThreshold/1000000).toFixed(1)}M threshold)`, 'archive');
+            
+            if (config.testOldBlocks) {
+                sendLog('Testing historical block access...', 'info');
+                historicalTest = await testHistoricalBlocks(client, blockCountNum);
+                if (historicalTest.passed) {
+                    sendLog('✓ Historical block access confirmed - Archive node!', 'archive');
+                } else {
+                    sendLog(`⚠️ Historical test failed: ${historicalTest.reason}`, 'warning');
+                }
+            }
+        }
+        
+        const result = {
+            isArchive: isArchive && historicalTest.passed,
+            blockCount: blockCountNum,
+            historicalTest,
+            version: info.serverVersion,
+            networkId: info.networkId
+        };
         
         // Update state
         state.nodes.tested.add(nodeUrl);
@@ -216,6 +230,7 @@ async function discoverNextNode() {
         
         if (result.isArchive) {
             state.stats.archive++;
+            state.blockHeights.push(blockCountNum); // Store for median calculation
             state.nodes.archive.push({
                 url: nodeUrl,
                 index: currentIndex,
@@ -241,59 +256,24 @@ async function discoverNextNode() {
         
     } catch (error) {
         state.stats.errors++;
-        sendError(`Node ${currentIndex} error: ${error.message}`, error);
-        sendLog(`Stack trace: ${error.stack}`, 'error');
+        sendError(`Discovery ${currentIndex} error: ${error.message}`, error);
+    } finally {
+        // Always disconnect
+        if (client) {
+            try {
+                if (client.disconnect) {
+                    await client.disconnect();
+                } else if (client.close) {
+                    client.close();
+                }
+                sendLog('Disconnected from node', 'debug');
+            } catch (e) {
+                // Ignore disconnect errors
+            }
+        }
     }
 }
 
-// Test individual node
-async function testNode(url) {
-    if (!kaspa.RpcClient) {
-        throw new Error('Kaspa.RpcClient not available');
-    }
-    
-    let client = null;
-    
-    try {
-        // Create worker client with resolver instance
-        client = new kaspa.RpcClient({
-            resolver: resolver,
-            networkId: 'mainnet'  // Use networkId, not networkType
-        });
-        
-        // Connect with timeout
-        await Promise.race([
-            client.connect(url),
-            timeout(10000, 'Connection timeout')
-        ]);
-        
-        // Get block count
-        const blockCount = await client.getBlockCount();
-        const isArchive = blockCount >= config.archiveThreshold;
-        
-        // Test historical blocks if needed
-        let historicalTest = { passed: true };
-        if (isArchive && config.testOldBlocks) {
-            historicalTest = await testHistoricalBlocks(client, blockCount);
-        }
-        
-        // Store block height for median calculation
-        if (isArchive) {
-            state.blockHeights.push(blockCount);
-        }
-        
-        return {
-            isArchive: isArchive && historicalTest.passed,
-            blockCount,
-            historicalTest
-        };
-        
-    } finally {
-        if (client && !client.isClosed()) {
-            client.close();
-        }
-    }
-}
 
 // Test historical block access
 async function testHistoricalBlocks(client, currentHeight) {
@@ -327,11 +307,26 @@ async function testHistoricalBlocks(client, currentHeight) {
         
         // Run tests
         for (const test of tests) {
-            const hash = await client.getBlockDagInfoByHeight(test.height);
-            if (!hash) {
+            try {
+                // Try to get block at specific height
+                sendLog(`Testing block at height ${test.height} (${test.label})...`, 'debug');
+                
+                // Method 1: Try getBlock with height parameter
+                const block = await client.getBlock({
+                    height: test.height,
+                    includeTransactions: false
+                });
+                
+                if (!block) {
+                    return {
+                        passed: false,
+                        reason: `No block at ${test.label} depth (height ${test.height})`
+                    };
+                }
+            } catch (blockError) {
                 return {
                     passed: false,
-                    reason: `No block at ${test.label} depth (${test.height})`
+                    reason: `Cannot access ${test.label} block: ${blockError.message}`
                 };
             }
         }
@@ -351,11 +346,6 @@ function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-function timeout(ms, message = 'Timeout') {
-    return new Promise((_, reject) => 
-        setTimeout(() => reject(new Error(message)), ms)
-    );
-}
 
 // Messaging functions
 function sendMessage(type, data = {}) {

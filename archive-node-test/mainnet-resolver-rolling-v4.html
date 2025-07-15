@@ -94,7 +94,19 @@
             KEEPALIVE_INTERVAL_MS: 20000,
             CACHE_KEY: 'kaspa_archive_nodes',
             RESOLVER_URL: 'mainnet',
-            TEST_DEPTHS: [864000, 2592000, 8640000, 25920000] // 1, 3, 10, 30 days
+            TEST_DEPTHS: [864000, 2592000, 8640000, 25920000], // 1, 3, 10, 30 days
+            DIRECT_URLS: [
+                // Kaspa.red
+                'wss://john.kaspa.red/kaspa/mainnet/wrpc/borsh',
+                'wss://alex.kaspa.red/kaspa/mainnet/wrpc/borsh',
+                'wss://mike.kaspa.red/kaspa/mainnet/wrpc/borsh',
+                'wss://paul.kaspa.red/kaspa/mainnet/wrpc/borsh',
+                // Kaspa.stream
+                'wss://eric.kaspa.stream/kaspa/mainnet/wrpc/borsh',
+                'wss://maxim.kaspa.stream/kaspa/mainnet/wrpc/borsh',
+                'wss://sean.kaspa.stream/kaspa/mainnet/wrpc/borsh',
+                'wss://troy.kaspa.stream/kaspa/mainnet/wrpc/borsh'
+            ]
         };
 
         // === Global State ===
@@ -108,6 +120,7 @@
         const workers = new Map();
         let activeWorkerCount = 0;
         let keepAliveInterval = null;
+        let urlIndex = 0;
 
         // === Event System ===
         const events = new EventTarget();
@@ -266,25 +279,30 @@
         }
 
         async function discoverNextNode(workerId) {
-            // Use resolver to get a random node
+            // Get next URL from direct URLs list
+            const nodeUrl = CONFIG.DIRECT_URLS[urlIndex % CONFIG.DIRECT_URLS.length];
+            urlIndex++;
+            
+            if (testedNodes.has(nodeUrl)) {
+                // All URLs tested
+                if (testedNodes.size >= CONFIG.DIRECT_URLS.length) {
+                    log('All nodes tested', 'info');
+                    return;
+                }
+                // Try next URL
+                return discoverNextNode(workerId);
+            }
+            
+            testedNodes.add(nodeUrl);
+            log(`Testing node: ${nodeUrl}`, 'info');
+            
             const client = new kaspa.RpcClient({
-                resolver: new kaspa.Resolver(),
+                url: nodeUrl,
                 networkId: "mainnet"
             });
             
             try {
                 await client.connect();
-                const nodeInfo = await client.getServerInfo();
-                const nodeUrl = client.url;
-                
-                if (!nodeUrl || testedNodes.has(nodeUrl)) {
-                    await client.disconnect();
-                    return;
-                }
-                
-                testedNodes.add(nodeUrl);
-                log(`Testing node: ${nodeUrl}`, 'info');
-                
                 const archiveInfo = await testArchiveNode(client, nodeUrl);
                 
                 if (archiveInfo) {

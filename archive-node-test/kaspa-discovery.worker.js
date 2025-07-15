@@ -76,6 +76,21 @@ async function handleInit(scriptUrl) {
         // Initialize WASM by calling the default export
         await kaspa.default('./kaspa-core_bg.wasm');
         
+        // Debug: Check what's available in kaspa module
+        sendLog('Checking kaspa module structure...', 'debug');
+        sendLog(`kaspa type: ${typeof kaspa}`, 'debug');
+        sendLog(`kaspa keys: ${Object.keys(kaspa).join(', ')}`, 'debug');
+        
+        // Check for specific classes
+        const classes = ['RpcClient', 'Resolver', 'Encoding', 'NetworkType', 'PrivateKey', 'Address'];
+        for (const cls of classes) {
+            if (kaspa[cls]) {
+                sendLog(`✓ ${cls} is available`, 'success');
+            } else {
+                sendLog(`✗ ${cls} is NOT available`, 'error');
+            }
+        }
+        
         sendLog('Kaspa module initialized', 'success');
         sendMessage('INITIALIZED', { success: true });
     } catch (error) {
@@ -152,9 +167,14 @@ async function discoverNextNode() {
     try {
         // Initialize resolver if needed
         if (!resolver) {
-            const { RpcClient, Resolver, Encoding, NetworkType } = kaspa;
-            resolver = new Resolver();
-            await resolver.connect(NetworkType.Mainnet, config.resolverUrl);
+            if (!kaspa.Resolver) {
+                throw new Error('Kaspa.Resolver not available');
+            }
+            resolver = new kaspa.Resolver();
+            
+            // NetworkType might be an enum or object
+            const networkType = kaspa.NetworkType?.Mainnet || 'mainnet';
+            await resolver.connect(networkType, config.resolverUrl);
         }
         
         // Get next node
@@ -214,12 +234,15 @@ async function discoverNextNode() {
 
 // Test individual node
 async function testNode(url) {
-    const { RpcClient } = kaspa;
+    if (!kaspa.RpcClient) {
+        throw new Error('Kaspa.RpcClient not available');
+    }
+    
     let client = null;
     
     try {
         // Create worker client
-        client = new RpcClient({
+        client = new kaspa.RpcClient({
             resolver: resolver,
             networkType: 'mainnet'
         });

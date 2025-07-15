@@ -686,19 +686,24 @@
                 }
             }
             
-            // Wait for all workers to finish
-            let waitCount = 0;
-            while (activeWorkerCount > 0 && waitCount < 30) { // Max 30 seconds wait
-                log(`Waiting for ${activeWorkerCount} workers to finish...`, 'info');
-                await new Promise(resolve => setTimeout(resolve, 1000));
-                waitCount++;
+            // Only wait for workers if we're truly stopping
+            if (!maintainArchives || (maintainArchives && activeArchiveConnections.size >= 5)) {
+                // Wait for all workers to finish
+                let waitCount = 0;
+                while (activeWorkerCount > 0 && waitCount < 30) { // Max 30 seconds wait
+                    log(`Waiting for ${activeWorkerCount} workers to finish...`, 'info');
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    waitCount++;
+                }
+                
+                log('Rolling discovery complete!', 'success');
+                document.getElementById('exportBtn').disabled = archiveNodes.size === 0;
+                
+                // Keep archive connections when auto-completing
+                await stopRollingDiscovery(true);
+            } else {
+                log('Continuing in maintenance mode to find more archive nodes...', 'info');
             }
-            
-            log('Rolling discovery complete!', 'success');
-            document.getElementById('exportBtn').disabled = archiveNodes.size === 0;
-            
-            // Keep archive connections when auto-completing
-            await stopRollingDiscovery(true);
             
             // If in maintenance mode, ensure workers are running
             if (maintainArchives && activeArchiveConnections.size < 5) {

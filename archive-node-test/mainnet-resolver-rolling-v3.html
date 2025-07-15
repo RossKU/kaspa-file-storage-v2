@@ -321,6 +321,7 @@
         let kaspa = null;
         let isInitialized = false;
         let isDiscovering = false;
+        let maintainArchives = false; // Keep searching to maintain 5 archives
         let currentClient = null;
         let resolver = null;
         
@@ -444,11 +445,11 @@
                         updateArchiveList();
                         updateWorkerDisplay();
                         
-                        // Schedule worker restart if discovery is active
-                        if (isDiscovering) {
+                        // Schedule worker restart if discovery is active or maintaining archives
+                        if (isDiscovering || maintainArchives) {
                             log(`Scheduling worker restart in 3 seconds...`, 'info');
                             setTimeout(() => {
-                                if (isDiscovering && calculateActiveWorkers() > activeWorkerCount) {
+                                if ((isDiscovering || maintainArchives) && calculateActiveWorkers() > activeWorkerCount) {
                                     spawnWorker();
                                 }
                             }, 3000);
@@ -528,7 +529,7 @@
                 updateWorkerDisplay();
                 
                 // Spawn new worker if needed
-                if (isDiscovering && calculateActiveWorkers() > activeWorkerCount) {
+                if ((isDiscovering || maintainArchives) && calculateActiveWorkers() > activeWorkerCount) {
                     setTimeout(() => spawnWorker(), 1000);
                 }
             });
@@ -617,6 +618,7 @@
             if (!isInitialized || isDiscovering) return;
             
             isDiscovering = true;
+            maintainArchives = true; // Enable archive maintenance mode
             stats.startTime = Date.now();
             discoveryStartTime = Date.now();
             
@@ -653,7 +655,7 @@
             }
             
             // Monitor discovery progress
-            while (isDiscovering && stats.totalTested < maxNodes) {
+            while ((isDiscovering || maintainArchives) && stats.totalTested < maxNodes) {
                 await new Promise(resolve => setTimeout(resolve, 1000));
                 
                 // Check if we need to spawn more workers
@@ -662,10 +664,17 @@
                     spawnWorker();
                 }
                 
-                // Stop if we have 5 archives and no active workers
+                // When we have 5 archives, switch to maintenance mode
                 if (activeArchiveConnections.size >= 5 && activeWorkerCount === 0) {
-                    log('5 archive nodes found, discovery complete!', 'success');
-                    break;
+                    if (isDiscovering) {
+                        log('🎯 5 archive nodes found! Switching to maintenance mode...', 'success');
+                        log('Workers will automatically restart if any archive connection is lost', 'info');
+                        isDiscovering = false; // Stop active discovery
+                        // maintainArchives remains true to allow worker restarts
+                    }
+                    
+                    // In maintenance mode, just wait and monitor
+                    await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5s in maintenance mode
                 }
             }
             
@@ -1087,6 +1096,7 @@
         // Stop rolling discovery
         window.stopRollingDiscovery = async function(keepArchiveConnections = false) {
             isDiscovering = false;
+            maintainArchives = false; // Stop archive maintenance
             document.getElementById('startBtn').disabled = false;
             document.getElementById('stopBtn').disabled = true;
             document.getElementById('stopBtn2').disabled = true;

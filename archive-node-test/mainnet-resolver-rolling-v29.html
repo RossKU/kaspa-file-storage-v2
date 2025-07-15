@@ -431,13 +431,23 @@
                         this.log(`Block count: ${dag.blockCount}`, 'info');
                         
                         if (hash && hash.length === 64) {
-                            await client.getBlock({ hash });
-                            this.log('✓ Custom block retrieved', 'success');
+                            const hashBlock = await client.getBlock({ 
+                                hash: hash,
+                                includeTransactions: true 
+                            });
+                            if (hashBlock) {
+                                const block = hashBlock.block || hashBlock;
+                                this.log('✓ Custom block retrieved', 'success');
+                                this.log(`  Height: ${block.header?.daaScore || 'N/A'}`, 'info');
+                                this.log(`  Transactions: ${block.transactions?.length || 0}`, 'info');
+                            }
                         }
                         
                         this.log('✓ Test passed', 'success');
                     } catch (e) {
                         this.log(`Test failed: ${e.message}`, 'error');
+                        this.log(`Error type: ${e.constructor?.name}`, 'debug');
+                        console.error('Full error:', e);
                     }
                 }
             }

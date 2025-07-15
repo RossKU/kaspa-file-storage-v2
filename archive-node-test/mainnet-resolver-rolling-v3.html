@@ -1096,12 +1096,20 @@
         // Stop rolling discovery
         window.stopRollingDiscovery = async function(keepArchiveConnections = false) {
             isDiscovering = false;
-            maintainArchives = false; // Stop archive maintenance
+            
+            // Only stop maintenance if we're disconnecting archives
+            if (!keepArchiveConnections) {
+                maintainArchives = false; // Stop archive maintenance
+            }
+            
             document.getElementById('startBtn').disabled = false;
             document.getElementById('stopBtn').disabled = true;
             document.getElementById('stopBtn2').disabled = true;
             
             log('Stopping rolling discovery...', 'warning');
+            if (keepArchiveConnections && maintainArchives) {
+                log('Archive maintenance mode remains active', 'info');
+            }
             
             // Stop all workers
             stopAllWorkers();

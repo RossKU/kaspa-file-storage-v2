@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test WASM in Worker</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #e0e0e0;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+        }
+        .log {
+            background: #000;
+            padding: 10px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>WASM Worker Test</h1>
+    
+    <h2>Test 1: Direct (No Worker)</h2>
+    <button onclick="testDirect()">Test Direct</button>
+    
+    <h2>Test 2: In Worker</h2>
+    <button onclick="testWorker()">Test Worker</button>
+    
+    <h2>Logs</h2>
+    <div id="log" class="log"></div>
+    
+    <script>
+        const logDiv = document.getElementById('log');
+        
+        function log(msg) {
+            logDiv.textContent += `[${new Date().toLocaleTimeString()}] ${msg}\n`;
+        }
+        
+        // Test 1: Direct (No Worker)
+        async function testDirect() {
+            try {
+                log('Direct: Importing kaspa-core.js...');
+                const kaspa = await import('./kaspa-core.js');
+                
+                log('Direct: Initializing WASM...');
+                await kaspa.default('./kaspa-core_bg.wasm');
+                
+                log('Direct: Creating PrivateKey...');
+                const privKey = new kaspa.PrivateKey('b7e151628aed2a6abf7158809cf4f3c762e7160f38b4da56a784d9045190cfef');
+                log('Direct: ✓ PrivateKey created');
+                
+                log('Direct: Creating Resolver...');
+                const resolver = new kaspa.Resolver();
+                log('Direct: ✓ Resolver created');
+                
+                log('Direct: Creating RpcClient...');
+                const client = new kaspa.RpcClient({
+                    resolver: resolver,
+                    networkId: 'mainnet'
+                });
+                log('Direct: ✓ RpcClient created');
+                
+                log('Direct: Connecting...');
+                await client.connect();
+                log('Direct: ✓ Connected!');
+                
+                const info = await client.getServerInfo();
+                log(`Direct: ✓ Server version: ${info.serverVersion}`);
+                
+                await client.disconnect();
+                log('Direct: ✓ Test completed successfully');
+                
+            } catch (error) {
+                log(`Direct: ✗ Error: ${error.message}`);
+                console.error(error);
+            }
+        }
+        
+        // Test 2: In Worker
+        function testWorker() {
+            log('Worker: Creating worker...');
+            
+            const workerCode = `
+                self.onmessage = async (e) => {
+                    try {
+                        self.postMessage({ type: 'log', msg: 'Worker: Starting test...' });
+                        
+                        // Import kaspa
+                        self.postMessage({ type: 'log', msg: 'Worker: Importing kaspa-core.js...' });
+                        const kaspa = await import('./kaspa-core.js');
+                        
+                        self.postMessage({ type: 'log', msg: 'Worker: Initializing WASM...' });
+                        await kaspa.default('./kaspa-core_bg.wasm');
+                        
+                        self.postMessage({ type: 'log', msg: 'Worker: Creating PrivateKey...' });
+                        const privKey = new kaspa.PrivateKey('b7e151628aed2a6abf7158809cf4f3c762e7160f38b4da56a784d9045190cfef');
+                        self.postMessage({ type: 'log', msg: 'Worker: ✓ PrivateKey created' });
+                        
+                        self.postMessage({ type: 'log', msg: 'Worker: Creating Resolver...' });
+                        const resolver = new kaspa.Resolver();
+                        self.postMessage({ type: 'log', msg: 'Worker: ✓ Resolver created' });
+                        
+                        self.postMessage({ type: 'log', msg: 'Worker: Creating RpcClient...' });
+                        const client = new kaspa.RpcClient({
+                            resolver: resolver,
+                            networkId: 'mainnet'
+                        });
+                        self.postMessage({ type: 'log', msg: 'Worker: ✓ RpcClient created' });
+                        
+                        self.postMessage({ type: 'log', msg: 'Worker: Connecting...' });
+                        await client.connect();
+                        self.postMessage({ type: 'log', msg: 'Worker: ✓ Connected!' });
+                        
+                        const info = await client.getServerInfo();
+                        self.postMessage({ type: 'log', msg: 'Worker: ✓ Server version: ' + info.serverVersion });
+                        
+                        await client.disconnect();
+                        self.postMessage({ type: 'success', msg: 'Worker: ✓ Test completed successfully' });
+                        
+                    } catch (error) {
+                        self.postMessage({ type: 'error', msg: 'Worker: ✗ Error: ' + error.message, stack: error.stack });
+                    }
+                };
+            `;
+            
+            const blob = new Blob([workerCode], { type: 'application/javascript' });
+            const worker = new Worker(URL.createObjectURL(blob), { type: 'module' });
+            
+            worker.onmessage = (e) => {
+                if (e.data.type === 'log') {
+                    log(e.data.msg);
+                } else if (e.data.type === 'error') {
+                    log(e.data.msg);
+                    console.error(e.data.stack);
+                } else if (e.data.type === 'success') {
+                    log(e.data.msg);
+                }
+            };
+            
+            worker.onerror = (error) => {
+                log(`Worker: ✗ Worker error: ${error.message}`);
+                console.error(error);
+            };
+            
+            worker.postMessage({ start: true });
+        }
+        
+        log('Ready. Click buttons to test.');
+    </script>
+</body>
+</html>

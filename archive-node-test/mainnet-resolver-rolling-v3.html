@@ -530,7 +530,12 @@
                 
                 // Spawn new worker if needed
                 if ((isDiscovering || maintainArchives) && calculateActiveWorkers() > activeWorkerCount) {
-                    setTimeout(() => spawnWorker(), 1000);
+                    // In maintenance mode, ignore max nodes limit
+                    if (maintainArchives && !isDiscovering) {
+                        setTimeout(() => spawnWorker(), 1000);
+                    } else if (stats.totalTested < parseInt(document.getElementById('maxNodes').value)) {
+                        setTimeout(() => spawnWorker(), 1000);
+                    }
                 }
             });
         }
@@ -691,6 +696,17 @@
             
             // Keep archive connections when auto-completing
             await stopRollingDiscovery(true);
+            
+            // If in maintenance mode, ensure workers are running
+            if (maintainArchives && activeArchiveConnections.size < 5) {
+                log(`Maintenance mode active: Need ${5 - activeArchiveConnections.size} more archive nodes`, 'info');
+                // Spawn initial maintenance workers
+                const neededWorkers = calculateActiveWorkers();
+                for (let i = 0; i < neededWorkers; i++) {
+                    await spawnWorker();
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                }
+            }
         }
 
         // Discover next node from Resolver
@@ -1111,8 +1127,10 @@
                 log('Archive maintenance mode remains active', 'info');
             }
             
-            // Stop all workers
-            stopAllWorkers();
+            // Stop all workers only if not maintaining archives
+            if (!keepArchiveConnections) {
+                stopAllWorkers();
+            }
             
             if (currentClient) {
                 try {

@@ -8,7 +8,7 @@ class KaspaDiscovery extends EventTarget {
         // Configuration
         this.config = {
             workerPath: './kaspa-discovery.worker.js',
-            kaspaScriptUrl: './kaspa/kaspa.js',
+            kaspaScriptUrl: './kaspa-core.js',
             resolverUrl: 'https://kaspa.stream',
             testInterval: 2000,
             maxNodes: 10000,

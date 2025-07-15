@@ -70,12 +70,12 @@ async function handleInit(scriptUrl) {
     try {
         sendLog('Initializing Kaspa module...', 'info');
         
-        // Import Kaspa module
-        importScripts(scriptUrl || './kaspa/kaspa.js');
+        // Import Kaspa module dynamically
+        kaspa = await import(scriptUrl || './kaspa-core.js');
         
-        // Initialize WASM
-        kaspa = globalThis.kaspa;
-        await kaspa.initKaspaFramework();
+        // Initialize WASM framework
+        await kaspa.init();
+        await kaspa.Wallet.setWorkerLogLevel('none');
         
         sendLog('Kaspa module initialized', 'success');
         sendMessage('INITIALIZED', { success: true });

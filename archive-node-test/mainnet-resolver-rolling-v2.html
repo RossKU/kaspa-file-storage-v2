@@ -288,6 +288,7 @@
         let discoveryStartTime = null;
         let totalAttempts = 0;
         let currentNodeUrl = null;
+        let keepAliveInterval = null; // For maintaining archive connections
         
         // Statistics
         let stats = {
@@ -311,6 +312,50 @@
             console.log(`[${type.toUpperCase()}] ${message}`)
         }
 
+        // Start keepalive mechanism for archive connections
+        function startKeepAlive() {
+            if (keepAliveInterval) return; // Already running
+            
+            log('Starting keepalive mechanism for archive connections', 'info');
+            
+            keepAliveInterval = setInterval(async () => {
+                if (activeArchiveConnections.size === 0) {
+                    stopKeepAlive();
+                    return;
+                }
+                
+                for (const [nodeId, client] of activeArchiveConnections) {
+                    try {
+                        // Lightweight RPC call to keep connection active
+                        await client.getServerInfo();
+                        // Only log every 5th ping to reduce noise
+                        if (Math.random() < 0.2) {
+                            log(`Keepalive: ${activeArchiveConnections.size} archive connections active`, 'debug');
+                        }
+                    } catch (e) {
+                        log(`Archive connection lost: ${nodeId.split('_')[0]}`, 'error');
+                        activeArchiveConnections.delete(nodeId);
+                        updateStats();
+                        updateArchiveList();
+                        
+                        // Stop keepalive if no connections remain
+                        if (activeArchiveConnections.size === 0) {
+                            stopKeepAlive();
+                        }
+                    }
+                }
+            }, 20000); // Every 20 seconds
+        }
+        
+        // Stop keepalive mechanism
+        function stopKeepAlive() {
+            if (keepAliveInterval) {
+                clearInterval(keepAliveInterval);
+                keepAliveInterval = null;
+                log('Stopped keepalive mechanism', 'info');
+            }
+        }
+        
         // Update statistics
         function updateStats() {
             document.getElementById('totalTested').textContent = stats.totalTested;
@@ -690,6 +735,11 @@
                         
                         // Enable block test button when we have archive connections
                         document.getElementById('testBlockBtn').disabled = false;
+                        
+                        // Start keepalive if this is the first archive connection
+                        if (activeArchiveConnections.size === 1 && !keepAliveInterval) {
+                            startKeepAlive();
+                        }
                     } else {
                         log(`Maximum archive connections reached (5), will disconnect`, 'info');
                         await client.disconnect();
@@ -833,6 +883,9 @@
             // Only close archive connections if explicitly requested
             if (!keepArchiveConnections && activeArchiveConnections.size > 0) {
                 log(`Closing ${activeArchiveConnections.size} active archive connections...`, 'warning');
+                // Stop keepalive before disconnecting
+                stopKeepAlive();
+                
                 for (const [nodeId, client] of activeArchiveConnections) {
                     try {
                         await client.disconnect();
@@ -845,6 +898,7 @@
                 updateStats();
             } else if (activeArchiveConnections.size > 0) {
                 log(`📌 Keeping ${activeArchiveConnections.size} archive connections active`, 'archive');
+                log(`⏱️ Keepalive mechanism will maintain connections every 20 seconds`, 'info');
             }
             
             const duration = Math.round((Date.now() - discoveryStartTime) / 1000);
@@ -1000,6 +1054,17 @@
         window.addEventListener('DOMContentLoaded', () => {
             log('Kaspa Resolver Rolling Discovery Ready', 'info');
             log('This tool uses Resolver to automatically discover and test Kaspa mainnet nodes', 'info');
+        });
+        
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            stopKeepAlive();
+            // Disconnect all archive connections
+            for (const [nodeId, client] of activeArchiveConnections) {
+                try {
+                    client.disconnect();
+                } catch (e) {}
+            }
         });
     </script>
 </body>

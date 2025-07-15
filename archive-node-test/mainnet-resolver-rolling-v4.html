@@ -266,37 +266,25 @@
         }
 
         async function discoverNextNode(workerId) {
-            const resolver = new kaspa.Resolver();
-            const urls = await resolver.getUrls(0, CONFIG.RESOLVER_URL);
-            
-            if (!urls || urls.length === 0) {
-                throw new Error('No URLs from resolver');
-            }
-            
-            // Find untested node
-            let nodeUrl = null;
-            for (const url of urls) {
-                if (!testedNodes.has(url)) {
-                    nodeUrl = url;
-                    testedNodes.add(url);
-                    break;
-                }
-            }
-            
-            if (!nodeUrl) {
-                log('All nodes tested', 'info');
-                return;
-            }
-            
-            // Test node
+            // Use resolver to get a random node
             const client = new kaspa.RpcClient({
-                url: nodeUrl,
-                resolver: false,
+                resolver: new kaspa.Resolver(),
                 networkId: "mainnet"
             });
             
             try {
                 await client.connect();
+                const nodeInfo = await client.getServerInfo();
+                const nodeUrl = client.url;
+                
+                if (!nodeUrl || testedNodes.has(nodeUrl)) {
+                    await client.disconnect();
+                    return;
+                }
+                
+                testedNodes.add(nodeUrl);
+                log(`Testing node: ${nodeUrl}`, 'info');
+                
                 const archiveInfo = await testArchiveNode(client, nodeUrl);
                 
                 if (archiveInfo) {
@@ -315,6 +303,7 @@
                     await client.disconnect();
                 }
             } catch (e) {
+                log(`Node test error: ${e.message}`, 'error');
                 try {
                     await client.disconnect();
                 } catch {}

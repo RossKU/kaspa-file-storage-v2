@@ -913,14 +913,123 @@
         let isUploadingFile = false; // Overall file upload status (v3.6.3 fix)
         let uploadSessionActive = false; // Upload session active flag (v5.3.6)
         
-        // Constants
-        const CHUNKS_PER_META = 160; // Maximum chunks per MetaTxID
-        const MAX_CHUNKS_SUPPORTED = 25600; // Maximum chunks supported via Super (160 × 160)
-        const PROCESS_CHUNK_SIZE = 1024 * 1024; // 1MB processing chunks
+        // ============= CONFIGURATION =============
+        // All application constants and configuration values
+        const CONFIG = {
+            // Chunk and Buffer Sizes
+            CHUNKS_PER_META: 160,                    // Maximum chunks per MetaTxID
+            MAX_CHUNKS_SUPPORTED: 25600,             // Maximum chunks supported via Super (160 × 160)
+            PROCESS_CHUNK_SIZE: 1024 * 1024,         // 1MB processing chunks
+            PROCESSING_CHUNK_SIZE: 1048576,          // 1MB processing chunks (duplicate - to be unified)
+            MAX_CACHE_SIZE: 100 * 1024 * 1024,       // 100MB max cache size
+            ARCHIVE_CHUNK_SIZE: 10 * 1024 * 1024,    // 10MB archive chunks
+            FILE_PREVIEW_SIZE: 1024 * 1024,          // 1MB file preview for hashing
+            FILE_PROCESSING_THRESHOLD: 50 * 1024 * 1024,  // 50MB threshold for file processing
+            PROCESS_CHUNK_SIZE_SMALL: 128 * 1024,    // 128KB process chunks
+            MAX_SIZE_WITH_META: 550 * 1024 * 1024,   // 550MB max file size with metadata
+            METADATA_SIZE_LIMIT: 20 * 1024,          // 20KB metadata size limit
+            FULL_HASH_THRESHOLD: 10 * 1024 * 1024,   // 10MB threshold for full file hashing
+            SAFETY_MARGIN: 1000,                     // ~1KB safety margin
+            CHUNK_SIZE_THRESHOLD: 22528,             // 22KB threshold (22 * 1024)
+            MAX_ENCRYPTED_SIZE: 22984,               // Maximum encrypted payload size
+            PAYLOAD_SIZE: 22 * 1024,                 // 22KB payload size
+            
+            // Timeout and Delay Values (in milliseconds)
+            DELAYS: {
+                QUICK: 10,                           // 10ms quick delay
+                BATCH_PROCESSING: 50,                // 50ms batch processing delay
+                SHORT: 500,                          // 500ms short delay
+                TRANSACTION_CONFIRM: 2000,           // 2s transaction confirmation
+                HEALTH_CHECK: 5000,                  // 5s health check timeout
+                DEFAULT_TIMEOUT: 10000,              // 10s default timeout
+                WS_MONITOR_INTERVAL: 5 * 60 * 1000,  // 5 minutes WebSocket monitor interval
+            },
+            
+            // Retry Configuration
+            RETRY: {
+                DEFAULT_COUNT: 3,                    // Default retry count
+                MIN_COUNT: 0,                        // Minimum retry count
+                MAX_COUNT: 10,                       // Maximum retry count
+                EXPONENTIAL_BASE: 1000,              // Base delay for exponential backoff (1s)
+            },
+            
+            // Network Configuration
+            NETWORK: {
+                DEFAULT_TYPE: 'testnet-10',          // Default network type
+                TESTNET_WS: 'wss://archive-tn10.kaspa.org:17210',
+                MAINNET_WS: 'wss://archive.kaspa.org:17110',
+                TESTNET_API: 'https://api-tn10.kaspa.org',
+                MAINNET_API: 'https://api.kaspa.org',
+                TRANSACTION_API: 'https://api.kaspa.org/transactions/',
+            },
+            
+            // File Extensions and Types
+            FILE_EXTENSIONS: {
+                KASPA: '.kaspa',                     // Kaspa file extension
+                KASPA_DIR: '.kaspa-dir',             // Directory Kaspa file extension
+                KPROGRESS: '.kprogress',             // Progress file extension
+                DROP_CLASS: '.kaspa-file-drop',      // CSS class for file drop
+            },
+            
+            // Transaction Configuration
+            TRANSACTION: {
+                AMOUNT: 100000000n,                  // 1 KAS in sompi
+                PRIORITY_FEE: 10000n,                // Transaction priority fee
+            },
+            
+            // Parallel Processing
+            PARALLEL: {
+                DEFAULT_DOWNLOADS: 3,                // Default concurrent downloads
+                DEFAULT_CONCURRENCY: 8,              // Default concurrency for chunks
+                ENABLED_BY_DEFAULT: false,           // Parallel download default state
+            },
+            
+            // Cryptographic Constants
+            CRYPTO: {
+                IV_SIZE: 12,                         // IV size for AES-GCM
+                PBKDF2_ITERATIONS: 100000,           // PBKDF2 iterations
+                RANDOM_BYTES: 32,                    // Random bytes for IDs
+                SHA256_SIZE: 32,                     // SHA-256 output size
+            },
+            
+            // UI and Display Constants
+            UI: {
+                TEXT_PREVIEW_LENGTH: 20,             // Text preview length
+                SAMPLE_SIZE: 4096,                   // Sample size for file hashing
+                MAX_FILENAME_LENGTH: 240,            // Maximum filename length
+                ANIMATION_DURATION: 1000,            // Pulse animation duration (1s)
+                HISTORY_ENTRIES_LIMIT: 100,          // Recent history limit
+                PROGRESS_UPDATE_INTERVAL: 10,        // Update progress every N chunks
+            },
+            
+            // Storage Configuration
+            STORAGE: {
+                DB_NAME: 'kaspa-upload-history',     // IndexedDB name
+                HISTORY_FILE: 'kaspa-uploads.kenv',  // History file name
+                MAX_HISTORY_SIZE: 100 * 1024 * 1024, // 100MB max history
+                ARCHIVE_SIZE: 10 * 1024 * 1024,      // 10MB archive chunks
+            },
+            
+            // Conversion Constants
+            CONVERSION: {
+                KB: 1024,                            // Kilobyte
+                MB: 1048576,                         // Megabyte
+            },
+            
+            // Character Sets
+            CHARSET: {
+                CID: 'abcdefghijklmnopqrstuvwxyz0123456789',  // CID character set
+            },
+        };
+        
+        // Legacy constants for backward compatibility (will be removed in future)
+        const CHUNKS_PER_META = CONFIG.CHUNKS_PER_META;
+        const MAX_CHUNKS_SUPPORTED = CONFIG.MAX_CHUNKS_SUPPORTED;
+        const PROCESS_CHUNK_SIZE = CONFIG.PROCESS_CHUNK_SIZE;
         
         // Parallel download settings (v3.6.2)
-        let parallelDownloadEnabled = false; // Default OFF for v3.5.0 compatibility
-        window.parallelDownloadEnabled = false; // v5.3.16: Initialize window variable
+        let parallelDownloadEnabled = CONFIG.PARALLEL.ENABLED_BY_DEFAULT;
+        window.parallelDownloadEnabled = CONFIG.PARALLEL.ENABLED_BY_DEFAULT; // v5.3.16: Initialize window variable
         
         // Load parallel download setting from localStorage
         function loadParallelSetting() {
@@ -941,10 +1050,10 @@
         // Upload History Manager Class
         class UploadHistoryManager {
             constructor() {
-                this.dbName = 'kaspa-upload-history';
-                this.fileName = 'kaspa-uploads.kenv';
-                this.maxSize = 100 * 1024 * 1024; // 100MB
-                this.archiveSize = 10 * 1024 * 1024; // 10MB chunks
+                this.dbName = CONFIG.STORAGE.DB_NAME;
+                this.fileName = CONFIG.STORAGE.HISTORY_FILE;
+                this.maxSize = CONFIG.STORAGE.MAX_HISTORY_SIZE;
+                this.archiveSize = CONFIG.STORAGE.ARCHIVE_SIZE;
                 this.encryptionKey = null;
                 this.loadedHistory = []; // In-memory history storage
                 log('[UploadHistoryManager] インスタンスを初期化しました', 'debug');
@@ -1091,7 +1200,7 @@
                 try {
                     const encoder = new TextEncoder();
                     const data = encoder.encode(text);
-                    const iv = crypto.getRandomValues(new Uint8Array(12));
+                    const iv = crypto.getRandomValues(new Uint8Array(CONFIG.CRYPTO.IV_SIZE));
                     
                     const encrypted = await crypto.subtle.encrypt(
                         { name: 'AES-GCM', iv: iv },
@@ -1507,7 +1616,7 @@
                     type: 'kaspa-file',
                     version: "3.3",  // v4.7.50: Updated to Format v3.3
                     created: item.uploadDate,
-                    network: item.network || 'testnet-10',
+                    network: item.network || CONFIG.NETWORK.DEFAULT_TYPE,
                     
                     // Encryption at top level
                     encryption: {
@@ -2027,9 +2136,9 @@
                 const metadataBytes = encoder.encode(metadataJson);
                 
                 // Simulate upload (in real implementation, this would use createMetaTransaction)
-                const simulatedTxId = 'dir_' + Array.from(crypto.getRandomValues(new Uint8Array(32)))
+                const simulatedTxId = 'dir_' + Array.from(crypto.getRandomValues(new Uint8Array(CONFIG.CRYPTO.RANDOM_BYTES)))
                     .map(b => b.toString(16).padStart(2, '0')).join('');
-                const simulatedBlockId = 'blk_' + Array.from(crypto.getRandomValues(new Uint8Array(32)))
+                const simulatedBlockId = 'blk_' + Array.from(crypto.getRandomValues(new Uint8Array(CONFIG.CRYPTO.RANDOM_BYTES)))
                     .map(b => b.toString(16).padStart(2, '0')).join('');
                 
                 log(`[DirectoryManager] ディレクトリメタデータをアップロード（シミュレーション）: ${simulatedTxId.substring(0, 16)}...`, 'info');
@@ -2099,7 +2208,7 @@
                 processDirectory(directory);
                 
                 // Parallel download with concurrency limit
-                const CONCURRENT_DOWNLOADS = 3;
+                const CONCURRENT_DOWNLOADS = CONFIG.PARALLEL.DEFAULT_DOWNLOADS;
                 const downloadQueue = [...allFiles];
                 const activeDownloads = [];
                 
@@ -2198,7 +2307,7 @@
                 }
                 
                 // Small delay between downloads
-                await new Promise(resolve => setTimeout(resolve, 500));
+                await new Promise(resolve => setTimeout(resolve, CONFIG.DELAYS.SHORT));
             }
             
             exportDirectory(id) {
@@ -2412,7 +2521,7 @@
                 }
                 
                 // Generate file hash for verification
-                const fileData = await this.file.slice(0, 1024 * 1024).arrayBuffer(); // First 1MB
+                const fileData = await this.file.slice(0, CONFIG.FILE_PREVIEW_SIZE).arrayBuffer(); // First 1MB
                 const hashBuffer = await crypto.subtle.digest('SHA-256', fileData);
                 const hashArray = Array.from(new Uint8Array(hashBuffer));
                 const fileHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
@@ -2422,7 +2531,7 @@
                 let fullFileData;
                 
                 // For large files, use file.size to avoid memory issues
-                if (this.file.size > 50 * 1024 * 1024) { // 50MB threshold
+                if (this.file.size > CONFIG.FILE_PROCESSING_THRESHOLD) { // 50MB threshold
                     actualFileSize = this.file.size;
                     // Read file in chunks for hash calculation
                     fullFileData = await this.file.arrayBuffer();
@@ -2474,7 +2583,7 @@
                         algorithm: "AES-256-GCM",
                         pbkdf2: {
                             salt: null, // Will be set during encryption
-                            iterations: 100000
+                            iterations: CONFIG.CRYPTO.PBKDF2_ITERATIONS
                         }
                     },
                     
@@ -2722,7 +2831,7 @@
         
         // Parallel Downloader Class (v3.6.2)
         class ParallelDownloader {
-            constructor(rpcClient, concurrency = 8) {
+            constructor(rpcClient, concurrency = CONFIG.PARALLEL.DEFAULT_CONCURRENCY) {
                 this.rpcClient = rpcClient;
                 this.concurrency = concurrency;
                 this.queue = [];
@@ -2733,7 +2842,7 @@
                 this.completedCount = 0;
                 this.totalBytes = 0;
                 this.queueLock = false;
-                this.maxRetries = 3;
+                this.maxRetries = CONFIG.RETRY.DEFAULT_COUNT;
             }
             
             async downloadChunks(txIds, blockIds, key, kaspaMetadata, progressCallback) {
@@ -2783,7 +2892,7 @@
                     }
                     
                     const elapsed = (Date.now() - this.startTime) / 1000;
-                    const throughput = (this.totalBytes / 1024 / 1024) / elapsed;
+                    const throughput = (this.totalBytes / CONFIG.CONVERSION.MB) / elapsed;
                     log(`並列ダウンロード完了: ${elapsed.toFixed(1)}秒, ${throughput.toFixed(1)} MB/秒`, 'success');
                     
                     return sortedChunks;
@@ -2798,7 +2907,7 @@
                     let work = null;
                     
                     while (this.queueLock) {
-                        await new Promise(resolve => setTimeout(resolve, 10));
+                        await new Promise(resolve => setTimeout(resolve, CONFIG.DELAYS.QUICK));
                     }
                     
                     this.queueLock = true;
@@ -2816,7 +2925,7 @@
                     }
                     
                     if (!work) {
-                        await new Promise(resolve => setTimeout(resolve, 50));
+                        await new Promise(resolve => setTimeout(resolve, CONFIG.DELAYS.BATCH_PROCESSING));
                         continue;
                     }
                     
@@ -2879,7 +2988,7 @@
                         
                         const elapsed = (Date.now() - this.startTime) / 1000;
                         const speed = this.completedCount / elapsed;
-                        const throughput = (this.totalBytes / 1024 / 1024) / elapsed;
+                        const throughput = (this.totalBytes / CONFIG.CONVERSION.MB) / elapsed;
                         
                         if (progressCallback) {
                             progressCallback({
@@ -2894,7 +3003,7 @@
                         work.retries++;
                         if (work.retries <= this.maxRetries) {
                             while (this.queueLock) {
-                                await new Promise(resolve => setTimeout(resolve, 10));
+                                await new Promise(resolve => setTimeout(resolve, CONFIG.DELAYS.QUICK));
                             }
                             this.queueLock = true;
                             try {
@@ -2965,7 +3074,7 @@
                     let work = null;
                     
                     while (this.queueLock) {
-                        await new Promise(resolve => setTimeout(resolve, 10));
+                        await new Promise(resolve => setTimeout(resolve, CONFIG.DELAYS.QUICK));
                     }
                     
                     this.queueLock = true;
@@ -2983,7 +3092,7 @@
                     }
                     
                     if (!work) {
-                        await new Promise(resolve => setTimeout(resolve, 50));
+                        await new Promise(resolve => setTimeout(resolve, CONFIG.DELAYS.BATCH_PROCESSING));
                         continue;
                     }
                     
@@ -3021,7 +3130,7 @@
                         
                         const elapsed = (Date.now() - this.startTime) / 1000;
                         const speed = this.completedCount / elapsed;
-                        const throughput = (this.totalBytes / 1024 / 1024) / elapsed;
+                        const throughput = (this.totalBytes / CONFIG.CONVERSION.MB) / elapsed;
                         
                         if (progressCallback) {
                             progressCallback({
@@ -3051,8 +3160,8 @@
         
         // Configuration
         const config = {
-            network: 'testnet-10',
-            retryCount: 3,
+            network: CONFIG.NETWORK.DEFAULT_TYPE,
+            retryCount: CONFIG.RETRY.DEFAULT_COUNT,
             timeout: 30000,
             testPrivateKey: 'b7e151628aed2a6abf7158809cf4f3c762e7160f38b4da56a784d9045190cfef',
             // Super metadata configuration (experimental)
@@ -3066,8 +3175,8 @@
             currentEndpoint: null, // Currently connected endpoint
             customEndpoint: null, // User-defined custom endpoint
             archiveEndpoints: {
-                'testnet-10': 'wss://archive-tn10.kaspa.org:17210',
-                'mainnet': 'wss://archive.kaspa.org:17110'
+                'testnet-10': CONFIG.NETWORK.TESTNET_WS,
+                'mainnet': CONFIG.NETWORK.MAINNET_WS
             },
             standardEndpoints: {
                 'testnet-10': null, // Use default resolver
@@ -3155,7 +3264,7 @@
         // Generate file CID based on content (v3.3 specification)
         async function generateFileCID(file) {
             // Sample the first 4KB of file content
-            const sampleSize = Math.min(4096, file.size);
+            const sampleSize = Math.min(CONFIG.UI.SAMPLE_SIZE, file.size);
             const sample = await file.slice(0, sampleSize).arrayBuffer();
             
             // Include file size for better uniqueness (content + size = better fingerprint)
@@ -3186,7 +3295,7 @@
         
         // Legacy random CID function (kept for compatibility)
         function generateRandomCID() {
-            const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+            const chars = CONFIG.CHARSET.CID;
             let result = '';
             for (let i = 0; i < 8; i++) {
                 result += chars.charAt(Math.floor(Math.random() * chars.length));
@@ -3197,7 +3306,7 @@
         // Generate safe filename with CID
         function generateSafeFilename(originalName, cid) {
             const ext = '.kaspa';
-            const maxLength = 240; // 安全マージン
+            const maxLength = CONFIG.UI.MAX_FILENAME_LENGTH; // 安全マージン
             
             // 1. 通常パターン
             let filename = `${originalName}.${cid}${ext}`;
@@ -3583,7 +3692,7 @@
         // v2.1 から v3.3 形式への変換関数
         function convertV21ToV33Progress(v21Progress) {
             // Calculate 1MB processing chunk boundaries
-            const PROCESSING_CHUNK_SIZE = 1048576; // 1MB
+            const PROCESSING_CHUNK_SIZE = CONFIG.PROCESSING_CHUNK_SIZE; // 1MB
             const fileSize = v21Progress.fileInfo.size;
             const chunkBoundaries = [];
             
@@ -3713,7 +3822,7 @@
                 document.getElementById('resumeInfo').style.display = 'block';
                 document.getElementById('resumeDetails').innerHTML = `
                     <p><strong>ファイル:</strong> ${fileInfo.name}</p>
-                    <p><strong>サイズ:</strong> ${(fileInfo.size / 1024 / 1024).toFixed(2)} MB</p>
+                    <p><strong>サイズ:</strong> ${(fileInfo.size / CONFIG.CONVERSION.MB).toFixed(2)} MB</p>
                     <p><strong>進捗:</strong> ${completedChunks}/${totalChunks} チャンク (${(completedChunks / totalChunks * 100).toFixed(1)}%)</p>
                     <p><strong>最終更新:</strong> ${new Date(lastUpdate).toLocaleString()}</p>
                     <p class="warning">⚠️ 同じファイルを選択してアップロードを続行してください</p>
@@ -3807,7 +3916,7 @@
                 }
                 
                 const elapsed = (Date.now() - this.startTime) / 1000;
-                const throughput = (this.totalBytes / 1024 / 1024) / elapsed;
+                const throughput = (this.totalBytes / CONFIG.CONVERSION.MB) / elapsed;
                 log(`[ParallelDownloader] 並列ダウンロード完了: ${elapsed.toFixed(1)}秒, ${throughput.toFixed(1)} MB/秒`, 'success');
                 
                 return sortedChunks;
@@ -3822,7 +3931,7 @@
                 let work = null;
                 
                 while (this.queueLock) {
-                    await new Promise(resolve => setTimeout(resolve, 10));
+                    await new Promise(resolve => setTimeout(resolve, CONFIG.DELAYS.QUICK));
                 }
                 
                 this.queueLock = true;
@@ -3840,7 +3949,7 @@
                 }
                 
                 if (!work) {
-                    await new Promise(resolve => setTimeout(resolve, 50));
+                    await new Promise(resolve => setTimeout(resolve, CONFIG.DELAYS.BATCH_PROCESSING));
                     continue;
                 }
                 
@@ -3876,7 +3985,7 @@
                             // Fallback to REST API if RPC failed
                             if (!payload) {
                                 const networkApiUrl = config.network === 'testnet-10' ? 
-                                    'https://api-tn10.kaspa.org' : 'https://api.kaspa.org';
+                                    CONFIG.NETWORK.TESTNET_API : CONFIG.NETWORK.MAINNET_API;
                                 const url = `${networkApiUrl}/transactions/${txId}`;
                                 const response = await fetchWithTimeout(url, {}, 5000, 1);
                                 const data = await response.json();
@@ -3909,7 +4018,7 @@
                     
                     const elapsed = (Date.now() - this.startTime) / 1000;
                     const speed = this.completedCount / elapsed;
-                    const throughput = (this.totalBytes / 1024 / 1024) / elapsed;
+                    const throughput = (this.totalBytes / CONFIG.CONVERSION.MB) / elapsed;
                     
                     if (progressCallback) {
                         progressCallback({
@@ -3924,7 +4033,7 @@
                     work.retries++;
                     if (work.retries <= this.maxRetries) {
                         while (this.queueLock) {
-                            await new Promise(resolve => setTimeout(resolve, 10));
+                            await new Promise(resolve => setTimeout(resolve, CONFIG.DELAYS.QUICK));
                         }
                         this.queueLock = true;
                         try {
@@ -4154,7 +4263,7 @@
                     // Derive encryption key
                     const salt = fromBase64(metadata.encryption.pbkdf2.salt);
                     const iterations = metadata.encryption.pbkdf2.iterations || 
-                        (metadata.version === "3.0" ? 10000 : 100000);
+                        (metadata.version === "3.0" ? 10000 : CONFIG.CRYPTO.PBKDF2_ITERATIONS);
                     const key = await deriveKey(password, salt, iterations);
                     
                     // Check if using new payload split approach
@@ -4769,7 +4878,7 @@
             log(`ファイル選択: ${file.name} (${(file.size/1024).toFixed(1)}KB)`);
             
             // Check if file size exceeds 550MB
-            const MAX_SIZE_WITH_META = 550 * 1024 * 1024; // 550MB
+            const MAX_SIZE_WITH_META = CONFIG.MAX_SIZE_WITH_META; // 550MB
             if (file.size > MAX_SIZE_WITH_META) {
                 log(`⚠️ 警告: このファイルサイズ(${(file.size/1024/1024).toFixed(1)}MB)では、ブロックチェーン上のメタデータトランザクションが生成されない可能性があります`, 'warning');
                 log('.kaspaファイルは生成されますが、メタデータの共有が制限されます', 'warning');
@@ -5206,13 +5315,13 @@
                 
                 // Size check (20KB safety margin)
                 const sizeKB = metadataBytes.length / 1024;
-                if (metadataBytes.length > 20 * 1024) {
+                if (metadataBytes.length > CONFIG.METADATA_SIZE_LIMIT) {
                     log(`⚠️ ディレクトリメタデータが大きすぎます（${sizeKB.toFixed(1)}KB）`, 'warning');
                     log('💡 ヒント: ファイル数を減らすか、サブディレクトリに分割してください', 'info');
                     log('📝 将来のバージョンでチャンク化をサポート予定です', 'info');
                     
                     // Calculate approximate file limit
-                    const approxFilesLimit = Math.floor((20 * 1024) / 150); // ~150 bytes per entry
+                    const approxFilesLimit = Math.floor(CONFIG.METADATA_SIZE_LIMIT / 150); // ~150 bytes per entry
                     log(`📊 現在の制限: 約${approxFilesLimit}ファイルまで`, 'info');
                     
                     throw new Error(`ディレクトリメタデータが20KBを超えています（${sizeKB.toFixed(1)}KB）`);
@@ -5435,10 +5544,10 @@
                 entries: formattedUtxos,
                 outputs: [{
                     address: address.toString(),
-                    amount: 100000000n // 1 KAS
+                    amount: CONFIG.TRANSACTION.AMOUNT // 1 KAS
                 }],
                 changeAddress: address.toString(),
-                priorityFee: 10000n,
+                priorityFee: CONFIG.TRANSACTION.PRIORITY_FEE,
                 networkId: config.network,
                 payload: payloadBytes
             });
@@ -5524,7 +5633,7 @@
         }
         
         async function fetchBlockIdFromExplorer(txid) {
-            const maxRetries = 10;
+            const maxRetries = CONFIG.RETRY.MAX_COUNT;
             for (let i = 0; i < maxRetries; i++) {
                 try {
                     const response = await fetchWithTimeout(
@@ -5545,7 +5654,7 @@
                 }
                 
                 // Wait before retry
-                await new Promise(resolve => setTimeout(resolve, 5000));
+                await new Promise(resolve => setTimeout(resolve, CONFIG.DELAYS.HEALTH_CHECK));
             }
             
             throw new Error(`BlockIDの取得に失敗: ${txid}`);
@@ -5606,7 +5715,7 @@
         }
 
         // Encryption
-        async function deriveKey(password, salt, iterations = 100000) {
+        async function deriveKey(password, salt, iterations = CONFIG.CRYPTO.PBKDF2_ITERATIONS) {
             const encoder = new TextEncoder();
             const keyMaterial = await crypto.subtle.importKey(
                 'raw',
@@ -6116,7 +6225,7 @@
                 log('[INFO] アップロードセッションを開始 (メイン)', 'info');
                 
                 log(`処理開始: ${currentFile.name}`);
-                log(`ファイルサイズ: ${(currentFile.size / 1024 / 1024).toFixed(2)} MB`);
+                log(`ファイルサイズ: ${(currentFile.size / CONFIG.CONVERSION.MB).toFixed(2)} MB`);
                 
                 // Generate CID early for progress manager
                 let fileCID = '';
@@ -6362,10 +6471,10 @@
                                     entries: formattedUtxos,
                                     outputs: [{
                                         address: address.toString(),
-                                        amount: 100000000n // 1 KAS
+                                        amount: CONFIG.TRANSACTION.AMOUNT // 1 KAS
                                     }],
                                     changeAddress: address.toString(),
-                                    priorityFee: 10000n,
+                                    priorityFee: CONFIG.TRANSACTION.PRIORITY_FEE,
                                     networkId: config.network,
                                     payload: payloadBytes
                                 });
@@ -6391,7 +6500,7 @@
                                 });
                                 
                                 // Wait for confirmation
-                                await new Promise(resolve => setTimeout(resolve, 2000));
+                                await new Promise(resolve => setTimeout(resolve, CONFIG.DELAYS.TRANSACTION_CONFIRM));
                                 
                                 // Get BlockID (existing logic)
                                 let waitTime = 0;
@@ -6408,7 +6517,7 @@
                                         }
                                     }
                                     
-                                    await new Promise(resolve => setTimeout(resolve, 500));
+                                    await new Promise(resolve => setTimeout(resolve, CONFIG.DELAYS.SHORT));
                                     waitTime += 500;
                                 }
                                 
@@ -6465,7 +6574,7 @@
                                     await progressManager.saveProgress();
                                     throw error;
                                 }
-                                await new Promise(resolve => setTimeout(resolve, 2000));
+                                await new Promise(resolve => setTimeout(resolve, CONFIG.DELAYS.TRANSACTION_CONFIRM));
                             }
                         }
                         
@@ -6620,10 +6729,10 @@
                                 entries: formattedUtxos,
                                 outputs: [{
                                     address: address.toString(),
-                                    amount: 100000000n // 1 KAS
+                                    amount: CONFIG.TRANSACTION.AMOUNT // 1 KAS
                                 }],
                                 changeAddress: address.toString(),
-                                priorityFee: 10000n,
+                                priorityFee: CONFIG.TRANSACTION.PRIORITY_FEE,
                                 networkId: config.network,
                                 payload: payloadBytes
                             });
@@ -6659,7 +6768,7 @@
                             
                             // Wait for transaction to be accepted
                             log(`トランザクションの確認待ち...`);
-                            await new Promise(resolve => setTimeout(resolve, 2000));
+                            await new Promise(resolve => setTimeout(resolve, CONFIG.DELAYS.TRANSACTION_CONFIRM));
                             
                             // Try WebSocket monitoring first
                             log(`トランザクション確認を待機中...`);
@@ -6708,7 +6817,7 @@
                                     }
                                 }
                                 
-                                await new Promise(resolve => setTimeout(resolve, 500));
+                                await new Promise(resolve => setTimeout(resolve, CONFIG.DELAYS.SHORT));
                                 waitTime += 500;
                             }
                             
@@ -6781,7 +6890,7 @@
                                 throw error;
                             }
                             log(`2秒待機後にリトライ...`);
-                            await new Promise(resolve => setTimeout(resolve, 2000));
+                            await new Promise(resolve => setTimeout(resolve, CONFIG.DELAYS.TRANSACTION_CONFIRM));
                         }
                     }
                     
@@ -6816,7 +6925,7 @@
                         algorithm: "AES-256-GCM",
                         pbkdf2: {
                             salt: toBase64(salt),
-                            iterations: 100000
+                            iterations: CONFIG.CRYPTO.PBKDF2_ITERATIONS
                         }
                     },
                     
@@ -7193,7 +7302,7 @@
                 let result;
                 try {
                     // Use same amount as regular chunks (1 KAS)
-                    const amount = 100000000n; // 1 KAS
+                    const amount = CONFIG.TRANSACTION.AMOUNT; // 1 KAS
                     
                     result = await kaspa.createTransactions({
                         entries: formattedUtxos,
@@ -7202,7 +7311,7 @@
                             amount: amount
                         }],
                         changeAddress: address.toString(),
-                        priorityFee: 10000n,
+                        priorityFee: CONFIG.TRANSACTION.PRIORITY_FEE,
                         networkId: config.network,
                         payload: metaPayload
                     });
@@ -7235,7 +7344,7 @@
                 log(`[DEBUG] WebSocket監視リストに追加: TxID: ${metaTxId.substring(0, 16)}... (メタトランザクション)`, 'debug');
                 
                 // Wait for confirmation
-                await new Promise(resolve => setTimeout(resolve, 2000));
+                await new Promise(resolve => setTimeout(resolve, CONFIG.DELAYS.TRANSACTION_CONFIRM));
                 
                 // Wait for BlockID from WebSocket monitor
                 log(`メタトランザクションのBlockIDを待機中...`);
@@ -7255,7 +7364,7 @@
                             break;
                         }
                     }
-                    await new Promise(resolve => setTimeout(resolve, 500));
+                    await new Promise(resolve => setTimeout(resolve, CONFIG.DELAYS.SHORT));
                     waitTime += 500;
                 }
                 
@@ -7420,10 +7529,10 @@
                     entries: formattedUtxos,
                     outputs: [{
                         address: address.toString(),
-                        amount: 100000000n // 1 KAS
+                        amount: CONFIG.TRANSACTION.AMOUNT // 1 KAS
                     }],
                     changeAddress: address.toString(),
-                    priorityFee: 10000n,
+                    priorityFee: CONFIG.TRANSACTION.PRIORITY_FEE,
                     networkId: config.network,
                     payload: metaPayload
                 });
@@ -7460,7 +7569,7 @@
                     });
                     
                     // Wait for confirmation
-                    await new Promise(resolve => setTimeout(resolve, 2000));
+                    await new Promise(resolve => setTimeout(resolve, CONFIG.DELAYS.TRANSACTION_CONFIRM));
                 } catch (submitError) {
                     log(`[SuperMeta] 送信エラー: ${submitError.message}`, 'error');
                     throw submitError;
@@ -7487,7 +7596,7 @@
                             break;
                         }
                     }
-                    await new Promise(resolve => setTimeout(resolve, 500));
+                    await new Promise(resolve => setTimeout(resolve, CONFIG.DELAYS.SHORT));
                     waitTime += 500;
                 }
                 
@@ -7594,10 +7703,10 @@
                     entries: formattedUtxos,
                     outputs: [{
                         address: address.toString(),
-                        amount: 100000000n // 1 KAS
+                        amount: CONFIG.TRANSACTION.AMOUNT // 1 KAS
                     }],
                     changeAddress: address.toString(),
-                    priorityFee: 10000n,
+                    priorityFee: CONFIG.TRANSACTION.PRIORITY_FEE,
                     networkId: config.network,
                     payload: metaPayload
                 });
@@ -7616,7 +7725,7 @@
                 });
                 
                 // Wait for confirmation
-                await new Promise(resolve => setTimeout(resolve, 2000));
+                await new Promise(resolve => setTimeout(resolve, CONFIG.DELAYS.TRANSACTION_CONFIRM));
                 
                 let superMetaBlockId = null;
                 let waitTime = 0;
@@ -7629,7 +7738,7 @@
                             break;
                         }
                     }
-                    await new Promise(resolve => setTimeout(resolve, 500));
+                    await new Promise(resolve => setTimeout(resolve, CONFIG.DELAYS.SHORT));
                     waitTime += 500;
                 }
                 
@@ -8064,13 +8173,13 @@
                 log(`file.name: ${file.name}`, 'info');
                 log(`file.type: ${file.type}`, 'info');
                 log(`file.size: ${file.size} bytes`, 'info');
-                log(`endsWith('.kaspa'): ${file.name.endsWith('.kaspa')}`, 'info');
-                log(`toLowerCase().endsWith('.kaspa'): ${file.name.toLowerCase().endsWith('.kaspa')}`, 'info');
+                log(`endsWith('.kaspa'): ${file.name.endsWith(CONFIG.FILE_EXTENSIONS.KASPA)}`, 'info');
+                log(`toLowerCase().endsWith('.kaspa'): ${file.name.toLowerCase().endsWith(CONFIG.FILE_EXTENSIONS.KASPA)}`, 'info');
             }
             
             if (!file || !file.name.endsWith('.kaspa')) {
                 log('有効な.kaspaファイルを選択してください', 'error');
-                log(`理由: file=${!!file}, name=${file?.name}, endsWith=${file?.name?.endsWith('.kaspa')}`, 'error');
+                log(`理由: file=${!!file}, name=${file?.name}, endsWith=${file?.name?.endsWith(CONFIG.FILE_EXTENSIONS.KASPA)}`, 'error');
                 return;
             }
             
@@ -9465,7 +9574,7 @@
                         log(`[DEBUG] アップロード中 - WebSocket監視を継続 (session=${uploadSessionActive}, file=${isUploadingFile}, chunks=${uploadingChunksCount})`, 'debug');
                         // Reset timeout
                         clearTimeout(wsMonitorTimeout);
-                        wsMonitorTimeout = setTimeout(arguments.callee, 5 * 60 * 1000);
+                        wsMonitorTimeout = setTimeout(arguments.callee, CONFIG.DELAYS.WS_MONITOR_INTERVAL);
                         return;
                     }
                     
@@ -9473,7 +9582,7 @@
                     if (monitoredTransactions.size > 0) {
                         log(`[DEBUG] 監視中のトランザクションあり (${monitoredTransactions.size}件) - 監視を継続`, 'debug');
                         clearTimeout(wsMonitorTimeout);
-                        wsMonitorTimeout = setTimeout(arguments.callee, 5 * 60 * 1000);
+                        wsMonitorTimeout = setTimeout(arguments.callee, CONFIG.DELAYS.WS_MONITOR_INTERVAL);
                         return;
                     }
                     
@@ -10141,7 +10250,7 @@
                     console.log('[MultiWallet] Public key generated successfully');
                     
                     // Network detection - より安全な方法
-                    let networkType = 'testnet-10'; // デフォルト
+                    let networkType = CONFIG.NETWORK.DEFAULT_TYPE; // デフォルト
                     
                     // グローバル変数をチェック
                     if (typeof NETWORK !== 'undefined' && NETWORK) {
@@ -10168,8 +10277,8 @@
                         }
                         // 方法2: testnet-10を直接指定
                         else {
-                            address = privateKey.toAddress('testnet-10').toString();
-                            console.log('[MultiWallet] Address generated with testnet-10:', address);
+                            address = privateKey.toAddress(CONFIG.NETWORK.DEFAULT_TYPE).toString();
+                            console.log('[MultiWallet] Address generated with ' + CONFIG.NETWORK.DEFAULT_TYPE + ':', address);
                         }
                     } catch (addrError) {
                         console.error('[MultiWallet] Primary address generation failed:', addrError);

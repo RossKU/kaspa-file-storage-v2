@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.4.43 - Fix upload initialization check for rpcClient</title>
+    <title>Kaspa P2P File Storage v5.4.44 - Fix WebSocket and transaction submit RpcClient references</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -892,6 +892,11 @@
         // v5.4.43: Fix upload initialization check for rpcClient
         // - Fixed !rpcClient → !NetworkState.rpcClient in processAndUpload and other functions (5 occurrences)
         // - Resolves "先にシステムを初期化してください" error when trying to upload
+        // v5.4.44: Fix WebSocket and transaction submit RpcClient references
+        // - Fixed rpcClient.addEventListener → NetworkState.rpcClient.addEventListener (1 occurrence)
+        // - Fixed .submit(rpcClient) → .submit(NetworkState.rpcClient) (8 occurrences)
+        // - Resolves "Cannot read properties of null (reading 'addEventListener')" error
+        // - Resolves "expected instance of RpcClient" error during transaction submission
         // - Restored architecture map
         // - 13-section code organization
         // - Improved function grouping
@@ -5614,7 +5619,7 @@
             
             // Submit transaction with error handling
             try {
-                const txid = await transaction.submit(rpcClient);
+                const txid = await transaction.submit(NetworkState.rpcClient);
                 
                 if (!txid) {
                     throw new Error('トランザクションの送信に失敗しました');
@@ -5636,7 +5641,7 @@
                     }
                     
                     // Retry transaction submission
-                    const txid = await transaction.submit(rpcClient);
+                    const txid = await transaction.submit(NetworkState.rpcClient);
                     
                     if (!txid) {
                         throw new Error('トランザクションの送信に失敗しました（再試行後）');
@@ -6547,7 +6552,7 @@
                                 
                                 const pendingTx = result.transactions[0];
                                 await pendingTx.sign([UserState.privateKey]);
-                                txid = await pendingTx.submit(rpcClient);
+                                txid = await pendingTx.submit(NetworkState.rpcClient);
                                 
                                 log(`ペイロード ${i + 1} TxID: ${txid.substring(0, 16)}...`, 'success');
                                 
@@ -6819,7 +6824,7 @@
                             
                             // Submit to network
                             log(`ネットワークに送信中...`);
-                            txid = await pendingTx.submit(rpcClient);
+                            txid = await pendingTx.submit(NetworkState.rpcClient);
                             
                             log(`チャンク ${i + 1} TxID: ${txid.substring(0, 16)}...`, 'success');
                             
@@ -7417,7 +7422,7 @@
                 
                 const pendingTx = result.transactions[0];
                 await pendingTx.sign([UserState.privateKey]);
-                const metaTxId = await pendingTx.submit(rpcClient);
+                const metaTxId = await pendingTx.submit(NetworkState.rpcClient);
                 
                 log(`メタトランザクションを送信しました: ${metaTxId}`, 'success');
                 
@@ -7639,7 +7644,7 @@
                 
                 // Submit transaction - using the same pattern as chunk upload
                 try {
-                    metaTxId = await pendingTx.submit(rpcClient);
+                    metaTxId = await pendingTx.submit(NetworkState.rpcClient);
                     
                     if (!metaTxId) {
                         throw new Error('submit()がnullを返しました');
@@ -7800,7 +7805,7 @@
                 
                 const pendingTx = result.transactions[0];
                 await pendingTx.sign([UserState.privateKey]);
-                const superMetaTxId = await pendingTx.submit(rpcClient);
+                const superMetaTxId = await pendingTx.submit(NetworkState.rpcClient);
                 
                 log(`[SuperMeta] スーパーメタTxID: ${superMetaTxId}`, 'success');
                 
@@ -9682,7 +9687,7 @@
                 log('Block Addedイベントを購読しました', 'success');
                 log('WebSocket経由でブロック追加イベントの監視を開始', 'info');
                 
-                rpcClient.addEventListener('block-added', (event) => {
+                NetworkState.rpcClient.addEventListener('block-added', (event) => {
                     const block = event.data.block;
                     const blockId = block.header.hash;
                     const blockTime = new Date(Number(block.header.timestamp));

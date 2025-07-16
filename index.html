@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.4.23 - Fix processAndUpload scope</title>
+    <title>Kaspa P2P File Storage v5.4.24 - Complete global variable fix</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -872,7 +872,7 @@
     </div>
 
     <script type="module">
-        // v5.4.23: Fix processAndUpload scope issues with debug logs
+        // v5.4.24: Complete global variable fix for processAndUpload
         // - Restored architecture map
         // - 13-section code organization
         // - Improved function grouping
@@ -942,8 +942,11 @@
         let currentFile = null;
         window.currentFile = null;  // Ensure global access
         let currentPassword = null;
+        window.currentPassword = null;  // Ensure global access
         let processedChunks = [];
+        window.processedChunks = [];  // Ensure global access
         let kaspaMetadata = null;
+        window.kaspaMetadata = null;  // Ensure global access
         let directoryMetadata = null; // ディレクトリ専用変数
         let wsMonitorActive = false;
         let monitoredTransactions = new Map();
@@ -6033,7 +6036,8 @@
             // Debug log
             log(`[DEBUG] processAndUpload called`, 'debug');
             log(`[DEBUG] window.currentFile: ${window.currentFile ? window.currentFile.name : 'null'}`, 'debug');
-            log(`[DEBUG] currentFile (local): ${typeof currentFile !== 'undefined' ? (currentFile ? currentFile.name : 'null') : 'undefined'}`, 'debug');
+            log(`[DEBUG] window.progressManager: ${window.progressManager ? 'exists' : 'null'}`, 'debug');
+            log(`[DEBUG] window.isDirectoryMode: ${window.isDirectoryMode}`, 'debug');
             
             // Check if directory mode
             if (window.isDirectoryMode) {
@@ -6057,14 +6061,14 @@
                 return;
             }
             
-            currentPassword = password;
+            window.currentPassword = password;
             
-            // Use local reference to window.currentFile
+            // Use local reference to window globals
             const currentFile = window.currentFile;
             const progressManager = window.progressManager;
             
             // Initialize processedChunks with existing chunks from progress
-            processedChunks = [];
+            window.processedChunks = [];
             if (progressManager && progressManager.progress) {
                 // Load existing chunks from kprogress - use chunkDetails only
                 const chunkDetails = progressManager.progress._progress?.chunkDetails || [];
@@ -6072,7 +6076,7 @@
                 // Reconstruct processedChunks from chunkDetails
                 for (const detail of chunkDetails) {
                     if (detail.txid && detail.blockId) {
-                        processedChunks.push({
+                        window.processedChunks.push({
                             index: detail.index,
                             txid: detail.txid,
                             blockId: detail.blockId,
@@ -6425,7 +6429,7 @@
                                 log(`ペイロード ${i + 1} アップロード完了 (${(uploadTime/1000).toFixed(1)}秒)`);
                                 
                                 // Store chunk info
-                                processedChunks.push({
+                                window.processedChunks.push({
                                     index: i,
                                     txid: txid,
                                     blockId: blockId,
@@ -6738,7 +6742,7 @@
                             }
                             
                             // Store chunk info
-                            processedChunks.push({
+                            window.processedChunks.push({
                                 index: i,
                                 txid: txid,
                                 blockId: blockId,
@@ -6793,7 +6797,7 @@
                 log('最終進捗を保存しました', 'success');
                 
                 // Prepare metadata with unified structure
-                kaspaMetadata = {
+                window.kaspaMetadata = {
                     type: 'kaspa-file',
                     version: "3.3",  // v4.7.50: Updated to Format v3.3
                     created: new Date().toISOString(),

@@ -2424,16 +2424,8 @@
             return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
         }
         
-        window.copyToClipboard = async function(text) {
-            const preview = text && text.length > 20 ? text.substring(0, 20) + '...' : text;
-            log(`[DEBUG] copyToClipboard が呼び出されました: ${preview}`, 'debug');
-            try {
-                await navigator.clipboard.writeText(text);
-                log('クリップボードにコピーしました', 'success');
-            } catch (err) {
-                log(`コピーエラー: ${err.message}`, 'error');
-            }
-        }
+        // Moved to UI CONTROL & EVENT HANDLERS section
+        // window.copyToClipboard - Clipboard operations handler
         
         // Progress Manager Class
         class ProgressManager {
@@ -3307,84 +3299,11 @@
             }
         }
 
-        // Tab switching
-        window.switchTab = function(tab) {
-            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-            
-            const tabIndex = ['upload', 'download', 'directory', 'history', 'settings'].indexOf(tab);
-            document.querySelectorAll('.tab-btn')[tabIndex].classList.add('active');
-            document.getElementById(`${tab}-tab`).classList.add('active');
-            
-            // Update history tab when switching to it
-            if (tab === 'history' && window.historyManager) {
-                window.historyManager.updateHistoryUI();
-            }
-            
-            // Update directory tab when switching to it
-            if (tab === 'directory' && window.directoryManager) {
-                window.directoryManager.updateFileSelector();
-                window.directoryManager.updateUI();
-            }
-        };
+        // Moved to UI CONTROL & EVENT HANDLERS section
+        // window.switchTab - Tab navigation handler
         
-        // Create directory function
-        window.createDirectory = async function() {
-            try {
-                const nameInput = document.getElementById('directoryName');
-                const name = nameInput.value.trim();
-                
-                if (!name) {
-                    alert('ディレクトリ名を入力してください');
-                    return;
-                }
-                
-                const parentSelector = document.getElementById('parentDirectory');
-                const parentCID = parentSelector.value || null;
-                
-                const checkboxes = document.querySelectorAll('input[name="directoryFiles"]:checked');
-                const selections = Array.from(checkboxes).map(cb => cb.value);
-                
-                if (selections.length === 0) {
-                    alert('少なくとも1つのファイルまたはディレクトリを選択してください');
-                    return;
-                }
-                
-                // Separate files and directories
-                const fileIds = selections
-                    .filter(s => s.startsWith('file:'))
-                    .map(s => s.substring(5));
-                
-                const dirCIDs = selections
-                    .filter(s => s.startsWith('dir:'))
-                    .map(s => s.substring(4));
-                
-                // Process subdirectories
-                if (dirCIDs.length > 0) {
-                    // Move directories under the new parent
-                    dirCIDs.forEach(dirCID => {
-                        const dir = window.directoryManager.directories.find(d => d.cid === dirCID);
-                        if (dir) {
-                            dir.parentCID = parentCID;
-                        }
-                    });
-                    window.directoryManager.saveDirectories();
-                }
-                
-                await window.directoryManager.createDirectory(name, fileIds, parentCID);
-                
-                // Clear form
-                nameInput.value = '';
-                checkboxes.forEach(cb => cb.checked = false);
-                
-                // Update UI
-                window.directoryManager.updateUI();
-                
-            } catch (error) {
-                log(`ディレクトリ作成エラー: ${error.message}`, 'error');
-                alert(`エラー: ${error.message}`);
-            }
-        };
+        // Moved to UI CONTROL & EVENT HANDLERS section
+        // window.createDirectory - Directory creation handler
 
         // Filter out trash and system files
         function shouldSkipFile(fileName, filePath = '') {
@@ -4781,29 +4700,8 @@
             }
         }
 
-        // Connection test
-        window.testConnection = async function() {
-            try {
-                log('接続テストを実行中...');
-                const startTime = Date.now();
-                
-                // Test RPC
-                const info = await rpcClient.getServerInfo();
-                const rpcTime = Date.now() - startTime;
-                log(`RPC応答時間: ${rpcTime}ms`, 'success');
-                
-                // Test Explorer API
-                const apiStart = Date.now();
-                const response = await fetchWithTimeout('https://api-tn10.kaspa.org/info/health', {}, 5000, 1); // 5s timeout, 1 retry for health check
-                const apiTime = Date.now() - apiStart;
-                log(`Explorer API応答時間: ${apiTime}ms`, 'success');
-                
-                alert(`接続テスト成功!\nRPC: ${rpcTime}ms\nAPI: ${apiTime}ms`);
-                
-            } catch (error) {
-                log(`接続テストエラー: ${error.message}`, 'error');
-            }
-        };
+        // Moved to UI CONTROL & EVENT HANDLERS section
+        // window.testConnection - Connection test handler
 
         // File handling
         window.handleFileSelect = async function(event) {
@@ -10405,6 +10303,133 @@
                 statusEl.textContent = 'Test data cleared.';
             }
         }
+        
+        // ============= UI CONTROL & EVENT HANDLERS =============
+        // User interface controls and event handling functions
+        
+        // Clipboard copy function (moved from UTILITY FUNCTIONS)
+        window.copyToClipboard = async function(text) {
+            const preview = text && text.length > 20 ? text.substring(0, 20) + '...' : text;
+            // Use window.log to ensure it's accessible
+            if (typeof log !== 'undefined') {
+                log(`[DEBUG] copyToClipboard が呼び出されました: ${preview}`, 'debug');
+            }
+            try {
+                await navigator.clipboard.writeText(text);
+                if (typeof log !== 'undefined') {
+                    log('クリップボードにコピーしました', 'success');
+                }
+            } catch (err) {
+                if (typeof log !== 'undefined') {
+                    log(`コピーエラー: ${err.message}`, 'error');
+                } else {
+                    console.error(`コピーエラー: ${err.message}`);
+                }
+            }
+        }
+        
+        // Tab switching function (moved from FILE OPERATIONS)
+        window.switchTab = function(tab) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            
+            const tabIndex = ['upload', 'download', 'directory', 'history', 'settings'].indexOf(tab);
+            document.querySelectorAll('.tab-btn')[tabIndex].classList.add('active');
+            document.getElementById(`${tab}-tab`).classList.add('active');
+            
+            // Update history tab when switching to it
+            if (tab === 'history' && window.historyManager) {
+                window.historyManager.updateHistoryUI();
+            }
+            
+            // Update directory tab when switching to it
+            if (tab === 'directory' && window.directoryManager) {
+                window.directoryManager.updateFileSelector();
+                window.directoryManager.updateUI();
+            }
+        };
+        
+        // Connection test function (moved from NETWORK & RPC FUNCTIONS)
+        window.testConnection = async function() {
+            try {
+                log('接続テストを実行中...');
+                const startTime = Date.now();
+                
+                // Test RPC
+                const info = await rpcClient.getServerInfo();
+                const rpcTime = Date.now() - startTime;
+                log(`RPC応答時間: ${rpcTime}ms`, 'success');
+                
+                // Test Explorer API
+                const apiStart = Date.now();
+                const response = await fetchWithTimeout('https://api-tn10.kaspa.org/info/health', {}, 5000, 1);
+                const apiTime = Date.now() - apiStart;
+                log(`Explorer API応答時間: ${apiTime}ms`, 'success');
+                
+                alert(`接続テスト成功!\nRPC: ${rpcTime}ms\nAPI: ${apiTime}ms`);
+            } catch (error) {
+                log(`接続テストエラー: ${error.message}`, 'error');
+                alert(`接続テスト失敗: ${error.message}`);
+            }
+        };
+        
+        // Directory creation function (moved from FILE OPERATIONS)
+        window.createDirectory = async function() {
+            try {
+                const nameInput = document.getElementById('directoryName');
+                const name = nameInput.value.trim();
+                
+                if (!name) {
+                    alert('ディレクトリ名を入力してください');
+                    return;
+                }
+                
+                const parentSelector = document.getElementById('parentDirectory');
+                const parentCID = parentSelector.value || null;
+                
+                const checkboxes = document.querySelectorAll('input[name="directoryFiles"]:checked');
+                const selections = Array.from(checkboxes).map(cb => cb.value);
+                
+                if (selections.length === 0) {
+                    alert('少なくとも1つのファイルまたはディレクトリを選択してください');
+                    return;
+                }
+                
+                // Separate files and directories
+                const fileIds = selections
+                    .filter(s => s.startsWith('file:'))
+                    .map(s => s.substring(5));
+                
+                const dirCIDs = selections
+                    .filter(s => s.startsWith('dir:'))
+                    .map(s => s.substring(4));
+                
+                // Process subdirectories
+                if (dirCIDs.length > 0) {
+                    // Move directories under the new parent
+                    dirCIDs.forEach(dirCID => {
+                        const dir = window.directoryManager.directories.find(d => d.cid === dirCID);
+                        if (dir) {
+                            dir.parentCID = parentCID;
+                        }
+                    });
+                    window.directoryManager.saveDirectories();
+                }
+                
+                await window.directoryManager.createDirectory(name, fileIds, parentCID);
+                
+                // Clear form
+                nameInput.value = '';
+                checkboxes.forEach(cb => cb.checked = false);
+                
+                // Update UI
+                window.directoryManager.updateUI();
+                
+            } catch (error) {
+                log(`ディレクトリ作成エラー: ${error.message}`, 'error');
+                alert(`エラー: ${error.message}`);
+            }
+        };
         
         // v5.3.6: Debug helper for upload status
         window.getUploadStatus = function() {

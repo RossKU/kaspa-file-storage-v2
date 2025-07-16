@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.4.32 - Fix UserState.UserState duplicate reference</title>
+    <title>Kaspa P2P File Storage v5.4.33 - Fix privateKey references in transaction signing</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -877,6 +877,7 @@
         // v5.4.30: Phase 2 UserState implementation (privateKey, address)
         // v5.4.31: Fix null reference error - replace all address.toString() with UserState.address.toString()
         // v5.4.32: Fix UserState.UserState duplicate reference error and add debug logging
+        // v5.4.33: Fix privateKey references - replace with UserState.privateKey in transaction signing
         // - Restored architecture map
         // - 13-section code organization
         // - Improved function grouping
@@ -5493,7 +5494,7 @@
         
         async function sendTransaction(transaction) {
             // Sign transaction
-            await transaction.sign([privateKey]);
+            await transaction.sign([UserState.privateKey]);
             
             // Submit transaction with error handling
             try {
@@ -6429,7 +6430,7 @@
                                 }
                                 
                                 const pendingTx = result.transactions[0];
-                                await pendingTx.sign([privateKey]);
+                                await pendingTx.sign([UserState.privateKey]);
                                 txid = await pendingTx.submit(rpcClient);
                                 
                                 log(`ペイロード ${i + 1} TxID: ${txid.substring(0, 16)}...`, 'success');
@@ -6505,7 +6506,13 @@
                                 
                             } catch (error) {
                                 retries++;
-                                log(`ペイロード ${i + 1} エラー (試行 ${retries}/${config.retryCount}): ${error.message}`, 'error');
+                                const errorMessage = error?.message || error?.toString() || 'Unknown error';
+                                log(`ペイロード ${i + 1} エラー (試行 ${retries}/${config.retryCount}): ${errorMessage}`, 'error');
+                                log(`[DEBUG] エラーオブジェクト:`, error, 'debug');
+                                log(`[DEBUG] エラータイプ: ${typeof error}`, 'debug');
+                                if (error?.stack) {
+                                    log(`[DEBUG] スタックトレース: ${error.stack}`, 'debug');
+                                }
                                 
                                 if (retries >= config.retryCount) {
                                     const chunkStatusElement = document.getElementById(`chunk-status-${i}`);
@@ -6565,7 +6572,9 @@
                     
                     } catch (error) {
                         // v4.7.57: 新方式のエラーハンドリング
-                        log(`[新方式] エラーが発生しました: ${error.message}`, 'error');
+                        const errorMessage = error?.message || error?.toString() || 'Unknown error';
+                        log(`[新方式] エラーが発生しました: ${errorMessage}`, 'error');
+                        log(`[新方式] エラー詳細:`, error, 'error');
                         log(`[新方式] 処理を中断します`, 'error');
                         throw error;
                     }
@@ -6690,7 +6699,7 @@
                             
                             // Sign the transaction
                             log(`トランザクションに署名中...`);
-                            await pendingTx.sign([privateKey]);
+                            await pendingTx.sign([UserState.privateKey]);
                             
                             // Submit to network
                             log(`ネットワークに送信中...`);
@@ -7011,9 +7020,14 @@
                 }
                 
             } catch (error) {
-                log(`アップロードエラー: ${error.message}`, 'error');
-                console.error('Upload error stack:', error.stack);
-                log(`[DEBUG] エラースタック: ${error.stack}`, 'debug');
+                const errorMessage = error?.message || error?.toString() || 'Unknown error';
+                log(`アップロードエラー: ${errorMessage}`, 'error');
+                console.error('Upload error:', error);
+                log(`[DEBUG] エラーオブジェクト:`, error, 'debug');
+                log(`[DEBUG] エラータイプ: ${typeof error}`, 'debug');
+                if (error?.stack) {
+                    log(`[DEBUG] エラースタック: ${error.stack}`, 'debug');
+                }
             } finally {
                 // v3.6.3 fix: Clear upload flag
                 isUploadingFile = false;
@@ -7286,7 +7300,7 @@
                 }
                 
                 const pendingTx = result.transactions[0];
-                await pendingTx.sign([privateKey]);
+                await pendingTx.sign([UserState.privateKey]);
                 const metaTxId = await pendingTx.submit(rpcClient);
                 
                 log(`メタトランザクションを送信しました: ${metaTxId}`, 'success');
@@ -7495,7 +7509,7 @@
                 });
                 
                 const pendingTx = result.transactions[0];
-                await pendingTx.sign([privateKey]);
+                await pendingTx.sign([UserState.privateKey]);
                 
                 // Debug: Check transaction before submission
                 log(`[SuperMeta] トランザクション送信前 - ペイロードサイズ: ${metaPayload.length} bytes`, 'debug');
@@ -7669,7 +7683,7 @@
                 });
                 
                 const pendingTx = result.transactions[0];
-                await pendingTx.sign([privateKey]);
+                await pendingTx.sign([UserState.privateKey]);
                 const superMetaTxId = await pendingTx.submit(rpcClient);
                 
                 log(`[SuperMeta] スーパーメタTxID: ${superMetaTxId}`, 'success');
@@ -10640,4 +10654,4 @@
         });
     </script>
 </body>
-</html><!-- Force GitHub Pages update: Wed Jul 16 2025 - v5.4.32: Fix duplicate reference -->
+</html><!-- Force GitHub Pages update: Wed Jul 16 2025 - v5.4.33: Fix privateKey references -->

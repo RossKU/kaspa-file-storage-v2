@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.4.17 - Phase 2.2 Complete (Fixed)</title>
+    <title>Kaspa P2P File Storage v5.4.18 - Phase 3 Complete</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -872,7 +872,7 @@
     </div>
 
     <script type="module">
-        // v5.4.17: Phase 2.2 Complete - handleFileSelect migration fixed
+        // v5.4.18: Phase 3 Complete - setupWorkspace refactored
         // - Restored architecture map
         // - 13-section code organization
         // - Improved function grouping
@@ -3364,6 +3364,97 @@
         }
 
         // Setup workspace directory for File System Access API
+        // ===== Workspace Helper Functions =====
+        
+        // Scan directory for .kprogress files
+        async function scanProgressFiles(dirHandle) {
+            progressFileMap.clear();
+            let progressCount = 0;
+            let skippedCount = 0;
+            
+            try {
+                for await (const entry of dirHandle.values()) {
+                    if (entry.kind === 'file' && entry.name.endsWith('.kprogress')) {
+                        // Skip trash/system files
+                        if (shouldSkipFile(entry.name)) {
+                            skippedCount++;
+                            log(`スキップ: ${entry.name}`, 'debug');
+                            continue;
+                        }
+                        
+                        // Extract base filename and CID from filename
+                        const match = entry.name.match(/^(.+?)\.([a-z0-9]{8})\.kprogress$/);
+                        if (match) {
+                            const baseFilename = match[1];
+                            const cid = match[2];
+                            progressFileMap.set(baseFilename, {
+                                cid: cid,
+                                fileHandle: entry,
+                                progressFilename: entry.name
+                            });
+                            progressCount++;
+                            log(`進捗ファイル検出: ${entry.name}`, 'info');
+                        }
+                    }
+                }
+                
+                if (progressCount > 0) {
+                    log(`${progressCount}個の進捗ファイルを検出しました`, 'success');
+                    showToast(`レジューム可能: ${progressCount}個のファイル`, 'info');
+                }
+                
+                if (skippedCount > 0) {
+                    log(`${skippedCount}個のゴミ箱/システムファイルをスキップしました`, 'debug');
+                }
+            } catch (err) {
+                log('進捗ファイルスキャンエラー: ' + err.message, 'warning');
+            }
+            
+            return progressCount;
+        }
+        
+        // Check for legacy progress file
+        async function checkLegacyProgress(dirHandle) {
+            try {
+                const fileHandle = await dirHandle.getFileHandle('kaspa-upload-progress.json');
+                const file = await fileHandle.getFile();
+                const content = await file.text();
+                const progress = JSON.parse(content);
+                
+                if (progress && progress.version === '2.0' && 
+                    progress.metadata.completedChunks < progress.metadata.totalChunks) {
+                    
+                    const useExisting = confirm(
+                        '作業フォルダに未完了のアップロードが見つかりました。\n\n' +
+                        `ファイル: ${progress.fileInfo.name}\n` +
+                        `進捗: ${progress.metadata.completedChunks}/${progress.metadata.totalChunks} チャンク\n\n` +
+                        'これを続行しますか？'
+                    );
+                    
+                    if (useExisting) {
+                        handleProgressLoad(progress);
+                        return true;
+                    }
+                }
+            } catch (err) {
+                // No existing progress file
+            }
+            
+            return false;
+        }
+        
+        // Load history if available
+        async function loadWorkspaceHistory() {
+            if (window.historyManager && window.historyManager.encryptionKey) {
+                try {
+                    await window.historyManager.loadFromFile();
+                } catch (err) {
+                    log('履歴ロードエラー: ' + err.message, 'warning');
+                }
+            }
+        }
+        
+        // Refactored setupWorkspace using helper functions
         async function setupWorkspace() {
             try {
                 const dirHandle = await window.showDirectoryPicker({
@@ -3375,77 +3466,13 @@
                 log(`作業フォルダを設定: ${dirHandle.name}`, 'success');
                 
                 // Scan for .kprogress files
-                progressFileMap.clear();
-                let progressCount = 0;
-                let skippedCount = 0;
+                await scanProgressFiles(dirHandle);
                 
-                try {
-                    for await (const entry of dirHandle.values()) {
-                        if (entry.kind === 'file' && entry.name.endsWith('.kprogress')) {
-                            // Skip trash/system files
-                            if (shouldSkipFile(entry.name)) {
-                                skippedCount++;
-                                log(`スキップ: ${entry.name}`, 'debug');
-                                continue;
-                            }
-                            
-                            // Extract base filename and CID from filename
-                            const match = entry.name.match(/^(.+?)\.([a-z0-9]{8})\.kprogress$/);
-                            if (match) {
-                                const baseFilename = match[1];
-                                const cid = match[2];
-                                progressFileMap.set(baseFilename, {
-                                    cid: cid,
-                                    fileHandle: entry,
-                                    progressFilename: entry.name
-                                });
-                                progressCount++;
-                                log(`進捗ファイル検出: ${entry.name}`, 'info');
-                            }
-                        }
-                    }
-                    
-                    if (progressCount > 0) {
-                        log(`${progressCount}個の進捗ファイルを検出しました`, 'success');
-                        showToast(`レジューム可能: ${progressCount}個のファイル`, 'info');
-                    }
-                    
-                    if (skippedCount > 0) {
-                        log(`${skippedCount}個のゴミ箱/システムファイルをスキップしました`, 'debug');
-                    }
-                } catch (err) {
-                    log('進捗ファイルスキャンエラー: ' + err.message, 'warning');
-                }
+                // Check for legacy progress file
+                await checkLegacyProgress(dirHandle);
                 
-                // Check for existing progress file (legacy support)
-                try {
-                    const fileHandle = await dirHandle.getFileHandle('kaspa-upload-progress.json');
-                    const file = await fileHandle.getFile();
-                    const content = await file.text();
-                    const progress = JSON.parse(content);
-                    
-                    if (progress && progress.version === '2.0' && 
-                        progress.metadata.completedChunks < progress.metadata.totalChunks) {
-                        
-                        const useExisting = confirm(
-                            '作業フォルダに未完了のアップロードが見つかりました。\n\n' +
-                            `ファイル: ${progress.fileInfo.name}\n` +
-                            `進捗: ${progress.metadata.completedChunks}/${progress.metadata.totalChunks} チャンク\n\n` +
-                            'これを続行しますか？'
-                        );
-                        
-                        if (useExisting) {
-                            handleProgressLoad(progress);
-                        }
-                    }
-                } catch (err) {
-                    // No existing progress file
-                }
-                
-                // Load history if historyManager is initialized
-                if (window.historyManager && window.historyManager.encryptionKey) {
-                    await window.historyManager.loadFromFile();
-                }
+                // Load history if available
+                await loadWorkspaceHistory();
                 
                 // Update UI to show workspace status
                 showWorkspaceStatus();

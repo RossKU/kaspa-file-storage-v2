@@ -203,9 +203,9 @@ onclick   handleFileSelect    uploadFile    createTransaction
 | 1.1 | copyToClipboard | ✅ 完了 | 2025-07-16 09:37 | log未定義エラー修正済み |
 | 1.2 | switchTab | ✅ 完了 | 2025-07-16 09:55 | 正常動作確認済み |
 | 1.3 | testConnection | ✅ 完了 | 2025-07-16 09:55 | 正常動作確認済み |
-| 2.1 | createDirectory | 未着手 | - | |
-| 2.2 | handleFileSelect | 未着手 | - | |
-| 3.1 | setupWorkspace | 未着手 | - | |
+| 2.1 | createDirectory | ✅ 完了 | 2025-07-16 (Git履歴から復元) | UI CONTROLへ移動済み |
+| 2.2 | handleFileSelect | ✅ 完了 | 2025-07-16 12:15 | ヘルパー関数に分割、UI CONTROLへ移動 |
+| 3.1 | setupWorkspace | ✅ 完了 | 2025-07-16 12:30 | ヘルパー関数に分割、DOMContentLoaded内に保持 |
 
 ## 🔍 次のステップ
 
@@ -214,10 +214,23 @@ onclick   handleFileSelect    uploadFile    createTransaction
 - switchTab: FILE OPS → UI CONTROL  
 - testConnection: NETWORK → UI CONTROL
 
-### 📋 Phase 2 準備中
-1. createDirectory の移動準備
-2. handleFileSelect の分割設計
-3. エラーハンドリングの確認
+### ✅ Phase 2 完了（2025-07-16）
+- createDirectory: FILE OPS → UI CONTROL（Git履歴から復元）
+- handleFileSelect: FILE OPS → UI CONTROL（ヘルパー関数に分割）
+  - checkFileSizeWarning: ファイルサイズ警告チェック
+  - checkAutoResumeProgress: 進捗ファイル自動検出
+  - updateFileSelectionUI: UI更新処理
+
+### ✅ Phase 3 完了（2025-07-16）
+- setupWorkspace: 3つのヘルパー関数に分割
+  - scanProgressFiles: .kprogressファイルのスキャン
+  - checkLegacyProgress: レガシー進捗ファイルのチェック
+  - loadWorkspaceHistory: 履歴の読み込み
+- DOMContentLoaded内での定義を維持（グローバルスコープ問題を回避）
+
+### 📋 次の作業
+1. グローバル変数の整理
+2. ディレクトリ機能の修正（v3.3フォーマット対応）
 
 ## 📊 成果
 
@@ -238,6 +251,20 @@ onclick   handleFileSelect    uploadFile    createTransaction
 - 一括ダウンロード時のパスワード問題を根本解決
 - 個別ファイルのパスワード再入力機能を実装
 - ディレクトリとファイルのパスワードが異なる場合に対応
+
+### v5.4.14での実施
+- アーキテクチャマップの復元
+- Phase 1/2.1の関数移動の復元
+
+### v5.4.17での実施
+- handleFileSelectを3つのヘルパー関数に分割
+- 安全な関数移行アプローチの確立
+- コードの可読性と保守性の向上
+
+### v5.4.18での実施
+- setupWorkspaceを3つのヘルパー関数に分割
+- 93行の関数を29行に簡素化
+- コードの再利用性向上
 
 ---
 

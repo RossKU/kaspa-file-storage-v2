@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.4.26 - Fix null reference errors</title>
+    <title>Kaspa P2P File Storage v5.4.27 - Fix meta-tx creation errors</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -872,7 +872,7 @@
     </div>
 
     <script type="module">
-        // v5.4.26: Fix null reference errors with window globals
+        // v5.4.27: Fix meta-tx creation errors with window globals
         // - Restored architecture map
         // - 13-section code organization
         // - Improved function grouping
@@ -7037,8 +7037,15 @@
             try {
                 log('メタトランザクション作成を開始します...', 'info');
                 
+                // Debug logs
+                log(`[DEBUG] kaspaMetadata: ${kaspaMetadata ? 'exists' : 'null'}`, 'debug');
+                log(`[DEBUG] window.kaspaMetadata: ${window.kaspaMetadata ? 'exists' : 'null'}`, 'debug');
+                if (window.kaspaMetadata) {
+                    log(`[DEBUG] window.kaspaMetadata.chunks: ${window.kaspaMetadata.chunks ? `array with ${window.kaspaMetadata.chunks.length} items` : 'null/undefined'}`, 'debug');
+                }
+                
                 // Check if super metadata is needed based on chunk count
-                const totalChunks = kaspaMetadata.chunks.length;
+                const totalChunks = window.kaspaMetadata?.chunks?.length || 0;
                 const CHUNKS_PER_META = 160; // 160 chunks per single MetaTxID
                 const MAX_CHUNKS_SUPPORTED = 25600; // 160 × 160
                 
@@ -7061,8 +7068,8 @@
                         const group = [];
                         for (let j = 0; j < CHUNKS_PER_META && i + j < totalChunks; j++) {
                             group.push({
-                                txid: kaspaMetadata.chunks[i + j],
-                                blockId: kaspaMetadata.chunkBlockIds[i + j]
+                                txid: window.kaspaMetadata.chunks[i + j],
+                                blockId: window.kaspaMetadata.chunkBlockIds[i + j]
                             });
                         }
                         chunkGroups.push(group);
@@ -7077,18 +7084,18 @@
                             chunkGroups[i], 
                             i, 
                             chunkGroups.length,
-                            kaspaMetadata,
-                            currentPassword,
+                            window.kaspaMetadata,
+                            window.currentPassword,
                             CHUNKS_PER_META
                         );
                         singleMetaTxs.push(singleMeta);
                     }
                     
                     // Create super meta-tx
-                    const superMeta = await createSuperMetaTx(singleMetaTxs, kaspaMetadata, currentPassword);
+                    const superMeta = await createSuperMetaTx(singleMetaTxs, window.kaspaMetadata, window.currentPassword);
                     
                     // Update metadata with super meta info
-                    kaspaMetadata.metaTx = {
+                    window.kaspaMetadata.metaTx = {
                         type: 'super',
                         txid: superMeta.txId,
                         blockId: superMeta.blockId,
@@ -7126,14 +7133,14 @@
                 const metaTxData = {
                     type: "kaspa-meta-tx",
                     version: "3.3",  // v4.7.50: Updated to Format v3.3
-                    created: kaspaMetadata.created,
-                    network: kaspaMetadata.network,
-                    encryption: kaspaMetadata.encryption,
-                    file: kaspaMetadata.file,
-                    chunks: kaspaMetadata.chunks,
-                    chunkBlockIds: kaspaMetadata.chunkBlockIds,  // v3.3フォーマット準拠
-                    recovery: kaspaMetadata.recovery,
-                    metadata: kaspaMetadata.metadata,
+                    created: window.kaspaMetadata.created,
+                    network: window.kaspaMetadata.network,
+                    encryption: window.kaspaMetadata.encryption,
+                    file: window.kaspaMetadata.file,
+                    chunks: window.kaspaMetadata.chunks,
+                    chunkBlockIds: window.kaspaMetadata.chunkBlockIds,  // v3.3フォーマット準拠
+                    recovery: window.kaspaMetadata.recovery,
+                    metadata: window.kaspaMetadata.metadata,
                     // Add flat structure for regular meta-tx
                     chunkStructure: {
                         type: "flat",
@@ -7146,11 +7153,11 @@
                 const metaDataBytes = new TextEncoder().encode(metaDataString);
                 
                 // Use the same salt and key from file encryption
-                if (!kaspaMetadata.encryption || !kaspaMetadata.encryption.pbkdf2) {
+                if (!window.kaspaMetadata.encryption || !window.kaspaMetadata.encryption.pbkdf2) {
                     throw new Error('暗号化情報が見つかりません');
                 }
-                const salt = fromBase64(kaspaMetadata.encryption.pbkdf2.salt);
-                const key = await deriveKey(currentPassword, salt);
+                const salt = fromBase64(window.kaspaMetadata.encryption.pbkdf2.salt);
+                const key = await deriveKey(window.currentPassword, salt);
                 
                 // Encrypt with chunk index -1 to indicate meta-tx
                 const encryptedMetaData = await encryptChunk(metaDataBytes, key, -1);
@@ -7276,7 +7283,7 @@
                 }
                 
                 // Add meta-tx to metadata for .kaspa file generation
-                kaspaMetadata.metaTx = {
+                window.kaspaMetadata.metaTx = {
                     txid: metaTxId,
                     blockId: metaBlockId,
                     reference: metaTxReference,

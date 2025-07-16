@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.4.30 - Phase 2 UserState implementation</title>
+    <title>Kaspa P2P File Storage v5.4.31 - Fix null reference error in address.toString()</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -875,6 +875,7 @@
         // v5.4.28: Fix empty chunks in kaspaMetadata
         // v5.4.29: Complete Phase 1 backward compatibility proxies
         // v5.4.30: Phase 2 UserState implementation (privateKey, address)
+        // v5.4.31: Fix null reference error - replace all address.toString() with UserState.address.toString()
         // - Restored architecture map
         // - 13-section code organization
         // - Improved function grouping
@@ -1082,6 +1083,9 @@
             
             async initialize(privateKey) {
                 log('[UploadHistoryManager] 初期化を開始します', 'debug');
+                log(`[UploadHistoryManager] privateKey: ${privateKey ? 'provided' : 'null/undefined'}`, 'debug');
+                log(`[UploadHistoryManager] privateKey type: ${typeof privateKey}`, 'debug');
+                
                 try {
                     // Derive encryption key from private key
                     const keyData = new TextEncoder().encode(privateKey);
@@ -1178,7 +1182,7 @@
                     const kenv = {
                         version: "2.0",
                         schemaVersion: 2,
-                        wallet: address?.toString() || '',
+                        wallet: UserState.address?.toString() || '',
                         created: new Date().toISOString(),
                         lastModified: new Date().toISOString(),
                         uploads: history,
@@ -4727,7 +4731,7 @@
                 const publicKey = UserState.privateKey.toPublicKey();
                 UserState.address = publicKey.toAddress(config.network);
                 
-                log(`ウォレットアドレス: ${UserState.address.toString()}`, 'success');
+                log(`ウォレットアドレス: ${UserState.UserState.address.toString()}`, 'success');
                 
                 // Create RPC client
                 rpcClient = new kaspa.RpcClient({
@@ -4743,7 +4747,7 @@
                 log(`接続成功! サーバー: ${info.serverVersion}`, 'success');
                 
                 // Get balance
-                const { entries } = await rpcClient.getUtxosByAddresses([address.toString()]);
+                const { entries } = await rpcClient.getUtxosByAddresses([UserState.address.toString()]);
                 const balance = entries.reduce((sum, utxo) => sum + Number(utxo.amount), 0) / 1e8;
                 log(`残高: ${balance} KAS`, 'info');
                 
@@ -4752,7 +4756,7 @@
                 document.getElementById('initStatus').style.display = 'block';
                 document.getElementById('initStatus').innerHTML = `
                     <p class="success">✅ システム初期化完了</p>
-                    <p>アドレス: ${UserState.address.toString()}</p>
+                    <p>アドレス: ${UserState.UserState.address.toString()}</p>
                     <p>残高: ${balance} KAS</p>
                 `;
                 document.getElementById('testBtn').disabled = false;
@@ -5439,14 +5443,14 @@
         // Transaction helper functions for directory upload
         async function createTransaction(payloadBase64) {
             // Get UTXOs
-            const { entries } = await rpcClient.getUtxosByAddresses([address.toString()]);
+            const { entries } = await rpcClient.getUtxosByAddresses([UserState.address.toString()]);
             if (!entries || entries.length === 0) {
                 throw new Error('利用可能なUTXOがありません');
             }
             
             // Format UTXOs
             const formattedUtxos = entries.map(utxo => ({
-                address: address.toString(),
+                address: UserState.address.toString(),
                 outpoint: {
                     transactionId: utxo.outpoint.transactionId,
                     index: utxo.outpoint.index
@@ -5464,10 +5468,10 @@
             const result = await kaspa.createTransactions({
                 entries: formattedUtxos,
                 outputs: [{
-                    address: address.toString(),
+                    address: UserState.address.toString(),
                     amount: 100000000n // 1 KAS
                 }],
-                changeAddress: address.toString(),
+                changeAddress: UserState.address.toString(),
                 priorityFee: 10000n,
                 networkId: config.network,
                 payload: payloadBytes
@@ -6346,7 +6350,7 @@
                         }
                         
                         // Get fresh UTXOs
-                        const { entries } = await rpcClient.getUtxosByAddresses([address.toString()]);
+                        const { entries } = await rpcClient.getUtxosByAddresses([UserState.address.toString()]);
                         if (!entries || entries.length === 0) {
                             throw new Error('利用可能なUTXOがありません');
                         }
@@ -6389,7 +6393,7 @@
                                 
                                 // Create transaction
                                 const formattedUtxos = entries.map(utxo => ({
-                                    address: address.toString(),
+                                    address: UserState.address.toString(),
                                     outpoint: {
                                         transactionId: utxo.outpoint.transactionId,
                                         index: utxo.outpoint.index
@@ -6403,10 +6407,10 @@
                                 const result = await kaspa.createTransactions({
                                     entries: formattedUtxos,
                                     outputs: [{
-                                        address: address.toString(),
+                                        address: UserState.address.toString(),
                                         amount: 100000000n // 1 KAS
                                     }],
-                                    changeAddress: address.toString(),
+                                    changeAddress: UserState.address.toString(),
                                     priorityFee: 10000n,
                                     networkId: config.network,
                                     payload: payloadBytes
@@ -6568,7 +6572,7 @@
                     while (nextChunkIndex >= 0) {
                     // Get fresh UTXOs for each chunk
                     log(`チャンク ${nextChunkIndex + 1}/${totalChunks} の処理を開始...`);
-                    const { entries } = await rpcClient.getUtxosByAddresses([address.toString()]);
+                    const { entries } = await rpcClient.getUtxosByAddresses([UserState.address.toString()]);
                     if (!entries || entries.length === 0) {
                         throw new Error('利用可能なUTXOがありません');
                     }
@@ -6647,7 +6651,7 @@
                             
                             // Format current UTXOs
                             const formattedUtxos = entries.map(utxo => ({
-                                address: address.toString(),
+                                address: UserState.address.toString(),
                                 outpoint: {
                                     transactionId: utxo.outpoint.transactionId,
                                     index: utxo.outpoint.index
@@ -6661,10 +6665,10 @@
                             const result = await kaspa.createTransactions({
                                 entries: formattedUtxos,
                                 outputs: [{
-                                    address: address.toString(),
+                                    address: UserState.address.toString(),
                                     amount: 100000000n // 1 KAS
                                 }],
-                                changeAddress: address.toString(),
+                                changeAddress: UserState.address.toString(),
                                 priorityFee: 10000n,
                                 networkId: config.network,
                                 payload: payloadBytes
@@ -6899,7 +6903,7 @@
                         metaTxBlockId: null,
                         uploadDate: new Date().toISOString(),
                         blockTime: null,
-                        uploadedBy: address.toString(),
+                        uploadedBy: UserState.address.toString(),
                         payloadSplit: useNewApproach, // Flag for new approach
                         chunkBoundaries: useNewApproach ? progressManager.progress.metadata.chunkBoundaries : undefined
                     }
@@ -7218,7 +7222,7 @@
                 log(`メタデータサイズ: ${metaDataBytes.length} bytes → 暗号化後: ${metaPayload.length} bytes (salt含む)`);
                 
                 // Upload meta-tx to blockchain
-                const utxoResponse = await rpcClient.getUtxosByAddresses([address.toString()]);
+                const utxoResponse = await rpcClient.getUtxosByAddresses([UserState.address.toString()]);
                 const entries = utxoResponse.entries || [];
                 
                 log(`${entries.length} UTXOs available for meta-tx`);
@@ -7226,7 +7230,7 @@
                 const formattedUtxos = entries.map(utxo => {
                     try {
                         return {
-                            address: address.toString(),
+                            address: UserState.address.toString(),
                             outpoint: {
                                 transactionId: utxo.outpoint.transactionId,
                                 index: utxo.outpoint.index
@@ -7253,10 +7257,10 @@
                     result = await kaspa.createTransactions({
                         entries: formattedUtxos,
                         outputs: [{
-                            address: address.toString(),
+                            address: UserState.address.toString(),
                             amount: amount
                         }],
-                        changeAddress: address.toString(),
+                        changeAddress: UserState.address.toString(),
                         priorityFee: 10000n,
                         networkId: config.network,
                         payload: metaPayload
@@ -7456,11 +7460,11 @@
                 log(`[SuperMeta] 中間メタデータサイズ: ${metaDataBytes.length} bytes`, 'debug');
                 
                 // Upload to blockchain
-                const utxoResponse = await rpcClient.getUtxosByAddresses([address.toString()]);
+                const utxoResponse = await rpcClient.getUtxosByAddresses([UserState.address.toString()]);
                 const entries = utxoResponse.entries || [];
                 
                 const formattedUtxos = entries.map(utxo => ({
-                    address: address.toString(),
+                    address: UserState.address.toString(),
                     outpoint: {
                         transactionId: utxo.outpoint.transactionId,
                         index: utxo.outpoint.index
@@ -7474,10 +7478,10 @@
                 const result = await kaspa.createTransactions({
                     entries: formattedUtxos,
                     outputs: [{
-                        address: address.toString(),
+                        address: UserState.address.toString(),
                         amount: 100000000n // 1 KAS
                     }],
-                    changeAddress: address.toString(),
+                    changeAddress: UserState.address.toString(),
                     priorityFee: 10000n,
                     networkId: config.network,
                     payload: metaPayload
@@ -7630,11 +7634,11 @@
                 log(`[SuperMeta] スーパーメタデータサイズ: ${metaDataBytes.length} bytes`, 'debug');
                 
                 // Upload to blockchain
-                const utxoResponse = await rpcClient.getUtxosByAddresses([address.toString()]);
+                const utxoResponse = await rpcClient.getUtxosByAddresses([UserState.address.toString()]);
                 const entries = utxoResponse.entries || [];
                 
                 const formattedUtxos = entries.map(utxo => ({
-                    address: address.toString(),
+                    address: UserState.address.toString(),
                     outpoint: {
                         transactionId: utxo.outpoint.transactionId,
                         index: utxo.outpoint.index
@@ -7648,10 +7652,10 @@
                 const result = await kaspa.createTransactions({
                     entries: formattedUtxos,
                     outputs: [{
-                        address: address.toString(),
+                        address: UserState.address.toString(),
                         amount: 100000000n // 1 KAS
                     }],
-                    changeAddress: address.toString(),
+                    changeAddress: UserState.address.toString(),
                     priorityFee: 10000n,
                     networkId: config.network,
                     payload: metaPayload
@@ -10629,4 +10633,4 @@
         });
     </script>
 </body>
-</html><!-- Force GitHub Pages update: Wed Jul 16 2025 - v5.4.30: Phase 2 UserState implementation -->
+</html><!-- Force GitHub Pages update: Wed Jul 16 2025 - v5.4.31: Fix null reference error -->

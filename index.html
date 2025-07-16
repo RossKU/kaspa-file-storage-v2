@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.4.35 - Fix WorkspaceState not defined error</title>
+    <title>Kaspa P2P File Storage v5.4.36 - Fix infinite recursion in workspaceHandle proxy</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -880,6 +880,7 @@
         // v5.4.33: Fix privateKey references - replace with UserState.privateKey in transaction signing
         // v5.4.34: Phase 3 WorkspaceState implementation (workspaceHandle, progressFileMap, historyManager)
         // v5.4.35: Fix WorkspaceState not defined error in UploadHistoryManager class
+        // v5.4.36: Fix infinite recursion in workspaceHandle getter/setter proxy
         // - Restored architecture map
         // - 13-section code organization
         // - Improved function grouping
@@ -1064,9 +1065,9 @@
         
         // Define getter/setter for workspaceHandle
         Object.defineProperty(window, 'workspaceHandle', {
-            get() { return window.workspaceHandle; },
+            get() { return WorkspaceState.handle; },
             set(value) { 
-                window.workspaceHandle = value;
+                WorkspaceState.handle = value;
             }
         });
         
@@ -10687,4 +10688,4 @@
         });
     </script>
 </body>
-</html><!-- Force GitHub Pages update: Wed Jul 16 2025 - v5.4.35: Fix WorkspaceState error -->
+</html><!-- Force GitHub Pages update: Wed Jul 16 2025 - v5.4.36: Fix infinite recursion -->

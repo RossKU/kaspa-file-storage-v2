@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.4.36 - Fix infinite recursion in workspaceHandle proxy</title>
+    <title>Kaspa P2P File Storage v5.4.37 - Expose WorkspaceState to window for global access</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -881,6 +881,7 @@
         // v5.4.34: Phase 3 WorkspaceState implementation (workspaceHandle, progressFileMap, historyManager)
         // v5.4.35: Fix WorkspaceState not defined error in UploadHistoryManager class
         // v5.4.36: Fix infinite recursion in workspaceHandle getter/setter proxy
+        // v5.4.37: Expose WorkspaceState to window for onclick handlers and global access
         // - Restored architecture map
         // - 13-section code organization
         // - Improved function grouping
@@ -1009,6 +1010,9 @@
             progressFileMap: new Map(),  // Map of filename -> {cid, fileHandle}
             historyManager: null    // Upload history manager instance
         };
+        
+        // Expose WorkspaceState to window for onclick handlers
+        window.WorkspaceState = WorkspaceState;
         
         // Backward compatibility proxies (to be removed in future versions)
         let parallelDownloadEnabled = AppState.settings.parallelDownloadEnabled;
@@ -10688,4 +10692,4 @@
         });
     </script>
 </body>
-</html><!-- Force GitHub Pages update: Wed Jul 16 2025 - v5.4.36: Fix infinite recursion -->
+</html><!-- Force GitHub Pages update: Wed Jul 16 2025 - v5.4.37: Expose WorkspaceState -->

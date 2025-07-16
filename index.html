@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.4.14 - Architecture Refactoring</title>
+    <title>Kaspa P2P File Storage v5.4.17 - Phase 2.2 Complete (Fixed)</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -872,7 +872,7 @@
     </div>
 
     <script type="module">
-        // v5.4.14: Architecture Refactoring Edition
+        // v5.4.17: Phase 2.2 Complete - handleFileSelect migration fixed
         // - Restored architecture map
         // - 13-section code organization
         // - Improved function grouping
@@ -4703,28 +4703,21 @@
         // Moved to UI CONTROL & EVENT HANDLERS section
         // window.testConnection - Connection test handler
 
-        // File handling
-        window.handleFileSelect = async function(event) {
-            // Clear directory mode
-            window.isDirectoryMode = false;
-            const uploadDirOption = document.getElementById('uploadDirMetadataOption');
-            if (uploadDirOption) {
-                uploadDirOption.style.display = 'none';
-            }
-            const file = event.target.files[0];
-            if (!file) return;
-            
-            currentFile = file;
-            log(`ファイル選択: ${file.name} (${(file.size/1024).toFixed(1)}KB)`);
-            
-            // Check if file size exceeds 550MB
+        // ===== File Operation Helper Functions =====
+        
+        // Check file size and show warning if needed
+        function checkFileSizeWarning(file) {
             const MAX_SIZE_WITH_META = 550 * 1024 * 1024; // 550MB
             if (file.size > MAX_SIZE_WITH_META) {
                 log(`⚠️ 警告: このファイルサイズ(${(file.size/1024/1024).toFixed(1)}MB)では、ブロックチェーン上のメタデータトランザクションが生成されない可能性があります`, 'warning');
                 log('.kaspaファイルは生成されますが、メタデータの共有が制限されます', 'warning');
+                return true;
             }
-            
-            // Auto-detect progress file from workspace
+            return false;
+        }
+        
+        // Check for auto-resume from progress file
+        async function checkAutoResumeProgress(file) {
             if (!window.pendingProgress && progressFileMap.has(file.name)) {
                 const progressInfo = progressFileMap.get(file.name);
                 log(`進捗ファイルを自動検出: ${progressInfo.progressFilename}`, 'info');
@@ -4747,15 +4740,11 @@
                     
                     if (calculatedCID === progressInfo.cid) {
                         log(`CID検証成功: ${calculatedCID}`, 'success');
-                        window.pendingProgress = progress;
-                        window.currentFileCID = progressInfo.cid;
                         
-                        // Show auto-resume notification
-                        // 完了チェック
+                        // Check if already completed
                         if (progress.metadata.completedChunks >= progress.metadata.totalChunks) {
                             log(`完了済みファイルを検出: ${file.name}`, 'info');
-                            // TODO: 履歴に移動して.kprogress削除
-                            return;
+                            return { completed: true };
                         }
                         
                         const resumeConfirm = confirm(
@@ -4766,8 +4755,11 @@
                             `レジュームしますか？`
                         );
                         
-                        if (!resumeConfirm) {
-                            window.pendingProgress = null;
+                        if (resumeConfirm) {
+                            window.pendingProgress = progress;
+                            window.currentFileCID = progressInfo.cid;
+                            return { resume: true, progress: progress, cid: progressInfo.cid };
+                        } else {
                             log('自動レジュームをキャンセルしました', 'info');
                         }
                     } else {
@@ -4778,51 +4770,34 @@
                     log(`進捗ファイル自動読み込みエラー: ${error.message}`, 'error');
                 }
             }
-            
-            // Check if we have pending progress for this file
-            if (window.pendingProgress) {
-                const chunkSize = parseInt(document.getElementById('chunkSize').value) * 1024;
-                // Use CID from progress if available
-                const cid = window.currentFileCID || window.pendingProgress.cid || null;
-                progressManager = new ProgressManager(file, chunkSize, cid, 'upload');
-                
-                if (progressManager.validateProgress(window.pendingProgress)) {
-                    // Initialize with existing progress
-                    await progressManager.initialize(window.pendingProgress);
-                    
-                    // Update UI to show resume status
-                    const stats = progressManager.getStats();
-                    const label = document.querySelector('.file-input-label');
-                    label.innerHTML = `
-                        <strong>${file.name}</strong><br>
-                        ${(file.size/1024/1024).toFixed(2)}MB<br>
-                        <span class="success">レジューム: ${stats.percentage}% 完了</span>
-                    `;
-                    
-                    log(`レジューム準備完了: ${stats.completed}/${stats.total} チャンク完了`, 'success');
-                    
-                    // Clear pending progress
-                    window.pendingProgress = null;
-                    document.getElementById('resumeInfo').style.display = 'none';
-                } else {
-                    log('進捗ファイルが選択されたファイルと一致しません', 'error');
-                    progressManager = null;
-                }
+            return { resume: false };
+        }
+        
+        // Update file selection UI
+        function updateFileSelectionUI(file, isResume = false, resumeStats = null) {
+            const label = document.querySelector('.file-input-label');
+            if (isResume && resumeStats) {
+                label.innerHTML = `
+                    <strong>${file.name}</strong><br>
+                    ${(file.size/1024/1024).toFixed(2)}MB<br>
+                    <span class="success">レジューム: ${resumeStats.percentage}% 完了</span>
+                `;
             } else {
-                // Update UI for new upload
-                const label = document.querySelector('.file-input-label');
                 label.innerHTML = `
                     <strong>${file.name}</strong><br>
                     ${(file.size/1024/1024).toFixed(2)}MB
                 `;
-                
-                // Show normal file upload UI
-                const uploadDirOption2 = document.getElementById('uploadDirMetadataOption');
-                if (uploadDirOption2) {
-                    uploadDirOption2.style.display = 'none';
-                }
             }
-        };
+            
+            // Hide directory upload option for regular files
+            const uploadDirOption = document.getElementById('uploadDirMetadataOption');
+            if (uploadDirOption) {
+                uploadDirOption.style.display = 'none';
+            }
+        }
+
+        // Moved to UI CONTROL & EVENT HANDLERS section
+        // window.handleFileSelect - File selection handler
         
         // Directory handling
         window.handleDirectorySelect = async function(event) {
@@ -10428,6 +10403,60 @@
             } catch (error) {
                 log(`ディレクトリ作成エラー: ${error.message}`, 'error');
                 alert(`エラー: ${error.message}`);
+            }
+        };
+        
+        // File selection handler (moved from FILE OPERATIONS)
+        window.handleFileSelect = async function(event) {
+            // Clear directory mode
+            window.isDirectoryMode = false;
+            const uploadDirOption = document.getElementById('uploadDirMetadataOption');
+            if (uploadDirOption) {
+                uploadDirOption.style.display = 'none';
+            }
+            
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            currentFile = file;
+            log(`ファイル選択: ${file.name} (${(file.size/1024).toFixed(1)}KB)`);
+            
+            // Check file size warning
+            checkFileSizeWarning(file);
+            
+            // Check for auto-resume
+            const resumeResult = await checkAutoResumeProgress(file);
+            if (resumeResult.completed) {
+                return; // File already completed
+            }
+            
+            // Handle resume or new upload
+            if (window.pendingProgress) {
+                const chunkSize = parseInt(document.getElementById('chunkSize').value) * 1024;
+                const cid = window.currentFileCID || window.pendingProgress.cid || null;
+                progressManager = new ProgressManager(file, chunkSize, cid, 'upload');
+                
+                if (progressManager.validateProgress(window.pendingProgress)) {
+                    // Initialize with existing progress
+                    await progressManager.initialize(window.pendingProgress);
+                    
+                    // Update UI to show resume status
+                    const stats = progressManager.getStats();
+                    updateFileSelectionUI(file, true, stats);
+                    
+                    log(`レジューム準備完了: ${stats.completed}/${stats.total} チャンク完了`, 'success');
+                    
+                    // Clear pending progress
+                    window.pendingProgress = null;
+                    document.getElementById('resumeInfo').style.display = 'none';
+                } else {
+                    log('進捗ファイルが選択されたファイルと一致しません', 'error');
+                    progressManager = null;
+                    updateFileSelectionUI(file, false);
+                }
+            } else {
+                // Update UI for new upload
+                updateFileSelectionUI(file, false);
             }
         };
         

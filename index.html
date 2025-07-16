@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.4.10 - Function Migration Phase 2</title>
+    <title>Kaspa P2P File Storage v5.4.11 - Error Handling Improvement</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -8413,7 +8413,10 @@
                         
                     } catch (error) {
                         errorFiles++;
-                        log(`[一括ダウンロード] エラー: ${entry.name} - ${error.message}`, 'error');
+                        // Enhanced error logging
+                        log(`[一括ダウンロード] エラー: ${entry.name} - ${error.message || error.toString()}`, 'error');
+                        log(`[一括ダウンロード] エラー詳細: ${JSON.stringify(error)}`, 'debug');
+                        console.error('[一括ダウンロード] Full error:', error);
                     }
                 }
                 

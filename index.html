@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.4.20 - Fix log undefined error</title>
+    <title>Kaspa P2P File Storage v5.4.21 - Fix helper functions scope</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -872,7 +872,7 @@
     </div>
 
     <script type="module">
-        // v5.4.20: Fix log undefined error in handleFileSelect
+        // v5.4.21: Fix helper functions scope for handleFileSelect
         // - Restored architecture map
         // - 13-section code organization
         // - Improved function grouping
@@ -4759,7 +4759,7 @@
         // ===== File Operation Helper Functions =====
         
         // Check file size and show warning if needed
-        function checkFileSizeWarning(file) {
+        window.checkFileSizeWarning = function checkFileSizeWarning(file) {
             const MAX_SIZE_WITH_META = 550 * 1024 * 1024; // 550MB
             if (file.size > MAX_SIZE_WITH_META) {
                 log(`⚠️ 警告: このファイルサイズ(${(file.size/1024/1024).toFixed(1)}MB)では、ブロックチェーン上のメタデータトランザクションが生成されない可能性があります`, 'warning');
@@ -4770,7 +4770,7 @@
         }
         
         // Check for auto-resume from progress file
-        async function checkAutoResumeProgress(file) {
+        window.checkAutoResumeProgress = async function checkAutoResumeProgress(file) {
             if (!window.pendingProgress && progressFileMap.has(file.name)) {
                 const progressInfo = progressFileMap.get(file.name);
                 log(`進捗ファイルを自動検出: ${progressInfo.progressFilename}`, 'info');
@@ -4827,7 +4827,7 @@
         }
         
         // Update file selection UI
-        function updateFileSelectionUI(file, isResume = false, resumeStats = null) {
+        window.updateFileSelectionUI = function updateFileSelectionUI(file, isResume = false, resumeStats = null) {
             const label = document.querySelector('.file-input-label');
             if (isResume && resumeStats) {
                 label.innerHTML = `

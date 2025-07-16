@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.4.33 - Fix privateKey references in transaction signing</title>
+    <title>Kaspa P2P File Storage v5.4.34 - Phase 3 WorkspaceState implementation</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -720,8 +720,8 @@
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                     <h3>履歴管理</h3>
                     <div>
-                        <button onclick="window.historyManager?.exportKenv()" class="small-button">📥 .kenvエクスポート</button>
-                        <button onclick="window.historyManager?.importKenv()" class="small-button">📤 .kenvインポート</button>
+                        <button onclick="WorkspaceState.historyManager?.exportKenv()" class="small-button">📥 .kenvエクスポート</button>
+                        <button onclick="WorkspaceState.historyManager?.importKenv()" class="small-button">📤 .kenvインポート</button>
                     </div>
                 </div>
                 
@@ -878,6 +878,7 @@
         // v5.4.31: Fix null reference error - replace all address.toString() with UserState.address.toString()
         // v5.4.32: Fix UserState.UserState duplicate reference error and add debug logging
         // v5.4.33: Fix privateKey references - replace with UserState.privateKey in transaction signing
+        // v5.4.34: Phase 3 WorkspaceState implementation (workspaceHandle, progressFileMap, historyManager)
         // - Restored architecture map
         // - 13-section code organization
         // - Improved function grouping
@@ -1000,6 +1001,13 @@
             address: null
         };
         
+        // ===== Phase 3: Workspace State Refactoring (v5.4.34) =====
+        const WorkspaceState = {
+            handle: null,           // File System Access API directory handle
+            progressFileMap: new Map(),  // Map of filename -> {cid, fileHandle}
+            historyManager: null    // Upload history manager instance
+        };
+        
         // Backward compatibility proxies (to be removed in future versions)
         let parallelDownloadEnabled = AppState.settings.parallelDownloadEnabled;
         window.parallelDownloadEnabled = AppState.settings.parallelDownloadEnabled;
@@ -1053,6 +1061,30 @@
             }
         });
         
+        // Define getter/setter for workspaceHandle
+        Object.defineProperty(window, 'workspaceHandle', {
+            get() { return WorkspaceState.handle; },
+            set(value) { 
+                WorkspaceState.handle = value;
+            }
+        });
+        
+        // Define getter/setter for progressFileMap
+        Object.defineProperty(window, 'progressFileMap', {
+            get() { return WorkspaceState.progressFileMap; },
+            set(value) { 
+                WorkspaceState.progressFileMap = value;
+            }
+        });
+        
+        // Define getter/setter for historyManager
+        Object.defineProperty(window, 'historyManager', {
+            get() { return WorkspaceState.historyManager; },
+            set(value) { 
+                WorkspaceState.historyManager = value;
+            }
+        });
+        
         // Load parallel download setting from localStorage
         function loadParallelSetting() {
             const saved = localStorage.getItem('kaspaParallelDownload');
@@ -1102,7 +1134,7 @@
                     log('[UploadHistoryManager] 暗号化キーを初期化しました', 'success');
                     
                     // Load existing history from workspace
-                    if (window.workspaceHandle) {
+                    if (WorkspaceState.handle) {
                         log('[UploadHistoryManager] ワークスペースハンドルが存在します。履歴の読み込みを開始します', 'debug');
                         await this.loadFromFile();
                     } else {
@@ -1117,7 +1149,7 @@
             async loadFromFile() {
                 log(`[UploadHistoryManager] .kenvファイル「${this.fileName}」の読み込みを開始します`, 'debug');
                 try {
-                    const fileHandle = await window.workspaceHandle.getFileHandle(this.fileName);
+                    const fileHandle = await WorkspaceState.handle.getFileHandle(this.fileName);
                     log('[UploadHistoryManager] .kenvファイルが見つかりました', 'success');
                     
                     const file = await fileHandle.getFile();
@@ -1170,7 +1202,7 @@
             }
             
             async saveToFile() {
-                if (!window.workspaceHandle) {
+                if (!WorkspaceState.handle) {
                     log('[UploadHistoryManager] ワークスペースハンドルがないため保存をスキップします', 'debug');
                     return;
                 }
@@ -1208,7 +1240,7 @@
                         data: encrypted
                     };
                     
-                    const fileHandle = await window.workspaceHandle.getFileHandle(this.fileName, { create: true });
+                    const fileHandle = await WorkspaceState.handle.getFileHandle(this.fileName, { create: true });
                     if (fileHandle) {
                         log(`[UploadHistoryManager] .kenvファイル「${this.fileName}」を作成/更新します`, 'debug');
                     }
@@ -1729,7 +1761,7 @@
                     await this.saveToFile();
                     
                     // Also trigger download
-                    const fileHandle = await window.workspaceHandle.getFileHandle(this.fileName);
+                    const fileHandle = await WorkspaceState.handle.getFileHandle(this.fileName);
                     const file = await fileHandle.getFile();
                     const content = await file.text();
                     log(`[UploadHistoryManager] エクスポートファイルサイズ: ${content.length} 文字`, 'debug');
@@ -1843,7 +1875,7 @@
                         data: encrypted
                     };
                     
-                    const fileHandle = await window.workspaceHandle.getFileHandle(archiveName, { create: true });
+                    const fileHandle = await WorkspaceState.handle.getFileHandle(archiveName, { create: true });
                     const writable = await fileHandle.createWritable();
                     await writable.write(JSON.stringify(data, null, 2));
                     await writable.close();
@@ -2072,7 +2104,7 @@
                 }
                 
                 // Get file details from history
-                const history = window.historyManager?.getHistory() || [];
+                const history = WorkspaceState.historyManager?.getHistory() || [];
                 const files = fileIds.map(id => {
                     const item = history.find(h => h.id === id);
                     if (!item) return null;
@@ -2455,7 +2487,7 @@
                 const fileList = document.getElementById('fileList');
                 if (!fileList) return;
                 
-                const history = window.historyManager?.getHistory() || [];
+                const history = WorkspaceState.historyManager?.getHistory() || [];
                 const existingDirs = this.directories;
                 
                 if (history.length === 0 && existingDirs.length === 0) {
@@ -2766,9 +2798,9 @@
                     }
                     
                     // Save to file if workspace is available
-                    if (window.workspaceHandle) {
+                    if (WorkspaceState.handle) {
                         try {
-                            const fileHandle = await window.workspaceHandle.getFileHandle(
+                            const fileHandle = await WorkspaceState.handle.getFileHandle(
                                 this.progressFileName,
                                 { create: true }
                             );
@@ -3453,7 +3485,7 @@
         
         // Scan directory for .kprogress files
         async function scanProgressFiles(dirHandle) {
-            progressFileMap.clear();
+            WorkspaceState.progressFileMap.clear();
             let progressCount = 0;
             let skippedCount = 0;
             
@@ -3472,7 +3504,7 @@
                         if (match) {
                             const baseFilename = match[1];
                             const cid = match[2];
-                            progressFileMap.set(baseFilename, {
+                            WorkspaceState.progressFileMap.set(baseFilename, {
                                 cid: cid,
                                 fileHandle: entry,
                                 progressFilename: entry.name
@@ -3530,9 +3562,9 @@
         
         // Load history if available
         async function loadWorkspaceHistory() {
-            if (window.historyManager && window.historyManager.encryptionKey) {
+            if (WorkspaceState.historyManager && WorkspaceState.historyManager.encryptionKey) {
                 try {
-                    await window.historyManager.loadFromFile();
+                    await WorkspaceState.historyManager.loadFromFile();
                 } catch (err) {
                     log('履歴ロードエラー: ' + err.message, 'warning');
                 }
@@ -3547,7 +3579,7 @@
                     startIn: 'downloads'
                 });
                 
-                window.workspaceHandle = dirHandle;
+                WorkspaceState.handle = dirHandle;
                 log(`作業フォルダを設定: ${dirHandle.name}`, 'success');
                 
                 // Scan for .kprogress files
@@ -3585,10 +3617,10 @@
             
             const status = document.getElementById('workspaceStatus');
             if (status) {
-                if (window.workspaceHandle) {
+                if (WorkspaceState.handle) {
                     status.innerHTML = `
                         <p style="margin: 0; color: #49EACB;">
-                            ✓ 作業フォルダ: ${window.workspaceHandle.name}
+                            ✓ 作業フォルダ: ${WorkspaceState.handle.name}
                             <button onclick="setupWorkspace()" style="margin-left: 10px; padding: 5px 10px; font-size: 12px;">変更</button>
                         </p>
                     `;
@@ -3618,9 +3650,9 @@
         // Progress file handling
         window.loadProgressFile = async function() {
             // Check workspace first
-            if (window.workspaceHandle) {
+            if (WorkspaceState.handle) {
                 try {
-                    const fileHandle = await window.workspaceHandle.getFileHandle('kaspa-upload-progress.json');
+                    const fileHandle = await WorkspaceState.handle.getFileHandle('kaspa-upload-progress.json');
                     const file = await fileHandle.getFile();
                     const content = await file.text();
                     const progress = JSON.parse(content);
@@ -3806,7 +3838,7 @@
                 log('進捗を読み込みました。同じファイルを選択してください。', 'info');
                 
                 // Show export button if no workspace
-                if (!window.workspaceHandle) {
+                if (!WorkspaceState.handle) {
                     const resumeDiv = document.getElementById('resumeInfo');
                     if (resumeDiv && !document.getElementById('exportProgressBtn')) {
                         const exportBtn = document.createElement('button');
@@ -4771,9 +4803,9 @@
                 document.getElementById('uploadBtn').disabled = false;
                 
                 // Initialize history manager
-                if (window.historyManager) {
-                    await window.historyManager.initialize(config.testPrivateKey);
-                    window.historyManager.updateHistoryUI();
+                if (WorkspaceState.historyManager) {
+                    await WorkspaceState.historyManager.initialize(config.testPrivateKey);
+                    WorkspaceState.historyManager.updateHistoryUI();
                 }
                 
                 updateNetworkStatus('online', 'オンライン');
@@ -4836,8 +4868,8 @@
         
         // Check for auto-resume from progress file
         window.checkAutoResumeProgress = async function checkAutoResumeProgress(file) {
-            if (!window.pendingProgress && progressFileMap.has(file.name)) {
-                const progressInfo = progressFileMap.get(file.name);
+            if (!window.pendingProgress && WorkspaceState.progressFileMap.has(file.name)) {
+                const progressInfo = WorkspaceState.progressFileMap.get(file.name);
                 log(`進捗ファイルを自動検出: ${progressInfo.progressFilename}`, 'info');
                 
                 try {
@@ -5151,7 +5183,7 @@
                     network: config.network
                 };
                 
-                await window.historyManager.addUpload(uploadData);
+                await WorkspaceState.historyManager.addUpload(uploadData);
                 
                 // Show completion summary
                 log(`\n🎉 ディレクトリアップロード完了!`, 'success');
@@ -5162,7 +5194,7 @@
                 log(`総コスト: ${totalCost.toFixed(8)} KAS`);
                 
                 // Update history UI
-                window.historyManager.updateHistoryUI();
+                WorkspaceState.historyManager.updateHistoryUI();
                 
             } catch (error) {
                 log(`ディレクトリアップロードエラー: ${error.message}`, 'error');
@@ -6941,7 +6973,7 @@
                 }
                 
                 // Add to history
-                if (window.historyManager) {
+                if (WorkspaceState.historyManager) {
                     // Get block time from last chunk or meta-tx
                     // Get block time from the last chunk
                     let blockTime = null;
@@ -6986,12 +7018,12 @@
                         network: config.network
                     };
                     log(`[DEBUG] 履歴データ生成完了 - ID: ${uploadData.id}`, 'debug');
-                    await window.historyManager.addUpload(uploadData);
+                    await WorkspaceState.historyManager.addUpload(uploadData);
                     
                     // Delete .kprogress file if exists
-                    if (progressManager && window.workspaceHandle) {
+                    if (progressManager && WorkspaceState.handle) {
                         try {
-                            await window.workspaceHandle.removeEntry(progressManager.progressFileName);
+                            await WorkspaceState.handle.removeEntry(progressManager.progressFileName);
                             log('.kprogressファイルを削除しました', 'info');
                         } catch (err) {
                             // File might not exist
@@ -7002,7 +7034,7 @@
                 // Check if meta-tx option is enabled
                 const useMetaTx = document.getElementById('useMetaTx').checked;
                 log(`[DEBUG] メタTx使用設定: ${useMetaTx}`, 'debug');
-                log(`[DEBUG] ワークスペース設定: ${window.workspaceHandle ? 'あり' : 'なし'}`, 'debug');
+                log(`[DEBUG] ワークスペース設定: ${WorkspaceState.handle ? 'あり' : 'なし'}`, 'debug');
                 
                 if (useMetaTx) {
                     log('[DEBUG] メタTx作成を開始します', 'debug');
@@ -7178,15 +7210,15 @@
                     };
                     
                     // Update history
-                    if (window.historyManager && window.currentFileCID) {
-                        const history = window.historyManager.getHistory();
+                    if (WorkspaceState.historyManager && window.currentFileCID) {
+                        const history = WorkspaceState.historyManager.getHistory();
                         const latestUpload = history.find(h => h.cid === window.currentFileCID);
                         if (latestUpload) {
                             latestUpload.metaTxId = superMeta.txId;
                             latestUpload.metaTxBlockId = superMeta.blockId;
                             latestUpload.metaTxType = 'super';
-                            localStorage.setItem(window.historyManager.dbName, JSON.stringify(history));
-                            await window.historyManager.saveToFile();
+                            localStorage.setItem(WorkspaceState.historyManager.dbName, JSON.stringify(history));
+                            await WorkspaceState.historyManager.saveToFile();
                         }
                     }
                     
@@ -7364,9 +7396,9 @@
                 };
                 
                 // Update history with metaTxId
-                if (window.historyManager && window.currentFileCID) {
+                if (WorkspaceState.historyManager && window.currentFileCID) {
                     log(`[DEBUG] 履歴更新開始 - CID: ${window.currentFileCID}`, 'debug');
-                    const history = window.historyManager.getHistory();
+                    const history = WorkspaceState.historyManager.getHistory();
                     const latestUpload = history.find(h => h.cid === window.currentFileCID);
                     if (latestUpload) {
                         log(`[DEBUG] 履歴エントリー発見 - ID: ${latestUpload.id}`, 'debug');
@@ -7377,14 +7409,14 @@
                         log(`[DEBUG] メタTxID設定: ${metaTxId}`, 'debug');
                         log(`[DEBUG] メタBlockID設定: ${metaBlockId || 'null'}`, 'debug');
                         // Save updated history
-                        localStorage.setItem(window.historyManager.dbName, JSON.stringify(history));
-                        await window.historyManager.saveToFile();
+                        localStorage.setItem(WorkspaceState.historyManager.dbName, JSON.stringify(history));
+                        await WorkspaceState.historyManager.saveToFile();
                         log('[UploadHistoryManager] メタTxIDとBlockIDを履歴に追加しました', 'debug');
                     } else {
                         log(`[DEBUG] CID ${window.currentFileCID} の履歴エントリーが見つかりません`, 'error');
                     }
                 } else {
-                    log(`[DEBUG] 履歴更新スキップ - historyManager: ${!!window.historyManager}, CID: ${window.currentFileCID || 'なし'}`, 'warning');
+                    log(`[DEBUG] 履歴更新スキップ - historyManager: ${!!WorkspaceState.historyManager}, CID: ${window.currentFileCID || 'なし'}`, 'warning');
                 }
                 
                 // Auto-stop WebSocket monitoring after meta-tx creation
@@ -7928,7 +7960,7 @@
             log('[一括ダウンロード] ディレクトリ内の全ファイルをダウンロード開始', 'info');
             
             // Check workspace handle
-            if (!window.workspaceHandle) {
+            if (!WorkspaceState.handle) {
                 log('作業フォルダが設定されていません。先に設定してください。', 'error');
                 alert('作業フォルダが設定されていません。\n画面上部の「設定」ボタンから作業フォルダを選択してください。');
                 await setupWorkspace();
@@ -7949,10 +7981,10 @@
                 
                 // Create base directory
                 const baseDirName = dirMetadata.directory?.name || 'download';
-                let targetHandle = window.workspaceHandle;
+                let targetHandle = WorkspaceState.handle;
                 
                 try {
-                    targetHandle = await window.workspaceHandle.getDirectoryHandle(baseDirName, { create: true });
+                    targetHandle = await WorkspaceState.handle.getDirectoryHandle(baseDirName, { create: true });
                     log(`[一括ダウンロード] ベースディレクトリ作成/取得: ${baseDirName}`, 'info');
                 } catch (e) {
                     log(`[一括ダウンロード] ベースディレクトリ作成エラー: ${e.message}`, 'error');
@@ -9397,7 +9429,7 @@
             setTimeout(async () => {
                 // Check if File System Access API is available
                 if ('showDirectoryPicker' in window) {
-                    const hasWorkspace = window.workspaceHandle !== null;
+                    const hasWorkspace = WorkspaceState.handle !== null;
                     if (!hasWorkspace) {
                         const useFileAPI = confirm(
                             'Kaspa P2P File Storage\n\n' +
@@ -9684,7 +9716,7 @@
             const historyFileList = document.getElementById('historyFileList');
             
             // Get history from localStorage
-            const history = window.historyManager.getHistory();
+            const history = WorkspaceState.historyManager.getHistory();
             
             // v4.7.24: Filter only file uploads with password AND metaTxId to prevent crashes
             const fileHistory = history.filter(item => {
@@ -9763,7 +9795,7 @@
                 return;
             }
             
-            const history = window.historyManager.getHistory();
+            const history = WorkspaceState.historyManager.getHistory();
             const selectedFiles = [];
             
             // Collect selected files
@@ -9874,7 +9906,7 @@
                 return;
             }
             
-            const history = window.historyManager.getHistory();
+            const history = WorkspaceState.historyManager.getHistory();
             const selectedFiles = [];
             
             // Collect selected files
@@ -9944,8 +9976,8 @@
             };
             
             // Add to history manager
-            await window.historyManager.addUpload(uploadData);
-            window.historyManager.updateHistoryUI();
+            await WorkspaceState.historyManager.addUpload(uploadData);
+            WorkspaceState.historyManager.updateHistoryUI();
             
             log(`📁 ディレクトリメタデータを生成しました: ${dirName}`, 'success');
             log(`含まれるファイル数: ${selectedFiles.length}`, 'info');
@@ -10021,7 +10053,7 @@
                     log('MetaTxID:BlockIDをクリップボードにコピーしました', 'info');
                     
                     // Update the temporary history entry with blockchain info
-                    const history = window.historyManager.getHistory();
+                    const history = WorkspaceState.historyManager.getHistory();
                     const tempEntry = history.find(h => h.isTemporary && h.name === dirName);
                     
                     if (tempEntry) {
@@ -10033,8 +10065,8 @@
                         tempEntry.isTemporary = false; // Remove temporary flag
                         
                         // Save updated history
-                        await window.historyManager.saveToFile();
-                        window.historyManager.updateHistoryUI();
+                        await WorkspaceState.historyManager.saveToFile();
+                        WorkspaceState.historyManager.updateHistoryUI();
                         
                         log('履歴のTxIDを更新しました', 'success');
                     }
@@ -10052,7 +10084,7 @@
         };
         
         // Initialize history manager on load
-        window.historyManager = new UploadHistoryManager();
+        WorkspaceState.historyManager = new UploadHistoryManager();
         window.directoryManager = new DirectoryManager();
         window.downloadManager = new DownloadManager();
         
@@ -10136,9 +10168,9 @@
             }
             
             // Save any pending data
-            if (window.historyManager) {
+            if (WorkspaceState.historyManager) {
                 try {
-                    window.historyManager.saveHistory();
+                    WorkspaceState.historyManager.saveHistory();
                 } catch (e) {
                     console.error('Failed to save history on unload:', e);
                 }
@@ -10470,8 +10502,8 @@
             document.getElementById(`${tab}-tab`).classList.add('active');
             
             // Update history tab when switching to it
-            if (tab === 'history' && window.historyManager) {
-                window.historyManager.updateHistoryUI();
+            if (tab === 'history' && WorkspaceState.historyManager) {
+                WorkspaceState.historyManager.updateHistoryUI();
             }
             
             // Update directory tab when switching to it
@@ -10654,4 +10686,4 @@
         });
     </script>
 </body>
-</html><!-- Force GitHub Pages update: Wed Jul 16 2025 - v5.4.33: Fix privateKey references -->
+</html><!-- Force GitHub Pages update: Wed Jul 16 2025 - v5.4.34: Phase 3 WorkspaceState -->

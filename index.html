@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.4.13 - Bulk Download Folder Fix</title>
+    <title>Kaspa P2P File Storage v5.4.14 - Architecture Refactoring</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -458,7 +458,7 @@
 </head>
 <body>
     <div class="header">
-        <h1 id="appTitle">🚀 Kaspa P2P File Storage v5.4.9 - Loading...</h1>
+        <h1 id="appTitle">🚀 Kaspa P2P File Storage v5.3.11 - Loading...</h1>
         <p>実ネットワーク接続による完全なP2Pファイル共有システム（用語修正）</p>
         <p id="appSubtitle" style="font-size: 12px; color: #49EACB; margin-top: 5px;">📋 Loading version...</p>
         <div id="networkStatus" style="margin-top: 10px;">
@@ -872,11 +872,10 @@
     </div>
 
     <script type="module">
-        // v5.4.9: Function Organization Edition
-        // - Centralized configuration (CONFIG object)
-        // - Unified error handling system
-        // - Progress update consolidation
-        // - Function grouping by responsibility
+        // v5.4.14: Architecture Refactoring Edition
+        // - Restored architecture map
+        // - 13-section code organization
+        // - Improved function grouping
         
         /*
          * ====================================================================
@@ -937,10 +936,6 @@
         } catch (e) {
             // Ignore errors in debug logging
         }
-        
-        // ============= GLOBAL STATE & INITIALIZATION =============
-        // Global variables and application state management
-        
         // Global state
         let kaspa = null;
         let rpcClient = null;
@@ -969,463 +964,14 @@
         let isUploadingFile = false; // Overall file upload status (v3.6.3 fix)
         let uploadSessionActive = false; // Upload session active flag (v5.3.6)
         
-        // ============= CONFIGURATION =============
-        // All application constants and configuration values
-        const CONFIG = {
-            // Chunk and Buffer Sizes
-            CHUNKS_PER_META: 160,                    // Maximum chunks per MetaTxID
-            MAX_CHUNKS_SUPPORTED: 25600,             // Maximum chunks supported via Super (160 × 160)
-            PROCESS_CHUNK_SIZE: 1024 * 1024,         // 1MB processing chunks
-            PROCESSING_CHUNK_SIZE: 1048576,          // 1MB processing chunks (duplicate - to be unified)
-            MAX_CACHE_SIZE: 100 * 1024 * 1024,       // 100MB max cache size
-            ARCHIVE_CHUNK_SIZE: 10 * 1024 * 1024,    // 10MB archive chunks
-            FILE_PREVIEW_SIZE: 1024 * 1024,          // 1MB file preview for hashing
-            FILE_PROCESSING_THRESHOLD: 50 * 1024 * 1024,  // 50MB threshold for file processing
-            PROCESS_CHUNK_SIZE_SMALL: 128 * 1024,    // 128KB process chunks
-            MAX_SIZE_WITH_META: 550 * 1024 * 1024,   // 550MB max file size with metadata
-            METADATA_SIZE_LIMIT: 20 * 1024,          // 20KB metadata size limit
-            FULL_HASH_THRESHOLD: 10 * 1024 * 1024,   // 10MB threshold for full file hashing
-            SAFETY_MARGIN: 1000,                     // ~1KB safety margin
-            CHUNK_SIZE_THRESHOLD: 22528,             // 22KB threshold (22 * 1024)
-            MAX_ENCRYPTED_SIZE: 22984,               // Maximum encrypted payload size
-            PAYLOAD_SIZE: 22 * 1024,                 // 22KB payload size
-            
-            // Timeout and Delay Values (in milliseconds)
-            DELAYS: {
-                QUICK: 10,                           // 10ms quick delay
-                BATCH_PROCESSING: 50,                // 50ms batch processing delay
-                SHORT: 500,                          // 500ms short delay
-                TRANSACTION_CONFIRM: 2000,           // 2s transaction confirmation
-                HEALTH_CHECK: 5000,                  // 5s health check timeout
-                DEFAULT_TIMEOUT: 10000,              // 10s default timeout
-                WS_MONITOR_INTERVAL: 5 * 60 * 1000,  // 5 minutes WebSocket monitor interval
-            },
-            
-            // Retry Configuration
-            RETRY: {
-                DEFAULT_COUNT: 3,                    // Default retry count
-                MIN_COUNT: 0,                        // Minimum retry count
-                MAX_COUNT: 10,                       // Maximum retry count
-                EXPONENTIAL_BASE: 1000,              // Base delay for exponential backoff (1s)
-            },
-            
-            // Network Configuration
-            NETWORK: {
-                DEFAULT_TYPE: 'testnet-10',          // Default network type
-                TESTNET_WS: 'wss://archive-tn10.kaspa.org:17210',
-                MAINNET_WS: 'wss://archive.kaspa.org:17110',
-                TESTNET_API: 'https://api-tn10.kaspa.org',
-                MAINNET_API: 'https://api.kaspa.org',
-                TRANSACTION_API: 'https://api.kaspa.org/transactions/',
-            },
-            
-            // File Extensions and Types
-            FILE_EXTENSIONS: {
-                KASPA: '.kaspa',                     // Kaspa file extension
-                KASPA_DIR: '.kaspa-dir',             // Directory Kaspa file extension
-                KPROGRESS: '.kprogress',             // Progress file extension
-                DROP_CLASS: '.kaspa-file-drop',      // CSS class for file drop
-            },
-            
-            // Transaction Configuration
-            TRANSACTION: {
-                AMOUNT: 100000000n,                  // 1 KAS in sompi
-                PRIORITY_FEE: 10000n,                // Transaction priority fee
-            },
-            
-            // Parallel Processing
-            PARALLEL: {
-                DEFAULT_DOWNLOADS: 3,                // Default concurrent downloads
-                DEFAULT_CONCURRENCY: 8,              // Default concurrency for chunks
-                ENABLED_BY_DEFAULT: false,           // Parallel download default state
-            },
-            
-            // Cryptographic Constants
-            CRYPTO: {
-                IV_SIZE: 12,                         // IV size for AES-GCM
-                PBKDF2_ITERATIONS: 100000,           // PBKDF2 iterations
-                RANDOM_BYTES: 32,                    // Random bytes for IDs
-                SHA256_SIZE: 32,                     // SHA-256 output size
-            },
-            
-            // UI and Display Constants
-            UI: {
-                TEXT_PREVIEW_LENGTH: 20,             // Text preview length
-                SAMPLE_SIZE: 4096,                   // Sample size for file hashing
-                MAX_FILENAME_LENGTH: 240,            // Maximum filename length
-                ANIMATION_DURATION: 1000,            // Pulse animation duration (1s)
-                HISTORY_ENTRIES_LIMIT: 100,          // Recent history limit
-                PROGRESS_UPDATE_INTERVAL: 10,        // Update progress every N chunks
-            },
-            
-            // Storage Configuration
-            STORAGE: {
-                DB_NAME: 'kaspa-upload-history',     // IndexedDB name
-                HISTORY_FILE: 'kaspa-uploads.kenv',  // History file name
-                MAX_HISTORY_SIZE: 100 * 1024 * 1024, // 100MB max history
-                ARCHIVE_SIZE: 10 * 1024 * 1024,      // 10MB archive chunks
-            },
-            
-            // Conversion Constants
-            CONVERSION: {
-                KB: 1024,                            // Kilobyte
-                MB: 1048576,                         // Megabyte
-            },
-            
-            // Character Sets
-            CHARSET: {
-                CID: 'abcdefghijklmnopqrstuvwxyz0123456789',  // CID character set
-            },
-        };
-        
-        // ============= ERROR HANDLING SYSTEM =============
-        // Centralized error handling and retry logic
-        
-        // Error categories
-        const ERROR_TYPES = {
-            NETWORK: 'NETWORK',
-            VALIDATION: 'VALIDATION',
-            FILESYSTEM: 'FILESYSTEM',
-            CRYPTO: 'CRYPTO',
-            TRANSACTION: 'TRANSACTION',
-            SYSTEM: 'SYSTEM',
-            USER: 'USER'
-        };
-        
-        // Error Handler Class
-        class ErrorHandler {
-            static handle(error, context, options = {}) {
-                const {
-                    type = ERROR_TYPES.SYSTEM,
-                    showAlert = false,
-                    showLog = true,
-                    rethrow = false,
-                    userMessage = null
-                } = options;
-                
-                // Format error message
-                const timestamp = new Date().toISOString();
-                const errorMessage = error?.message || String(error);
-                const fullMessage = `[${context}] ${errorMessage}`;
-                
-                // Log error if enabled
-                if (showLog) {
-                    log(fullMessage, 'error');
-                    // Also log to console for debugging
-                    console.error(`[${timestamp}] ${fullMessage}`, error);
-                }
-                
-                // Show alert if requested
-                if (showAlert) {
-                    const alertMessage = userMessage || this.getUserFriendlyMessage(type, errorMessage);
-                    alert(alertMessage);
-                }
-                
-                // Update UI if applicable
-                this.updateErrorUI(context, errorMessage);
-                
-                // Rethrow if requested
-                if (rethrow) {
-                    throw error;
-                }
-                
-                return { success: false, error: errorMessage };
-            }
-            
-            static getUserFriendlyMessage(type, errorMessage) {
-                const messages = {
-                    [ERROR_TYPES.NETWORK]: 'ネットワーク接続エラーが発生しました。接続を確認してください。',
-                    [ERROR_TYPES.VALIDATION]: '入力内容に誤りがあります。',
-                    [ERROR_TYPES.FILESYSTEM]: 'ファイル操作中にエラーが発生しました。',
-                    [ERROR_TYPES.CRYPTO]: '暗号化処理中にエラーが発生しました。',
-                    [ERROR_TYPES.TRANSACTION]: 'トランザクション処理中にエラーが発生しました。',
-                    [ERROR_TYPES.SYSTEM]: 'システムエラーが発生しました。',
-                    [ERROR_TYPES.USER]: errorMessage
-                };
-                return messages[type] || messages[ERROR_TYPES.SYSTEM];
-            }
-            
-            static updateErrorUI(context, message) {
-                // Update status elements based on context
-                const contextMap = {
-                    'upload': 'uploadStatus',
-                    'download': 'downloadStatus',
-                    'chunk': 'chunkStatus',
-                    'network': 'networkStatus'
-                };
-                
-                const elementId = contextMap[context.toLowerCase().split('-')[0]];
-                if (elementId) {
-                    const element = document.getElementById(elementId);
-                    if (element) {
-                        element.textContent = `エラー: ${message}`;
-                        element.className = 'error';
-                    }
-                }
-            }
-        }
-        
-        // Retry utility with exponential backoff
-        async function retryWithBackoff(operation, options = {}) {
-            const {
-                maxRetries = CONFIG.RETRY.DEFAULT_COUNT,
-                baseDelay = CONFIG.RETRY.EXPONENTIAL_BASE,
-                context = 'Operation',
-                onRetry = null
-            } = options;
-            
-            let lastError;
-            
-            for (let attempt = 0; attempt <= maxRetries; attempt++) {
-                try {
-                    return await operation();
-                } catch (error) {
-                    lastError = error;
-                    
-                    if (attempt < maxRetries) {
-                        const delay = baseDelay * Math.pow(2, attempt);
-                        log(`${context} 失敗 (試行 ${attempt + 1}/${maxRetries}): ${error.message}`, 'warning');
-                        log(`${delay}ms 後にリトライします...`, 'info');
-                        
-                        if (onRetry) {
-                            onRetry(attempt + 1, maxRetries, error);
-                        }
-                        
-                        await new Promise(resolve => setTimeout(resolve, delay));
-                    }
-                }
-            }
-            
-            // All retries failed
-            ErrorHandler.handle(lastError, context, {
-                type: ERROR_TYPES.NETWORK,
-                showLog: true,
-                userMessage: `${context}が${maxRetries}回の試行後も失敗しました。`
-            });
-            
-            throw lastError;
-        }
-        
-        // Wrapper for async operations with error handling
-        async function safeExecute(operation, context, options = {}) {
-            try {
-                return await operation();
-            } catch (error) {
-                return ErrorHandler.handle(error, context, options);
-            }
-        }
-        
-        // Network-specific error handler
-        async function handleNetworkError(error, context) {
-            // Check if it's a connection error
-            if (error.message?.includes('Failed to fetch') || 
-                error.message?.includes('NetworkError') ||
-                error.message?.includes('ERR_NETWORK')) {
-                
-                updateNetworkStatus('offline', 'ネットワークエラー');
-                
-                return ErrorHandler.handle(error, context, {
-                    type: ERROR_TYPES.NETWORK,
-                    showAlert: true,
-                    userMessage: 'ネットワーク接続を確認してください。'
-                });
-            }
-            
-            // For other errors, use general handler
-            return ErrorHandler.handle(error, context, {
-                type: ERROR_TYPES.SYSTEM
-            });
-        }
-        
-        // Transaction-specific error handler with retry
-        async function executeTransaction(txOperation, context) {
-            return retryWithBackoff(
-                txOperation,
-                {
-                    maxRetries: CONFIG.RETRY.DEFAULT_COUNT,
-                    context: `Transaction ${context}`,
-                    onRetry: (attempt, max) => {
-                        const statusEl = document.getElementById('transactionStatus');
-                        if (statusEl) {
-                            statusEl.textContent = `トランザクション送信中... (${attempt}/${max})`;
-                        }
-                    }
-                }
-            );
-        }
-        
-        // File operation error handler
-        function handleFileError(error, operation) {
-            const fileErrors = {
-                'NotAllowedError': 'ファイルアクセスが許可されていません。',
-                'NotFoundError': 'ファイルが見つかりません。',
-                'SecurityError': 'セキュリティ制限によりアクセスできません。',
-                'AbortError': '操作がキャンセルされました。'
-            };
-            
-            const userMessage = fileErrors[error.name] || `ファイル${operation}中にエラーが発生しました。`;
-            
-            return ErrorHandler.handle(error, `File ${operation}`, {
-                type: ERROR_TYPES.FILESYSTEM,
-                showAlert: true,
-                userMessage
-            });
-        }
-        
-        // ============= PROGRESS UPDATE SYSTEM =============
-        // Unified progress update management
-        
-        /**
-         * Unified progress update function for all progress bars
-         * @param {Object} options - Progress update options
-         * @param {string} options.type - 'upload' or 'download'
-         * @param {number} options.current - Current progress value
-         * @param {number} options.total - Total value
-         * @param {number} [options.percent] - Pre-calculated percentage
-         * @param {string} [options.statusText] - Status message
-         * @param {boolean} [options.showProgress] - Show/hide progress container
-         * @param {number} [options.decimals=0] - Number of decimal places
-         * @param {string} [options.customStatus] - Custom status element ID
-         */
-        function updateProgress(options) {
-            const {
-                type,
-                current,
-                total,
-                percent,
-                statusText,
-                showProgress,
-                decimals = 0,
-                customStatus
-            } = options;
-            
-            // Calculate percentage if not provided
-            const percentage = percent !== undefined ? percent : 
-                (total > 0 ? ((current / total) * 100).toFixed(decimals) : 0);
-            
-            // Get element IDs based on type
-            const progressId = `${type}Progress`;
-            const progressBarId = `${type}ProgressBar`;
-            const statusId = customStatus || `${type}Status`;
-            
-            // Handle show/hide
-            if (showProgress !== undefined) {
-                const progressElement = document.getElementById(progressId);
-                if (progressElement) {
-                    progressElement.style.display = showProgress ? 'block' : 'none';
-                }
-            }
-            
-            // Update progress bar
-            const progressBar = document.getElementById(progressBarId);
-            if (progressBar) {
-                progressBar.style.width = percentage + '%';
-                
-                // Set text content based on context
-                if (statusText && type === 'upload' && current !== undefined && total !== undefined) {
-                    progressBar.textContent = `${percentage}% - ${statusText}`;
-                } else {
-                    progressBar.textContent = percentage + '%';
-                }
-            }
-            
-            // Update status text
-            if (statusText) {
-                const statusElement = document.getElementById(statusId);
-                if (statusElement) {
-                    statusElement.textContent = statusText;
-                }
-            }
-            
-            // Log progress for debugging
-            if (CONFIG.UI.PROGRESS_UPDATE_INTERVAL && current % CONFIG.UI.PROGRESS_UPDATE_INTERVAL === 0) {
-                log(`[Progress] ${type}: ${percentage}% (${current}/${total})`, 'debug');
-            }
-        }
-        
-        /**
-         * Helper function to update chunk progress display
-         * @param {number} index - Chunk index
-         * @param {string} status - Status text or HTML
-         * @param {string} [className] - CSS class for styling
-         */
-        function updateChunkStatus(index, status, className) {
-            const element = document.getElementById(`chunk-status-${index}`);
-            if (element) {
-                element.innerHTML = status;
-                if (className) {
-                    element.className = className;
-                }
-            }
-        }
-        
-        /**
-         * Show/hide progress container with optional initialization
-         * @param {string} type - 'upload' or 'download'
-         * @param {boolean} show - Show or hide
-         * @param {Object} [initOptions] - Initial progress options
-         */
-        function toggleProgress(type, show, initOptions = {}) {
-            updateProgress({
-                type,
-                showProgress: show,
-                ...initOptions
-            });
-            
-            // Reset progress bar if hiding
-            if (!show) {
-                updateProgress({
-                    type,
-                    current: 0,
-                    total: 100,
-                    statusText: ''
-                });
-            }
-        }
-        
-        /**
-         * Calculate and format file size progress
-         * @param {number} loaded - Bytes loaded
-         * @param {number} total - Total bytes
-         * @returns {string} Formatted progress string
-         */
-        function formatSizeProgress(loaded, total) {
-            const loadedMB = (loaded / CONFIG.CONVERSION.MB).toFixed(2);
-            const totalMB = (total / CONFIG.CONVERSION.MB).toFixed(2);
-            return `${loadedMB} / ${totalMB} MB`;
-        }
-        
-        /**
-         * Calculate throughput and ETA
-         * @param {number} bytesProcessed - Bytes processed so far
-         * @param {number} startTime - Start timestamp
-         * @param {number} totalBytes - Total bytes to process
-         * @returns {Object} Throughput and ETA information
-         */
-        function calculateThroughput(bytesProcessed, startTime, totalBytes) {
-            const elapsed = (Date.now() - startTime) / 1000; // seconds
-            const throughput = bytesProcessed / elapsed; // bytes per second
-            const throughputMBps = (throughput / CONFIG.CONVERSION.MB).toFixed(2);
-            
-            const remainingBytes = totalBytes - bytesProcessed;
-            const etaSeconds = remainingBytes / throughput;
-            const etaMinutes = Math.ceil(etaSeconds / 60);
-            
-            return {
-                throughputMBps,
-                etaMinutes,
-                elapsed: elapsed.toFixed(1)
-            };
-        }
-        
-        // Legacy constants for backward compatibility (will be removed in future)
-        const CHUNKS_PER_META = CONFIG.CHUNKS_PER_META;
-        const MAX_CHUNKS_SUPPORTED = CONFIG.MAX_CHUNKS_SUPPORTED;
-        const PROCESS_CHUNK_SIZE = CONFIG.PROCESS_CHUNK_SIZE;
+        // Constants
+        const CHUNKS_PER_META = 160; // Maximum chunks per MetaTxID
+        const MAX_CHUNKS_SUPPORTED = 25600; // Maximum chunks supported via Super (160 × 160)
+        const PROCESS_CHUNK_SIZE = 1024 * 1024; // 1MB processing chunks
         
         // Parallel download settings (v3.6.2)
-        let parallelDownloadEnabled = CONFIG.PARALLEL.ENABLED_BY_DEFAULT;
-        window.parallelDownloadEnabled = CONFIG.PARALLEL.ENABLED_BY_DEFAULT; // v5.3.16: Initialize window variable
+        let parallelDownloadEnabled = false; // Default OFF for v3.5.0 compatibility
+        window.parallelDownloadEnabled = false; // v5.3.16: Initialize window variable
         
         // Load parallel download setting from localStorage
         function loadParallelSetting() {
@@ -1446,10 +992,10 @@
         // Upload History Manager Class
         class UploadHistoryManager {
             constructor() {
-                this.dbName = CONFIG.STORAGE.DB_NAME;
-                this.fileName = CONFIG.STORAGE.HISTORY_FILE;
-                this.maxSize = CONFIG.STORAGE.MAX_HISTORY_SIZE;
-                this.archiveSize = CONFIG.STORAGE.ARCHIVE_SIZE;
+                this.dbName = 'kaspa-upload-history';
+                this.fileName = 'kaspa-uploads.kenv';
+                this.maxSize = 100 * 1024 * 1024; // 100MB
+                this.archiveSize = 10 * 1024 * 1024; // 10MB chunks
                 this.encryptionKey = null;
                 this.loadedHistory = []; // In-memory history storage
                 log('[UploadHistoryManager] インスタンスを初期化しました', 'debug');
@@ -1478,10 +1024,8 @@
                         log('[UploadHistoryManager] ワークスペースハンドルが存在しません', 'info');
                     }
                 } catch (error) {
-                    ErrorHandler.handle(error, 'UploadHistoryManager-Initialize', {
-                        type: ERROR_TYPES.SYSTEM,
-                        rethrow: true
-                    });
+                    log(`[UploadHistoryManager] 初期化エラー: ${error.message}`, 'error');
+                    throw error;
                 }
             }
             
@@ -1598,7 +1142,7 @@
                 try {
                     const encoder = new TextEncoder();
                     const data = encoder.encode(text);
-                    const iv = crypto.getRandomValues(new Uint8Array(CONFIG.CRYPTO.IV_SIZE));
+                    const iv = crypto.getRandomValues(new Uint8Array(12));
                     
                     const encrypted = await crypto.subtle.encrypt(
                         { name: 'AES-GCM', iv: iv },
@@ -2014,7 +1558,7 @@
                     type: 'kaspa-file',
                     version: "3.3",  // v4.7.50: Updated to Format v3.3
                     created: item.uploadDate,
-                    network: item.network || CONFIG.NETWORK.DEFAULT_TYPE,
+                    network: item.network || 'testnet-10',
                     
                     // Encryption at top level
                     encryption: {
@@ -2534,9 +2078,9 @@
                 const metadataBytes = encoder.encode(metadataJson);
                 
                 // Simulate upload (in real implementation, this would use createMetaTransaction)
-                const simulatedTxId = 'dir_' + Array.from(crypto.getRandomValues(new Uint8Array(CONFIG.CRYPTO.RANDOM_BYTES)))
+                const simulatedTxId = 'dir_' + Array.from(crypto.getRandomValues(new Uint8Array(32)))
                     .map(b => b.toString(16).padStart(2, '0')).join('');
-                const simulatedBlockId = 'blk_' + Array.from(crypto.getRandomValues(new Uint8Array(CONFIG.CRYPTO.RANDOM_BYTES)))
+                const simulatedBlockId = 'blk_' + Array.from(crypto.getRandomValues(new Uint8Array(32)))
                     .map(b => b.toString(16).padStart(2, '0')).join('');
                 
                 log(`[DirectoryManager] ディレクトリメタデータをアップロード（シミュレーション）: ${simulatedTxId.substring(0, 16)}...`, 'info');
@@ -2606,7 +2150,7 @@
                 processDirectory(directory);
                 
                 // Parallel download with concurrency limit
-                const CONCURRENT_DOWNLOADS = CONFIG.PARALLEL.DEFAULT_DOWNLOADS;
+                const CONCURRENT_DOWNLOADS = 3;
                 const downloadQueue = [...allFiles];
                 const activeDownloads = [];
                 
@@ -2705,7 +2249,7 @@
                 }
                 
                 // Small delay between downloads
-                await new Promise(resolve => setTimeout(resolve, CONFIG.DELAYS.SHORT));
+                await new Promise(resolve => setTimeout(resolve, 500));
             }
             
             exportDirectory(id) {
@@ -2871,8 +2415,7 @@
             }
         }
         
-        // ============= UTILITY FUNCTIONS =============
-        // General purpose helper functions
+        // Utility functions
         function formatSize(bytes) {
             if (bytes === 0) return '0 B';
             const k = 1024;
@@ -2883,9 +2426,6 @@
         
         // Moved to UI CONTROL & EVENT HANDLERS section
         // window.copyToClipboard - Clipboard operations handler
-        
-        // ============= STORAGE MANAGEMENT =============
-        // Progress tracking and file storage classes
         
         // Progress Manager Class
         class ProgressManager {
@@ -2915,7 +2455,7 @@
                 }
                 
                 // Generate file hash for verification
-                const fileData = await this.file.slice(0, CONFIG.FILE_PREVIEW_SIZE).arrayBuffer(); // First 1MB
+                const fileData = await this.file.slice(0, 1024 * 1024).arrayBuffer(); // First 1MB
                 const hashBuffer = await crypto.subtle.digest('SHA-256', fileData);
                 const hashArray = Array.from(new Uint8Array(hashBuffer));
                 const fileHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
@@ -2925,7 +2465,7 @@
                 let fullFileData;
                 
                 // For large files, use file.size to avoid memory issues
-                if (this.file.size > CONFIG.FILE_PROCESSING_THRESHOLD) { // 50MB threshold
+                if (this.file.size > 50 * 1024 * 1024) { // 50MB threshold
                     actualFileSize = this.file.size;
                     // Read file in chunks for hash calculation
                     fullFileData = await this.file.arrayBuffer();
@@ -2977,7 +2517,7 @@
                         algorithm: "AES-256-GCM",
                         pbkdf2: {
                             salt: null, // Will be set during encryption
-                            iterations: CONFIG.CRYPTO.PBKDF2_ITERATIONS
+                            iterations: 100000
                         }
                     },
                     
@@ -3136,11 +2676,8 @@
                         localStorage.setItem('kaspa-upload-metadata', JSON.stringify(metadata));
                         // v4.7.25: Remove save notifications
                     } catch (err) {
-                        // v4.7.25: Use centralized error handler
-                        ErrorHandler.handle(err, 'Progress-LocalStorage', {
-                            type: ERROR_TYPES.SYSTEM,
-                            showLog: true
-                        });
+                        // v4.7.25: Remove error log for localStorage
+                        console.error(`localStorage保存エラー: ${err.message}`);
                     }
                     
                     // Save to file if workspace is available
@@ -3156,11 +2693,8 @@
                             
                             // v4.7.25: Remove save notifications and status update
                         } catch (err) {
-                            // v4.7.25: Use centralized error handler
-                        ErrorHandler.handle(err, 'Progress-FileSave', {
-                            type: ERROR_TYPES.FILESYSTEM,
-                            showLog: true
-                        });
+                            // v4.7.25: Remove error log for file save
+                        console.error(`ファイル保存エラー: ${err.message}`);
                         }
                     } else {
                         // No workspace - localStorage only, no automatic downloads
@@ -3231,7 +2765,7 @@
         
         // Parallel Downloader Class (v3.6.2)
         class ParallelDownloader {
-            constructor(rpcClient, concurrency = CONFIG.PARALLEL.DEFAULT_CONCURRENCY) {
+            constructor(rpcClient, concurrency = 8) {
                 this.rpcClient = rpcClient;
                 this.concurrency = concurrency;
                 this.queue = [];
@@ -3242,7 +2776,7 @@
                 this.completedCount = 0;
                 this.totalBytes = 0;
                 this.queueLock = false;
-                this.maxRetries = CONFIG.RETRY.DEFAULT_COUNT;
+                this.maxRetries = 3;
             }
             
             async downloadChunks(txIds, blockIds, key, kaspaMetadata, progressCallback) {
@@ -3292,7 +2826,7 @@
                     }
                     
                     const elapsed = (Date.now() - this.startTime) / 1000;
-                    const throughput = (this.totalBytes / CONFIG.CONVERSION.MB) / elapsed;
+                    const throughput = (this.totalBytes / 1024 / 1024) / elapsed;
                     log(`並列ダウンロード完了: ${elapsed.toFixed(1)}秒, ${throughput.toFixed(1)} MB/秒`, 'success');
                     
                     return sortedChunks;
@@ -3307,7 +2841,7 @@
                     let work = null;
                     
                     while (this.queueLock) {
-                        await new Promise(resolve => setTimeout(resolve, CONFIG.DELAYS.QUICK));
+                        await new Promise(resolve => setTimeout(resolve, 10));
                     }
                     
                     this.queueLock = true;
@@ -3325,33 +2859,35 @@
                     }
                     
                     if (!work) {
-                        await new Promise(resolve => setTimeout(resolve, CONFIG.DELAYS.BATCH_PROCESSING));
+                        await new Promise(resolve => setTimeout(resolve, 50));
                         continue;
                     }
                     
                     try {
                         const { txId, blockId, index } = work;
                         
-                        // Use centralized retry logic
-                        const response = await retryWithBackoff(
-                            async () => {
-                                return await this.rpcClient.getBlock({
+                        let response = null;
+                        let lastError = null;
+                        
+                        for (let retry = 0; retry <= this.maxRetries; retry++) {
+                            try {
+                                response = await this.rpcClient.getBlock({
                                     hash: blockId,
                                     includeTransactions: true
                                 });
-                            },
-                            {
-                                maxRetries: this.maxRetries,
-                                context: `チャンク${index}取得`,
-                                onRetry: (attempt, max) => {
-                                    // Update UI if needed
-                                    const chunkStatus = document.getElementById(`chunk-status-${index}`);
-                                    if (chunkStatus) {
-                                        chunkStatus.textContent = `リトライ ${attempt}/${max}`;
-                                    }
+                                break;
+                            } catch (error) {
+                                lastError = error;
+                                if (retry < this.maxRetries) {
+                                    log(`チャンク${index}の取得に失敗 (リトライ ${retry + 1}/${this.maxRetries}): ${error.message}`, 'warning');
+                                    await new Promise(resolve => setTimeout(resolve, 1000 * (retry + 1)));
                                 }
                             }
-                        );
+                        }
+                        
+                        if (!response) {
+                            throw lastError || new Error('ブロック取得に失敗');
+                        }
                         
                         const block = response?.block?.block || response?.block;
                         if (!block) {
@@ -3386,7 +2922,7 @@
                         
                         const elapsed = (Date.now() - this.startTime) / 1000;
                         const speed = this.completedCount / elapsed;
-                        const throughput = (this.totalBytes / CONFIG.CONVERSION.MB) / elapsed;
+                        const throughput = (this.totalBytes / 1024 / 1024) / elapsed;
                         
                         if (progressCallback) {
                             progressCallback({
@@ -3401,7 +2937,7 @@
                         work.retries++;
                         if (work.retries <= this.maxRetries) {
                             while (this.queueLock) {
-                                await new Promise(resolve => setTimeout(resolve, CONFIG.DELAYS.QUICK));
+                                await new Promise(resolve => setTimeout(resolve, 10));
                             }
                             this.queueLock = true;
                             try {
@@ -3472,7 +3008,7 @@
                     let work = null;
                     
                     while (this.queueLock) {
-                        await new Promise(resolve => setTimeout(resolve, CONFIG.DELAYS.QUICK));
+                        await new Promise(resolve => setTimeout(resolve, 10));
                     }
                     
                     this.queueLock = true;
@@ -3490,7 +3026,7 @@
                     }
                     
                     if (!work) {
-                        await new Promise(resolve => setTimeout(resolve, CONFIG.DELAYS.BATCH_PROCESSING));
+                        await new Promise(resolve => setTimeout(resolve, 50));
                         continue;
                     }
                     
@@ -3528,7 +3064,7 @@
                         
                         const elapsed = (Date.now() - this.startTime) / 1000;
                         const speed = this.completedCount / elapsed;
-                        const throughput = (this.totalBytes / CONFIG.CONVERSION.MB) / elapsed;
+                        const throughput = (this.totalBytes / 1024 / 1024) / elapsed;
                         
                         if (progressCallback) {
                             progressCallback({
@@ -3558,8 +3094,8 @@
         
         // Configuration
         const config = {
-            network: CONFIG.NETWORK.DEFAULT_TYPE,
-            retryCount: CONFIG.RETRY.DEFAULT_COUNT,
+            network: 'testnet-10',
+            retryCount: 3,
             timeout: 30000,
             testPrivateKey: 'b7e151628aed2a6abf7158809cf4f3c762e7160f38b4da56a784d9045190cfef',
             // Super metadata configuration (experimental)
@@ -3573,8 +3109,8 @@
             currentEndpoint: null, // Currently connected endpoint
             customEndpoint: null, // User-defined custom endpoint
             archiveEndpoints: {
-                'testnet-10': CONFIG.NETWORK.TESTNET_WS,
-                'mainnet': CONFIG.NETWORK.MAINNET_WS
+                'testnet-10': 'wss://archive-tn10.kaspa.org:17210',
+                'mainnet': 'wss://archive.kaspa.org:17110'
             },
             standardEndpoints: {
                 'testnet-10': null, // Use default resolver
@@ -3662,7 +3198,7 @@
         // Generate file CID based on content (v3.3 specification)
         async function generateFileCID(file) {
             // Sample the first 4KB of file content
-            const sampleSize = Math.min(CONFIG.UI.SAMPLE_SIZE, file.size);
+            const sampleSize = Math.min(4096, file.size);
             const sample = await file.slice(0, sampleSize).arrayBuffer();
             
             // Include file size for better uniqueness (content + size = better fingerprint)
@@ -3693,7 +3229,7 @@
         
         // Legacy random CID function (kept for compatibility)
         function generateRandomCID() {
-            const chars = CONFIG.CHARSET.CID;
+            const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
             let result = '';
             for (let i = 0; i < 8; i++) {
                 result += chars.charAt(Math.floor(Math.random() * chars.length));
@@ -3704,7 +3240,7 @@
         // Generate safe filename with CID
         function generateSafeFilename(originalName, cid) {
             const ext = '.kaspa';
-            const maxLength = CONFIG.UI.MAX_FILENAME_LENGTH; // 安全マージン
+            const maxLength = 240; // 安全マージン
             
             // 1. 通常パターン
             let filename = `${originalName}.${cid}${ext}`;
@@ -4017,7 +3553,7 @@
         // v2.1 から v3.3 形式への変換関数
         function convertV21ToV33Progress(v21Progress) {
             // Calculate 1MB processing chunk boundaries
-            const PROCESSING_CHUNK_SIZE = CONFIG.PROCESSING_CHUNK_SIZE; // 1MB
+            const PROCESSING_CHUNK_SIZE = 1048576; // 1MB
             const fileSize = v21Progress.fileInfo.size;
             const chunkBoundaries = [];
             
@@ -4147,7 +3683,7 @@
                 document.getElementById('resumeInfo').style.display = 'block';
                 document.getElementById('resumeDetails').innerHTML = `
                     <p><strong>ファイル:</strong> ${fileInfo.name}</p>
-                    <p><strong>サイズ:</strong> ${(fileInfo.size / CONFIG.CONVERSION.MB).toFixed(2)} MB</p>
+                    <p><strong>サイズ:</strong> ${(fileInfo.size / 1024 / 1024).toFixed(2)} MB</p>
                     <p><strong>進捗:</strong> ${completedChunks}/${totalChunks} チャンク (${(completedChunks / totalChunks * 100).toFixed(1)}%)</p>
                     <p><strong>最終更新:</strong> ${new Date(lastUpdate).toLocaleString()}</p>
                     <p class="warning">⚠️ 同じファイルを選択してアップロードを続行してください</p>
@@ -4241,7 +3777,7 @@
                 }
                 
                 const elapsed = (Date.now() - this.startTime) / 1000;
-                const throughput = (this.totalBytes / CONFIG.CONVERSION.MB) / elapsed;
+                const throughput = (this.totalBytes / 1024 / 1024) / elapsed;
                 log(`[ParallelDownloader] 並列ダウンロード完了: ${elapsed.toFixed(1)}秒, ${throughput.toFixed(1)} MB/秒`, 'success');
                 
                 return sortedChunks;
@@ -4256,7 +3792,7 @@
                 let work = null;
                 
                 while (this.queueLock) {
-                    await new Promise(resolve => setTimeout(resolve, CONFIG.DELAYS.QUICK));
+                    await new Promise(resolve => setTimeout(resolve, 10));
                 }
                 
                 this.queueLock = true;
@@ -4274,7 +3810,7 @@
                 }
                 
                 if (!work) {
-                    await new Promise(resolve => setTimeout(resolve, CONFIG.DELAYS.BATCH_PROCESSING));
+                    await new Promise(resolve => setTimeout(resolve, 50));
                     continue;
                 }
                 
@@ -4310,7 +3846,7 @@
                             // Fallback to REST API if RPC failed
                             if (!payload) {
                                 const networkApiUrl = config.network === 'testnet-10' ? 
-                                    CONFIG.NETWORK.TESTNET_API : CONFIG.NETWORK.MAINNET_API;
+                                    'https://api-tn10.kaspa.org' : 'https://api.kaspa.org';
                                 const url = `${networkApiUrl}/transactions/${txId}`;
                                 const response = await fetchWithTimeout(url, {}, 5000, 1);
                                 const data = await response.json();
@@ -4343,7 +3879,7 @@
                     
                     const elapsed = (Date.now() - this.startTime) / 1000;
                     const speed = this.completedCount / elapsed;
-                    const throughput = (this.totalBytes / CONFIG.CONVERSION.MB) / elapsed;
+                    const throughput = (this.totalBytes / 1024 / 1024) / elapsed;
                     
                     if (progressCallback) {
                         progressCallback({
@@ -4358,7 +3894,7 @@
                     work.retries++;
                     if (work.retries <= this.maxRetries) {
                         while (this.queueLock) {
-                            await new Promise(resolve => setTimeout(resolve, CONFIG.DELAYS.QUICK));
+                            await new Promise(resolve => setTimeout(resolve, 10));
                         }
                         this.queueLock = true;
                         try {
@@ -4588,7 +4124,7 @@
                     // Derive encryption key
                     const salt = fromBase64(metadata.encryption.pbkdf2.salt);
                     const iterations = metadata.encryption.pbkdf2.iterations || 
-                        (metadata.version === "3.0" ? 10000 : CONFIG.CRYPTO.PBKDF2_ITERATIONS);
+                        (metadata.version === "3.0" ? 10000 : 100000);
                     const key = await deriveKey(password, salt, iterations);
                     
                     // Check if using new payload split approach
@@ -5130,9 +4666,6 @@
             }
         };
         
-        // ============= NETWORK & RPC FUNCTIONS =============
-        // Network connectivity, RPC client management, and API calls
-        
         // Initialize or reinitialize RPC client
         async function initializeRpcClient() {
             try {
@@ -5169,34 +4702,7 @@
 
         // Moved to UI CONTROL & EVENT HANDLERS section
         // window.testConnection - Connection test handler
-        
-        // Connection test function (moved from NETWORK & RPC FUNCTIONS)
-        window.testConnection = async function() {
-            try {
-                log('接続テストを実行中...');
-                const startTime = Date.now();
-                
-                // Test RPC
-                const info = await rpcClient.getServerInfo();
-                const rpcTime = Date.now() - startTime;
-                log(`RPC応答時間: ${rpcTime}ms`, 'success');
-                
-                // Test Explorer API
-                const apiStart = Date.now();
-                const response = await fetchWithTimeout('https://api-tn10.kaspa.org/info/health', {}, 5000, 1); // 5s timeout, 1 retry for health check
-                const apiTime = Date.now() - apiStart;
-                log(`Explorer API応答時間: ${apiTime}ms`, 'success');
-                
-                alert(`接続テスト成功!\nRPC: ${rpcTime}ms\nAPI: ${apiTime}ms`);
-                
-            } catch (error) {
-                log(`接続テストエラー: ${error.message}`, 'error');
-            }
-        };
 
-        // ============= FILE OPERATIONS =============
-        // File upload, download, and management functions
-        
         // File handling
         window.handleFileSelect = async function(event) {
             // Clear directory mode
@@ -5212,7 +4718,7 @@
             log(`ファイル選択: ${file.name} (${(file.size/1024).toFixed(1)}KB)`);
             
             // Check if file size exceeds 550MB
-            const MAX_SIZE_WITH_META = CONFIG.MAX_SIZE_WITH_META; // 550MB
+            const MAX_SIZE_WITH_META = 550 * 1024 * 1024; // 550MB
             if (file.size > MAX_SIZE_WITH_META) {
                 log(`⚠️ 警告: このファイルサイズ(${(file.size/1024/1024).toFixed(1)}MB)では、ブロックチェーン上のメタデータトランザクションが生成されない可能性があります`, 'warning');
                 log('.kaspaファイルは生成されますが、メタデータの共有が制限されます', 'warning');
@@ -5430,7 +4936,7 @@
             }
             
             document.getElementById('uploadBtn').disabled = true;
-            toggleProgress('upload', true, { current: 0, total: 100, statusText: 'ファイルを処理中...' });
+            document.getElementById('uploadProgress').style.display = 'block';
             
             try {
                 const files = window.selectedDirectory.files;
@@ -5509,13 +5015,10 @@
                         });
                     }
                     
-                    // Update progress using unified function
-                    updateProgress({
-                        type: 'upload',
-                        current: i + 1,
-                        total: files.length,
-                        statusText: `${i + 1}/${files.length} ファイル`
-                    });
+                    // Update progress
+                    const progressPercent = Math.round(((i + 1) / files.length) * 100);
+                    document.getElementById('uploadProgressBar').style.width = progressPercent + '%';
+                    document.getElementById('uploadProgressBar').textContent = `${progressPercent}% - ${i + 1}/${files.length} ファイル`;
                 }
                 
                 // Create directory metadata
@@ -5652,13 +5155,13 @@
                 
                 // Size check (20KB safety margin)
                 const sizeKB = metadataBytes.length / 1024;
-                if (metadataBytes.length > CONFIG.METADATA_SIZE_LIMIT) {
+                if (metadataBytes.length > 20 * 1024) {
                     log(`⚠️ ディレクトリメタデータが大きすぎます（${sizeKB.toFixed(1)}KB）`, 'warning');
                     log('💡 ヒント: ファイル数を減らすか、サブディレクトリに分割してください', 'info');
                     log('📝 将来のバージョンでチャンク化をサポート予定です', 'info');
                     
                     // Calculate approximate file limit
-                    const approxFilesLimit = Math.floor(CONFIG.METADATA_SIZE_LIMIT / 150); // ~150 bytes per entry
+                    const approxFilesLimit = Math.floor((20 * 1024) / 150); // ~150 bytes per entry
                     log(`📊 現在の制限: 約${approxFilesLimit}ファイルまで`, 'info');
                     
                     throw new Error(`ディレクトリメタデータが20KBを超えています（${sizeKB.toFixed(1)}KB）`);
@@ -5852,9 +5355,6 @@
             }
         };
         
-        // ============= TRANSACTION FUNCTIONS =============
-        // Blockchain transaction creation, broadcasting, and verification
-        
         // Transaction helper functions for directory upload
         async function createTransaction(payloadBase64) {
             // Get UTXOs
@@ -5884,10 +5384,10 @@
                 entries: formattedUtxos,
                 outputs: [{
                     address: address.toString(),
-                    amount: CONFIG.TRANSACTION.AMOUNT // 1 KAS
+                    amount: 100000000n // 1 KAS
                 }],
                 changeAddress: address.toString(),
-                priorityFee: CONFIG.TRANSACTION.PRIORITY_FEE,
+                priorityFee: 10000n,
                 networkId: config.network,
                 payload: payloadBytes
             });
@@ -5973,7 +5473,7 @@
         }
         
         async function fetchBlockIdFromExplorer(txid) {
-            const maxRetries = CONFIG.RETRY.MAX_COUNT;
+            const maxRetries = 10;
             for (let i = 0; i < maxRetries; i++) {
                 try {
                     const response = await fetchWithTimeout(
@@ -5994,15 +5494,12 @@
                 }
                 
                 // Wait before retry
-                await new Promise(resolve => setTimeout(resolve, CONFIG.DELAYS.HEALTH_CHECK));
+                await new Promise(resolve => setTimeout(resolve, 5000));
             }
             
             throw new Error(`BlockIDの取得に失敗: ${txid}`);
         }
 
-        // ============= CRYPTOGRAPHY & COMPRESSION =============
-        // Encryption, decryption, compression, and hashing functions
-        
         // Compression logic
         const COMPRESS_SKIP = new Set(['jpg','jpeg','png','gif','webp','mp4','avi','mov','mp3','wav','zip','rar','pdf']);
         
@@ -6058,7 +5555,7 @@
         }
 
         // Encryption
-        async function deriveKey(password, salt, iterations = CONFIG.CRYPTO.PBKDF2_ITERATIONS) {
+        async function deriveKey(password, salt, iterations = 100000) {
             const encoder = new TextEncoder();
             const keyMaterial = await crypto.subtle.importKey(
                 'raw',
@@ -6568,7 +6065,7 @@
                 log('[INFO] アップロードセッションを開始 (メイン)', 'info');
                 
                 log(`処理開始: ${currentFile.name}`);
-                log(`ファイルサイズ: ${(currentFile.size / CONFIG.CONVERSION.MB).toFixed(2)} MB`);
+                log(`ファイルサイズ: ${(currentFile.size / 1024 / 1024).toFixed(2)} MB`);
                 
                 // Generate CID early for progress manager
                 let fileCID = '';
@@ -6814,10 +6311,10 @@
                                     entries: formattedUtxos,
                                     outputs: [{
                                         address: address.toString(),
-                                        amount: CONFIG.TRANSACTION.AMOUNT // 1 KAS
+                                        amount: 100000000n // 1 KAS
                                     }],
                                     changeAddress: address.toString(),
-                                    priorityFee: CONFIG.TRANSACTION.PRIORITY_FEE,
+                                    priorityFee: 10000n,
                                     networkId: config.network,
                                     payload: payloadBytes
                                 });
@@ -6843,7 +6340,7 @@
                                 });
                                 
                                 // Wait for confirmation
-                                await new Promise(resolve => setTimeout(resolve, CONFIG.DELAYS.TRANSACTION_CONFIRM));
+                                await new Promise(resolve => setTimeout(resolve, 2000));
                                 
                                 // Get BlockID (existing logic)
                                 let waitTime = 0;
@@ -6860,7 +6357,7 @@
                                         }
                                     }
                                     
-                                    await new Promise(resolve => setTimeout(resolve, CONFIG.DELAYS.SHORT));
+                                    await new Promise(resolve => setTimeout(resolve, 500));
                                     waitTime += 500;
                                 }
                                 
@@ -6917,7 +6414,7 @@
                                     await progressManager.saveProgress();
                                     throw error;
                                 }
-                                await new Promise(resolve => setTimeout(resolve, CONFIG.DELAYS.TRANSACTION_CONFIRM));
+                                await new Promise(resolve => setTimeout(resolve, 2000));
                             }
                         }
                         
@@ -7036,7 +6533,7 @@
                     }
                     
                     // Update status
-                    updateChunkStatus(i, '<span class="uploading">アップロード中...</span>');
+                    document.getElementById(`chunk-status-${i}`).innerHTML = '<span class="uploading">アップロード中...</span>';
                     
                     // Upload to blockchain with retry
                     let txid = null;
@@ -7072,10 +6569,10 @@
                                 entries: formattedUtxos,
                                 outputs: [{
                                     address: address.toString(),
-                                    amount: CONFIG.TRANSACTION.AMOUNT // 1 KAS
+                                    amount: 100000000n // 1 KAS
                                 }],
                                 changeAddress: address.toString(),
-                                priorityFee: CONFIG.TRANSACTION.PRIORITY_FEE,
+                                priorityFee: 10000n,
                                 networkId: config.network,
                                 payload: payloadBytes
                             });
@@ -7111,7 +6608,7 @@
                             
                             // Wait for transaction to be accepted
                             log(`トランザクションの確認待ち...`);
-                            await new Promise(resolve => setTimeout(resolve, CONFIG.DELAYS.TRANSACTION_CONFIRM));
+                            await new Promise(resolve => setTimeout(resolve, 2000));
                             
                             // Try WebSocket monitoring first
                             log(`トランザクション確認を待機中...`);
@@ -7160,7 +6657,7 @@
                                     }
                                 }
                                 
-                                await new Promise(resolve => setTimeout(resolve, CONFIG.DELAYS.SHORT));
+                                await new Promise(resolve => setTimeout(resolve, 500));
                                 waitTime += 500;
                             }
                             
@@ -7233,7 +6730,7 @@
                                 throw error;
                             }
                             log(`2秒待機後にリトライ...`);
-                            await new Promise(resolve => setTimeout(resolve, CONFIG.DELAYS.TRANSACTION_CONFIRM));
+                            await new Promise(resolve => setTimeout(resolve, 2000));
                         }
                     }
                     
@@ -7268,7 +6765,7 @@
                         algorithm: "AES-256-GCM",
                         pbkdf2: {
                             salt: toBase64(salt),
-                            iterations: CONFIG.CRYPTO.PBKDF2_ITERATIONS
+                            iterations: 100000
                         }
                     },
                     
@@ -7645,7 +7142,7 @@
                 let result;
                 try {
                     // Use same amount as regular chunks (1 KAS)
-                    const amount = CONFIG.TRANSACTION.AMOUNT; // 1 KAS
+                    const amount = 100000000n; // 1 KAS
                     
                     result = await kaspa.createTransactions({
                         entries: formattedUtxos,
@@ -7654,7 +7151,7 @@
                             amount: amount
                         }],
                         changeAddress: address.toString(),
-                        priorityFee: CONFIG.TRANSACTION.PRIORITY_FEE,
+                        priorityFee: 10000n,
                         networkId: config.network,
                         payload: metaPayload
                     });
@@ -7687,7 +7184,7 @@
                 log(`[DEBUG] WebSocket監視リストに追加: TxID: ${metaTxId.substring(0, 16)}... (メタトランザクション)`, 'debug');
                 
                 // Wait for confirmation
-                await new Promise(resolve => setTimeout(resolve, CONFIG.DELAYS.TRANSACTION_CONFIRM));
+                await new Promise(resolve => setTimeout(resolve, 2000));
                 
                 // Wait for BlockID from WebSocket monitor
                 log(`メタトランザクションのBlockIDを待機中...`);
@@ -7707,7 +7204,7 @@
                             break;
                         }
                     }
-                    await new Promise(resolve => setTimeout(resolve, CONFIG.DELAYS.SHORT));
+                    await new Promise(resolve => setTimeout(resolve, 500));
                     waitTime += 500;
                 }
                 
@@ -7872,10 +7369,10 @@
                     entries: formattedUtxos,
                     outputs: [{
                         address: address.toString(),
-                        amount: CONFIG.TRANSACTION.AMOUNT // 1 KAS
+                        amount: 100000000n // 1 KAS
                     }],
                     changeAddress: address.toString(),
-                    priorityFee: CONFIG.TRANSACTION.PRIORITY_FEE,
+                    priorityFee: 10000n,
                     networkId: config.network,
                     payload: metaPayload
                 });
@@ -7912,7 +7409,7 @@
                     });
                     
                     // Wait for confirmation
-                    await new Promise(resolve => setTimeout(resolve, CONFIG.DELAYS.TRANSACTION_CONFIRM));
+                    await new Promise(resolve => setTimeout(resolve, 2000));
                 } catch (submitError) {
                     log(`[SuperMeta] 送信エラー: ${submitError.message}`, 'error');
                     throw submitError;
@@ -7939,7 +7436,7 @@
                             break;
                         }
                     }
-                    await new Promise(resolve => setTimeout(resolve, CONFIG.DELAYS.SHORT));
+                    await new Promise(resolve => setTimeout(resolve, 500));
                     waitTime += 500;
                 }
                 
@@ -8046,10 +7543,10 @@
                     entries: formattedUtxos,
                     outputs: [{
                         address: address.toString(),
-                        amount: CONFIG.TRANSACTION.AMOUNT // 1 KAS
+                        amount: 100000000n // 1 KAS
                     }],
                     changeAddress: address.toString(),
-                    priorityFee: CONFIG.TRANSACTION.PRIORITY_FEE,
+                    priorityFee: 10000n,
                     networkId: config.network,
                     payload: metaPayload
                 });
@@ -8068,7 +7565,7 @@
                 });
                 
                 // Wait for confirmation
-                await new Promise(resolve => setTimeout(resolve, CONFIG.DELAYS.TRANSACTION_CONFIRM));
+                await new Promise(resolve => setTimeout(resolve, 2000));
                 
                 let superMetaBlockId = null;
                 let waitTime = 0;
@@ -8081,7 +7578,7 @@
                             break;
                         }
                     }
-                    await new Promise(resolve => setTimeout(resolve, CONFIG.DELAYS.SHORT));
+                    await new Promise(resolve => setTimeout(resolve, 500));
                     waitTime += 500;
                 }
                 
@@ -8319,12 +7816,6 @@
                     return;
                 }
                 
-                // ディレクトリ内のファイルが異なるパスワードを持つ可能性を警告
-                if (!dirMetadata.auth?.passwordIncluded) {
-                    log('⚠️ 注意: ディレクトリ内の各ファイルは異なるパスワードで暗号化されている可能性があります', 'warning');
-                    log('入力されたパスワードで全ファイルの復号化を試みます', 'info');
-                }
-                
                 // Create base directory
                 const baseDirName = dirMetadata.directory?.name || 'download';
                 let targetHandle = window.workspaceHandle;
@@ -8400,18 +7891,15 @@
                         const folderStructureOption = {
                             enabled: true,
                             basePath: baseDirName, // Use directory name instead of handle
-                            filePath: entry.path || entry.name,
-                            // v5.4.13: Pass targetHandle for batch downloads to avoid multiple folder pickers
-                            targetHandle: currentTargetHandle
+                            filePath: entry.path || entry.name
+                            // v4.7.12: Remove targetHandle to force folder picker each time
                         };
                         
                         await window.downloadManager.executeDownload(metadata, password, {
                             onProgress: (progress) => {
-                                const percent = ((completedFiles + progress.current/progress.total) / totalFiles * 100);
-                                updateProgress({
-                                    type: 'download',
-                                    percent: percent.toFixed(0)
-                                });
+                                const percent = ((completedFiles + progress.current/progress.total) / totalFiles * 100).toFixed(0);
+                                document.getElementById('downloadProgressBar').style.width = percent + '%';
+                                document.getElementById('downloadProgressBar').textContent = percent + '%';
                             },
                             folderStructure: folderStructureOption
                         });
@@ -8419,55 +7907,8 @@
                         completedFiles++;
                         
                     } catch (error) {
-                        // Check if it's a decryption error
-                        if (error.name === 'OperationError' || error.message?.includes('decrypt')) {
-                            log(`[一括ダウンロード] ${entry.name} の復号化に失敗しました - パスワードが異なる可能性があります`, 'error');
-                            
-                            // パスワードの再入力を求める
-                            const newPassword = prompt(
-                                `${entry.name} の復号化に失敗しました。\n\n` +
-                                `このファイルは異なるパスワードで暗号化されている可能性があります。\n` +
-                                `正しいパスワードを入力してください:`, 
-                                ''
-                            );
-                            
-                            if (newPassword && newPassword.length >= 8) {
-                                try {
-                                    // 新しいパスワードで再試行
-                                    log(`[一括ダウンロード] 新しいパスワードで再試行: ${entry.name}`, 'info');
-                                    const metadata = await window.downloadManager.fetchMetadata(entry.metaTxId, entry.blockId, newPassword);
-                                    
-                                    // 再試行時も同じフォルダ構造オプションを使用
-                                    const retryFolderOption = {
-                                        ...folderStructureOption,
-                                        targetHandle: currentTargetHandle // 再試行でも同じフォルダを使用
-                                    };
-                                    
-                                    await window.downloadManager.executeDownload(metadata, newPassword, {
-                                        onProgress: (progress) => {
-                                            const percent = ((completedFiles + progress.current/progress.total) / totalFiles * 100);
-                                            updateProgress({
-                                                type: 'download',
-                                                percent: percent.toFixed(0)
-                                            });
-                                        },
-                                        folderStructure: retryFolderOption
-                                    });
-                                    
-                                    completedFiles++;
-                                    continue; // 次のファイルへ
-                                } catch (retryError) {
-                                    log(`[一括ダウンロード] 再試行も失敗: ${entry.name} - ${retryError.message || retryError}`, 'error');
-                                    console.error('[一括ダウンロード] 再試行エラー詳細:', retryError);
-                                }
-                            }
-                        }
-                        
                         errorFiles++;
-                        // Enhanced error logging
-                        log(`[一括ダウンロード] エラー: ${entry.name} - ${error.message || error.toString()}`, 'error');
-                        log(`[一括ダウンロード] エラー詳細: ${JSON.stringify(error)}`, 'debug');
-                        console.error('[一括ダウンロード] Full error:', error);
+                        log(`[一括ダウンロード] エラー: ${entry.name} - ${error.message}`, 'error');
                     }
                 }
                 
@@ -8572,13 +8013,13 @@
                 log(`file.name: ${file.name}`, 'info');
                 log(`file.type: ${file.type}`, 'info');
                 log(`file.size: ${file.size} bytes`, 'info');
-                log(`endsWith('.kaspa'): ${file.name.endsWith(CONFIG.FILE_EXTENSIONS.KASPA)}`, 'info');
-                log(`toLowerCase().endsWith('.kaspa'): ${file.name.toLowerCase().endsWith(CONFIG.FILE_EXTENSIONS.KASPA)}`, 'info');
+                log(`endsWith('.kaspa'): ${file.name.endsWith('.kaspa')}`, 'info');
+                log(`toLowerCase().endsWith('.kaspa'): ${file.name.toLowerCase().endsWith('.kaspa')}`, 'info');
             }
             
             if (!file || !file.name.endsWith('.kaspa')) {
                 log('有効な.kaspaファイルを選択してください', 'error');
-                log(`理由: file=${!!file}, name=${file?.name}, endsWith=${file?.name?.endsWith(CONFIG.FILE_EXTENSIONS.KASPA)}`, 'error');
+                log(`理由: file=${!!file}, name=${file?.name}, endsWith=${file?.name?.endsWith('.kaspa')}`, 'error');
                 return;
             }
             
@@ -9600,9 +9041,6 @@
             }
         };
 
-        // ============= MONITORING FUNCTIONS =============
-        // WebSocket monitoring and transaction tracking
-        
         // Check if monitoring should stop
         async function checkMonitoringStop() {
             // v5.3.6: Don't stop monitoring during upload session
@@ -9976,7 +9414,7 @@
                         log(`[DEBUG] アップロード中 - WebSocket監視を継続 (session=${uploadSessionActive}, file=${isUploadingFile}, chunks=${uploadingChunksCount})`, 'debug');
                         // Reset timeout
                         clearTimeout(wsMonitorTimeout);
-                        wsMonitorTimeout = setTimeout(arguments.callee, CONFIG.DELAYS.WS_MONITOR_INTERVAL);
+                        wsMonitorTimeout = setTimeout(arguments.callee, 5 * 60 * 1000);
                         return;
                     }
                     
@@ -9984,7 +9422,7 @@
                     if (monitoredTransactions.size > 0) {
                         log(`[DEBUG] 監視中のトランザクションあり (${monitoredTransactions.size}件) - 監視を継続`, 'debug');
                         clearTimeout(wsMonitorTimeout);
-                        wsMonitorTimeout = setTimeout(arguments.callee, CONFIG.DELAYS.WS_MONITOR_INTERVAL);
+                        wsMonitorTimeout = setTimeout(arguments.callee, 5 * 60 * 1000);
                         return;
                     }
                     
@@ -10652,7 +10090,7 @@
                     console.log('[MultiWallet] Public key generated successfully');
                     
                     // Network detection - より安全な方法
-                    let networkType = CONFIG.NETWORK.DEFAULT_TYPE; // デフォルト
+                    let networkType = 'testnet-10'; // デフォルト
                     
                     // グローバル変数をチェック
                     if (typeof NETWORK !== 'undefined' && NETWORK) {
@@ -10679,8 +10117,8 @@
                         }
                         // 方法2: testnet-10を直接指定
                         else {
-                            address = privateKey.toAddress(CONFIG.NETWORK.DEFAULT_TYPE).toString();
-                            console.log('[MultiWallet] Address generated with ' + CONFIG.NETWORK.DEFAULT_TYPE + ':', address);
+                            address = privateKey.toAddress('testnet-10').toString();
+                            console.log('[MultiWallet] Address generated with testnet-10:', address);
                         }
                     } catch (addrError) {
                         console.error('[MultiWallet] Primary address generation failed:', addrError);
@@ -10768,9 +10206,6 @@
             }
         }
 
-        // ============= TEST FUNCTIONS =============
-        // Testing and debugging utilities
-        
         // テスト関数
         function testPhase1_Basic() {
             console.log('\n=== Phase 1 Basic Test ===');
@@ -10805,144 +10240,7 @@
             console.log('✓ Test data cleared');
         }
 
-        // ============= UI CONTROL & EVENT HANDLERS =============
-        // User interface controls and event handling functions
-        
         // UI用の関数
-        
-        // Clipboard copy function (moved from UTILITY FUNCTIONS)
-        window.copyToClipboard = async function(text) {
-            const preview = text && text.length > 20 ? text.substring(0, 20) + '...' : text;
-            // Use window.log to ensure it's accessible
-            if (typeof log !== 'undefined') {
-                log(`[DEBUG] copyToClipboard が呼び出されました: ${preview}`, 'debug');
-            }
-            try {
-                await navigator.clipboard.writeText(text);
-                if (typeof log !== 'undefined') {
-                    log('クリップボードにコピーしました', 'success');
-                }
-            } catch (err) {
-                if (typeof log !== 'undefined') {
-                    log(`コピーエラー: ${err.message}`, 'error');
-                } else {
-                    console.error(`コピーエラー: ${err.message}`);
-                }
-            }
-        }
-        
-        // Tab switching function (moved from FILE OPERATIONS)
-        window.switchTab = function(tab) {
-            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-            
-            const tabIndex = ['upload', 'download', 'directory', 'history', 'settings'].indexOf(tab);
-            document.querySelectorAll('.tab-btn')[tabIndex].classList.add('active');
-            document.getElementById(`${tab}-tab`).classList.add('active');
-            
-            // Update history tab when switching to it
-            if (tab === 'history' && window.historyManager) {
-                window.historyManager.updateHistoryUI();
-            }
-            
-            // Update directory tab when switching to it
-            if (tab === 'directory' && window.directoryManager) {
-                window.directoryManager.updateFileSelector();
-                window.directoryManager.updateUI();
-            }
-        };
-        
-        // Directory creation function (moved from FILE OPERATIONS)
-        window.createDirectory = async function() {
-            try {
-                const nameInput = document.getElementById('directoryName');
-                const name = nameInput.value.trim();
-                
-                if (!name) {
-                    alert('ディレクトリ名を入力してください');
-                    return;
-                }
-                
-                const parentSelector = document.getElementById('parentDirectory');
-                const parentCID = parentSelector.value || null;
-                
-                const checkboxes = document.querySelectorAll('input[name="directoryFiles"]:checked');
-                const selections = Array.from(checkboxes).map(cb => cb.value);
-                
-                if (selections.length === 0) {
-                    alert('少なくとも1つのファイルまたはディレクトリを選択してください');
-                    return;
-                }
-                
-                // Separate files and directories
-                const fileIds = selections
-                    .filter(s => s.startsWith('file:'))
-                    .map(s => s.substring(5));
-                
-                const dirCIDs = selections
-                    .filter(s => s.startsWith('dir:'))
-                    .map(s => s.substring(4));
-                
-                // Process subdirectories
-                if (dirCIDs.length > 0) {
-                    // Move directories under the new parent
-                    dirCIDs.forEach(dirCID => {
-                        const dir = window.directoryManager.directories.find(d => d.cid === dirCID);
-                        if (dir) {
-                            dir.parentCID = parentCID;
-                        }
-                    });
-                    window.directoryManager.saveDirectories();
-                }
-                
-                await window.directoryManager.createDirectory(name, fileIds, parentCID);
-                
-                // Clear form
-                nameInput.value = '';
-                checkboxes.forEach(cb => cb.checked = false);
-                
-                // Update UI
-                window.directoryManager.updateUI();
-                
-            } catch (error) {
-                ErrorHandler.handle(error, 'Directory-Create', {
-                    type: ERROR_TYPES.FILESYSTEM,
-                    showAlert: true,
-                    showLog: true
-                });
-            }
-        };
-        
-        function onNodeTypeChange() {
-            const nodeTypeSelect = document.getElementById('nodeTypeSelect');
-            const customEndpointSection = document.getElementById('customEndpointSection');
-            
-            if (nodeTypeSelect && customEndpointSection) {
-                if (nodeTypeSelect.value === 'custom') {
-                    customEndpointSection.style.display = 'block';
-                } else {
-                    customEndpointSection.style.display = 'none';
-                }
-                
-                // Update config
-                config.nodeType = nodeTypeSelect.value;
-                log(`[Config] ノードタイプ変更: ${config.nodeType}`, 'info');
-            }
-        }
-        
-        function saveCustomEndpoint() {
-            const customEndpointInput = document.getElementById('customRpcEndpoint');
-            if (customEndpointInput && customEndpointInput.value.trim()) {
-                config.customEndpoint = customEndpointInput.value.trim();
-                log(`[Config] カスタムエンドポイント保存: ${config.customEndpoint}`, 'info');
-                
-                // If currently using custom node type, update connection
-                if (config.nodeType === 'custom') {
-                    log('[Config] 次回接続時にカスタムエンドポイントが使用されます', 'info');
-                }
-            }
-        }
-        
         function runPhase1Test() {
             const statusEl = document.getElementById('phase1TestStatus');
             statusEl.style.display = 'block';
@@ -11006,6 +10304,133 @@
             }
         }
         
+        // ============= UI CONTROL & EVENT HANDLERS =============
+        // User interface controls and event handling functions
+        
+        // Clipboard copy function (moved from UTILITY FUNCTIONS)
+        window.copyToClipboard = async function(text) {
+            const preview = text && text.length > 20 ? text.substring(0, 20) + '...' : text;
+            // Use window.log to ensure it's accessible
+            if (typeof log !== 'undefined') {
+                log(`[DEBUG] copyToClipboard が呼び出されました: ${preview}`, 'debug');
+            }
+            try {
+                await navigator.clipboard.writeText(text);
+                if (typeof log !== 'undefined') {
+                    log('クリップボードにコピーしました', 'success');
+                }
+            } catch (err) {
+                if (typeof log !== 'undefined') {
+                    log(`コピーエラー: ${err.message}`, 'error');
+                } else {
+                    console.error(`コピーエラー: ${err.message}`);
+                }
+            }
+        }
+        
+        // Tab switching function (moved from FILE OPERATIONS)
+        window.switchTab = function(tab) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            
+            const tabIndex = ['upload', 'download', 'directory', 'history', 'settings'].indexOf(tab);
+            document.querySelectorAll('.tab-btn')[tabIndex].classList.add('active');
+            document.getElementById(`${tab}-tab`).classList.add('active');
+            
+            // Update history tab when switching to it
+            if (tab === 'history' && window.historyManager) {
+                window.historyManager.updateHistoryUI();
+            }
+            
+            // Update directory tab when switching to it
+            if (tab === 'directory' && window.directoryManager) {
+                window.directoryManager.updateFileSelector();
+                window.directoryManager.updateUI();
+            }
+        };
+        
+        // Connection test function (moved from NETWORK & RPC FUNCTIONS)
+        window.testConnection = async function() {
+            try {
+                log('接続テストを実行中...');
+                const startTime = Date.now();
+                
+                // Test RPC
+                const info = await rpcClient.getServerInfo();
+                const rpcTime = Date.now() - startTime;
+                log(`RPC応答時間: ${rpcTime}ms`, 'success');
+                
+                // Test Explorer API
+                const apiStart = Date.now();
+                const response = await fetchWithTimeout('https://api-tn10.kaspa.org/info/health', {}, 5000, 1);
+                const apiTime = Date.now() - apiStart;
+                log(`Explorer API応答時間: ${apiTime}ms`, 'success');
+                
+                alert(`接続テスト成功!\nRPC: ${rpcTime}ms\nAPI: ${apiTime}ms`);
+            } catch (error) {
+                log(`接続テストエラー: ${error.message}`, 'error');
+                alert(`接続テスト失敗: ${error.message}`);
+            }
+        };
+        
+        // Directory creation function (moved from FILE OPERATIONS)
+        window.createDirectory = async function() {
+            try {
+                const nameInput = document.getElementById('directoryName');
+                const name = nameInput.value.trim();
+                
+                if (!name) {
+                    alert('ディレクトリ名を入力してください');
+                    return;
+                }
+                
+                const parentSelector = document.getElementById('parentDirectory');
+                const parentCID = parentSelector.value || null;
+                
+                const checkboxes = document.querySelectorAll('input[name="directoryFiles"]:checked');
+                const selections = Array.from(checkboxes).map(cb => cb.value);
+                
+                if (selections.length === 0) {
+                    alert('少なくとも1つのファイルまたはディレクトリを選択してください');
+                    return;
+                }
+                
+                // Separate files and directories
+                const fileIds = selections
+                    .filter(s => s.startsWith('file:'))
+                    .map(s => s.substring(5));
+                
+                const dirCIDs = selections
+                    .filter(s => s.startsWith('dir:'))
+                    .map(s => s.substring(4));
+                
+                // Process subdirectories
+                if (dirCIDs.length > 0) {
+                    // Move directories under the new parent
+                    dirCIDs.forEach(dirCID => {
+                        const dir = window.directoryManager.directories.find(d => d.cid === dirCID);
+                        if (dir) {
+                            dir.parentCID = parentCID;
+                        }
+                    });
+                    window.directoryManager.saveDirectories();
+                }
+                
+                await window.directoryManager.createDirectory(name, fileIds, parentCID);
+                
+                // Clear form
+                nameInput.value = '';
+                checkboxes.forEach(cb => cb.checked = false);
+                
+                // Update UI
+                window.directoryManager.updateUI();
+                
+            } catch (error) {
+                log(`ディレクトリ作成エラー: ${error.message}`, 'error');
+                alert(`エラー: ${error.message}`);
+            }
+        };
+        
         // v5.3.6: Debug helper for upload status
         window.getUploadStatus = function() {
             return {
@@ -11043,4 +10468,4 @@
         });
     </script>
 </body>
-</html><!-- Force GitHub Pages update: Wed Jul 16 2025 - v5.4.9: Function Organization -->
+</html><!-- Force GitHub Pages update: Mon Jul 13 2025 - v5.4.0: Archive Node Support -->

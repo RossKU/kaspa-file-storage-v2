@@ -10832,12 +10832,21 @@
         // Clipboard copy function (moved from UTILITY FUNCTIONS)
         window.copyToClipboard = async function(text) {
             const preview = text && text.length > 20 ? text.substring(0, 20) + '...' : text;
-            log(`[DEBUG] copyToClipboard が呼び出されました: ${preview}`, 'debug');
+            // Use window.log to ensure it's accessible
+            if (typeof log !== 'undefined') {
+                log(`[DEBUG] copyToClipboard が呼び出されました: ${preview}`, 'debug');
+            }
             try {
                 await navigator.clipboard.writeText(text);
-                log('クリップボードにコピーしました', 'success');
+                if (typeof log !== 'undefined') {
+                    log('クリップボードにコピーしました', 'success');
+                }
             } catch (err) {
-                log(`コピーエラー: ${err.message}`, 'error');
+                if (typeof log !== 'undefined') {
+                    log(`コピーエラー: ${err.message}`, 'error');
+                } else {
+                    console.error(`コピーエラー: ${err.message}`);
+                }
             }
         }
         function onNodeTypeChange() {

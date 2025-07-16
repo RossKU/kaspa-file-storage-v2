@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.4.11 - Error Handling Improvement</title>
+    <title>Kaspa P2P File Storage v5.4.12 - Bulk Download Password Fix</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -8319,6 +8319,12 @@
                     return;
                 }
                 
+                // ディレクトリ内のファイルが異なるパスワードを持つ可能性を警告
+                if (!dirMetadata.auth?.passwordIncluded) {
+                    log('⚠️ 注意: ディレクトリ内の各ファイルは異なるパスワードで暗号化されている可能性があります', 'warning');
+                    log('入力されたパスワードで全ファイルの復号化を試みます', 'info');
+                }
+                
                 // Create base directory
                 const baseDirName = dirMetadata.directory?.name || 'download';
                 let targetHandle = window.workspaceHandle;
@@ -8412,6 +8418,43 @@
                         completedFiles++;
                         
                     } catch (error) {
+                        // Check if it's a decryption error
+                        if (error.name === 'OperationError' || error.message?.includes('decrypt')) {
+                            log(`[一括ダウンロード] ${entry.name} の復号化に失敗しました - パスワードが異なる可能性があります`, 'error');
+                            
+                            // パスワードの再入力を求める
+                            const newPassword = prompt(
+                                `${entry.name} の復号化に失敗しました。\n\n` +
+                                `このファイルは異なるパスワードで暗号化されている可能性があります。\n` +
+                                `正しいパスワードを入力してください:`, 
+                                ''
+                            );
+                            
+                            if (newPassword && newPassword.length >= 8) {
+                                try {
+                                    // 新しいパスワードで再試行
+                                    log(`[一括ダウンロード] 新しいパスワードで再試行: ${entry.name}`, 'info');
+                                    const metadata = await window.downloadManager.fetchMetadata(entry.metaTxId, entry.blockId, newPassword);
+                                    
+                                    await window.downloadManager.executeDownload(metadata, newPassword, {
+                                        onProgress: (progress) => {
+                                            const percent = ((completedFiles + progress.current/progress.total) / totalFiles * 100);
+                                            updateProgress({
+                                                type: 'download',
+                                                percent: percent.toFixed(0)
+                                            });
+                                        },
+                                        folderStructure: folderStructureOption
+                                    });
+                                    
+                                    completedFiles++;
+                                    continue; // 次のファイルへ
+                                } catch (retryError) {
+                                    log(`[一括ダウンロード] 再試行も失敗: ${entry.name}`, 'error');
+                                }
+                            }
+                        }
+                        
                         errorFiles++;
                         // Enhanced error logging
                         log(`[一括ダウンロード] エラー: ${entry.name} - ${error.message || error.toString()}`, 'error');

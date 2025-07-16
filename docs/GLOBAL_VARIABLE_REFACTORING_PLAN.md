@@ -227,3 +227,20 @@ Object.defineProperty(window, 'parallelDownloadEnabled', {
 - AppStateオブジェクトによるグループ化
 - 後方互換性のためのgetter/setter実装
 - 既存コードへの影響を最小化
+
+### v5.4.20-22 - 緊急修正
+
+**発見された問題：**
+1. UI CONTROLセクション内の関数からグローバル変数へのアクセス問題
+2. `handleFileSelect` で設定した `currentFile` が `processAndUpload` で参照できない
+3. ヘルパー関数（checkFileSizeWarning等）がグローバルスコープで利用できない
+
+**実施した修正：**
+- v5.4.20: `log` 関数を `window.log` として公開
+- v5.4.21: ヘルパー関数を window オブジェクトに公開
+- v5.4.22: グローバル変数への明示的な window 経由アクセス
+  - `currentFile` → `window.currentFile`
+  - `progressManager` → `window.progressManager`
+
+**教訓：**
+UI CONTROLセクション（DOMContentLoaded内）で定義された関数は、グローバル変数や関数にアクセスする際、明示的に`window`経由でアクセスする必要がある。

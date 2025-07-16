@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.4.22 - Fix global variable access</title>
+    <title>Kaspa P2P File Storage v5.4.23 - Fix processAndUpload scope</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -872,7 +872,7 @@
     </div>
 
     <script type="module">
-        // v5.4.22: Fix global variable access in UI CONTROL section
+        // v5.4.23: Fix processAndUpload scope issues with debug logs
         // - Restored architecture map
         // - 13-section code organization
         // - Improved function grouping
@@ -6030,13 +6030,18 @@
         
         // Process and upload file
         window.processAndUpload = async function() {
+            // Debug log
+            log(`[DEBUG] processAndUpload called`, 'debug');
+            log(`[DEBUG] window.currentFile: ${window.currentFile ? window.currentFile.name : 'null'}`, 'debug');
+            log(`[DEBUG] currentFile (local): ${typeof currentFile !== 'undefined' ? (currentFile ? currentFile.name : 'null') : 'undefined'}`, 'debug');
+            
             // Check if directory mode
             if (window.isDirectoryMode) {
                 await processAndUploadDirectory();
                 return;
             }
             
-            if (!currentFile) {
+            if (!window.currentFile) {
                 log('ファイルが選択されていません', 'error');
                 return;
             }
@@ -6053,6 +6058,10 @@
             }
             
             currentPassword = password;
+            
+            // Use local reference to window.currentFile
+            const currentFile = window.currentFile;
+            const progressManager = window.progressManager;
             
             // Initialize processedChunks with existing chunks from progress
             processedChunks = [];

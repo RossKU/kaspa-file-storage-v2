@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.4.41 - Fix rpcClient null reference errors</title>
+    <title>Kaspa P2P File Storage v5.4.42 - Fix duplicate NetworkState references in rpcClient</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -886,6 +886,9 @@
         // v5.4.39: Phase 4 NetworkState implementation (kaspa, rpcClient, ws variables)
         // v5.4.40: Fix kaspa null reference errors - use NetworkState.kaspa everywhere
         // v5.4.41: Fix rpcClient null reference errors - use NetworkState.rpcClient everywhere
+        // v5.4.42: Fix duplicate NetworkState references in rpcClient
+        // - Fixed NetworkState.NetworkState.rpcClient → NetworkState.rpcClient (24 occurrences)
+        // - Fixed this.NetworkState.rpcClient → NetworkState.rpcClient (2 occurrences)
         // - Restored architecture map
         // - 13-section code organization
         // - Improved function grouping
@@ -3061,7 +3064,7 @@
                         
                         for (let retry = 0; retry <= this.maxRetries; retry++) {
                             try {
-                                response = await this.NetworkState.rpcClient.getBlock({
+                                response = await NetworkState.rpcClient.getBlock({
                                     hash: blockId,
                                     includeTransactions: true
                                 });
@@ -3223,7 +3226,7 @@
                     try {
                         const { txId, blockId, index } = work;
                         
-                        const response = await this.NetworkState.rpcClient.getBlock({
+                        const response = await NetworkState.rpcClient.getBlock({
                             hash: blockId,
                             includeTransactions: true
                         });
@@ -4045,7 +4048,7 @@
                         try {
                             // Try RPC first if we have blockId
                             if (blockId && rpcClient) {
-                                const response = await NetworkState.NetworkState.rpcClient.getBlock({
+                                const response = await NetworkState.rpcClient.getBlock({
                                     hash: blockId,
                                     includeTransactions: true
                                 });
@@ -4162,7 +4165,7 @@
                     if (blockId && rpcClient) {
                         log(`[DownloadManager] BlockID経由でメタデータ取得: ${blockId.substring(0, 16)}...`, 'info');
                         
-                        const blockResponse = await NetworkState.NetworkState.rpcClient.getBlock({
+                        const blockResponse = await NetworkState.rpcClient.getBlock({
                             hash: blockId,
                             includeTransactions: true
                         });
@@ -4235,7 +4238,7 @@
                     log(`[DownloadManager] ペイロード ${index + 1} ダウンロード開始: ${txId.substring(0, 16)}...`, 'info');
                     
                     // Get block data
-                    const blockResponse = await NetworkState.NetworkState.rpcClient.getBlock({
+                    const blockResponse = await NetworkState.rpcClient.getBlock({
                         hash: blockId,
                         includeTransactions: true
                     });
@@ -4276,7 +4279,7 @@
                     log(`[DownloadManager] チャンク ${index + 1} ダウンロード開始: ${txId.substring(0, 16)}...`, 'info');
                     
                     // Get block data
-                    const blockResponse = await NetworkState.NetworkState.rpcClient.getBlock({
+                    const blockResponse = await NetworkState.rpcClient.getBlock({
                         hash: blockId,
                         includeTransactions: true
                     });
@@ -4861,11 +4864,11 @@
                 await NetworkState.rpcClient.connect();
                 
                 // Test connection
-                const info = await NetworkState.NetworkState.rpcClient.getServerInfo();
+                const info = await NetworkState.rpcClient.getServerInfo();
                 log(`接続成功! サーバー: ${info.serverVersion}`, 'success');
                 
                 // Get balance
-                const { entries } = await NetworkState.NetworkState.rpcClient.getUtxosByAddresses([UserState.address.toString()]);
+                const { entries } = await NetworkState.rpcClient.getUtxosByAddresses([UserState.address.toString()]);
                 const balance = entries.reduce((sum, utxo) => sum + Number(utxo.amount), 0) / 1e8;
                 log(`残高: ${balance} KAS`, 'info');
                 
@@ -4915,7 +4918,7 @@
                 updateNodeConnectionStatus(config.nodeType, config.currentEndpoint);
                 
                 // Test connection
-                const info = await NetworkState.NetworkState.rpcClient.getServerInfo();
+                const info = await NetworkState.rpcClient.getServerInfo();
                 log(`RPC再接続成功! サーバー: ${info.serverVersion}`, 'success');
                 
                 updateNetworkStatus('online', 'オンライン');
@@ -5561,7 +5564,7 @@
         // Transaction helper functions for directory upload
         async function createTransaction(payloadBase64) {
             // Get UTXOs
-            const { entries } = await NetworkState.NetworkState.rpcClient.getUtxosByAddresses([UserState.address.toString()]);
+            const { entries } = await NetworkState.rpcClient.getUtxosByAddresses([UserState.address.toString()]);
             if (!entries || entries.length === 0) {
                 throw new Error('利用可能なUTXOがありません');
             }
@@ -6111,7 +6114,7 @@
                 // First try with blockId if available
                 if (blockId) {
                     try {
-                        const blockResponse = await NetworkState.NetworkState.rpcClient.getBlock({
+                        const blockResponse = await NetworkState.rpcClient.getBlock({
                             hash: blockId,
                             includeTransactions: true
                         });
@@ -6468,7 +6471,7 @@
                         }
                         
                         // Get fresh UTXOs
-                        const { entries } = await NetworkState.NetworkState.rpcClient.getUtxosByAddresses([UserState.address.toString()]);
+                        const { entries } = await NetworkState.rpcClient.getUtxosByAddresses([UserState.address.toString()]);
                         if (!entries || entries.length === 0) {
                             throw new Error('利用可能なUTXOがありません');
                         }
@@ -6698,7 +6701,7 @@
                     while (nextChunkIndex >= 0) {
                     // Get fresh UTXOs for each chunk
                     log(`チャンク ${nextChunkIndex + 1}/${totalChunks} の処理を開始...`);
-                    const { entries } = await NetworkState.NetworkState.rpcClient.getUtxosByAddresses([UserState.address.toString()]);
+                    const { entries } = await NetworkState.rpcClient.getUtxosByAddresses([UserState.address.toString()]);
                     if (!entries || entries.length === 0) {
                         throw new Error('利用可能なUTXOがありません');
                     }
@@ -6859,7 +6862,7 @@
                                 if (waitTime >= 30000) {
                                     try {
                                         log('30秒経過 - RPCで確認を試みます...');
-                                        const txInfo = await NetworkState.NetworkState.rpcClient.getTransaction({
+                                        const txInfo = await NetworkState.rpcClient.getTransaction({
                                             transactionId: txid,
                                             includeBlockInfo: true
                                         });
@@ -7353,7 +7356,7 @@
                 log(`メタデータサイズ: ${metaDataBytes.length} bytes → 暗号化後: ${metaPayload.length} bytes (salt含む)`);
                 
                 // Upload meta-tx to blockchain
-                const utxoResponse = await NetworkState.NetworkState.rpcClient.getUtxosByAddresses([UserState.address.toString()]);
+                const utxoResponse = await NetworkState.rpcClient.getUtxosByAddresses([UserState.address.toString()]);
                 const entries = utxoResponse.entries || [];
                 
                 log(`${entries.length} UTXOs available for meta-tx`);
@@ -7591,7 +7594,7 @@
                 log(`[SuperMeta] 中間メタデータサイズ: ${metaDataBytes.length} bytes`, 'debug');
                 
                 // Upload to blockchain
-                const utxoResponse = await NetworkState.NetworkState.rpcClient.getUtxosByAddresses([UserState.address.toString()]);
+                const utxoResponse = await NetworkState.rpcClient.getUtxosByAddresses([UserState.address.toString()]);
                 const entries = utxoResponse.entries || [];
                 
                 const formattedUtxos = entries.map(utxo => ({
@@ -7765,7 +7768,7 @@
                 log(`[SuperMeta] スーパーメタデータサイズ: ${metaDataBytes.length} bytes`, 'debug');
                 
                 // Upload to blockchain
-                const utxoResponse = await NetworkState.NetworkState.rpcClient.getUtxosByAddresses([UserState.address.toString()]);
+                const utxoResponse = await NetworkState.rpcClient.getUtxosByAddresses([UserState.address.toString()]);
                 const entries = utxoResponse.entries || [];
                 
                 const formattedUtxos = entries.map(utxo => ({
@@ -8422,7 +8425,7 @@
                 if (blockId) {
                     log(`BlockIDを使用してRPC経由で取得中...`, 'info');
                     try {
-                        const blockResponse = await NetworkState.NetworkState.rpcClient.getBlock({
+                        const blockResponse = await NetworkState.rpcClient.getBlock({
                             hash: blockId,
                             includeTransactions: true
                         });
@@ -8462,7 +8465,7 @@
                             if (switched) {
                                 // Retry the operation with archive node
                                 log(`[RPC] アーカイブノードで再試行中...`, 'info');
-                                const blockResponse = await NetworkState.NetworkState.rpcClient.getBlock({
+                                const blockResponse = await NetworkState.rpcClient.getBlock({
                                     hash: blockId,
                                     includeTransactions: true
                                 });
@@ -8578,7 +8581,7 @@
                     
                     try {
                         // Get transaction via RPC
-                        const txResponse = await NetworkState.NetworkState.rpcClient.getTransaction({
+                        const txResponse = await NetworkState.rpcClient.getTransaction({
                             transactionId: metaTxId,
                             includeBlockInfo: true
                         });
@@ -8713,7 +8716,7 @@
                                     if (intMetaBlockId && intMetaBlockId !== '') {
                                         // Try to get via BlockID
                                         try {
-                                            const blockResponse = await NetworkState.NetworkState.rpcClient.getBlock({
+                                            const blockResponse = await NetworkState.rpcClient.getBlock({
                                                 hash: intMetaBlockId,
                                                 includeTransactions: true
                                             });
@@ -9055,7 +9058,7 @@
                         
                         let response;
                         try {
-                            response = await NetworkState.NetworkState.rpcClient.getBlock(request);
+                            response = await NetworkState.rpcClient.getBlock(request);
                             log(`RPC getBlock response received`, 'info');
                             log(`Response type: ${typeof response}`, 'info');
                             log(`Response keys: ${Object.keys(response || {}).join(', ')}`, 'info');
@@ -9165,7 +9168,7 @@
                             
                             let response;
                             try {
-                                response = await NetworkState.NetworkState.rpcClient.getBlock(request);
+                                response = await NetworkState.rpcClient.getBlock(request);
                                 log(`RPC getBlock response received`, 'info');
                                 log(`Response type: ${typeof response}`, 'info');
                                 log(`Response keys: ${Object.keys(response || {}).join(', ')}`, 'info');
@@ -9565,7 +9568,7 @@
                         
                         // Test RPC connection
                         try {
-                            const info = await NetworkState.NetworkState.rpcClient.getServerInfo();
+                            const info = await NetworkState.rpcClient.getServerInfo();
                             log(`RPC接続確認: ${info.serverVersion}`, 'success');
                         } catch (err) {
                             log('RPC接続エラー - 再接続を試みます', 'error');
@@ -9625,7 +9628,7 @@
             // Check connection status and reconnect if needed
             try {
                 // Test connection with a simple RPC call
-                await NetworkState.NetworkState.rpcClient.getServerInfo();
+                await NetworkState.rpcClient.getServerInfo();
             } catch (error) {
                 try {
                     log('RPC再接続中...', 'info');
@@ -10598,7 +10601,7 @@
                 const startTime = Date.now();
                 
                 // Test RPC
-                const info = await NetworkState.NetworkState.rpcClient.getServerInfo();
+                const info = await NetworkState.rpcClient.getServerInfo();
                 const rpcTime = Date.now() - startTime;
                 log(`RPC応答時間: ${rpcTime}ms`, 'success');
                 

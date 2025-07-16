@@ -3763,26 +3763,8 @@
             }
         }
 
-        // Tab switching
-        window.switchTab = function(tab) {
-            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-            
-            const tabIndex = ['upload', 'download', 'directory', 'history', 'settings'].indexOf(tab);
-            document.querySelectorAll('.tab-btn')[tabIndex].classList.add('active');
-            document.getElementById(`${tab}-tab`).classList.add('active');
-            
-            // Update history tab when switching to it
-            if (tab === 'history' && window.historyManager) {
-                window.historyManager.updateHistoryUI();
-            }
-            
-            // Update directory tab when switching to it
-            if (tab === 'directory' && window.directoryManager) {
-                window.directoryManager.updateFileSelector();
-                window.directoryManager.updateUI();
-            }
-        };
+        // Moved to UI CONTROL & EVENT HANDLERS section
+        // window.switchTab - Tab navigation handler
         
         // Create directory function
         window.createDirectory = async function() {
@@ -5243,7 +5225,10 @@
             }
         }
 
-        // Connection test
+        // Moved to UI CONTROL & EVENT HANDLERS section
+        // window.testConnection - Connection test handler
+        
+        // Connection test function (moved from NETWORK & RPC FUNCTIONS)
         window.testConnection = async function() {
             try {
                 log('接続テストを実行中...');
@@ -10849,6 +10834,28 @@
                 }
             }
         }
+        
+        // Tab switching function (moved from FILE OPERATIONS)
+        window.switchTab = function(tab) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            
+            const tabIndex = ['upload', 'download', 'directory', 'history', 'settings'].indexOf(tab);
+            document.querySelectorAll('.tab-btn')[tabIndex].classList.add('active');
+            document.getElementById(`${tab}-tab`).classList.add('active');
+            
+            // Update history tab when switching to it
+            if (tab === 'history' && window.historyManager) {
+                window.historyManager.updateHistoryUI();
+            }
+            
+            // Update directory tab when switching to it
+            if (tab === 'directory' && window.directoryManager) {
+                window.directoryManager.updateFileSelector();
+                window.directoryManager.updateUI();
+            }
+        };
+        
         function onNodeTypeChange() {
             const nodeTypeSelect = document.getElementById('nodeTypeSelect');
             const customEndpointSection = document.getElementById('customEndpointSection');

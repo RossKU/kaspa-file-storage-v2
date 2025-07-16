@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.4.37 - Expose WorkspaceState to window for global access</title>
+    <title>Kaspa P2P File Storage v5.4.38 - Add debug logging for parallel download</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -882,6 +882,7 @@
         // v5.4.35: Fix WorkspaceState not defined error in UploadHistoryManager class
         // v5.4.36: Fix infinite recursion in workspaceHandle getter/setter proxy
         // v5.4.37: Expose WorkspaceState to window for onclick handlers and global access
+        // v5.4.38: Add debug logging to investigate parallel download performance issue
         // - Restored architecture map
         // - 13-section code organization
         // - Improved function grouping
@@ -3895,10 +3896,13 @@
             this.totalChunks = txIds.length;
             
             log(`[ParallelDownloader] 暗号化チャンクの並列ダウンロード開始: ${txIds.length}チャンク, ${this.concurrency}並列`, 'info');
+            log(`[DEBUG] ParallelDownloader - queue length: ${this.queue.length}`, 'debug');
+            log(`[DEBUG] ParallelDownloader - active workers will be: ${this.concurrency}`, 'debug');
             
             try {
                 const workers = [];
                 for (let i = 0; i < this.concurrency; i++) {
+                    log(`[DEBUG] Starting worker ${i + 1}/${this.concurrency}`, 'debug');
                     workers.push(this.workerRaw(progressCallback));
                 }
                 
@@ -3966,6 +3970,7 @@
                 
                 try {
                     const { txId, blockId, index } = work;
+                    log(`[DEBUG] Worker processing chunk ${index}: txId=${txId.substring(0, 8)}...`, 'debug');
                     
                     let payload = null;
                     let lastError = null;
@@ -4026,6 +4031,7 @@
                     this.results.set(index, payload);
                     this.completedCount++;
                     this.totalBytes += payload.length;
+                    log(`[DEBUG] Chunk ${index} completed. Total: ${this.completedCount}/${this.totalChunks}, Bytes: ${this.totalBytes}`, 'debug');
                     
                     const elapsed = (Date.now() - this.startTime) / 1000;
                     const speed = this.completedCount / elapsed;
@@ -10692,4 +10698,4 @@
         });
     </script>
 </body>
-</html><!-- Force GitHub Pages update: Wed Jul 16 2025 - v5.4.37: Expose WorkspaceState -->
+</html><!-- Force GitHub Pages update: Wed Jul 16 2025 - v5.4.38: Debug parallel download -->

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.4.18 - Phase 3 Complete</title>
+    <title>Kaspa P2P File Storage v5.4.19 - Global State Phase 1</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -872,7 +872,7 @@
     </div>
 
     <script type="module">
-        // v5.4.18: Phase 3 Complete - setupWorkspace refactored
+        // v5.4.19: Global State Phase 1 - Safe variables grouped
         // - Restored architecture map
         // - 13-section code organization
         // - Improved function grouping
@@ -946,8 +946,8 @@
         let directoryMetadata = null; // ディレクトリ専用変数
         let wsMonitorActive = false;
         let monitoredTransactions = new Map();
-        let uploadHistory = [];
-        let systemLogs = [];
+        // uploadHistory moved to AppState.history.uploadHistory
+        // systemLogs moved to AppState.history.systemLogs
         let privateKey = null;
         let address = null;
         let progressManager = null;
@@ -957,7 +957,7 @@
         let workspaceHandle = null; // File System Access API directory handle
         let progressFileMap = new Map(); // Map of filename -> {cid, fileHandle}
         let historyManager = null; // Upload history manager
-        let wsMonitorTimeout = null; // WebSocket monitoring timeout
+        // wsMonitorTimeout moved to AppState.monitoring.wsMonitorTimeout
         let uploadingChunksCount = 0; // Number of chunks being uploaded
         let uploadingMetaTx = false; // Whether meta-tx is being uploaded
         let uploadingDirMeta = false; // Whether directory meta is being uploaded
@@ -969,23 +969,49 @@
         const MAX_CHUNKS_SUPPORTED = 25600; // Maximum chunks supported via Super (160 × 160)
         const PROCESS_CHUNK_SIZE = 1024 * 1024; // 1MB processing chunks
         
-        // Parallel download settings (v3.6.2)
-        let parallelDownloadEnabled = false; // Default OFF for v3.5.0 compatibility
-        window.parallelDownloadEnabled = false; // v5.3.16: Initialize window variable
+        // ===== Phase 1: Global State Refactoring (v5.4.19) =====
+        // Grouped application state for better organization
+        const AppState = {
+            settings: {
+                parallelDownloadEnabled: false  // Default OFF for v3.5.0 compatibility
+            },
+            monitoring: {
+                wsMonitorTimeout: null  // WebSocket monitoring timeout
+            },
+            history: {
+                uploadHistory: [],      // Upload history records
+                systemLogs: []         // System log entries
+            }
+        };
+        
+        // Backward compatibility proxies (to be removed in future versions)
+        let parallelDownloadEnabled = AppState.settings.parallelDownloadEnabled;
+        window.parallelDownloadEnabled = AppState.settings.parallelDownloadEnabled;
+        
+        // Define getter/setter for parallelDownloadEnabled
+        Object.defineProperty(window, 'parallelDownloadEnabled', {
+            get() { return AppState.settings.parallelDownloadEnabled; },
+            set(value) { 
+                AppState.settings.parallelDownloadEnabled = value;
+                parallelDownloadEnabled = value;  // Keep local variable in sync
+            }
+        });
         
         // Load parallel download setting from localStorage
         function loadParallelSetting() {
             const saved = localStorage.getItem('kaspaParallelDownload');
             if (saved !== null) {
-                parallelDownloadEnabled = saved === 'true';
-                window.parallelDownloadEnabled = parallelDownloadEnabled; // v5.3.16: Set window variable
+                AppState.settings.parallelDownloadEnabled = saved === 'true';
+                parallelDownloadEnabled = AppState.settings.parallelDownloadEnabled;
+                window.parallelDownloadEnabled = AppState.settings.parallelDownloadEnabled;
                 const toggle = document.getElementById('parallelDownloadToggle');
                 if (toggle) {
-                    toggle.checked = parallelDownloadEnabled;
+                    toggle.checked = AppState.settings.parallelDownloadEnabled;
                 }
             } else {
-                // v5.3.16: Ensure window variable is set even when no saved setting
-                window.parallelDownloadEnabled = parallelDownloadEnabled;
+                // Ensure all references are synchronized
+                window.parallelDownloadEnabled = AppState.settings.parallelDownloadEnabled;
+                parallelDownloadEnabled = AppState.settings.parallelDownloadEnabled;
             }
         }
         
@@ -3164,7 +3190,7 @@
                 message: message
             };
             
-            systemLogs.push(logEntry);
+            AppState.history.systemLogs.push(logEntry);
             
             const logContainer = document.getElementById('systemLog');
             const entry = document.createElement('div');
@@ -6815,7 +6841,7 @@
                 };
                 
                 // Save to history
-                uploadHistory.push({
+                AppState.history.uploadHistory.push({
                     filename: currentFile.name,
                     timestamp: Date.now(),
                     metadata: kaspaMetadata
@@ -8767,7 +8793,7 @@
                 
                 // Check if parallel download should be used
                 // v4.7.44: Enable parallel download for 2+ chunks
-                const useParallel = parallelDownloadEnabled && kaspaMetadata.chunks.length >= 2;
+                const useParallel = AppState.settings.parallelDownloadEnabled && kaspaMetadata.chunks.length >= 2;
                 
                 if (useParallel) {
                     // Parallel download
@@ -9075,9 +9101,9 @@
                 wsMonitorActive = false;
                 
                 // Clear timeout
-                if (wsMonitorTimeout) {
-                    clearTimeout(wsMonitorTimeout);
-                    wsMonitorTimeout = null;
+                if (AppState.monitoring.wsMonitorTimeout) {
+                    clearTimeout(AppState.monitoring.wsMonitorTimeout);
+                    AppState.monitoring.wsMonitorTimeout = null;
                 }
                 
                 // Reset counters
@@ -9093,11 +9119,12 @@
 
         // Toggle parallel download
         window.toggleParallelDownload = function() {
-            parallelDownloadEnabled = document.getElementById('parallelDownloadToggle').checked;
-            window.parallelDownloadEnabled = parallelDownloadEnabled; // v5.3.16: Fix window variable
-            localStorage.setItem('kaspaParallelDownload', parallelDownloadEnabled.toString());
+            AppState.settings.parallelDownloadEnabled = document.getElementById('parallelDownloadToggle').checked;
+            parallelDownloadEnabled = AppState.settings.parallelDownloadEnabled;
+            window.parallelDownloadEnabled = AppState.settings.parallelDownloadEnabled;
+            localStorage.setItem('kaspaParallelDownload', AppState.settings.parallelDownloadEnabled.toString());
             
-            if (parallelDownloadEnabled) {
+            if (AppState.settings.parallelDownloadEnabled) {
                 log('並列ダウンロードを有効にしました（実験的機能）', 'warning');
             } else {
                 log('並列ダウンロードを無効にしました（安定モード）', 'success');
@@ -9108,7 +9135,7 @@
         window.exportLogs = function() {
             const exportData = {
                 timestamp: new Date().toISOString(),
-                logs: systemLogs,
+                logs: AppState.history.systemLogs,
                 uploadHistory: uploadHistory,
                 monitoredTransactions: Array.from(monitoredTransactions.entries())
             };
@@ -9126,7 +9153,7 @@
 
         window.clearLogs = function() {
             if (confirm('すべてのログをクリアしますか？')) {
-                systemLogs = [];
+                AppState.history.systemLogs = [];
                 document.getElementById('systemLog').innerHTML = '';
                 document.getElementById('monitorLog').innerHTML = '';
                 log('ログをクリアしました', 'info');
@@ -9134,7 +9161,7 @@
         };
 
         window.copyLog = function() {
-            const logText = systemLogs.map(log => 
+            const logText = AppState.history.systemLogs.map(log => 
                 `[${log.time}] ${log.type.toUpperCase()}: ${log.message}`
             ).join('\n');
             
@@ -9216,8 +9243,8 @@
             // Display upload history
             setInterval(() => {
                 const historyDiv = document.getElementById('uploadHistory');
-                if (uploadHistory.length > 0) {
-                    historyDiv.innerHTML = uploadHistory.slice(-5).reverse().map(item => `
+                if (AppState.history.uploadHistory.length > 0) {
+                    historyDiv.innerHTML = AppState.history.uploadHistory.slice(-5).reverse().map(item => `
                         <div class="metric-box">
                             <strong>${item.filename}</strong><br>
                             ${new Date(item.timestamp).toLocaleString()}<br>
@@ -9243,7 +9270,7 @@
             
             log(`🚀 Kaspa P2P v${getAppVersion()} 準備完了！`, 'info');
             log(`📋 v${getAppVersion()}: スーパーメタデータで大規模ファイル対応`, 'info');
-            log('✨ 並列ダウンロード: ' + (parallelDownloadEnabled ? '有効' : '無効'), 'info');
+            log('✨ 並列ダウンロード: ' + (AppState.settings.parallelDownloadEnabled ? '有効' : '無効'), 'info');
             log('システムを初期化してください', 'info');
             
             // Update title and subtitle with dynamic version
@@ -9407,24 +9434,24 @@
                 wsMonitorActive = true;
                 
                 // Set 5 minute timeout with upload session check (v5.3.6)
-                if (wsMonitorTimeout) {
-                    clearTimeout(wsMonitorTimeout);
+                if (AppState.monitoring.wsMonitorTimeout) {
+                    clearTimeout(AppState.monitoring.wsMonitorTimeout);
                 }
-                wsMonitorTimeout = setTimeout(async () => {
+                AppState.monitoring.wsMonitorTimeout = setTimeout(async () => {
                     // v5.3.7: Enhanced check - Don't stop monitoring during any upload activity
                     if (uploadSessionActive || isUploadingFile || uploadingChunksCount > 0 || uploadingMetaTx || uploadingDirMeta) {
                         log(`[DEBUG] アップロード中 - WebSocket監視を継続 (session=${uploadSessionActive}, file=${isUploadingFile}, chunks=${uploadingChunksCount})`, 'debug');
                         // Reset timeout
-                        clearTimeout(wsMonitorTimeout);
-                        wsMonitorTimeout = setTimeout(arguments.callee, 5 * 60 * 1000);
+                        clearTimeout(AppState.monitoring.wsMonitorTimeout);
+                        AppState.monitoring.wsMonitorTimeout = setTimeout(arguments.callee, 5 * 60 * 1000);
                         return;
                     }
                     
                     // Also check if there are monitored transactions
                     if (monitoredTransactions.size > 0) {
                         log(`[DEBUG] 監視中のトランザクションあり (${monitoredTransactions.size}件) - 監視を継続`, 'debug');
-                        clearTimeout(wsMonitorTimeout);
-                        wsMonitorTimeout = setTimeout(arguments.callee, 5 * 60 * 1000);
+                        clearTimeout(AppState.monitoring.wsMonitorTimeout);
+                        AppState.monitoring.wsMonitorTimeout = setTimeout(arguments.callee, 5 * 60 * 1000);
                         return;
                     }
                     

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.4.42 - Fix duplicate NetworkState references in rpcClient</title>
+    <title>Kaspa P2P File Storage v5.4.43 - Fix upload initialization check for rpcClient</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -889,6 +889,9 @@
         // v5.4.42: Fix duplicate NetworkState references in rpcClient
         // - Fixed NetworkState.NetworkState.rpcClient → NetworkState.rpcClient (24 occurrences)
         // - Fixed this.NetworkState.rpcClient → NetworkState.rpcClient (2 occurrences)
+        // v5.4.43: Fix upload initialization check for rpcClient
+        // - Fixed !rpcClient → !NetworkState.rpcClient in processAndUpload and other functions (5 occurrences)
+        // - Resolves "先にシステムを初期化してください" error when trying to upload
         // - Restored architecture map
         // - 13-section code organization
         // - Improved function grouping
@@ -5136,7 +5139,7 @@
                 return;
             }
             
-            if (!rpcClient) {
+            if (!NetworkState.rpcClient) {
                 log('先にシステムを初期化してください', 'error');
                 return;
             }
@@ -6229,7 +6232,7 @@
                 return;
             }
             
-            if (!rpcClient) {
+            if (!NetworkState.rpcClient) {
                 log('先にシステムを初期化してください', 'error');
                 return;
             }
@@ -8412,7 +8415,7 @@
                 return;
             }
             
-            if (!rpcClient) {
+            if (!NetworkState.rpcClient) {
                 log('先にシステムを初期化してください', 'error');
                 return;
             }
@@ -8939,7 +8942,7 @@
                 return;
             }
             
-            if (!rpcClient) {
+            if (!NetworkState.rpcClient) {
                 log('先にシステムを初期化してください', 'error');
                 return;
             }
@@ -9620,7 +9623,7 @@
         
         // WebSocket monitoring (unified version with reconnection support)
         window.startMonitoring = async function() {
-            if (!rpcClient) {
+            if (!NetworkState.rpcClient) {
                 log('先にシステムを初期化してください', 'error');
                 return;
             }

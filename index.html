@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.4.9 - Function Organization</title>
+    <title>Kaspa P2P File Storage v5.4.10 - Function Migration Phase 2</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -3766,66 +3766,8 @@
         // Moved to UI CONTROL & EVENT HANDLERS section
         // window.switchTab - Tab navigation handler
         
-        // Create directory function
-        window.createDirectory = async function() {
-            try {
-                const nameInput = document.getElementById('directoryName');
-                const name = nameInput.value.trim();
-                
-                if (!name) {
-                    alert('ディレクトリ名を入力してください');
-                    return;
-                }
-                
-                const parentSelector = document.getElementById('parentDirectory');
-                const parentCID = parentSelector.value || null;
-                
-                const checkboxes = document.querySelectorAll('input[name="directoryFiles"]:checked');
-                const selections = Array.from(checkboxes).map(cb => cb.value);
-                
-                if (selections.length === 0) {
-                    alert('少なくとも1つのファイルまたはディレクトリを選択してください');
-                    return;
-                }
-                
-                // Separate files and directories
-                const fileIds = selections
-                    .filter(s => s.startsWith('file:'))
-                    .map(s => s.substring(5));
-                
-                const dirCIDs = selections
-                    .filter(s => s.startsWith('dir:'))
-                    .map(s => s.substring(4));
-                
-                // Process subdirectories
-                if (dirCIDs.length > 0) {
-                    // Move directories under the new parent
-                    dirCIDs.forEach(dirCID => {
-                        const dir = window.directoryManager.directories.find(d => d.cid === dirCID);
-                        if (dir) {
-                            dir.parentCID = parentCID;
-                        }
-                    });
-                    window.directoryManager.saveDirectories();
-                }
-                
-                await window.directoryManager.createDirectory(name, fileIds, parentCID);
-                
-                // Clear form
-                nameInput.value = '';
-                checkboxes.forEach(cb => cb.checked = false);
-                
-                // Update UI
-                window.directoryManager.updateUI();
-                
-            } catch (error) {
-                ErrorHandler.handle(error, 'Directory-Create', {
-                    type: ERROR_TYPES.FILESYSTEM,
-                    showAlert: true,
-                    showLog: true
-                });
-            }
-        };
+        // Moved to UI CONTROL & EVENT HANDLERS section
+        // window.createDirectory - Directory creation handler
 
         // Filter out trash and system files
         function shouldSkipFile(fileName, filePath = '') {
@@ -10853,6 +10795,67 @@
             if (tab === 'directory' && window.directoryManager) {
                 window.directoryManager.updateFileSelector();
                 window.directoryManager.updateUI();
+            }
+        };
+        
+        // Directory creation function (moved from FILE OPERATIONS)
+        window.createDirectory = async function() {
+            try {
+                const nameInput = document.getElementById('directoryName');
+                const name = nameInput.value.trim();
+                
+                if (!name) {
+                    alert('ディレクトリ名を入力してください');
+                    return;
+                }
+                
+                const parentSelector = document.getElementById('parentDirectory');
+                const parentCID = parentSelector.value || null;
+                
+                const checkboxes = document.querySelectorAll('input[name="directoryFiles"]:checked');
+                const selections = Array.from(checkboxes).map(cb => cb.value);
+                
+                if (selections.length === 0) {
+                    alert('少なくとも1つのファイルまたはディレクトリを選択してください');
+                    return;
+                }
+                
+                // Separate files and directories
+                const fileIds = selections
+                    .filter(s => s.startsWith('file:'))
+                    .map(s => s.substring(5));
+                
+                const dirCIDs = selections
+                    .filter(s => s.startsWith('dir:'))
+                    .map(s => s.substring(4));
+                
+                // Process subdirectories
+                if (dirCIDs.length > 0) {
+                    // Move directories under the new parent
+                    dirCIDs.forEach(dirCID => {
+                        const dir = window.directoryManager.directories.find(d => d.cid === dirCID);
+                        if (dir) {
+                            dir.parentCID = parentCID;
+                        }
+                    });
+                    window.directoryManager.saveDirectories();
+                }
+                
+                await window.directoryManager.createDirectory(name, fileIds, parentCID);
+                
+                // Clear form
+                nameInput.value = '';
+                checkboxes.forEach(cb => cb.checked = false);
+                
+                // Update UI
+                window.directoryManager.updateUI();
+                
+            } catch (error) {
+                ErrorHandler.handle(error, 'Directory-Create', {
+                    type: ERROR_TYPES.FILESYSTEM,
+                    showAlert: true,
+                    showLog: true
+                });
             }
         };
         

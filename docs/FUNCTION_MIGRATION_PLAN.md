@@ -1,11 +1,11 @@
-# 関数移行計画 - Kaspa File Storage v5.4.8
+# 関数移行計画 - Kaspa File Storage v5.4.9
 
 ## 📋 概要
 
 このドキュメントは、index.htmlの関数を適切なセクションに再配置するための詳細な計画です。
 安全性を最優先に、段階的な移行を行います。
 
-最終更新: 2025-07-16
+最終更新: 2025-07-16 09:57
 
 ## 🎯 目標
 
@@ -200,19 +200,31 @@ onclick   handleFileSelect    uploadFile    createTransaction
 
 | Phase | 関数名 | 状態 | 完了日 | 備考 |
 |-------|--------|------|--------|------|
-| 1 | copyToClipboard | 未着手 | - | |
-| 1 | switchTab | 未着手 | - | |
-| 1 | testConnection | 未着手 | - | |
-| 2 | createDirectory | 未着手 | - | |
-| 2 | handleFileSelect | 未着手 | - | |
-| 3 | setupWorkspace | 未着手 | - | |
+| 1.1 | copyToClipboard | ✅ 完了 | 2025-07-16 09:37 | log未定義エラー修正済み |
+| 1.2 | switchTab | ✅ 完了 | 2025-07-16 09:55 | 正常動作確認済み |
+| 1.3 | testConnection | ✅ 完了 | 2025-07-16 09:55 | 正常動作確認済み |
+| 2.1 | createDirectory | 未着手 | - | |
+| 2.2 | handleFileSelect | 未着手 | - | |
+| 3.1 | setupWorkspace | 未着手 | - | |
 
 ## 🔍 次のステップ
 
-1. Phase 1の3つの関数を移動
-2. 各移動後にテストとコミット
-3. Phase 2の準備（関数分割の設計）
-4. 段階的に実施し、問題があれば即座に停止
+### ✅ Phase 1 完了（2025-07-16）
+- copyToClipboard: UTILITY → UI CONTROL（log未定義エラー修正含む）
+- switchTab: FILE OPS → UI CONTROL  
+- testConnection: NETWORK → UI CONTROL
+
+### 📋 Phase 2 準備中
+1. createDirectory の移動準備
+2. handleFileSelect の分割設計
+3. エラーハンドリングの確認
+
+## 📊 成果
+
+### v5.4.9での改善
+- 3つの関数を適切なセクションに移動
+- log未定義エラーの修正
+- コード構造の改善
 
 ---
 

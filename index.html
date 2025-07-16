@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.4.31 - Fix null reference error in address.toString()</title>
+    <title>Kaspa P2P File Storage v5.4.32 - Fix UserState.UserState duplicate reference</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -876,6 +876,7 @@
         // v5.4.29: Complete Phase 1 backward compatibility proxies
         // v5.4.30: Phase 2 UserState implementation (privateKey, address)
         // v5.4.31: Fix null reference error - replace all address.toString() with UserState.address.toString()
+        // v5.4.32: Fix UserState.UserState duplicate reference error and add debug logging
         // - Restored architecture map
         // - 13-section code organization
         // - Improved function grouping
@@ -4727,11 +4728,17 @@
                 log('すべての必要な関数を確認しました', 'success');
                 
                 // Initialize wallet
+                log('[DEBUG] UserState before initialization:', UserState, 'debug');
                 UserState.privateKey = new kaspa.PrivateKey(config.testPrivateKey);
-                const publicKey = UserState.privateKey.toPublicKey();
-                UserState.address = publicKey.toAddress(config.network);
+                log('[DEBUG] UserState.privateKey set', 'debug');
                 
-                log(`ウォレットアドレス: ${UserState.UserState.address.toString()}`, 'success');
+                const publicKey = UserState.privateKey.toPublicKey();
+                log('[DEBUG] Public key generated', 'debug');
+                
+                UserState.address = publicKey.toAddress(config.network);
+                log('[DEBUG] UserState.address set:', UserState.address, 'debug');
+                
+                log(`ウォレットアドレス: ${UserState.address.toString()}`, 'success');
                 
                 // Create RPC client
                 rpcClient = new kaspa.RpcClient({
@@ -4756,7 +4763,7 @@
                 document.getElementById('initStatus').style.display = 'block';
                 document.getElementById('initStatus').innerHTML = `
                     <p class="success">✅ システム初期化完了</p>
-                    <p>アドレス: ${UserState.UserState.address.toString()}</p>
+                    <p>アドレス: ${UserState.address.toString()}</p>
                     <p>残高: ${balance} KAS</p>
                 `;
                 document.getElementById('testBtn').disabled = false;
@@ -10633,4 +10640,4 @@
         });
     </script>
 </body>
-</html><!-- Force GitHub Pages update: Wed Jul 16 2025 - v5.4.31: Fix null reference error -->
+</html><!-- Force GitHub Pages update: Wed Jul 16 2025 - v5.4.32: Fix duplicate reference -->

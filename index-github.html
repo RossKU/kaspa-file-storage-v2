@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.4.0 - Archive Node Support</title>
+    <title>Kaspa P2P File Storage v5.4.42 - Fix duplicate NetworkState references in rpcClient</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -720,8 +720,8 @@
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                     <h3>履歴管理</h3>
                     <div>
-                        <button onclick="window.historyManager?.exportKenv()" class="small-button">📥 .kenvエクスポート</button>
-                        <button onclick="window.historyManager?.importKenv()" class="small-button">📤 .kenvインポート</button>
+                        <button onclick="WorkspaceState.historyManager?.exportKenv()" class="small-button">📥 .kenvエクスポート</button>
+                        <button onclick="WorkspaceState.historyManager?.importKenv()" class="small-button">📤 .kenvインポート</button>
                     </div>
                 </div>
                 
@@ -872,11 +872,78 @@
     </div>
 
     <script type="module">
-        // v5.3.14: Optimized kprogress format
-        // - Removed duplicate chunks/chunkBlockIds arrays from root level
-        // - All chunk information now stored only in _progress.chunkDetails
-        // - Reduces kprogress file size by eliminating redundant data
-        // - Maintains backward compatibility by reading from chunkDetails
+        // v5.4.28: Fix empty chunks in kaspaMetadata
+        // v5.4.29: Complete Phase 1 backward compatibility proxies
+        // v5.4.30: Phase 2 UserState implementation (privateKey, address)
+        // v5.4.31: Fix null reference error - replace all address.toString() with UserState.address.toString()
+        // v5.4.32: Fix UserState.UserState duplicate reference error and add debug logging
+        // v5.4.33: Fix privateKey references - replace with UserState.privateKey in transaction signing
+        // v5.4.34: Phase 3 WorkspaceState implementation (workspaceHandle, progressFileMap, historyManager)
+        // v5.4.35: Fix WorkspaceState not defined error in UploadHistoryManager class
+        // v5.4.36: Fix infinite recursion in workspaceHandle getter/setter proxy
+        // v5.4.37: Expose WorkspaceState to window for onclick handlers and global access
+        // v5.4.38: Add debug logging to investigate parallel download performance issue
+        // v5.4.39: Phase 4 NetworkState implementation (kaspa, rpcClient, ws variables)
+        // v5.4.40: Fix kaspa null reference errors - use NetworkState.kaspa everywhere
+        // v5.4.41: Fix rpcClient null reference errors - use NetworkState.rpcClient everywhere
+        // v5.4.42: Fix duplicate NetworkState references in rpcClient
+        // - Fixed NetworkState.NetworkState.rpcClient → NetworkState.rpcClient (24 occurrences)
+        // - Fixed this.NetworkState.rpcClient → NetworkState.rpcClient (2 occurrences)
+        // - Restored architecture map
+        // - 13-section code organization
+        // - Improved function grouping
+        
+        /*
+         * ====================================================================
+         *                    APPLICATION ARCHITECTURE MAP
+         * ====================================================================
+         * 
+         * This application follows a layered architecture pattern:
+         * 
+         * ┌─────────────────────────────────────────────────────────────────┐
+         * │                      UI LAYER (User Interface)                   │
+         * │  ├─ UI CONTROL & EVENT HANDLERS: User interactions             │
+         * │  └─ PROGRESS UPDATE SYSTEM: Visual feedback                    │
+         * ├─────────────────────────────────────────────────────────────────┤
+         * │                   BUSINESS LOGIC LAYER                          │
+         * │  ├─ FILE OPERATIONS: Upload/download orchestration             │
+         * │  ├─ TRANSACTION FUNCTIONS: Blockchain operations               │
+         * │  └─ MONITORING FUNCTIONS: Async operation tracking             │
+         * ├─────────────────────────────────────────────────────────────────┤
+         * │                  INFRASTRUCTURE LAYER                           │
+         * │  ├─ NETWORK & RPC: Kaspa blockchain connectivity               │
+         * │  ├─ STORAGE MANAGEMENT: File & progress persistence            │
+         * │  └─ CRYPTOGRAPHY & COMPRESSION: Data security                  │
+         * ├─────────────────────────────────────────────────────────────────┤
+         * │                    FOUNDATION LAYER                             │
+         * │  ├─ CONFIGURATION: System-wide constants                       │
+         * │  ├─ ERROR HANDLING: Unified error management                   │
+         * │  ├─ UTILITY FUNCTIONS: Shared helpers                          │
+         * │  └─ GLOBAL STATE: Application state management                 │
+         * └─────────────────────────────────────────────────────────────────┘
+         * 
+         * SECTION STRUCTURE:
+         * 1. CONFIGURATION .................. System constants and settings
+         * 2. ERROR HANDLING SYSTEM .......... Centralized error management
+         * 3. PROGRESS UPDATE SYSTEM ......... Unified progress tracking
+         * 4. GLOBAL STATE & INITIALIZATION .. Application state
+         * 5. UTILITY FUNCTIONS .............. General purpose helpers
+         * 6. STORAGE MANAGEMENT ............. Data persistence classes
+         * 7. CRYPTOGRAPHY & COMPRESSION ..... Security functions
+         * 8. NETWORK & RPC FUNCTIONS ........ Blockchain connectivity
+         * 9. FILE OPERATIONS ................ File handling logic
+         * 10. TRANSACTION FUNCTIONS ......... Blockchain transactions
+         * 11. MONITORING FUNCTIONS .......... WebSocket monitoring
+         * 12. TEST FUNCTIONS ................ Development utilities
+         * 13. UI CONTROL & EVENT HANDLERS ... User interface logic
+         * 
+         * CALL FLOW EXAMPLE:
+         * User Action → Event Handler → Business Logic → Infrastructure → Network
+         *      ↑                               ↓                 ↓           ↓
+         *   UI Update ← Progress Update ← Error Handler ← Response
+         * 
+         * ====================================================================
+         */
         
         // Debug logging - Safe version
         try {
@@ -889,39 +956,29 @@
         let kaspa = null;
         let rpcClient = null;
         let currentFile = null;
+        window.currentFile = null;  // Ensure global access
         let currentPassword = null;
+        window.currentPassword = null;  // Ensure global access
         let processedChunks = [];
+        window.processedChunks = [];  // Ensure global access
         let kaspaMetadata = null;
+        window.kaspaMetadata = null;  // Ensure global access
         let directoryMetadata = null; // ディレクトリ専用変数
         let wsMonitorActive = false;
-        
-        // Archive node support configuration (v5.4.0)
-        let config = {
-            nodeType: 'auto', // auto, standard, archive, custom
-            currentEndpoint: null,
-            customEndpoint: null,
-            archiveEndpoints: {
-                'testnet-10': 'wss://archive-tn10.kaspa.org:17210',
-                'mainnet': 'wss://archive.kaspa.org:17110'
-            },
-            standardEndpoints: {
-                'testnet-10': null, // Will use default resolver
-                'mainnet': null     // Will use default resolver
-            }
-        };
         let monitoredTransactions = new Map();
-        let uploadHistory = [];
-        let systemLogs = [];
+        // uploadHistory moved to AppState.history.uploadHistory
+        // systemLogs moved to AppState.history.systemLogs
         let privateKey = null;
         let address = null;
         let progressManager = null;
+        window.progressManager = null;  // Ensure global access
         let wsConnection = null;
         let wsConnected = false;
         let wsReconnectInterval = null;
         let workspaceHandle = null; // File System Access API directory handle
         let progressFileMap = new Map(); // Map of filename -> {cid, fileHandle}
         let historyManager = null; // Upload history manager
-        let wsMonitorTimeout = null; // WebSocket monitoring timeout
+        // wsMonitorTimeout moved to AppState.monitoring.wsMonitorTimeout
         let uploadingChunksCount = 0; // Number of chunks being uploaded
         let uploadingMetaTx = false; // Whether meta-tx is being uploaded
         let uploadingDirMeta = false; // Whether directory meta is being uploaded
@@ -933,23 +990,192 @@
         const MAX_CHUNKS_SUPPORTED = 25600; // Maximum chunks supported via Super (160 × 160)
         const PROCESS_CHUNK_SIZE = 1024 * 1024; // 1MB processing chunks
         
-        // Parallel download settings (v3.6.2)
-        let parallelDownloadEnabled = false; // Default OFF for v3.5.0 compatibility
-        window.parallelDownloadEnabled = false; // v5.3.16: Initialize window variable
+        // ===== Phase 1: Global State Refactoring (v5.4.19) =====
+        // Grouped application state for better organization
+        const AppState = {
+            settings: {
+                parallelDownloadEnabled: false  // Default OFF for v3.5.0 compatibility
+            },
+            monitoring: {
+                wsMonitorTimeout: null  // WebSocket monitoring timeout
+            },
+            history: {
+                uploadHistory: [],      // Upload history records
+                systemLogs: []         // System log entries
+            }
+        };
+        
+        // ===== Phase 2: User State Refactoring (v5.4.30) =====
+        const UserState = {
+            privateKey: null,
+            address: null
+        };
+        
+        // ===== Phase 3: Workspace State Refactoring (v5.4.34) =====
+        const WorkspaceState = {
+            handle: null,           // File System Access API directory handle
+            progressFileMap: new Map(),  // Map of filename -> {cid, fileHandle}
+            historyManager: null    // Upload history manager instance
+        };
+        
+        // Expose WorkspaceState to window for onclick handlers
+        window.WorkspaceState = WorkspaceState;
+        
+        // ===== Phase 4: Network State Refactoring (v5.4.39) =====
+        const NetworkState = {
+            kaspa: null,                // Kaspa SDK instance
+            rpcClient: null,            // RPC client instance
+            ws: {
+                connection: null,       // WebSocket connection
+                connected: false,       // WebSocket connection state
+                reconnectInterval: null,// Reconnection interval
+                monitorActive: false    // WebSocket monitoring state
+            }
+        };
+        
+        // Expose NetworkState to window for global access
+        window.NetworkState = NetworkState;
+        
+        // Backward compatibility proxies (to be removed in future versions)
+        let parallelDownloadEnabled = AppState.settings.parallelDownloadEnabled;
+        window.parallelDownloadEnabled = AppState.settings.parallelDownloadEnabled;
+        
+        // Define getter/setter for parallelDownloadEnabled
+        Object.defineProperty(window, 'parallelDownloadEnabled', {
+            get() { return AppState.settings.parallelDownloadEnabled; },
+            set(value) { 
+                AppState.settings.parallelDownloadEnabled = value;
+                parallelDownloadEnabled = value;  // Keep local variable in sync
+            }
+        });
+        
+        // Define getter/setter for wsMonitorTimeout
+        Object.defineProperty(window, 'wsMonitorTimeout', {
+            get() { return AppState.monitoring.wsMonitorTimeout; },
+            set(value) { 
+                AppState.monitoring.wsMonitorTimeout = value;
+            }
+        });
+        
+        // Define getter/setter for uploadHistory
+        Object.defineProperty(window, 'uploadHistory', {
+            get() { return AppState.history.uploadHistory; },
+            set(value) { 
+                AppState.history.uploadHistory = value;
+            }
+        });
+        
+        // Define getter/setter for systemLogs
+        Object.defineProperty(window, 'systemLogs', {
+            get() { return AppState.history.systemLogs; },
+            set(value) { 
+                AppState.history.systemLogs = value;
+            }
+        });
+        
+        // Define getter/setter for privateKey
+        Object.defineProperty(window, 'privateKey', {
+            get() { return UserState.privateKey; },
+            set(value) { 
+                UserState.privateKey = value;
+            }
+        });
+        
+        // Define getter/setter for address
+        Object.defineProperty(window, 'address', {
+            get() { return UserState.address; },
+            set(value) { 
+                UserState.address = value;
+            }
+        });
+        
+        // Define getter/setter for workspaceHandle
+        Object.defineProperty(window, 'workspaceHandle', {
+            get() { return WorkspaceState.handle; },
+            set(value) { 
+                WorkspaceState.handle = value;
+            }
+        });
+        
+        // Define getter/setter for progressFileMap
+        Object.defineProperty(window, 'progressFileMap', {
+            get() { return WorkspaceState.progressFileMap; },
+            set(value) { 
+                WorkspaceState.progressFileMap = value;
+            }
+        });
+        
+        // Define getter/setter for historyManager
+        Object.defineProperty(window, 'historyManager', {
+            get() { return WorkspaceState.historyManager; },
+            set(value) { 
+                WorkspaceState.historyManager = value;
+            }
+        });
+        
+        // Define getter/setter for kaspa
+        Object.defineProperty(window, 'kaspa', {
+            get() { return NetworkState.kaspa; },
+            set(value) { 
+                NetworkState.kaspa = value;
+            }
+        });
+        
+        // Define getter/setter for rpcClient
+        Object.defineProperty(window, 'rpcClient', {
+            get() { return NetworkState.rpcClient; },
+            set(value) { 
+                NetworkState.rpcClient = value;
+            }
+        });
+        
+        // Define getter/setter for wsConnection
+        Object.defineProperty(window, 'wsConnection', {
+            get() { return NetworkState.ws.connection; },
+            set(value) { 
+                NetworkState.ws.connection = value;
+            }
+        });
+        
+        // Define getter/setter for wsConnected
+        Object.defineProperty(window, 'wsConnected', {
+            get() { return NetworkState.ws.connected; },
+            set(value) { 
+                NetworkState.ws.connected = value;
+            }
+        });
+        
+        // Define getter/setter for wsReconnectInterval
+        Object.defineProperty(window, 'wsReconnectInterval', {
+            get() { return NetworkState.ws.reconnectInterval; },
+            set(value) { 
+                NetworkState.ws.reconnectInterval = value;
+            }
+        });
+        
+        // Define getter/setter for wsMonitorActive
+        Object.defineProperty(window, 'wsMonitorActive', {
+            get() { return NetworkState.ws.monitorActive; },
+            set(value) { 
+                NetworkState.ws.monitorActive = value;
+            }
+        });
         
         // Load parallel download setting from localStorage
         function loadParallelSetting() {
             const saved = localStorage.getItem('kaspaParallelDownload');
             if (saved !== null) {
-                parallelDownloadEnabled = saved === 'true';
-                window.parallelDownloadEnabled = parallelDownloadEnabled; // v5.3.16: Set window variable
+                AppState.settings.parallelDownloadEnabled = saved === 'true';
+                parallelDownloadEnabled = AppState.settings.parallelDownloadEnabled;
+                window.parallelDownloadEnabled = AppState.settings.parallelDownloadEnabled;
                 const toggle = document.getElementById('parallelDownloadToggle');
                 if (toggle) {
-                    toggle.checked = parallelDownloadEnabled;
+                    toggle.checked = AppState.settings.parallelDownloadEnabled;
                 }
             } else {
-                // v5.3.16: Ensure window variable is set even when no saved setting
-                window.parallelDownloadEnabled = parallelDownloadEnabled;
+                // Ensure all references are synchronized
+                window.parallelDownloadEnabled = AppState.settings.parallelDownloadEnabled;
+                parallelDownloadEnabled = AppState.settings.parallelDownloadEnabled;
             }
         }
         
@@ -967,6 +1193,9 @@
             
             async initialize(privateKey) {
                 log('[UploadHistoryManager] 初期化を開始します', 'debug');
+                log(`[UploadHistoryManager] privateKey: ${privateKey ? 'provided' : 'null/undefined'}`, 'debug');
+                log(`[UploadHistoryManager] privateKey type: ${typeof privateKey}`, 'debug');
+                
                 try {
                     // Derive encryption key from private key
                     const keyData = new TextEncoder().encode(privateKey);
@@ -1063,7 +1292,7 @@
                     const kenv = {
                         version: "2.0",
                         schemaVersion: 2,
-                        wallet: address?.toString() || '',
+                        wallet: UserState.address?.toString() || '',
                         created: new Date().toISOString(),
                         lastModified: new Date().toISOString(),
                         uploads: history,
@@ -1951,7 +2180,7 @@
                 }
                 
                 // Get file details from history
-                const history = window.historyManager?.getHistory() || [];
+                const history = WorkspaceState.historyManager?.getHistory() || [];
                 const files = fileIds.map(id => {
                     const item = history.find(h => h.id === id);
                     if (!item) return null;
@@ -2334,7 +2563,7 @@
                 const fileList = document.getElementById('fileList');
                 if (!fileList) return;
                 
-                const history = window.historyManager?.getHistory() || [];
+                const history = WorkspaceState.historyManager?.getHistory() || [];
                 const existingDirs = this.directories;
                 
                 if (history.length === 0 && existingDirs.length === 0) {
@@ -2388,16 +2617,8 @@
             return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
         }
         
-        window.copyToClipboard = async function(text) {
-            const preview = text && text.length > 20 ? text.substring(0, 20) + '...' : text;
-            log(`[DEBUG] copyToClipboard が呼び出されました: ${preview}`, 'debug');
-            try {
-                await navigator.clipboard.writeText(text);
-                log('クリップボードにコピーしました', 'success');
-            } catch (err) {
-                log(`コピーエラー: ${err.message}`, 'error');
-            }
-        }
+        // Moved to UI CONTROL & EVENT HANDLERS section
+        // window.copyToClipboard - Clipboard operations handler
         
         // Progress Manager Class
         class ProgressManager {
@@ -2843,7 +3064,7 @@
                         
                         for (let retry = 0; retry <= this.maxRetries; retry++) {
                             try {
-                                response = await this.rpcClient.getBlock({
+                                response = await NetworkState.rpcClient.getBlock({
                                     hash: blockId,
                                     includeTransactions: true
                                 });
@@ -3005,7 +3226,7 @@
                     try {
                         const { txId, blockId, index } = work;
                         
-                        const response = await this.rpcClient.getBlock({
+                        const response = await NetworkState.rpcClient.getBlock({
                             hash: blockId,
                             includeTransactions: true
                         });
@@ -3127,7 +3348,7 @@
         }
         
         // Logging system
-        function log(message, type = 'info') {
+        window.log = function log(message, type = 'info') {
             const timestamp = new Date();
             const logEntry = {
                 timestamp: timestamp.toISOString(),
@@ -3136,7 +3357,7 @@
                 message: message
             };
             
-            systemLogs.push(logEntry);
+            AppState.history.systemLogs.push(logEntry);
             
             const logContainer = document.getElementById('systemLog');
             const entry = document.createElement('div');
@@ -3165,51 +3386,6 @@
                     break;
             }
             statusText.textContent = text;
-        }
-
-        // Node type change handler for archive node support
-        function onNodeTypeChange() {
-            const nodeTypeSelect = document.getElementById('nodeTypeSelect');
-            const customEndpointSection = document.getElementById('customEndpointSection');
-            const selectedType = nodeTypeSelect.value;
-            
-            console.log('[RPC] Node type changed to:', selectedType);
-            
-            // Show/hide custom endpoint input
-            if (selectedType === 'custom') {
-                customEndpointSection.style.display = 'block';
-            } else {
-                customEndpointSection.style.display = 'none';
-            }
-            
-            // Update config if available
-            if (typeof config !== 'undefined' && config) {
-                config.nodeType = selectedType;
-                console.log('[RPC] Config updated with node type:', selectedType);
-            }
-            
-            // Update connection status display
-            const nodeConnectionStatus = document.getElementById('nodeConnectionStatus');
-            const nodeConnectionInfo = document.getElementById('nodeConnectionInfo');
-            
-            if (nodeConnectionStatus && nodeConnectionInfo) {
-                nodeConnectionStatus.style.display = 'block';
-                
-                switch(selectedType) {
-                    case 'auto':
-                        nodeConnectionInfo.textContent = '自動選択モード（推奨）';
-                        break;
-                    case 'standard':
-                        nodeConnectionInfo.textContent = '通常ノードを使用';
-                        break;
-                    case 'archive':
-                        nodeConnectionInfo.textContent = 'アーカイブノードを使用';
-                        break;
-                    case 'custom':
-                        nodeConnectionInfo.textContent = 'カスタムエンドポイントを設定してください';
-                        break;
-                }
-            }
         }
 
         // Generate file CID based on content (v3.3 specification)
@@ -3316,84 +3492,11 @@
             }
         }
 
-        // Tab switching
-        window.switchTab = function(tab) {
-            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-            
-            const tabIndex = ['upload', 'download', 'directory', 'history', 'settings'].indexOf(tab);
-            document.querySelectorAll('.tab-btn')[tabIndex].classList.add('active');
-            document.getElementById(`${tab}-tab`).classList.add('active');
-            
-            // Update history tab when switching to it
-            if (tab === 'history' && window.historyManager) {
-                window.historyManager.updateHistoryUI();
-            }
-            
-            // Update directory tab when switching to it
-            if (tab === 'directory' && window.directoryManager) {
-                window.directoryManager.updateFileSelector();
-                window.directoryManager.updateUI();
-            }
-        };
+        // Moved to UI CONTROL & EVENT HANDLERS section
+        // window.switchTab - Tab navigation handler
         
-        // Create directory function
-        window.createDirectory = async function() {
-            try {
-                const nameInput = document.getElementById('directoryName');
-                const name = nameInput.value.trim();
-                
-                if (!name) {
-                    alert('ディレクトリ名を入力してください');
-                    return;
-                }
-                
-                const parentSelector = document.getElementById('parentDirectory');
-                const parentCID = parentSelector.value || null;
-                
-                const checkboxes = document.querySelectorAll('input[name="directoryFiles"]:checked');
-                const selections = Array.from(checkboxes).map(cb => cb.value);
-                
-                if (selections.length === 0) {
-                    alert('少なくとも1つのファイルまたはディレクトリを選択してください');
-                    return;
-                }
-                
-                // Separate files and directories
-                const fileIds = selections
-                    .filter(s => s.startsWith('file:'))
-                    .map(s => s.substring(5));
-                
-                const dirCIDs = selections
-                    .filter(s => s.startsWith('dir:'))
-                    .map(s => s.substring(4));
-                
-                // Process subdirectories
-                if (dirCIDs.length > 0) {
-                    // Move directories under the new parent
-                    dirCIDs.forEach(dirCID => {
-                        const dir = window.directoryManager.directories.find(d => d.cid === dirCID);
-                        if (dir) {
-                            dir.parentCID = parentCID;
-                        }
-                    });
-                    window.directoryManager.saveDirectories();
-                }
-                
-                await window.directoryManager.createDirectory(name, fileIds, parentCID);
-                
-                // Clear form
-                nameInput.value = '';
-                checkboxes.forEach(cb => cb.checked = false);
-                
-                // Update UI
-                window.directoryManager.updateUI();
-                
-            } catch (error) {
-                log(`ディレクトリ作成エラー: ${error.message}`, 'error');
-                alert(`エラー: ${error.message}`);
-            }
-        };
+        // Moved to UI CONTROL & EVENT HANDLERS section
+        // window.createDirectory - Directory creation handler
 
         // Filter out trash and system files
         function shouldSkipFile(fileName, filePath = '') {
@@ -3454,6 +3557,97 @@
         }
 
         // Setup workspace directory for File System Access API
+        // ===== Workspace Helper Functions =====
+        
+        // Scan directory for .kprogress files
+        async function scanProgressFiles(dirHandle) {
+            WorkspaceState.progressFileMap.clear();
+            let progressCount = 0;
+            let skippedCount = 0;
+            
+            try {
+                for await (const entry of dirHandle.values()) {
+                    if (entry.kind === 'file' && entry.name.endsWith('.kprogress')) {
+                        // Skip trash/system files
+                        if (shouldSkipFile(entry.name)) {
+                            skippedCount++;
+                            log(`スキップ: ${entry.name}`, 'debug');
+                            continue;
+                        }
+                        
+                        // Extract base filename and CID from filename
+                        const match = entry.name.match(/^(.+?)\.([a-z0-9]{8})\.kprogress$/);
+                        if (match) {
+                            const baseFilename = match[1];
+                            const cid = match[2];
+                            WorkspaceState.progressFileMap.set(baseFilename, {
+                                cid: cid,
+                                fileHandle: entry,
+                                progressFilename: entry.name
+                            });
+                            progressCount++;
+                            log(`進捗ファイル検出: ${entry.name}`, 'info');
+                        }
+                    }
+                }
+                
+                if (progressCount > 0) {
+                    log(`${progressCount}個の進捗ファイルを検出しました`, 'success');
+                    showToast(`レジューム可能: ${progressCount}個のファイル`, 'info');
+                }
+                
+                if (skippedCount > 0) {
+                    log(`${skippedCount}個のゴミ箱/システムファイルをスキップしました`, 'debug');
+                }
+            } catch (err) {
+                log('進捗ファイルスキャンエラー: ' + err.message, 'warning');
+            }
+            
+            return progressCount;
+        }
+        
+        // Check for legacy progress file
+        async function checkLegacyProgress(dirHandle) {
+            try {
+                const fileHandle = await dirHandle.getFileHandle('kaspa-upload-progress.json');
+                const file = await fileHandle.getFile();
+                const content = await file.text();
+                const progress = JSON.parse(content);
+                
+                if (progress && progress.version === '2.0' && 
+                    progress.metadata.completedChunks < progress.metadata.totalChunks) {
+                    
+                    const useExisting = confirm(
+                        '作業フォルダに未完了のアップロードが見つかりました。\n\n' +
+                        `ファイル: ${progress.fileInfo.name}\n` +
+                        `進捗: ${progress.metadata.completedChunks}/${progress.metadata.totalChunks} チャンク\n\n` +
+                        'これを続行しますか？'
+                    );
+                    
+                    if (useExisting) {
+                        handleProgressLoad(progress);
+                        return true;
+                    }
+                }
+            } catch (err) {
+                // No existing progress file
+            }
+            
+            return false;
+        }
+        
+        // Load history if available
+        async function loadWorkspaceHistory() {
+            if (WorkspaceState.historyManager && WorkspaceState.historyManager.encryptionKey) {
+                try {
+                    await WorkspaceState.historyManager.loadFromFile();
+                } catch (err) {
+                    log('履歴ロードエラー: ' + err.message, 'warning');
+                }
+            }
+        }
+        
+        // Refactored setupWorkspace using helper functions
         async function setupWorkspace() {
             try {
                 const dirHandle = await window.showDirectoryPicker({
@@ -3465,77 +3659,13 @@
                 log(`作業フォルダを設定: ${dirHandle.name}`, 'success');
                 
                 // Scan for .kprogress files
-                progressFileMap.clear();
-                let progressCount = 0;
-                let skippedCount = 0;
+                await scanProgressFiles(dirHandle);
                 
-                try {
-                    for await (const entry of dirHandle.values()) {
-                        if (entry.kind === 'file' && entry.name.endsWith('.kprogress')) {
-                            // Skip trash/system files
-                            if (shouldSkipFile(entry.name)) {
-                                skippedCount++;
-                                log(`スキップ: ${entry.name}`, 'debug');
-                                continue;
-                            }
-                            
-                            // Extract base filename and CID from filename
-                            const match = entry.name.match(/^(.+?)\.([a-z0-9]{8})\.kprogress$/);
-                            if (match) {
-                                const baseFilename = match[1];
-                                const cid = match[2];
-                                progressFileMap.set(baseFilename, {
-                                    cid: cid,
-                                    fileHandle: entry,
-                                    progressFilename: entry.name
-                                });
-                                progressCount++;
-                                log(`進捗ファイル検出: ${entry.name}`, 'info');
-                            }
-                        }
-                    }
-                    
-                    if (progressCount > 0) {
-                        log(`${progressCount}個の進捗ファイルを検出しました`, 'success');
-                        showToast(`レジューム可能: ${progressCount}個のファイル`, 'info');
-                    }
-                    
-                    if (skippedCount > 0) {
-                        log(`${skippedCount}個のゴミ箱/システムファイルをスキップしました`, 'debug');
-                    }
-                } catch (err) {
-                    log('進捗ファイルスキャンエラー: ' + err.message, 'warning');
-                }
+                // Check for legacy progress file
+                await checkLegacyProgress(dirHandle);
                 
-                // Check for existing progress file (legacy support)
-                try {
-                    const fileHandle = await dirHandle.getFileHandle('kaspa-upload-progress.json');
-                    const file = await fileHandle.getFile();
-                    const content = await file.text();
-                    const progress = JSON.parse(content);
-                    
-                    if (progress && progress.version === '2.0' && 
-                        progress.metadata.completedChunks < progress.metadata.totalChunks) {
-                        
-                        const useExisting = confirm(
-                            '作業フォルダに未完了のアップロードが見つかりました。\n\n' +
-                            `ファイル: ${progress.fileInfo.name}\n` +
-                            `進捗: ${progress.metadata.completedChunks}/${progress.metadata.totalChunks} チャンク\n\n` +
-                            'これを続行しますか？'
-                        );
-                        
-                        if (useExisting) {
-                            handleProgressLoad(progress);
-                        }
-                    }
-                } catch (err) {
-                    // No existing progress file
-                }
-                
-                // Load history if historyManager is initialized
-                if (window.historyManager && window.historyManager.encryptionKey) {
-                    await window.historyManager.loadFromFile();
-                }
+                // Load history if available
+                await loadWorkspaceHistory();
                 
                 // Update UI to show workspace status
                 showWorkspaceStatus();
@@ -3835,10 +3965,13 @@
             this.totalChunks = txIds.length;
             
             log(`[ParallelDownloader] 暗号化チャンクの並列ダウンロード開始: ${txIds.length}チャンク, ${this.concurrency}並列`, 'info');
+            log(`[DEBUG] ParallelDownloader - queue length: ${this.queue.length}`, 'debug');
+            log(`[DEBUG] ParallelDownloader - active workers will be: ${this.concurrency}`, 'debug');
             
             try {
                 const workers = [];
                 for (let i = 0; i < this.concurrency; i++) {
+                    log(`[DEBUG] Starting worker ${i + 1}/${this.concurrency}`, 'debug');
                     workers.push(this.workerRaw(progressCallback));
                 }
                 
@@ -3906,6 +4039,7 @@
                 
                 try {
                     const { txId, blockId, index } = work;
+                    log(`[DEBUG] Worker processing chunk ${index}: txId=${txId.substring(0, 8)}...`, 'debug');
                     
                     let payload = null;
                     let lastError = null;
@@ -3914,7 +4048,7 @@
                         try {
                             // Try RPC first if we have blockId
                             if (blockId && rpcClient) {
-                                const response = await rpcClient.getBlock({
+                                const response = await NetworkState.rpcClient.getBlock({
                                     hash: blockId,
                                     includeTransactions: true
                                 });
@@ -3966,6 +4100,7 @@
                     this.results.set(index, payload);
                     this.completedCount++;
                     this.totalBytes += payload.length;
+                    log(`[DEBUG] Chunk ${index} completed. Total: ${this.completedCount}/${this.totalChunks}, Bytes: ${this.totalBytes}`, 'debug');
                     
                     const elapsed = (Date.now() - this.startTime) / 1000;
                     const speed = this.completedCount / elapsed;
@@ -4030,7 +4165,7 @@
                     if (blockId && rpcClient) {
                         log(`[DownloadManager] BlockID経由でメタデータ取得: ${blockId.substring(0, 16)}...`, 'info');
                         
-                        const blockResponse = await rpcClient.getBlock({
+                        const blockResponse = await NetworkState.rpcClient.getBlock({
                             hash: blockId,
                             includeTransactions: true
                         });
@@ -4103,7 +4238,7 @@
                     log(`[DownloadManager] ペイロード ${index + 1} ダウンロード開始: ${txId.substring(0, 16)}...`, 'info');
                     
                     // Get block data
-                    const blockResponse = await rpcClient.getBlock({
+                    const blockResponse = await NetworkState.rpcClient.getBlock({
                         hash: blockId,
                         includeTransactions: true
                     });
@@ -4144,7 +4279,7 @@
                     log(`[DownloadManager] チャンク ${index + 1} ダウンロード開始: ${txId.substring(0, 16)}...`, 'info');
                     
                     // Get block data
-                    const blockResponse = await rpcClient.getBlock({
+                    const blockResponse = await NetworkState.rpcClient.getBlock({
                         hash: blockId,
                         includeTransactions: true
                     });
@@ -4689,63 +4824,69 @@
                 updateNetworkStatus('connecting', '初期化中...');
                 
                 // Import WASM SDK
-                kaspa = await import('./kaspa-core.js');
+                NetworkState.kaspa = await import('./kaspa-core.js');
                 log('kaspa-core.jsをインポートしました');
                 
                 // Initialize WASM binary
-                await kaspa.default('./kaspa-core_bg.wasm');
+                await NetworkState.kaspa.default('./kaspa-core_bg.wasm');
                 log('WASMバイナリを初期化しました');
                 
                 // Verify functions
                 const requiredFunctions = ['RpcClient', 'Resolver', 'createTransactions', 
                     'PrivateKey', 'addressFromScriptPublicKey', 'Address'];
                 for (const func of requiredFunctions) {
-                    if (typeof kaspa[func] !== 'function') {
+                    if (typeof NetworkState.kaspa[func] !== 'function') {
                         throw new Error(`必要な関数が見つかりません: ${func}`);
                     }
                 }
                 log('すべての必要な関数を確認しました', 'success');
                 
                 // Initialize wallet
-                privateKey = new kaspa.PrivateKey(config.testPrivateKey);
-                const publicKey = privateKey.toPublicKey();
-                address = publicKey.toAddress(config.network);
+                log('[DEBUG] UserState before initialization:', UserState, 'debug');
+                UserState.privateKey = new NetworkState.kaspa.PrivateKey(config.testPrivateKey);
+                log('[DEBUG] UserState.privateKey set', 'debug');
                 
-                log(`ウォレットアドレス: ${address.toString()}`, 'success');
+                const publicKey = UserState.privateKey.toPublicKey();
+                log('[DEBUG] Public key generated', 'debug');
+                
+                UserState.address = publicKey.toAddress(config.network);
+                log('[DEBUG] UserState.address set:', UserState.address, 'debug');
+                
+                log(`ウォレットアドレス: ${UserState.address.toString()}`, 'success');
                 
                 // Create RPC client
-                rpcClient = new kaspa.RpcClient({
-                    resolver: new kaspa.Resolver(),
+                NetworkState.rpcClient = new NetworkState.kaspa.RpcClient({
+                    resolver: new NetworkState.kaspa.Resolver(),
                     networkId: config.network
                 });
                 
                 log('RPC接続を試行中...');
-                await rpcClient.connect();
+                await NetworkState.rpcClient.connect();
                 
                 // Test connection
-                const info = await rpcClient.getServerInfo();
+                const info = await NetworkState.rpcClient.getServerInfo();
                 log(`接続成功! サーバー: ${info.serverVersion}`, 'success');
                 
                 // Get balance
-                const { entries } = await rpcClient.getUtxosByAddresses([address.toString()]);
+                const { entries } = await NetworkState.rpcClient.getUtxosByAddresses([UserState.address.toString()]);
                 const balance = entries.reduce((sum, utxo) => sum + Number(utxo.amount), 0) / 1e8;
                 log(`残高: ${balance} KAS`, 'info');
                 
                 // Update UI
-                window.kaspa = kaspa;
+                window.kaspa = NetworkState.kaspa;
                 document.getElementById('initStatus').style.display = 'block';
                 document.getElementById('initStatus').innerHTML = `
                     <p class="success">✅ システム初期化完了</p>
-                    <p>アドレス: ${address.toString()}</p>
+                    <p>アドレス: ${UserState.address.toString()}</p>
                     <p>残高: ${balance} KAS</p>
                 `;
                 document.getElementById('testBtn').disabled = false;
                 document.getElementById('uploadBtn').disabled = false;
                 
                 // Initialize history manager
-                if (window.historyManager) {
-                    await window.historyManager.initialize(config.testPrivateKey);
-                    window.historyManager.updateHistoryUI();
+                if (WorkspaceState.historyManager) {
+                    await WorkspaceState.historyManager.initialize(config.testPrivateKey);
+                    WorkspaceState.historyManager.updateHistoryUI();
                 }
                 
                 updateNetworkStatus('online', 'オンライン');
@@ -4764,20 +4905,20 @@
                 // Close existing connection if any
                 if (rpcClient) {
                     try {
-                        await rpcClient.disconnect();
+                        await NetworkState.rpcClient.disconnect();
                     } catch (err) {
                         // Ignore disconnect errors
                     }
                 }
                 
                 // Create new RPC client with node type support
-                rpcClient = await createRpcClient();
+                NetworkState.rpcClient = await createRpcClient();
                 
-                await rpcClient.connect();
+                await NetworkState.rpcClient.connect();
                 updateNodeConnectionStatus(config.nodeType, config.currentEndpoint);
                 
                 // Test connection
-                const info = await rpcClient.getServerInfo();
+                const info = await NetworkState.rpcClient.getServerInfo();
                 log(`RPC再接続成功! サーバー: ${info.serverVersion}`, 'success');
                 
                 updateNetworkStatus('online', 'オンライン');
@@ -4790,54 +4931,26 @@
             }
         }
 
-        // Connection test
-        window.testConnection = async function() {
-            try {
-                log('接続テストを実行中...');
-                const startTime = Date.now();
-                
-                // Test RPC
-                const info = await rpcClient.getServerInfo();
-                const rpcTime = Date.now() - startTime;
-                log(`RPC応答時間: ${rpcTime}ms`, 'success');
-                
-                // Test Explorer API
-                const apiStart = Date.now();
-                const response = await fetchWithTimeout('https://api-tn10.kaspa.org/info/health', {}, 5000, 1); // 5s timeout, 1 retry for health check
-                const apiTime = Date.now() - apiStart;
-                log(`Explorer API応答時間: ${apiTime}ms`, 'success');
-                
-                alert(`接続テスト成功!\nRPC: ${rpcTime}ms\nAPI: ${apiTime}ms`);
-                
-            } catch (error) {
-                log(`接続テストエラー: ${error.message}`, 'error');
-            }
-        };
+        // Moved to UI CONTROL & EVENT HANDLERS section
+        // window.testConnection - Connection test handler
 
-        // File handling
-        window.handleFileSelect = async function(event) {
-            // Clear directory mode
-            window.isDirectoryMode = false;
-            const uploadDirOption = document.getElementById('uploadDirMetadataOption');
-            if (uploadDirOption) {
-                uploadDirOption.style.display = 'none';
-            }
-            const file = event.target.files[0];
-            if (!file) return;
-            
-            currentFile = file;
-            log(`ファイル選択: ${file.name} (${(file.size/1024).toFixed(1)}KB)`);
-            
-            // Check if file size exceeds 550MB
+        // ===== File Operation Helper Functions =====
+        
+        // Check file size and show warning if needed
+        window.checkFileSizeWarning = function checkFileSizeWarning(file) {
             const MAX_SIZE_WITH_META = 550 * 1024 * 1024; // 550MB
             if (file.size > MAX_SIZE_WITH_META) {
                 log(`⚠️ 警告: このファイルサイズ(${(file.size/1024/1024).toFixed(1)}MB)では、ブロックチェーン上のメタデータトランザクションが生成されない可能性があります`, 'warning');
                 log('.kaspaファイルは生成されますが、メタデータの共有が制限されます', 'warning');
+                return true;
             }
-            
-            // Auto-detect progress file from workspace
-            if (!window.pendingProgress && progressFileMap.has(file.name)) {
-                const progressInfo = progressFileMap.get(file.name);
+            return false;
+        }
+        
+        // Check for auto-resume from progress file
+        window.checkAutoResumeProgress = async function checkAutoResumeProgress(file) {
+            if (!window.pendingProgress && WorkspaceState.progressFileMap.has(file.name)) {
+                const progressInfo = WorkspaceState.progressFileMap.get(file.name);
                 log(`進捗ファイルを自動検出: ${progressInfo.progressFilename}`, 'info');
                 
                 try {
@@ -4858,15 +4971,11 @@
                     
                     if (calculatedCID === progressInfo.cid) {
                         log(`CID検証成功: ${calculatedCID}`, 'success');
-                        window.pendingProgress = progress;
-                        window.currentFileCID = progressInfo.cid;
                         
-                        // Show auto-resume notification
-                        // 完了チェック
+                        // Check if already completed
                         if (progress.metadata.completedChunks >= progress.metadata.totalChunks) {
                             log(`完了済みファイルを検出: ${file.name}`, 'info');
-                            // TODO: 履歴に移動して.kprogress削除
-                            return;
+                            return { completed: true };
                         }
                         
                         const resumeConfirm = confirm(
@@ -4877,8 +4986,11 @@
                             `レジュームしますか？`
                         );
                         
-                        if (!resumeConfirm) {
-                            window.pendingProgress = null;
+                        if (resumeConfirm) {
+                            window.pendingProgress = progress;
+                            window.currentFileCID = progressInfo.cid;
+                            return { resume: true, progress: progress, cid: progressInfo.cid };
+                        } else {
                             log('自動レジュームをキャンセルしました', 'info');
                         }
                     } else {
@@ -4889,51 +5001,34 @@
                     log(`進捗ファイル自動読み込みエラー: ${error.message}`, 'error');
                 }
             }
-            
-            // Check if we have pending progress for this file
-            if (window.pendingProgress) {
-                const chunkSize = parseInt(document.getElementById('chunkSize').value) * 1024;
-                // Use CID from progress if available
-                const cid = window.currentFileCID || window.pendingProgress.cid || null;
-                progressManager = new ProgressManager(file, chunkSize, cid, 'upload');
-                
-                if (progressManager.validateProgress(window.pendingProgress)) {
-                    // Initialize with existing progress
-                    await progressManager.initialize(window.pendingProgress);
-                    
-                    // Update UI to show resume status
-                    const stats = progressManager.getStats();
-                    const label = document.querySelector('.file-input-label');
-                    label.innerHTML = `
-                        <strong>${file.name}</strong><br>
-                        ${(file.size/1024/1024).toFixed(2)}MB<br>
-                        <span class="success">レジューム: ${stats.percentage}% 完了</span>
-                    `;
-                    
-                    log(`レジューム準備完了: ${stats.completed}/${stats.total} チャンク完了`, 'success');
-                    
-                    // Clear pending progress
-                    window.pendingProgress = null;
-                    document.getElementById('resumeInfo').style.display = 'none';
-                } else {
-                    log('進捗ファイルが選択されたファイルと一致しません', 'error');
-                    progressManager = null;
-                }
+            return { resume: false };
+        }
+        
+        // Update file selection UI
+        window.updateFileSelectionUI = function updateFileSelectionUI(file, isResume = false, resumeStats = null) {
+            const label = document.querySelector('.file-input-label');
+            if (isResume && resumeStats) {
+                label.innerHTML = `
+                    <strong>${file.name}</strong><br>
+                    ${(file.size/1024/1024).toFixed(2)}MB<br>
+                    <span class="success">レジューム: ${resumeStats.percentage}% 完了</span>
+                `;
             } else {
-                // Update UI for new upload
-                const label = document.querySelector('.file-input-label');
                 label.innerHTML = `
                     <strong>${file.name}</strong><br>
                     ${(file.size/1024/1024).toFixed(2)}MB
                 `;
-                
-                // Show normal file upload UI
-                const uploadDirOption2 = document.getElementById('uploadDirMetadataOption');
-                if (uploadDirOption2) {
-                    uploadDirOption2.style.display = 'none';
-                }
             }
-        };
+            
+            // Hide directory upload option for regular files
+            const uploadDirOption = document.getElementById('uploadDirMetadataOption');
+            if (uploadDirOption) {
+                uploadDirOption.style.display = 'none';
+            }
+        }
+
+        // Moved to UI CONTROL & EVENT HANDLERS section
+        // window.handleFileSelect - File selection handler
         
         // Directory handling
         window.handleDirectorySelect = async function(event) {
@@ -5169,7 +5264,7 @@
                     network: config.network
                 };
                 
-                await window.historyManager.addUpload(uploadData);
+                await WorkspaceState.historyManager.addUpload(uploadData);
                 
                 // Show completion summary
                 log(`\n🎉 ディレクトリアップロード完了!`, 'success');
@@ -5180,7 +5275,7 @@
                 log(`総コスト: ${totalCost.toFixed(8)} KAS`);
                 
                 // Update history UI
-                window.historyManager.updateHistoryUI();
+                WorkspaceState.historyManager.updateHistoryUI();
                 
             } catch (error) {
                 log(`ディレクトリアップロードエラー: ${error.message}`, 'error');
@@ -5469,14 +5564,14 @@
         // Transaction helper functions for directory upload
         async function createTransaction(payloadBase64) {
             // Get UTXOs
-            const { entries } = await rpcClient.getUtxosByAddresses([address.toString()]);
+            const { entries } = await NetworkState.rpcClient.getUtxosByAddresses([UserState.address.toString()]);
             if (!entries || entries.length === 0) {
                 throw new Error('利用可能なUTXOがありません');
             }
             
             // Format UTXOs
             const formattedUtxos = entries.map(utxo => ({
-                address: address.toString(),
+                address: UserState.address.toString(),
                 outpoint: {
                     transactionId: utxo.outpoint.transactionId,
                     index: utxo.outpoint.index
@@ -5491,13 +5586,13 @@
             const payloadBytes = fromBase64(payloadBase64);
             
             // Create transaction
-            const result = await kaspa.createTransactions({
+            const result = await NetworkState.kaspa.createTransactions({
                 entries: formattedUtxos,
                 outputs: [{
-                    address: address.toString(),
+                    address: UserState.address.toString(),
                     amount: 100000000n // 1 KAS
                 }],
-                changeAddress: address.toString(),
+                changeAddress: UserState.address.toString(),
                 priorityFee: 10000n,
                 networkId: config.network,
                 payload: payloadBytes
@@ -5512,7 +5607,7 @@
         
         async function sendTransaction(transaction) {
             // Sign transaction
-            await transaction.sign([privateKey]);
+            await transaction.sign([UserState.privateKey]);
             
             // Submit transaction with error handling
             try {
@@ -5529,7 +5624,7 @@
                     log('WebSocket接続が切断されました。再接続を試みます...', 'warning');
                     
                     // Reconnect
-                    await rpcClient.connect();
+                    await NetworkState.rpcClient.connect();
                     log('RPC再接続成功', 'success');
                     
                     // Restart monitoring
@@ -6019,7 +6114,7 @@
                 // First try with blockId if available
                 if (blockId) {
                     try {
-                        const blockResponse = await rpcClient.getBlock({
+                        const blockResponse = await NetworkState.rpcClient.getBlock({
                             hash: blockId,
                             includeTransactions: true
                         });
@@ -6111,13 +6206,19 @@
         
         // Process and upload file
         window.processAndUpload = async function() {
+            // Debug log
+            log(`[DEBUG] processAndUpload called`, 'debug');
+            log(`[DEBUG] window.currentFile: ${window.currentFile ? window.currentFile.name : 'null'}`, 'debug');
+            log(`[DEBUG] window.progressManager: ${window.progressManager ? 'exists' : 'null'}`, 'debug');
+            log(`[DEBUG] window.isDirectoryMode: ${window.isDirectoryMode}`, 'debug');
+            
             // Check if directory mode
             if (window.isDirectoryMode) {
                 await processAndUploadDirectory();
                 return;
             }
             
-            if (!currentFile) {
+            if (!window.currentFile) {
                 log('ファイルが選択されていません', 'error');
                 return;
             }
@@ -6133,10 +6234,14 @@
                 return;
             }
             
-            currentPassword = password;
+            window.currentPassword = password;
+            
+            // Use local reference to window globals
+            const currentFile = window.currentFile;
+            let progressManager = window.progressManager;
             
             // Initialize processedChunks with existing chunks from progress
-            processedChunks = [];
+            window.processedChunks = [];
             if (progressManager && progressManager.progress) {
                 // Load existing chunks from kprogress - use chunkDetails only
                 const chunkDetails = progressManager.progress._progress?.chunkDetails || [];
@@ -6144,7 +6249,7 @@
                 // Reconstruct processedChunks from chunkDetails
                 for (const detail of chunkDetails) {
                     if (detail.txid && detail.blockId) {
-                        processedChunks.push({
+                        window.processedChunks.push({
                             index: detail.index,
                             txid: detail.txid,
                             blockId: detail.blockId,
@@ -6155,7 +6260,7 @@
                         });
                     }
                 }
-                log(`既存のチャンク情報を復元: ${processedChunks.length}個`, 'info');
+                log(`既存のチャンク情報を復元: ${window.processedChunks.length}個`, 'info');
             }
             
             document.getElementById('uploadBtn').disabled = true;
@@ -6203,6 +6308,7 @@
                 if (!progressManager) {
                     log('新規ProgressManagerを作成中...');
                     progressManager = new ProgressManager(currentFile, chunkSize, fileCID, 'upload');
+                    window.progressManager = progressManager;  // Update global reference
                     await progressManager.initialize();
                     log(`ProgressManager初期化完了 - 総チャンク数: ${progressManager.progress.metadata.totalChunks}`);
                 } else {
@@ -6213,6 +6319,7 @@
                     if (!verified) {
                         log('チャンク検証に失敗したため、レジュームをキャンセルします', 'error');
                         progressManager = null;
+                        window.progressManager = null;  // Update global reference
                         return;
                     }
                 }
@@ -6364,7 +6471,7 @@
                         }
                         
                         // Get fresh UTXOs
-                        const { entries } = await rpcClient.getUtxosByAddresses([address.toString()]);
+                        const { entries } = await NetworkState.rpcClient.getUtxosByAddresses([UserState.address.toString()]);
                         if (!entries || entries.length === 0) {
                             throw new Error('利用可能なUTXOがありません');
                         }
@@ -6407,7 +6514,7 @@
                                 
                                 // Create transaction
                                 const formattedUtxos = entries.map(utxo => ({
-                                    address: address.toString(),
+                                    address: UserState.address.toString(),
                                     outpoint: {
                                         transactionId: utxo.outpoint.transactionId,
                                         index: utxo.outpoint.index
@@ -6418,13 +6525,13 @@
                                     blockDaaScore: BigInt(utxo.blockDaaScore)
                                 }));
                                 
-                                const result = await kaspa.createTransactions({
+                                const result = await NetworkState.kaspa.createTransactions({
                                     entries: formattedUtxos,
                                     outputs: [{
-                                        address: address.toString(),
+                                        address: UserState.address.toString(),
                                         amount: 100000000n // 1 KAS
                                     }],
-                                    changeAddress: address.toString(),
+                                    changeAddress: UserState.address.toString(),
                                     priorityFee: 10000n,
                                     networkId: config.network,
                                     payload: payloadBytes
@@ -6436,7 +6543,7 @@
                                 }
                                 
                                 const pendingTx = result.transactions[0];
-                                await pendingTx.sign([privateKey]);
+                                await pendingTx.sign([UserState.privateKey]);
                                 txid = await pendingTx.submit(rpcClient);
                                 
                                 log(`ペイロード ${i + 1} TxID: ${txid.substring(0, 16)}...`, 'success');
@@ -6497,7 +6604,7 @@
                                 log(`ペイロード ${i + 1} アップロード完了 (${(uploadTime/1000).toFixed(1)}秒)`);
                                 
                                 // Store chunk info
-                                processedChunks.push({
+                                window.processedChunks.push({
                                     index: i,
                                     txid: txid,
                                     blockId: blockId,
@@ -6512,7 +6619,13 @@
                                 
                             } catch (error) {
                                 retries++;
-                                log(`ペイロード ${i + 1} エラー (試行 ${retries}/${config.retryCount}): ${error.message}`, 'error');
+                                const errorMessage = error?.message || error?.toString() || 'Unknown error';
+                                log(`ペイロード ${i + 1} エラー (試行 ${retries}/${config.retryCount}): ${errorMessage}`, 'error');
+                                log(`[DEBUG] エラーオブジェクト:`, error, 'debug');
+                                log(`[DEBUG] エラータイプ: ${typeof error}`, 'debug');
+                                if (error?.stack) {
+                                    log(`[DEBUG] スタックトレース: ${error.stack}`, 'debug');
+                                }
                                 
                                 if (retries >= config.retryCount) {
                                     const chunkStatusElement = document.getElementById(`chunk-status-${i}`);
@@ -6572,7 +6685,9 @@
                     
                     } catch (error) {
                         // v4.7.57: 新方式のエラーハンドリング
-                        log(`[新方式] エラーが発生しました: ${error.message}`, 'error');
+                        const errorMessage = error?.message || error?.toString() || 'Unknown error';
+                        log(`[新方式] エラーが発生しました: ${errorMessage}`, 'error');
+                        log(`[新方式] エラー詳細:`, error, 'error');
                         log(`[新方式] 処理を中断します`, 'error');
                         throw error;
                     }
@@ -6586,7 +6701,7 @@
                     while (nextChunkIndex >= 0) {
                     // Get fresh UTXOs for each chunk
                     log(`チャンク ${nextChunkIndex + 1}/${totalChunks} の処理を開始...`);
-                    const { entries } = await rpcClient.getUtxosByAddresses([address.toString()]);
+                    const { entries } = await NetworkState.rpcClient.getUtxosByAddresses([UserState.address.toString()]);
                     if (!entries || entries.length === 0) {
                         throw new Error('利用可能なUTXOがありません');
                     }
@@ -6665,7 +6780,7 @@
                             
                             // Format current UTXOs
                             const formattedUtxos = entries.map(utxo => ({
-                                address: address.toString(),
+                                address: UserState.address.toString(),
                                 outpoint: {
                                     transactionId: utxo.outpoint.transactionId,
                                     index: utxo.outpoint.index
@@ -6676,13 +6791,13 @@
                                 blockDaaScore: BigInt(utxo.blockDaaScore)
                             }));
                             
-                            const result = await kaspa.createTransactions({
+                            const result = await NetworkState.kaspa.createTransactions({
                                 entries: formattedUtxos,
                                 outputs: [{
-                                    address: address.toString(),
+                                    address: UserState.address.toString(),
                                     amount: 100000000n // 1 KAS
                                 }],
-                                changeAddress: address.toString(),
+                                changeAddress: UserState.address.toString(),
                                 priorityFee: 10000n,
                                 networkId: config.network,
                                 payload: payloadBytes
@@ -6697,7 +6812,7 @@
                             
                             // Sign the transaction
                             log(`トランザクションに署名中...`);
-                            await pendingTx.sign([privateKey]);
+                            await pendingTx.sign([UserState.privateKey]);
                             
                             // Submit to network
                             log(`ネットワークに送信中...`);
@@ -6747,7 +6862,7 @@
                                 if (waitTime >= 30000) {
                                     try {
                                         log('30秒経過 - RPCで確認を試みます...');
-                                        const txInfo = await rpcClient.getTransaction({
+                                        const txInfo = await NetworkState.rpcClient.getTransaction({
                                             transactionId: txid,
                                             includeBlockInfo: true
                                         });
@@ -6810,7 +6925,7 @@
                             }
                             
                             // Store chunk info
-                            processedChunks.push({
+                            window.processedChunks.push({
                                 index: i,
                                 txid: txid,
                                 blockId: blockId,
@@ -6857,7 +6972,7 @@
                 } // End of old approach
                 
                 // Calculate cost
-                const totalPayloadKB = processedChunks.reduce((sum, c) => sum + c.payloadSize, 0) / 1024;
+                const totalPayloadKB = window.processedChunks.reduce((sum, c) => sum + c.payloadSize, 0) / 1024;
                 const totalCost = totalChunks * 0.00005 + totalPayloadKB * 0.00001;
                 
                 // Final progress save
@@ -6865,7 +6980,7 @@
                 log('最終進捗を保存しました', 'success');
                 
                 // Prepare metadata with unified structure
-                kaspaMetadata = {
+                window.kaspaMetadata = {
                     type: 'kaspa-file',
                     version: "3.3",  // v4.7.50: Updated to Format v3.3
                     created: new Date().toISOString(),
@@ -6891,7 +7006,7 @@
                             algorithm: useCompression ? "LZ77" : "none",
                             enabled: useCompression,
                             originalSize: currentFile.size,
-                            compressedSize: processedChunks.reduce((sum, c) => sum + c.compressedSize, 0)
+                            compressedSize: window.processedChunks.reduce((sum, c) => sum + c.compressedSize, 0)
                         }
                     },
                     
@@ -6899,9 +7014,9 @@
                     cid: window.currentFileCIDFull || null,
                     
                     // Chunk information
-                    chunks: processedChunks.map(c => c.txid),
-                    chunkBlockIds: processedChunks.map(c => c.blockId),
-                    chunkSizes: processedChunks.map(c => c.originalSize), // v4.7.36: 各チャンクの実際のサイズ
+                    chunks: window.processedChunks.map(c => c.txid),
+                    chunkBlockIds: window.processedChunks.map(c => c.blockId),
+                    chunkSizes: window.processedChunks.map(c => c.originalSize), // v4.7.36: 各チャンクの実際のサイズ
                     
                     // Recovery information
                     recovery: {
@@ -6917,28 +7032,34 @@
                         metaTxBlockId: null,
                         uploadDate: new Date().toISOString(),
                         blockTime: null,
-                        uploadedBy: address.toString(),
+                        uploadedBy: UserState.address.toString(),
                         payloadSplit: useNewApproach, // Flag for new approach
                         chunkBoundaries: useNewApproach ? progressManager.progress.metadata.chunkBoundaries : undefined
                     }
                 };
                 
                 // Save to history
-                uploadHistory.push({
+                AppState.history.uploadHistory.push({
                     filename: currentFile.name,
                     timestamp: Date.now(),
-                    metadata: kaspaMetadata
+                    metadata: window.kaspaMetadata
                 });
                 
                 log(`アップロード完了! 総コスト: ${totalCost.toFixed(5)} KAS`, 'success');
                 
+                // Debug log for kaspaMetadata
+                log(`[DEBUG] kaspaMetadata is: ${window.kaspaMetadata ? 'defined' : 'null'}`, 'debug');
+                if (window.kaspaMetadata) {
+                    log(`[DEBUG] kaspaMetadata.encryption: ${window.kaspaMetadata.encryption ? 'exists' : 'null'}`, 'debug');
+                }
+                
                 // Add to history
-                if (window.historyManager) {
+                if (WorkspaceState.historyManager) {
                     // Get block time from last chunk or meta-tx
                     // Get block time from the last chunk
                     let blockTime = null;
-                    if (processedChunks.length > 0) {
-                        const lastChunk = processedChunks[processedChunks.length - 1];
+                    if (window.processedChunks.length > 0) {
+                        const lastChunk = window.processedChunks[window.processedChunks.length - 1];
                         if (lastChunk.blockTime) {
                             blockTime = lastChunk.blockTime.toISOString();
                             log(`[DEBUG] 最後のチャンクのブロック時刻を取得: ${blockTime}`, 'debug');
@@ -6957,28 +7078,28 @@
                         totalCost: totalCost,
                         metaTxId: null, // Will be set if meta-tx is used
                         metaTxBlockId: null, // Will be set if meta-tx is used
-                        firstChunkTxId: processedChunks[0]?.txid || '',
+                        firstChunkTxId: window.processedChunks[0]?.txid || '',
                         cid: window.currentFileCID || '',
-                        password: currentPassword || null,
+                        password: window.currentPassword || null,
                         // New structure: store encryption info directly
                         encryption: {
                             algorithm: "AES-256-GCM",
-                            salt: kaspaMetadata.encryption?.pbkdf2?.salt || '',
-                            iterations: kaspaMetadata.encryption?.pbkdf2?.iterations || 10000
+                            salt: window.kaspaMetadata?.encryption?.pbkdf2?.salt || '',
+                            iterations: window.kaspaMetadata?.encryption?.pbkdf2?.iterations || 10000
                         },
-                        compression: kaspaMetadata.file?.compression || {
+                        compression: window.kaspaMetadata?.file?.compression || {
                             algorithm: "none",
                             enabled: false
                         },
                         // Store complete metadata for backward compatibility
-                        metadata: kaspaMetadata,
-                        chunkTxIds: processedChunks.map(c => c.txid),
-                        chunkBlockIds: processedChunks.map(c => c.blockId),
+                        metadata: window.kaspaMetadata,
+                        chunkTxIds: window.processedChunks.map(c => c.txid),
+                        chunkBlockIds: window.processedChunks.map(c => c.blockId),
                         chunkSize: config.chunkSize,
                         network: config.network
                     };
                     log(`[DEBUG] 履歴データ生成完了 - ID: ${uploadData.id}`, 'debug');
-                    await window.historyManager.addUpload(uploadData);
+                    await WorkspaceState.historyManager.addUpload(uploadData);
                     
                     // Delete .kprogress file if exists
                     if (progressManager && window.workspaceHandle) {
@@ -7012,9 +7133,14 @@
                 }
                 
             } catch (error) {
-                log(`アップロードエラー: ${error.message}`, 'error');
-                console.error('Upload error stack:', error.stack);
-                log(`[DEBUG] エラースタック: ${error.stack}`, 'debug');
+                const errorMessage = error?.message || error?.toString() || 'Unknown error';
+                log(`アップロードエラー: ${errorMessage}`, 'error');
+                console.error('Upload error:', error);
+                log(`[DEBUG] エラーオブジェクト:`, error, 'debug');
+                log(`[DEBUG] エラータイプ: ${typeof error}`, 'debug');
+                if (error?.stack) {
+                    log(`[DEBUG] エラースタック: ${error.stack}`, 'debug');
+                }
             } finally {
                 // v3.6.3 fix: Clear upload flag
                 isUploadingFile = false;
@@ -7097,8 +7223,15 @@
             try {
                 log('メタトランザクション作成を開始します...', 'info');
                 
+                // Debug logs
+                log(`[DEBUG] kaspaMetadata: ${kaspaMetadata ? 'exists' : 'null'}`, 'debug');
+                log(`[DEBUG] window.kaspaMetadata: ${window.kaspaMetadata ? 'exists' : 'null'}`, 'debug');
+                if (window.kaspaMetadata) {
+                    log(`[DEBUG] window.kaspaMetadata.chunks: ${window.kaspaMetadata.chunks ? `array with ${window.kaspaMetadata.chunks.length} items` : 'null/undefined'}`, 'debug');
+                }
+                
                 // Check if super metadata is needed based on chunk count
-                const totalChunks = kaspaMetadata.chunks.length;
+                const totalChunks = window.kaspaMetadata?.chunks?.length || 0;
                 const CHUNKS_PER_META = 160; // 160 chunks per single MetaTxID
                 const MAX_CHUNKS_SUPPORTED = 25600; // 160 × 160
                 
@@ -7121,8 +7254,8 @@
                         const group = [];
                         for (let j = 0; j < CHUNKS_PER_META && i + j < totalChunks; j++) {
                             group.push({
-                                txid: kaspaMetadata.chunks[i + j],
-                                blockId: kaspaMetadata.chunkBlockIds[i + j]
+                                txid: window.kaspaMetadata.chunks[i + j],
+                                blockId: window.kaspaMetadata.chunkBlockIds[i + j]
                             });
                         }
                         chunkGroups.push(group);
@@ -7137,18 +7270,18 @@
                             chunkGroups[i], 
                             i, 
                             chunkGroups.length,
-                            kaspaMetadata,
-                            currentPassword,
+                            window.kaspaMetadata,
+                            window.currentPassword,
                             CHUNKS_PER_META
                         );
                         singleMetaTxs.push(singleMeta);
                     }
                     
                     // Create super meta-tx
-                    const superMeta = await createSuperMetaTx(singleMetaTxs, kaspaMetadata, currentPassword);
+                    const superMeta = await createSuperMetaTx(singleMetaTxs, window.kaspaMetadata, window.currentPassword);
                     
                     // Update metadata with super meta info
-                    kaspaMetadata.metaTx = {
+                    window.kaspaMetadata.metaTx = {
                         type: 'super',
                         txid: superMeta.txId,
                         blockId: superMeta.blockId,
@@ -7158,15 +7291,15 @@
                     };
                     
                     // Update history
-                    if (window.historyManager && window.currentFileCID) {
-                        const history = window.historyManager.getHistory();
+                    if (WorkspaceState.historyManager && window.currentFileCID) {
+                        const history = WorkspaceState.historyManager.getHistory();
                         const latestUpload = history.find(h => h.cid === window.currentFileCID);
                         if (latestUpload) {
                             latestUpload.metaTxId = superMeta.txId;
                             latestUpload.metaTxBlockId = superMeta.blockId;
                             latestUpload.metaTxType = 'super';
-                            localStorage.setItem(window.historyManager.dbName, JSON.stringify(history));
-                            await window.historyManager.saveToFile();
+                            localStorage.setItem(WorkspaceState.historyManager.dbName, JSON.stringify(history));
+                            await WorkspaceState.historyManager.saveToFile();
                         }
                     }
                     
@@ -7186,14 +7319,14 @@
                 const metaTxData = {
                     type: "kaspa-meta-tx",
                     version: "3.3",  // v4.7.50: Updated to Format v3.3
-                    created: kaspaMetadata.created,
-                    network: kaspaMetadata.network,
-                    encryption: kaspaMetadata.encryption,
-                    file: kaspaMetadata.file,
-                    chunks: kaspaMetadata.chunks,
-                    chunkBlockIds: kaspaMetadata.chunkBlockIds,  // v3.3フォーマット準拠
-                    recovery: kaspaMetadata.recovery,
-                    metadata: kaspaMetadata.metadata,
+                    created: window.kaspaMetadata.created,
+                    network: window.kaspaMetadata.network,
+                    encryption: window.kaspaMetadata.encryption,
+                    file: window.kaspaMetadata.file,
+                    chunks: window.kaspaMetadata.chunks,
+                    chunkBlockIds: window.kaspaMetadata.chunkBlockIds,  // v3.3フォーマット準拠
+                    recovery: window.kaspaMetadata.recovery,
+                    metadata: window.kaspaMetadata.metadata,
                     // Add flat structure for regular meta-tx
                     chunkStructure: {
                         type: "flat",
@@ -7206,11 +7339,11 @@
                 const metaDataBytes = new TextEncoder().encode(metaDataString);
                 
                 // Use the same salt and key from file encryption
-                if (!kaspaMetadata.encryption || !kaspaMetadata.encryption.pbkdf2) {
+                if (!window.kaspaMetadata.encryption || !window.kaspaMetadata.encryption.pbkdf2) {
                     throw new Error('暗号化情報が見つかりません');
                 }
-                const salt = fromBase64(kaspaMetadata.encryption.pbkdf2.salt);
-                const key = await deriveKey(currentPassword, salt);
+                const salt = fromBase64(window.kaspaMetadata.encryption.pbkdf2.salt);
+                const key = await deriveKey(window.currentPassword, salt);
                 
                 // Encrypt with chunk index -1 to indicate meta-tx
                 const encryptedMetaData = await encryptChunk(metaDataBytes, key, -1);
@@ -7223,7 +7356,7 @@
                 log(`メタデータサイズ: ${metaDataBytes.length} bytes → 暗号化後: ${metaPayload.length} bytes (salt含む)`);
                 
                 // Upload meta-tx to blockchain
-                const utxoResponse = await rpcClient.getUtxosByAddresses([address.toString()]);
+                const utxoResponse = await NetworkState.rpcClient.getUtxosByAddresses([UserState.address.toString()]);
                 const entries = utxoResponse.entries || [];
                 
                 log(`${entries.length} UTXOs available for meta-tx`);
@@ -7231,7 +7364,7 @@
                 const formattedUtxos = entries.map(utxo => {
                     try {
                         return {
-                            address: address.toString(),
+                            address: UserState.address.toString(),
                             outpoint: {
                                 transactionId: utxo.outpoint.transactionId,
                                 index: utxo.outpoint.index
@@ -7255,13 +7388,13 @@
                     // Use same amount as regular chunks (1 KAS)
                     const amount = 100000000n; // 1 KAS
                     
-                    result = await kaspa.createTransactions({
+                    result = await NetworkState.kaspa.createTransactions({
                         entries: formattedUtxos,
                         outputs: [{
-                            address: address.toString(),
+                            address: UserState.address.toString(),
                             amount: amount
                         }],
-                        changeAddress: address.toString(),
+                        changeAddress: UserState.address.toString(),
                         priorityFee: 10000n,
                         networkId: config.network,
                         payload: metaPayload
@@ -7280,7 +7413,7 @@
                 }
                 
                 const pendingTx = result.transactions[0];
-                await pendingTx.sign([privateKey]);
+                await pendingTx.sign([UserState.privateKey]);
                 const metaTxId = await pendingTx.submit(rpcClient);
                 
                 log(`メタトランザクションを送信しました: ${metaTxId}`, 'success');
@@ -7336,7 +7469,7 @@
                 }
                 
                 // Add meta-tx to metadata for .kaspa file generation
-                kaspaMetadata.metaTx = {
+                window.kaspaMetadata.metaTx = {
                     txid: metaTxId,
                     blockId: metaBlockId,
                     reference: metaTxReference,
@@ -7344,9 +7477,9 @@
                 };
                 
                 // Update history with metaTxId
-                if (window.historyManager && window.currentFileCID) {
+                if (WorkspaceState.historyManager && window.currentFileCID) {
                     log(`[DEBUG] 履歴更新開始 - CID: ${window.currentFileCID}`, 'debug');
-                    const history = window.historyManager.getHistory();
+                    const history = WorkspaceState.historyManager.getHistory();
                     const latestUpload = history.find(h => h.cid === window.currentFileCID);
                     if (latestUpload) {
                         log(`[DEBUG] 履歴エントリー発見 - ID: ${latestUpload.id}`, 'debug');
@@ -7357,14 +7490,14 @@
                         log(`[DEBUG] メタTxID設定: ${metaTxId}`, 'debug');
                         log(`[DEBUG] メタBlockID設定: ${metaBlockId || 'null'}`, 'debug');
                         // Save updated history
-                        localStorage.setItem(window.historyManager.dbName, JSON.stringify(history));
-                        await window.historyManager.saveToFile();
+                        localStorage.setItem(WorkspaceState.historyManager.dbName, JSON.stringify(history));
+                        await WorkspaceState.historyManager.saveToFile();
                         log('[UploadHistoryManager] メタTxIDとBlockIDを履歴に追加しました', 'debug');
                     } else {
                         log(`[DEBUG] CID ${window.currentFileCID} の履歴エントリーが見つかりません`, 'error');
                     }
                 } else {
-                    log(`[DEBUG] 履歴更新スキップ - historyManager: ${!!window.historyManager}, CID: ${window.currentFileCID || 'なし'}`, 'warning');
+                    log(`[DEBUG] 履歴更新スキップ - historyManager: ${!!WorkspaceState.historyManager}, CID: ${window.currentFileCID || 'なし'}`, 'warning');
                 }
                 
                 // Auto-stop WebSocket monitoring after meta-tx creation
@@ -7461,11 +7594,11 @@
                 log(`[SuperMeta] 中間メタデータサイズ: ${metaDataBytes.length} bytes`, 'debug');
                 
                 // Upload to blockchain
-                const utxoResponse = await rpcClient.getUtxosByAddresses([address.toString()]);
+                const utxoResponse = await NetworkState.rpcClient.getUtxosByAddresses([UserState.address.toString()]);
                 const entries = utxoResponse.entries || [];
                 
                 const formattedUtxos = entries.map(utxo => ({
-                    address: address.toString(),
+                    address: UserState.address.toString(),
                     outpoint: {
                         transactionId: utxo.outpoint.transactionId,
                         index: utxo.outpoint.index
@@ -7476,20 +7609,20 @@
                     blockDaaScore: BigInt(utxo.blockDaaScore)
                 }));
                 
-                const result = await kaspa.createTransactions({
+                const result = await NetworkState.kaspa.createTransactions({
                     entries: formattedUtxos,
                     outputs: [{
-                        address: address.toString(),
+                        address: UserState.address.toString(),
                         amount: 100000000n // 1 KAS
                     }],
-                    changeAddress: address.toString(),
+                    changeAddress: UserState.address.toString(),
                     priorityFee: 10000n,
                     networkId: config.network,
                     payload: metaPayload
                 });
                 
                 const pendingTx = result.transactions[0];
-                await pendingTx.sign([privateKey]);
+                await pendingTx.sign([UserState.privateKey]);
                 
                 // Debug: Check transaction before submission
                 log(`[SuperMeta] トランザクション送信前 - ペイロードサイズ: ${metaPayload.length} bytes`, 'debug');
@@ -7635,11 +7768,11 @@
                 log(`[SuperMeta] スーパーメタデータサイズ: ${metaDataBytes.length} bytes`, 'debug');
                 
                 // Upload to blockchain
-                const utxoResponse = await rpcClient.getUtxosByAddresses([address.toString()]);
+                const utxoResponse = await NetworkState.rpcClient.getUtxosByAddresses([UserState.address.toString()]);
                 const entries = utxoResponse.entries || [];
                 
                 const formattedUtxos = entries.map(utxo => ({
-                    address: address.toString(),
+                    address: UserState.address.toString(),
                     outpoint: {
                         transactionId: utxo.outpoint.transactionId,
                         index: utxo.outpoint.index
@@ -7650,20 +7783,20 @@
                     blockDaaScore: BigInt(utxo.blockDaaScore)
                 }));
                 
-                const result = await kaspa.createTransactions({
+                const result = await NetworkState.kaspa.createTransactions({
                     entries: formattedUtxos,
                     outputs: [{
-                        address: address.toString(),
+                        address: UserState.address.toString(),
                         amount: 100000000n // 1 KAS
                     }],
-                    changeAddress: address.toString(),
+                    changeAddress: UserState.address.toString(),
                     priorityFee: 10000n,
                     networkId: config.network,
                     payload: metaPayload
                 });
                 
                 const pendingTx = result.transactions[0];
-                await pendingTx.sign([privateKey]);
+                await pendingTx.sign([UserState.privateKey]);
                 const superMetaTxId = await pendingTx.submit(rpcClient);
                 
                 log(`[SuperMeta] スーパーメタTxID: ${superMetaTxId}`, 'success');
@@ -8292,7 +8425,7 @@
                 if (blockId) {
                     log(`BlockIDを使用してRPC経由で取得中...`, 'info');
                     try {
-                        const blockResponse = await rpcClient.getBlock({
+                        const blockResponse = await NetworkState.rpcClient.getBlock({
                             hash: blockId,
                             includeTransactions: true
                         });
@@ -8332,7 +8465,7 @@
                             if (switched) {
                                 // Retry the operation with archive node
                                 log(`[RPC] アーカイブノードで再試行中...`, 'info');
-                                const blockResponse = await rpcClient.getBlock({
+                                const blockResponse = await NetworkState.rpcClient.getBlock({
                                     hash: blockId,
                                     includeTransactions: true
                                 });
@@ -8448,7 +8581,7 @@
                     
                     try {
                         // Get transaction via RPC
-                        const txResponse = await rpcClient.getTransaction({
+                        const txResponse = await NetworkState.rpcClient.getTransaction({
                             transactionId: metaTxId,
                             includeBlockInfo: true
                         });
@@ -8583,7 +8716,7 @@
                                     if (intMetaBlockId && intMetaBlockId !== '') {
                                         // Try to get via BlockID
                                         try {
-                                            const blockResponse = await rpcClient.getBlock({
+                                            const blockResponse = await NetworkState.rpcClient.getBlock({
                                                 hash: intMetaBlockId,
                                                 includeTransactions: true
                                             });
@@ -8876,7 +9009,7 @@
                 
                 // Check if parallel download should be used
                 // v4.7.44: Enable parallel download for 2+ chunks
-                const useParallel = parallelDownloadEnabled && kaspaMetadata.chunks.length >= 2;
+                const useParallel = AppState.settings.parallelDownloadEnabled && kaspaMetadata.chunks.length >= 2;
                 
                 if (useParallel) {
                     // Parallel download
@@ -8925,7 +9058,7 @@
                         
                         let response;
                         try {
-                            response = await rpcClient.getBlock(request);
+                            response = await NetworkState.rpcClient.getBlock(request);
                             log(`RPC getBlock response received`, 'info');
                             log(`Response type: ${typeof response}`, 'info');
                             log(`Response keys: ${Object.keys(response || {}).join(', ')}`, 'info');
@@ -9035,7 +9168,7 @@
                             
                             let response;
                             try {
-                                response = await rpcClient.getBlock(request);
+                                response = await NetworkState.rpcClient.getBlock(request);
                                 log(`RPC getBlock response received`, 'info');
                                 log(`Response type: ${typeof response}`, 'info');
                                 log(`Response keys: ${Object.keys(response || {}).join(', ')}`, 'info');
@@ -9179,14 +9312,14 @@
             
             try {
                 if (rpcClient) {
-                    await rpcClient.unsubscribeBlockAdded();
+                    await NetworkState.rpcClient.unsubscribeBlockAdded();
                 }
-                wsMonitorActive = false;
+                NetworkState.ws.monitorActive = false;
                 
                 // Clear timeout
-                if (wsMonitorTimeout) {
-                    clearTimeout(wsMonitorTimeout);
-                    wsMonitorTimeout = null;
+                if (AppState.monitoring.wsMonitorTimeout) {
+                    clearTimeout(AppState.monitoring.wsMonitorTimeout);
+                    AppState.monitoring.wsMonitorTimeout = null;
                 }
                 
                 // Reset counters
@@ -9202,11 +9335,12 @@
 
         // Toggle parallel download
         window.toggleParallelDownload = function() {
-            parallelDownloadEnabled = document.getElementById('parallelDownloadToggle').checked;
-            window.parallelDownloadEnabled = parallelDownloadEnabled; // v5.3.16: Fix window variable
-            localStorage.setItem('kaspaParallelDownload', parallelDownloadEnabled.toString());
+            AppState.settings.parallelDownloadEnabled = document.getElementById('parallelDownloadToggle').checked;
+            parallelDownloadEnabled = AppState.settings.parallelDownloadEnabled;
+            window.parallelDownloadEnabled = AppState.settings.parallelDownloadEnabled;
+            localStorage.setItem('kaspaParallelDownload', AppState.settings.parallelDownloadEnabled.toString());
             
-            if (parallelDownloadEnabled) {
+            if (AppState.settings.parallelDownloadEnabled) {
                 log('並列ダウンロードを有効にしました（実験的機能）', 'warning');
             } else {
                 log('並列ダウンロードを無効にしました（安定モード）', 'success');
@@ -9217,7 +9351,7 @@
         window.exportLogs = function() {
             const exportData = {
                 timestamp: new Date().toISOString(),
-                logs: systemLogs,
+                logs: AppState.history.systemLogs,
                 uploadHistory: uploadHistory,
                 monitoredTransactions: Array.from(monitoredTransactions.entries())
             };
@@ -9235,7 +9369,7 @@
 
         window.clearLogs = function() {
             if (confirm('すべてのログをクリアしますか？')) {
-                systemLogs = [];
+                AppState.history.systemLogs = [];
                 document.getElementById('systemLog').innerHTML = '';
                 document.getElementById('monitorLog').innerHTML = '';
                 log('ログをクリアしました', 'info');
@@ -9243,7 +9377,7 @@
         };
 
         window.copyLog = function() {
-            const logText = systemLogs.map(log => 
+            const logText = AppState.history.systemLogs.map(log => 
                 `[${log.time}] ${log.type.toUpperCase()}: ${log.message}`
             ).join('\n');
             
@@ -9325,8 +9459,8 @@
             // Display upload history
             setInterval(() => {
                 const historyDiv = document.getElementById('uploadHistory');
-                if (uploadHistory.length > 0) {
-                    historyDiv.innerHTML = uploadHistory.slice(-5).reverse().map(item => `
+                if (AppState.history.uploadHistory.length > 0) {
+                    historyDiv.innerHTML = AppState.history.uploadHistory.slice(-5).reverse().map(item => `
                         <div class="metric-box">
                             <strong>${item.filename}</strong><br>
                             ${new Date(item.timestamp).toLocaleString()}<br>
@@ -9352,7 +9486,7 @@
             
             log(`🚀 Kaspa P2P v${getAppVersion()} 準備完了！`, 'info');
             log(`📋 v${getAppVersion()}: スーパーメタデータで大規模ファイル対応`, 'info');
-            log('✨ 並列ダウンロード: ' + (parallelDownloadEnabled ? '有効' : '無効'), 'info');
+            log('✨ 並列ダウンロード: ' + (AppState.settings.parallelDownloadEnabled ? '有効' : '無効'), 'info');
             log('システムを初期化してください', 'info');
             
             // Update title and subtitle with dynamic version
@@ -9434,7 +9568,7 @@
                         
                         // Test RPC connection
                         try {
-                            const info = await rpcClient.getServerInfo();
+                            const info = await NetworkState.rpcClient.getServerInfo();
                             log(`RPC接続確認: ${info.serverVersion}`, 'success');
                         } catch (err) {
                             log('RPC接続エラー - 再接続を試みます', 'error');
@@ -9494,11 +9628,11 @@
             // Check connection status and reconnect if needed
             try {
                 // Test connection with a simple RPC call
-                await rpcClient.getServerInfo();
+                await NetworkState.rpcClient.getServerInfo();
             } catch (error) {
                 try {
                     log('RPC再接続中...', 'info');
-                    await rpcClient.connect();
+                    await NetworkState.rpcClient.connect();
                     log('RPC再接続成功', 'success');
                 } catch (reconnectError) {
                     log(`RPC再接続エラー: ${reconnectError.message}`, 'error');
@@ -9513,27 +9647,27 @@
             
             try {
                 log('WebSocket監視を開始...', 'info');
-                wsMonitorActive = true;
+                NetworkState.ws.monitorActive = true;
                 
                 // Set 5 minute timeout with upload session check (v5.3.6)
-                if (wsMonitorTimeout) {
-                    clearTimeout(wsMonitorTimeout);
+                if (AppState.monitoring.wsMonitorTimeout) {
+                    clearTimeout(AppState.monitoring.wsMonitorTimeout);
                 }
-                wsMonitorTimeout = setTimeout(async () => {
+                AppState.monitoring.wsMonitorTimeout = setTimeout(async () => {
                     // v5.3.7: Enhanced check - Don't stop monitoring during any upload activity
                     if (uploadSessionActive || isUploadingFile || uploadingChunksCount > 0 || uploadingMetaTx || uploadingDirMeta) {
                         log(`[DEBUG] アップロード中 - WebSocket監視を継続 (session=${uploadSessionActive}, file=${isUploadingFile}, chunks=${uploadingChunksCount})`, 'debug');
                         // Reset timeout
-                        clearTimeout(wsMonitorTimeout);
-                        wsMonitorTimeout = setTimeout(arguments.callee, 5 * 60 * 1000);
+                        clearTimeout(AppState.monitoring.wsMonitorTimeout);
+                        AppState.monitoring.wsMonitorTimeout = setTimeout(arguments.callee, 5 * 60 * 1000);
                         return;
                     }
                     
                     // Also check if there are monitored transactions
                     if (monitoredTransactions.size > 0) {
                         log(`[DEBUG] 監視中のトランザクションあり (${monitoredTransactions.size}件) - 監視を継続`, 'debug');
-                        clearTimeout(wsMonitorTimeout);
-                        wsMonitorTimeout = setTimeout(arguments.callee, 5 * 60 * 1000);
+                        clearTimeout(AppState.monitoring.wsMonitorTimeout);
+                        AppState.monitoring.wsMonitorTimeout = setTimeout(arguments.callee, 5 * 60 * 1000);
                         return;
                     }
                     
@@ -9541,7 +9675,7 @@
                     await stopMonitoring();
                 }, 5 * 60 * 1000);
                 
-                await rpcClient.subscribeBlockAdded();
+                await NetworkState.rpcClient.subscribeBlockAdded();
                 log('Block Addedイベントを購読しました', 'success');
                 log('WebSocket経由でブロック追加イベントの監視を開始', 'info');
                 
@@ -9611,7 +9745,7 @@
                 
             } catch (error) {
                 log(`WebSocket監視エラー: ${error.message}`, 'error');
-                wsMonitorActive = false;
+                NetworkState.ws.monitorActive = false;
                 
                 // Network error recovery - will retry on reconnect
                 if (error.message.includes('network') || error.message.includes('connection')) {
@@ -9633,11 +9767,11 @@
             
             try {
                 if (rpcClient) {
-                    await rpcClient.unsubscribeBlockAdded();
+                    await NetworkState.rpcClient.unsubscribeBlockAdded();
                     monitorLog('監視を停止しました', 'success');
                     log('WebSocket監視を停止しました', 'info');
                 }
-                wsMonitorActive = false;
+                NetworkState.ws.monitorActive = false;
                 
             } catch (error) {
                 monitorLog(`監視停止エラー: ${error.message}`, 'error');
@@ -9663,7 +9797,7 @@
             const historyFileList = document.getElementById('historyFileList');
             
             // Get history from localStorage
-            const history = window.historyManager.getHistory();
+            const history = WorkspaceState.historyManager.getHistory();
             
             // v4.7.24: Filter only file uploads with password AND metaTxId to prevent crashes
             const fileHistory = history.filter(item => {
@@ -9742,7 +9876,7 @@
                 return;
             }
             
-            const history = window.historyManager.getHistory();
+            const history = WorkspaceState.historyManager.getHistory();
             const selectedFiles = [];
             
             // Collect selected files
@@ -9853,7 +9987,7 @@
                 return;
             }
             
-            const history = window.historyManager.getHistory();
+            const history = WorkspaceState.historyManager.getHistory();
             const selectedFiles = [];
             
             // Collect selected files
@@ -9923,8 +10057,8 @@
             };
             
             // Add to history manager
-            await window.historyManager.addUpload(uploadData);
-            window.historyManager.updateHistoryUI();
+            await WorkspaceState.historyManager.addUpload(uploadData);
+            WorkspaceState.historyManager.updateHistoryUI();
             
             log(`📁 ディレクトリメタデータを生成しました: ${dirName}`, 'success');
             log(`含まれるファイル数: ${selectedFiles.length}`, 'info');
@@ -10000,7 +10134,7 @@
                     log('MetaTxID:BlockIDをクリップボードにコピーしました', 'info');
                     
                     // Update the temporary history entry with blockchain info
-                    const history = window.historyManager.getHistory();
+                    const history = WorkspaceState.historyManager.getHistory();
                     const tempEntry = history.find(h => h.isTemporary && h.name === dirName);
                     
                     if (tempEntry) {
@@ -10012,8 +10146,8 @@
                         tempEntry.isTemporary = false; // Remove temporary flag
                         
                         // Save updated history
-                        await window.historyManager.saveToFile();
-                        window.historyManager.updateHistoryUI();
+                        await WorkspaceState.historyManager.saveToFile();
+                        WorkspaceState.historyManager.updateHistoryUI();
                         
                         log('履歴のTxIDを更新しました', 'success');
                     }
@@ -10031,7 +10165,7 @@
         };
         
         // Initialize history manager on load
-        window.historyManager = new UploadHistoryManager();
+        WorkspaceState.historyManager = new UploadHistoryManager();
         window.directoryManager = new DirectoryManager();
         window.downloadManager = new DownloadManager();
         
@@ -10115,9 +10249,9 @@
             }
             
             // Save any pending data
-            if (window.historyManager) {
+            if (WorkspaceState.historyManager) {
                 try {
-                    window.historyManager.saveHistory();
+                    WorkspaceState.historyManager.saveHistory();
                 } catch (e) {
                     console.error('Failed to save history on unload:', e);
                 }
@@ -10187,14 +10321,14 @@
                         throw new Error('Kaspa WASM not initialized. Please run "システムを初期化" first.');
                     }
                     
-                    if (!kaspa.PrivateKey) {
+                    if (!NetworkState.kaspa.PrivateKey) {
                         throw new Error('PrivateKey class not available in Kaspa WASM.');
                     }
                     
                     // デバッグ情報
                     console.log('[MultiWallet] Available kaspa methods:', Object.keys(kaspa));
                     
-                    const privateKey = new kaspa.PrivateKey();
+                    const privateKey = new NetworkState.kaspa.PrivateKey();
                     console.log('[MultiWallet] Private key generated successfully');
                     
                     const publicKey = privateKey.toPublicKey();
@@ -10223,12 +10357,12 @@
                     try {
                         // 方法1: グローバルNETWORK変数を使用（既存システムと同じ）
                         if (typeof NETWORK !== 'undefined' && NETWORK) {
-                            address = privateKey.toAddress(NETWORK).toString();
+                            UserState.address = privateKey.toAddress(NETWORK).toString();
                             console.log('[MultiWallet] Address generated with global NETWORK:', address);
                         }
                         // 方法2: testnet-10を直接指定
                         else {
-                            address = privateKey.toAddress('testnet-10').toString();
+                            UserState.address = privateKey.toAddress('testnet-10').toString();
                             console.log('[MultiWallet] Address generated with testnet-10:', address);
                         }
                     } catch (addrError) {
@@ -10236,7 +10370,7 @@
                         
                         // フォールバック1: 引数なしで試す（デフォルトネットワーク）
                         try {
-                            address = privateKey.toAddress().toString();
+                            UserState.address = privateKey.toAddress().toString();
                             console.log('[MultiWallet] Address generated with default network:', address);
                         } catch (fallback1Error) {
                             console.error('[MultiWallet] Fallback 1 failed:', fallback1Error);
@@ -10245,7 +10379,7 @@
                             try {
                                 // 最後の手段として、公開鍵の文字列表現を使用
                                 const pubKeyStr = publicKey.toString();
-                                address = `testnet:${pubKeyStr.substring(0, 62)}`;
+                                UserState.address = `testnet:${pubKeyStr.substring(0, 62)}`;
                                 console.log('[MultiWallet] Temporary address generated:', address);
                             } catch (fallback2Error) {
                                 console.error('[MultiWallet] All fallbacks failed:', fallback2Error);
@@ -10415,6 +10549,187 @@
             }
         }
         
+        // ============= UI CONTROL & EVENT HANDLERS =============
+        // User interface controls and event handling functions
+        
+        // Clipboard copy function (moved from UTILITY FUNCTIONS)
+        window.copyToClipboard = async function(text) {
+            const preview = text && text.length > 20 ? text.substring(0, 20) + '...' : text;
+            // Use window.log to ensure it's accessible
+            if (typeof log !== 'undefined') {
+                log(`[DEBUG] copyToClipboard が呼び出されました: ${preview}`, 'debug');
+            }
+            try {
+                await navigator.clipboard.writeText(text);
+                if (typeof log !== 'undefined') {
+                    log('クリップボードにコピーしました', 'success');
+                }
+            } catch (err) {
+                if (typeof log !== 'undefined') {
+                    log(`コピーエラー: ${err.message}`, 'error');
+                } else {
+                    console.error(`コピーエラー: ${err.message}`);
+                }
+            }
+        }
+        
+        // Tab switching function (moved from FILE OPERATIONS)
+        window.switchTab = function(tab) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            
+            const tabIndex = ['upload', 'download', 'directory', 'history', 'settings'].indexOf(tab);
+            document.querySelectorAll('.tab-btn')[tabIndex].classList.add('active');
+            document.getElementById(`${tab}-tab`).classList.add('active');
+            
+            // Update history tab when switching to it
+            if (tab === 'history' && WorkspaceState.historyManager) {
+                WorkspaceState.historyManager.updateHistoryUI();
+            }
+            
+            // Update directory tab when switching to it
+            if (tab === 'directory' && window.directoryManager) {
+                window.directoryManager.updateFileSelector();
+                window.directoryManager.updateUI();
+            }
+        };
+        
+        // Connection test function (moved from NETWORK & RPC FUNCTIONS)
+        window.testConnection = async function() {
+            try {
+                log('接続テストを実行中...');
+                const startTime = Date.now();
+                
+                // Test RPC
+                const info = await NetworkState.rpcClient.getServerInfo();
+                const rpcTime = Date.now() - startTime;
+                log(`RPC応答時間: ${rpcTime}ms`, 'success');
+                
+                // Test Explorer API
+                const apiStart = Date.now();
+                const response = await fetchWithTimeout('https://api-tn10.kaspa.org/info/health', {}, 5000, 1);
+                const apiTime = Date.now() - apiStart;
+                log(`Explorer API応答時間: ${apiTime}ms`, 'success');
+                
+                alert(`接続テスト成功!\nRPC: ${rpcTime}ms\nAPI: ${apiTime}ms`);
+            } catch (error) {
+                log(`接続テストエラー: ${error.message}`, 'error');
+                alert(`接続テスト失敗: ${error.message}`);
+            }
+        };
+        
+        // Directory creation function (moved from FILE OPERATIONS)
+        window.createDirectory = async function() {
+            try {
+                const nameInput = document.getElementById('directoryName');
+                const name = nameInput.value.trim();
+                
+                if (!name) {
+                    alert('ディレクトリ名を入力してください');
+                    return;
+                }
+                
+                const parentSelector = document.getElementById('parentDirectory');
+                const parentCID = parentSelector.value || null;
+                
+                const checkboxes = document.querySelectorAll('input[name="directoryFiles"]:checked');
+                const selections = Array.from(checkboxes).map(cb => cb.value);
+                
+                if (selections.length === 0) {
+                    alert('少なくとも1つのファイルまたはディレクトリを選択してください');
+                    return;
+                }
+                
+                // Separate files and directories
+                const fileIds = selections
+                    .filter(s => s.startsWith('file:'))
+                    .map(s => s.substring(5));
+                
+                const dirCIDs = selections
+                    .filter(s => s.startsWith('dir:'))
+                    .map(s => s.substring(4));
+                
+                // Process subdirectories
+                if (dirCIDs.length > 0) {
+                    // Move directories under the new parent
+                    dirCIDs.forEach(dirCID => {
+                        const dir = window.directoryManager.directories.find(d => d.cid === dirCID);
+                        if (dir) {
+                            dir.parentCID = parentCID;
+                        }
+                    });
+                    window.directoryManager.saveDirectories();
+                }
+                
+                await window.directoryManager.createDirectory(name, fileIds, parentCID);
+                
+                // Clear form
+                nameInput.value = '';
+                checkboxes.forEach(cb => cb.checked = false);
+                
+                // Update UI
+                window.directoryManager.updateUI();
+                
+            } catch (error) {
+                log(`ディレクトリ作成エラー: ${error.message}`, 'error');
+                alert(`エラー: ${error.message}`);
+            }
+        };
+        
+        // File selection handler (moved from FILE OPERATIONS)
+        window.handleFileSelect = async function(event) {
+            // Clear directory mode
+            window.isDirectoryMode = false;
+            const uploadDirOption = document.getElementById('uploadDirMetadataOption');
+            if (uploadDirOption) {
+                uploadDirOption.style.display = 'none';
+            }
+            
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            window.currentFile = file;
+            log(`ファイル選択: ${file.name} (${(file.size/1024).toFixed(1)}KB)`);
+            
+            // Check file size warning
+            checkFileSizeWarning(file);
+            
+            // Check for auto-resume
+            const resumeResult = await checkAutoResumeProgress(file);
+            if (resumeResult.completed) {
+                return; // File already completed
+            }
+            
+            // Handle resume or new upload
+            if (window.pendingProgress) {
+                const chunkSize = parseInt(document.getElementById('chunkSize').value) * 1024;
+                const cid = window.currentFileCID || window.pendingProgress.cid || null;
+                window.progressManager = new ProgressManager(file, chunkSize, cid, 'upload');
+                
+                if (window.progressManager.validateProgress(window.pendingProgress)) {
+                    // Initialize with existing progress
+                    await window.progressManager.initialize(window.pendingProgress);
+                    
+                    // Update UI to show resume status
+                    const stats = window.progressManager.getStats();
+                    updateFileSelectionUI(file, true, stats);
+                    
+                    log(`レジューム準備完了: ${stats.completed}/${stats.total} チャンク完了`, 'success');
+                    
+                    // Clear pending progress
+                    window.pendingProgress = null;
+                    document.getElementById('resumeInfo').style.display = 'none';
+                } else {
+                    log('進捗ファイルが選択されたファイルと一致しません', 'error');
+                    window.progressManager = null;
+                    updateFileSelectionUI(file, false);
+                }
+            } else {
+                // Update UI for new upload
+                updateFileSelectionUI(file, false);
+            }
+        };
+        
         // v5.3.6: Debug helper for upload status
         window.getUploadStatus = function() {
             return {
@@ -10452,4 +10767,4 @@
         });
     </script>
 </body>
-</html><!-- Force GitHub Pages update: Mon Jul 13 2025 - v5.4.0: Archive Node Support -->
+</html><!-- Force GitHub Pages update: Wed Jul 16 2025 - v5.4.41: Fix rpcClient references -->

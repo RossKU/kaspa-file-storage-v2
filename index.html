@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.4.12 - Bulk Download Password Fix</title>
+    <title>Kaspa P2P File Storage v5.4.13 - Bulk Download Folder Fix</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -8400,8 +8400,9 @@
                         const folderStructureOption = {
                             enabled: true,
                             basePath: baseDirName, // Use directory name instead of handle
-                            filePath: entry.path || entry.name
-                            // v4.7.12: Remove targetHandle to force folder picker each time
+                            filePath: entry.path || entry.name,
+                            // v5.4.13: Pass targetHandle for batch downloads to avoid multiple folder pickers
+                            targetHandle: currentTargetHandle
                         };
                         
                         await window.downloadManager.executeDownload(metadata, password, {
@@ -8436,6 +8437,12 @@
                                     log(`[一括ダウンロード] 新しいパスワードで再試行: ${entry.name}`, 'info');
                                     const metadata = await window.downloadManager.fetchMetadata(entry.metaTxId, entry.blockId, newPassword);
                                     
+                                    // 再試行時も同じフォルダ構造オプションを使用
+                                    const retryFolderOption = {
+                                        ...folderStructureOption,
+                                        targetHandle: currentTargetHandle // 再試行でも同じフォルダを使用
+                                    };
+                                    
                                     await window.downloadManager.executeDownload(metadata, newPassword, {
                                         onProgress: (progress) => {
                                             const percent = ((completedFiles + progress.current/progress.total) / totalFiles * 100);
@@ -8444,13 +8451,14 @@
                                                 percent: percent.toFixed(0)
                                             });
                                         },
-                                        folderStructure: folderStructureOption
+                                        folderStructure: retryFolderOption
                                     });
                                     
                                     completedFiles++;
                                     continue; // 次のファイルへ
                                 } catch (retryError) {
-                                    log(`[一括ダウンロード] 再試行も失敗: ${entry.name}`, 'error');
+                                    log(`[一括ダウンロード] 再試行も失敗: ${entry.name} - ${retryError.message || retryError}`, 'error');
+                                    console.error('[一括ダウンロード] 再試行エラー詳細:', retryError);
                                 }
                             }
                         }

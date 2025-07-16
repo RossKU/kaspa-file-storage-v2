@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.4.27 - Fix meta-tx creation errors</title>
+    <title>Kaspa P2P File Storage v5.4.28 - Fix empty chunks in metadata</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -872,7 +872,7 @@
     </div>
 
     <script type="module">
-        // v5.4.27: Fix meta-tx creation errors with window globals
+        // v5.4.28: Fix empty chunks in kaspaMetadata
         // - Restored architecture map
         // - 13-section code organization
         // - Improved function grouping
@@ -6087,7 +6087,7 @@
                         });
                     }
                 }
-                log(`既存のチャンク情報を復元: ${processedChunks.length}個`, 'info');
+                log(`既存のチャンク情報を復元: ${window.processedChunks.length}個`, 'info');
             }
             
             document.getElementById('uploadBtn').disabled = true;
@@ -6791,7 +6791,7 @@
                 } // End of old approach
                 
                 // Calculate cost
-                const totalPayloadKB = processedChunks.reduce((sum, c) => sum + c.payloadSize, 0) / 1024;
+                const totalPayloadKB = window.processedChunks.reduce((sum, c) => sum + c.payloadSize, 0) / 1024;
                 const totalCost = totalChunks * 0.00005 + totalPayloadKB * 0.00001;
                 
                 // Final progress save
@@ -6825,7 +6825,7 @@
                             algorithm: useCompression ? "LZ77" : "none",
                             enabled: useCompression,
                             originalSize: currentFile.size,
-                            compressedSize: processedChunks.reduce((sum, c) => sum + c.compressedSize, 0)
+                            compressedSize: window.processedChunks.reduce((sum, c) => sum + c.compressedSize, 0)
                         }
                     },
                     
@@ -6833,9 +6833,9 @@
                     cid: window.currentFileCIDFull || null,
                     
                     // Chunk information
-                    chunks: processedChunks.map(c => c.txid),
-                    chunkBlockIds: processedChunks.map(c => c.blockId),
-                    chunkSizes: processedChunks.map(c => c.originalSize), // v4.7.36: 各チャンクの実際のサイズ
+                    chunks: window.processedChunks.map(c => c.txid),
+                    chunkBlockIds: window.processedChunks.map(c => c.blockId),
+                    chunkSizes: window.processedChunks.map(c => c.originalSize), // v4.7.36: 各チャンクの実際のサイズ
                     
                     // Recovery information
                     recovery: {

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.4.38 - Add debug logging for parallel download</title>
+    <title>Kaspa P2P File Storage v5.4.39 - Phase 4 NetworkState implementation</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -883,6 +883,7 @@
         // v5.4.36: Fix infinite recursion in workspaceHandle getter/setter proxy
         // v5.4.37: Expose WorkspaceState to window for onclick handlers and global access
         // v5.4.38: Add debug logging to investigate parallel download performance issue
+        // v5.4.39: Phase 4 NetworkState implementation (kaspa, rpcClient, ws variables)
         // - Restored architecture map
         // - 13-section code organization
         // - Improved function grouping
@@ -1015,6 +1016,21 @@
         // Expose WorkspaceState to window for onclick handlers
         window.WorkspaceState = WorkspaceState;
         
+        // ===== Phase 4: Network State Refactoring (v5.4.39) =====
+        const NetworkState = {
+            kaspa: null,                // Kaspa SDK instance
+            rpcClient: null,            // RPC client instance
+            ws: {
+                connection: null,       // WebSocket connection
+                connected: false,       // WebSocket connection state
+                reconnectInterval: null,// Reconnection interval
+                monitorActive: false    // WebSocket monitoring state
+            }
+        };
+        
+        // Expose NetworkState to window for global access
+        window.NetworkState = NetworkState;
+        
         // Backward compatibility proxies (to be removed in future versions)
         let parallelDownloadEnabled = AppState.settings.parallelDownloadEnabled;
         window.parallelDownloadEnabled = AppState.settings.parallelDownloadEnabled;
@@ -1089,6 +1105,54 @@
             get() { return WorkspaceState.historyManager; },
             set(value) { 
                 WorkspaceState.historyManager = value;
+            }
+        });
+        
+        // Define getter/setter for kaspa
+        Object.defineProperty(window, 'kaspa', {
+            get() { return NetworkState.kaspa; },
+            set(value) { 
+                NetworkState.kaspa = value;
+            }
+        });
+        
+        // Define getter/setter for rpcClient
+        Object.defineProperty(window, 'rpcClient', {
+            get() { return NetworkState.rpcClient; },
+            set(value) { 
+                NetworkState.rpcClient = value;
+            }
+        });
+        
+        // Define getter/setter for wsConnection
+        Object.defineProperty(window, 'wsConnection', {
+            get() { return NetworkState.ws.connection; },
+            set(value) { 
+                NetworkState.ws.connection = value;
+            }
+        });
+        
+        // Define getter/setter for wsConnected
+        Object.defineProperty(window, 'wsConnected', {
+            get() { return NetworkState.ws.connected; },
+            set(value) { 
+                NetworkState.ws.connected = value;
+            }
+        });
+        
+        // Define getter/setter for wsReconnectInterval
+        Object.defineProperty(window, 'wsReconnectInterval', {
+            get() { return NetworkState.ws.reconnectInterval; },
+            set(value) { 
+                NetworkState.ws.reconnectInterval = value;
+            }
+        });
+        
+        // Define getter/setter for wsMonitorActive
+        Object.defineProperty(window, 'wsMonitorActive', {
+            get() { return NetworkState.ws.monitorActive; },
+            set(value) { 
+                NetworkState.ws.monitorActive = value;
             }
         });
         
@@ -4755,7 +4819,7 @@
                 updateNetworkStatus('connecting', '初期化中...');
                 
                 // Import WASM SDK
-                kaspa = await import('./kaspa-core.js');
+                NetworkState.kaspa = await import('./kaspa-core.js');
                 log('kaspa-core.jsをインポートしました');
                 
                 // Initialize WASM binary
@@ -4786,7 +4850,7 @@
                 log(`ウォレットアドレス: ${UserState.address.toString()}`, 'success');
                 
                 // Create RPC client
-                rpcClient = new kaspa.RpcClient({
+                NetworkState.rpcClient = new NetworkState.kaspa.RpcClient({
                     resolver: new kaspa.Resolver(),
                     networkId: config.network
                 });
@@ -4804,7 +4868,7 @@
                 log(`残高: ${balance} KAS`, 'info');
                 
                 // Update UI
-                window.kaspa = kaspa;
+                window.kaspa = NetworkState.kaspa;
                 document.getElementById('initStatus').style.display = 'block';
                 document.getElementById('initStatus').innerHTML = `
                     <p class="success">✅ システム初期化完了</p>
@@ -4843,7 +4907,7 @@
                 }
                 
                 // Create new RPC client with node type support
-                rpcClient = await createRpcClient();
+                NetworkState.rpcClient = await createRpcClient();
                 
                 await rpcClient.connect();
                 updateNodeConnectionStatus(config.nodeType, config.currentEndpoint);
@@ -9245,7 +9309,7 @@
                 if (rpcClient) {
                     await rpcClient.unsubscribeBlockAdded();
                 }
-                wsMonitorActive = false;
+                NetworkState.ws.monitorActive = false;
                 
                 // Clear timeout
                 if (AppState.monitoring.wsMonitorTimeout) {
@@ -9578,7 +9642,7 @@
             
             try {
                 log('WebSocket監視を開始...', 'info');
-                wsMonitorActive = true;
+                NetworkState.ws.monitorActive = true;
                 
                 // Set 5 minute timeout with upload session check (v5.3.6)
                 if (AppState.monitoring.wsMonitorTimeout) {
@@ -9676,7 +9740,7 @@
                 
             } catch (error) {
                 log(`WebSocket監視エラー: ${error.message}`, 'error');
-                wsMonitorActive = false;
+                NetworkState.ws.monitorActive = false;
                 
                 // Network error recovery - will retry on reconnect
                 if (error.message.includes('network') || error.message.includes('connection')) {
@@ -9702,7 +9766,7 @@
                     monitorLog('監視を停止しました', 'success');
                     log('WebSocket監視を停止しました', 'info');
                 }
-                wsMonitorActive = false;
+                NetworkState.ws.monitorActive = false;
                 
             } catch (error) {
                 monitorLog(`監視停止エラー: ${error.message}`, 'error');
@@ -10698,4 +10762,4 @@
         });
     </script>
 </body>
-</html><!-- Force GitHub Pages update: Wed Jul 16 2025 - v5.4.38: Debug parallel download -->
+</html><!-- Force GitHub Pages update: Wed Jul 16 2025 - v5.4.39: Phase 4 NetworkState -->

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.4.0 - Archive Node Support</title>
+    <title>Kaspa P2P File Storage v5.4.14 - Architecture Refactoring</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -872,11 +872,62 @@
     </div>
 
     <script type="module">
-        // v5.3.14: Optimized kprogress format
-        // - Removed duplicate chunks/chunkBlockIds arrays from root level
-        // - All chunk information now stored only in _progress.chunkDetails
-        // - Reduces kprogress file size by eliminating redundant data
-        // - Maintains backward compatibility by reading from chunkDetails
+        // v5.4.14: Architecture Refactoring Edition
+        // - Restored architecture map
+        // - 13-section code organization
+        // - Improved function grouping
+        
+        /*
+         * ====================================================================
+         *                    APPLICATION ARCHITECTURE MAP
+         * ====================================================================
+         * 
+         * This application follows a layered architecture pattern:
+         * 
+         * ┌─────────────────────────────────────────────────────────────────┐
+         * │                      UI LAYER (User Interface)                   │
+         * │  ├─ UI CONTROL & EVENT HANDLERS: User interactions             │
+         * │  └─ PROGRESS UPDATE SYSTEM: Visual feedback                    │
+         * ├─────────────────────────────────────────────────────────────────┤
+         * │                   BUSINESS LOGIC LAYER                          │
+         * │  ├─ FILE OPERATIONS: Upload/download orchestration             │
+         * │  ├─ TRANSACTION FUNCTIONS: Blockchain operations               │
+         * │  └─ MONITORING FUNCTIONS: Async operation tracking             │
+         * ├─────────────────────────────────────────────────────────────────┤
+         * │                  INFRASTRUCTURE LAYER                           │
+         * │  ├─ NETWORK & RPC: Kaspa blockchain connectivity               │
+         * │  ├─ STORAGE MANAGEMENT: File & progress persistence            │
+         * │  └─ CRYPTOGRAPHY & COMPRESSION: Data security                  │
+         * ├─────────────────────────────────────────────────────────────────┤
+         * │                    FOUNDATION LAYER                             │
+         * │  ├─ CONFIGURATION: System-wide constants                       │
+         * │  ├─ ERROR HANDLING: Unified error management                   │
+         * │  ├─ UTILITY FUNCTIONS: Shared helpers                          │
+         * │  └─ GLOBAL STATE: Application state management                 │
+         * └─────────────────────────────────────────────────────────────────┘
+         * 
+         * SECTION STRUCTURE:
+         * 1. CONFIGURATION .................. System constants and settings
+         * 2. ERROR HANDLING SYSTEM .......... Centralized error management
+         * 3. PROGRESS UPDATE SYSTEM ......... Unified progress tracking
+         * 4. GLOBAL STATE & INITIALIZATION .. Application state
+         * 5. UTILITY FUNCTIONS .............. General purpose helpers
+         * 6. STORAGE MANAGEMENT ............. Data persistence classes
+         * 7. CRYPTOGRAPHY & COMPRESSION ..... Security functions
+         * 8. NETWORK & RPC FUNCTIONS ........ Blockchain connectivity
+         * 9. FILE OPERATIONS ................ File handling logic
+         * 10. TRANSACTION FUNCTIONS ......... Blockchain transactions
+         * 11. MONITORING FUNCTIONS .......... WebSocket monitoring
+         * 12. TEST FUNCTIONS ................ Development utilities
+         * 13. UI CONTROL & EVENT HANDLERS ... User interface logic
+         * 
+         * CALL FLOW EXAMPLE:
+         * User Action → Event Handler → Business Logic → Infrastructure → Network
+         *      ↑                               ↓                 ↓           ↓
+         *   UI Update ← Progress Update ← Error Handler ← Response
+         * 
+         * ====================================================================
+         */
         
         // Debug logging - Safe version
         try {

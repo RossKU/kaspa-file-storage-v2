@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.4.25 - Fix const assignment error</title>
+    <title>Kaspa P2P File Storage v5.4.26 - Fix null reference errors</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -872,7 +872,7 @@
     </div>
 
     <script type="module">
-        // v5.4.25: Fix const assignment error in processAndUpload
+        // v5.4.26: Fix null reference errors with window globals
         // - Restored architecture map
         // - 13-section code organization
         // - Improved function grouping
@@ -6861,18 +6861,24 @@
                 AppState.history.uploadHistory.push({
                     filename: currentFile.name,
                     timestamp: Date.now(),
-                    metadata: kaspaMetadata
+                    metadata: window.kaspaMetadata
                 });
                 
                 log(`アップロード完了! 総コスト: ${totalCost.toFixed(5)} KAS`, 'success');
+                
+                // Debug log for kaspaMetadata
+                log(`[DEBUG] kaspaMetadata is: ${window.kaspaMetadata ? 'defined' : 'null'}`, 'debug');
+                if (window.kaspaMetadata) {
+                    log(`[DEBUG] kaspaMetadata.encryption: ${window.kaspaMetadata.encryption ? 'exists' : 'null'}`, 'debug');
+                }
                 
                 // Add to history
                 if (window.historyManager) {
                     // Get block time from last chunk or meta-tx
                     // Get block time from the last chunk
                     let blockTime = null;
-                    if (processedChunks.length > 0) {
-                        const lastChunk = processedChunks[processedChunks.length - 1];
+                    if (window.processedChunks.length > 0) {
+                        const lastChunk = window.processedChunks[window.processedChunks.length - 1];
                         if (lastChunk.blockTime) {
                             blockTime = lastChunk.blockTime.toISOString();
                             log(`[DEBUG] 最後のチャンクのブロック時刻を取得: ${blockTime}`, 'debug');
@@ -6891,23 +6897,23 @@
                         totalCost: totalCost,
                         metaTxId: null, // Will be set if meta-tx is used
                         metaTxBlockId: null, // Will be set if meta-tx is used
-                        firstChunkTxId: processedChunks[0]?.txid || '',
+                        firstChunkTxId: window.processedChunks[0]?.txid || '',
                         cid: window.currentFileCID || '',
-                        password: currentPassword || null,
+                        password: window.currentPassword || null,
                         // New structure: store encryption info directly
                         encryption: {
                             algorithm: "AES-256-GCM",
-                            salt: kaspaMetadata.encryption?.pbkdf2?.salt || '',
-                            iterations: kaspaMetadata.encryption?.pbkdf2?.iterations || 10000
+                            salt: window.kaspaMetadata?.encryption?.pbkdf2?.salt || '',
+                            iterations: window.kaspaMetadata?.encryption?.pbkdf2?.iterations || 10000
                         },
-                        compression: kaspaMetadata.file?.compression || {
+                        compression: window.kaspaMetadata?.file?.compression || {
                             algorithm: "none",
                             enabled: false
                         },
                         // Store complete metadata for backward compatibility
-                        metadata: kaspaMetadata,
-                        chunkTxIds: processedChunks.map(c => c.txid),
-                        chunkBlockIds: processedChunks.map(c => c.blockId),
+                        metadata: window.kaspaMetadata,
+                        chunkTxIds: window.processedChunks.map(c => c.txid),
+                        chunkBlockIds: window.processedChunks.map(c => c.blockId),
                         chunkSize: config.chunkSize,
                         network: config.network
                     };

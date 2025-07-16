@@ -2881,16 +2881,8 @@
             return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
         }
         
-        window.copyToClipboard = async function(text) {
-            const preview = text && text.length > 20 ? text.substring(0, 20) + '...' : text;
-            log(`[DEBUG] copyToClipboard が呼び出されました: ${preview}`, 'debug');
-            try {
-                await navigator.clipboard.writeText(text);
-                log('クリップボードにコピーしました', 'success');
-            } catch (err) {
-                log(`コピーエラー: ${err.message}`, 'error');
-            }
-        }
+        // Moved to UI CONTROL & EVENT HANDLERS section
+        // window.copyToClipboard - Clipboard operations handler
         
         // ============= STORAGE MANAGEMENT =============
         // Progress tracking and file storage classes
@@ -10836,6 +10828,18 @@
         // User interface controls and event handling functions
         
         // UI用の関数
+        
+        // Clipboard copy function (moved from UTILITY FUNCTIONS)
+        window.copyToClipboard = async function(text) {
+            const preview = text && text.length > 20 ? text.substring(0, 20) + '...' : text;
+            log(`[DEBUG] copyToClipboard が呼び出されました: ${preview}`, 'debug');
+            try {
+                await navigator.clipboard.writeText(text);
+                log('クリップボードにコピーしました', 'success');
+            } catch (err) {
+                log(`コピーエラー: ${err.message}`, 'error');
+            }
+        }
         function onNodeTypeChange() {
             const nodeTypeSelect = document.getElementById('nodeTypeSelect');
             const customEndpointSection = document.getElementById('customEndpointSection');

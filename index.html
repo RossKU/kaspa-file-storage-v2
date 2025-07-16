@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.4.21 - Fix helper functions scope</title>
+    <title>Kaspa P2P File Storage v5.4.22 - Fix global variable access</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -872,7 +872,7 @@
     </div>
 
     <script type="module">
-        // v5.4.21: Fix helper functions scope for handleFileSelect
+        // v5.4.22: Fix global variable access in UI CONTROL section
         // - Restored architecture map
         // - 13-section code organization
         // - Improved function grouping
@@ -940,6 +940,7 @@
         let kaspa = null;
         let rpcClient = null;
         let currentFile = null;
+        window.currentFile = null;  // Ensure global access
         let currentPassword = null;
         let processedChunks = [];
         let kaspaMetadata = null;
@@ -951,6 +952,7 @@
         let privateKey = null;
         let address = null;
         let progressManager = null;
+        window.progressManager = null;  // Ensure global access
         let wsConnection = null;
         let wsConnected = false;
         let wsReconnectInterval = null;
@@ -10472,7 +10474,7 @@
             const file = event.target.files[0];
             if (!file) return;
             
-            currentFile = file;
+            window.currentFile = file;
             log(`ファイル選択: ${file.name} (${(file.size/1024).toFixed(1)}KB)`);
             
             // Check file size warning
@@ -10488,14 +10490,14 @@
             if (window.pendingProgress) {
                 const chunkSize = parseInt(document.getElementById('chunkSize').value) * 1024;
                 const cid = window.currentFileCID || window.pendingProgress.cid || null;
-                progressManager = new ProgressManager(file, chunkSize, cid, 'upload');
+                window.progressManager = new ProgressManager(file, chunkSize, cid, 'upload');
                 
-                if (progressManager.validateProgress(window.pendingProgress)) {
+                if (window.progressManager.validateProgress(window.pendingProgress)) {
                     // Initialize with existing progress
-                    await progressManager.initialize(window.pendingProgress);
+                    await window.progressManager.initialize(window.pendingProgress);
                     
                     // Update UI to show resume status
-                    const stats = progressManager.getStats();
+                    const stats = window.progressManager.getStats();
                     updateFileSelectionUI(file, true, stats);
                     
                     log(`レジューム準備完了: ${stats.completed}/${stats.total} チャンク完了`, 'success');
@@ -10505,7 +10507,7 @@
                     document.getElementById('resumeInfo').style.display = 'none';
                 } else {
                     log('進捗ファイルが選択されたファイルと一致しません', 'error');
-                    progressManager = null;
+                    window.progressManager = null;
                     updateFileSelectionUI(file, false);
                 }
             } else {

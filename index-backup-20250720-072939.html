@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.6.9 - Enhanced Debug Logging</title>
+    <title>Kaspa P2P File Storage v5.6.8 - Fixed Auto-Resume Logic</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -962,10 +962,6 @@
         // v5.6.8: Fixed Auto-Resume Logic
         // - Fixed handleReconnected() calling non-existent resumeFromProgress function
         // - Now properly loads progress from localStorage and calls processAndUpload()
-        // v5.6.9: Enhanced Debug Logging (Phase 0-A)
-        // - Modified log function to accept 3rd parameter for error/object details
-        // - Fixed debug messages that were showing empty error details
-        // - Improved error object stringification with proper formatting
         // - Added debug logging for auto-resume troubleshooting
         // - Added handleNetworkError() unified error handler
         // - Improved offline/online event handling with 2-second delay
@@ -3986,7 +3982,7 @@
         }
         
         // Logging system
-        window.log = function log(message, type = 'info', detail = null) {
+        window.log = function log(message, type = 'info') {
             const timestamp = new Date();
             const logEntry = {
                 timestamp: timestamp.toISOString(),
@@ -3995,51 +3991,12 @@
                 message: message
             };
             
-            // Handle third parameter (detail) if provided
-            if (detail !== null) {
-                // For objects, try to stringify
-                if (typeof detail === 'object') {
-                    try {
-                        // Pretty print with 2 space indentation
-                        const detailStr = JSON.stringify(detail, null, 2);
-                        // If it's a single line, append inline
-                        if (!detailStr.includes('\n')) {
-                            logEntry.message += ' ' + detailStr;
-                        } else {
-                            // For multi-line, add on new line
-                            logEntry.message += '\n' + detailStr;
-                        }
-                    } catch (e) {
-                        // Handle circular references or other stringify errors
-                        if (detail instanceof Error) {
-                            logEntry.message += ' ' + detail.toString();
-                            if (detail.stack) {
-                                logEntry.message += '\nStack: ' + detail.stack;
-                            }
-                        } else {
-                            logEntry.message += ' [オブジェクトの文字列化に失敗]';
-                        }
-                    }
-                } else {
-                    // For non-objects, just convert to string
-                    logEntry.message += ' ' + String(detail);
-                }
-            }
-            
             AppState.history.systemLogs.push(logEntry);
             
             const logContainer = document.getElementById('systemLog');
             const entry = document.createElement('div');
             entry.className = 'log-entry';
-            // Escape HTML and preserve newlines for display
-            const escapedMessage = logEntry.message
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;')
-                .replace(/'/g, '&#039;')
-                .replace(/\n/g, '<br>');
-            entry.innerHTML = `<span class="log-time">[${logEntry.time}]</span> <span class="log-${type}">${escapedMessage}</span>`;
+            entry.innerHTML = `<span class="log-time">[${logEntry.time}]</span> <span class="log-${type}">${message}</span>`;
             logContainer.appendChild(entry);
             logContainer.scrollTop = logContainer.scrollHeight;
         }

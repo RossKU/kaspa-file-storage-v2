@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Log Function Test - Phase 0-A</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #1e1e1e;
+            color: #d4d4d4;
+        }
+        #systemLog {
+            background: #2d2d2d;
+            border: 1px solid #3e3e3e;
+            padding: 10px;
+            height: 400px;
+            overflow-y: auto;
+            margin-bottom: 20px;
+        }
+        .log-entry {
+            margin-bottom: 5px;
+            white-space: pre-wrap;
+        }
+        .log-time {
+            color: #6a9955;
+        }
+        .log-info {
+            color: #9cdcfe;
+        }
+        .log-error {
+            color: #f48771;
+        }
+        .log-warning {
+            color: #dcdcaa;
+        }
+        .log-success {
+            color: #4ec9b0;
+        }
+        .log-debug {
+            color: #b5cea8;
+        }
+        button {
+            margin: 5px;
+            padding: 10px;
+            background: #0e639c;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #1177bb;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 10px;
+            border: 1px solid #3e3e3e;
+        }
+    </style>
+</head>
+<body>
+    <h1>Log Function Test - Phase 0-A</h1>
+    
+    <div id="systemLog"></div>
+    
+    <div class="test-section">
+        <h2>基本テスト（2引数・後方互換性）</h2>
+        <button onclick="test2Args()">2引数テスト実行</button>
+    </div>
+    
+    <div class="test-section">
+        <h2>3引数テスト（新機能）</h2>
+        <button onclick="test3ArgsString()">文字列詳細テスト</button>
+        <button onclick="test3ArgsObject()">オブジェクト詳細テスト</button>
+        <button onclick="test3ArgsError()">エラーオブジェクトテスト</button>
+        <button onclick="test3ArgsWebSocket()">WebSocketエラーテスト</button>
+    </div>
+    
+    <div class="test-section">
+        <h2>エッジケーステスト</h2>
+        <button onclick="testCircularRef()">循環参照テスト</button>
+        <button onclick="testNull()">null/undefinedテスト</button>
+        <button onclick="testMultiline()">複数行テスト</button>
+    </div>
+    
+    <div class="test-section">
+        <h2>実際の使用例テスト</h2>
+        <button onclick="testRealWorldExamples()">実際のエラーパターン</button>
+    </div>
+    
+    <button onclick="clearLog()" style="background: #cc3333;">ログクリア</button>
+
+    <script>
+        // Mock AppState for testing
+        window.AppState = {
+            history: {
+                systemLogs: []
+            }
+        };
+        
+        // Include the modified log function here
+        window.log = function log(message, type = 'info', detail = null) {
+            const timestamp = new Date();
+            const logEntry = {
+                timestamp: timestamp.toISOString(),
+                time: timestamp.toLocaleTimeString(),
+                type: type,
+                message: message
+            };
+            
+            // Handle third parameter (detail) if provided
+            if (detail !== null) {
+                // For objects, try to stringify
+                if (typeof detail === 'object') {
+                    try {
+                        // Pretty print with 2 space indentation
+                        const detailStr = JSON.stringify(detail, null, 2);
+                        // If it's a single line, append inline
+                        if (!detailStr.includes('\n')) {
+                            logEntry.message += ' ' + detailStr;
+                        } else {
+                            // For multi-line, add on new line
+                            logEntry.message += '\n' + detailStr;
+                        }
+                    } catch (e) {
+                        // Handle circular references or other stringify errors
+                        if (detail instanceof Error) {
+                            logEntry.message += ' ' + detail.toString();
+                            if (detail.stack) {
+                                logEntry.message += '\nStack: ' + detail.stack;
+                            }
+                        } else {
+                            logEntry.message += ' [オブジェクトの文字列化に失敗]';
+                        }
+                    }
+                } else {
+                    // For non-objects, just convert to string
+                    logEntry.message += ' ' + String(detail);
+                }
+            }
+            
+            AppState.history.systemLogs.push(logEntry);
+            
+            const logContainer = document.getElementById('systemLog');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            // Escape HTML and preserve newlines for display
+            const escapedMessage = logEntry.message
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;')
+                .replace(/\n/g, '<br>');
+            entry.innerHTML = `<span class="log-time">[${logEntry.time}]</span> <span class="log-${type}">${escapedMessage}</span>`;
+            logContainer.appendChild(entry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+        
+        // Test functions
+        function test2Args() {
+            log('これは通常のログメッセージです', 'info');
+            log('警告メッセージ', 'warning');
+            log('エラーメッセージ', 'error');
+            log('成功メッセージ', 'success');
+            log('デバッグメッセージ', 'debug');
+            log('テスト完了: 2引数の後方互換性OK', 'success');
+        }
+        
+        function test3ArgsString() {
+            log('文字列詳細付きログ', 'info', 'これは追加の詳細情報です');
+            log('WebSocketエラー', 'error', 'RPC Server (remote error) -> WebSocket disconnected');
+            log('テスト完了: 文字列詳細OK', 'success');
+        }
+        
+        function test3ArgsObject() {
+            log('シンプルなオブジェクト', 'info', {key: 'value', number: 123});
+            log('ネストしたオブジェクト', 'debug', {
+                user: {
+                    name: 'テストユーザー',
+                    id: 1
+                },
+                settings: {
+                    theme: 'dark',
+                    language: 'ja'
+                }
+            });
+            log('テスト完了: オブジェクト詳細OK', 'success');
+        }
+        
+        function test3ArgsError() {
+            const error = new Error('これはテストエラーです');
+            log('エラーオブジェクト', 'error', error);
+            
+            // Simulate a real error
+            try {
+                throw new Error('スタックトレース付きエラー');
+            } catch (e) {
+                log('キャッチされたエラー', 'error', e);
+            }
+            
+            log('テスト完了: エラーオブジェクトOK', 'success');
+        }
+        
+        function test3ArgsWebSocket() {
+            // Simulate the actual error pattern from logs
+            const wsError = 'RPC Server (remote error) -> WebSocket disconnected';
+            log('[DEBUG] エラーオブジェクト:', wsError, 'debug');
+            
+            const wsError2 = 'RPC Server (remote error) -> WebSocket -> WebSocket is not connected';
+            log('[新方式] エラー詳細:', wsError2, 'error');
+            
+            log('テスト完了: WebSocketエラーパターンOK', 'success');
+        }
+        
+        function testCircularRef() {
+            const obj = {name: 'circular'};
+            obj.self = obj; // Create circular reference
+            
+            log('循環参照オブジェクト', 'warning', obj);
+            log('テスト完了: 循環参照処理OK', 'success');
+        }
+        
+        function testNull() {
+            log('null詳細', 'info', null);
+            log('undefined詳細', 'info', undefined);
+            log('空文字列詳細', 'info', '');
+            log('数値ゼロ詳細', 'info', 0);
+            log('false詳細', 'info', false);
+            log('テスト完了: null/undefined処理OK', 'success');
+        }
+        
+        function testMultiline() {
+            const multilineData = {
+                message: 'これは複数行の\nメッセージです',
+                data: {
+                    lines: ['行1', '行2', '行3'],
+                    nested: {
+                        deep: {
+                            value: 'ネストした値'
+                        }
+                    }
+                }
+            };
+            
+            log('複数行データ', 'info', multilineData);
+            log('テスト完了: 複数行表示OK', 'success');
+        }
+        
+        function testRealWorldExamples() {
+            // Test actual error patterns from the log file
+            log('ペイロード 3 エラー (試行 1/3): RPC Server (remote error) -> WebSocket disconnected', 'error');
+            log('[DEBUG] エラーオブジェクト:', 'RPC Server (remote error) -> WebSocket disconnected', 'debug');
+            log('[DEBUG] エラータイプ: string', 'debug');
+            
+            // Test with error detail
+            const errorDetail = {
+                message: 'WebSocket is not connected',
+                code: 'WS_NOT_CONNECTED',
+                timestamp: new Date().toISOString()
+            };
+            log('[新方式] エラー詳細:', errorDetail, 'error');
+            
+            // Test progress save
+            const progressData = {
+                completedChunks: 2,
+                totalChunks: 24,
+                fileName: 'test.jpg',
+                size: 1493
+            };
+            log('[DEBUG] 進捗データサイズ: 1493 bytes', 'debug', progressData);
+            
+            log('テスト完了: 実際のエラーパターンOK', 'success');
+        }
+        
+        function clearLog() {
+            document.getElementById('systemLog').innerHTML = '';
+            AppState.history.systemLogs = [];
+            log('ログをクリアしました', 'info');
+        }
+        
+        // Initial message
+        log('Log Function Test Ready - Phase 0-A修正確認', 'info');
+        log('各テストボタンをクリックして動作を確認してください', 'info');
+    </script>
+</body>
+</html>

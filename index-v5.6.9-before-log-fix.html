@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.6.10 - Fixed Log Argument Order</title>
+    <title>Kaspa P2P File Storage v5.6.9 - Enhanced Debug Logging</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -966,10 +966,6 @@
         // - Modified log function to accept 3rd parameter for error/object details
         // - Fixed debug messages that were showing empty error details
         // - Improved error object stringification with proper formatting
-        // v5.6.10: Fixed Log Argument Order
-        // - Fixed incorrect argument order in log() calls
-        // - Changed log(message, detail, type) to log(message, type, detail)
-        // - Now error objects are properly displayed in debug logs
         // - Added debug logging for auto-resume troubleshooting
         // - Added handleNetworkError() unified error handler
         // - Improved offline/online event handling with 2-second delay
@@ -5514,7 +5510,7 @@
                 log('すべての必要な関数を確認しました', 'success');
                 
                 // Initialize wallet
-                log('[DEBUG] UserState before initialization:', 'debug', UserState);
+                log('[DEBUG] UserState before initialization:', UserState, 'debug');
                 UserState.privateKey = new NetworkState.kaspa.PrivateKey(config.testPrivateKey);
                 log('[DEBUG] UserState.privateKey set', 'debug');
                 
@@ -5522,7 +5518,7 @@
                 log('[DEBUG] Public key generated', 'debug');
                 
                 UserState.address = publicKey.toAddress(config.network);
-                log('[DEBUG] UserState.address set:', 'debug', UserState.address);
+                log('[DEBUG] UserState.address set:', UserState.address, 'debug');
                 
                 log(`ウォレットアドレス: ${UserState.address.toString()}`, 'success');
                 
@@ -7424,7 +7420,7 @@
                                 retries++;
                                 const errorMessage = error?.message || error?.toString() || 'Unknown error';
                                 log(`ペイロード ${i + 1} エラー (試行 ${retries}/${config.retryCount}): ${errorMessage}`, 'error');
-                                log(`[DEBUG] エラーオブジェクト:`, 'debug', error);
+                                log(`[DEBUG] エラーオブジェクト:`, error, 'debug');
                                 log(`[DEBUG] エラータイプ: ${typeof error}`, 'debug');
                                 if (error?.stack) {
                                     log(`[DEBUG] スタックトレース: ${error.stack}`, 'debug');
@@ -7490,7 +7486,7 @@
                         // v4.7.57: 新方式のエラーハンドリング
                         const errorMessage = error?.message || error?.toString() || 'Unknown error';
                         log(`[新方式] エラーが発生しました: ${errorMessage}`, 'error');
-                        log(`[新方式] エラー詳細:`, 'error', error);
+                        log(`[新方式] エラー詳細:`, error, 'error');
                         log(`[新方式] 処理を中断します`, 'error');
                         throw error;
                     }
@@ -7949,7 +7945,7 @@
                 const errorMessage = error?.message || error?.toString() || 'Unknown error';
                 log(`アップロードエラー: ${errorMessage}`, 'error');
                 console.error('Upload error:', error);
-                log(`[DEBUG] エラーオブジェクト:`, 'debug', error);
+                log(`[DEBUG] エラーオブジェクト:`, error, 'debug');
                 log(`[DEBUG] エラータイプ: ${typeof error}`, 'debug');
                 if (error?.stack) {
                     log(`[DEBUG] エラースタック: ${error.stack}`, 'debug');

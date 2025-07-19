@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.5.38-safe - uploadingDirMeta parallel update</title>
+    <title>Kaspa P2P File Storage v5.5.38 - FileState.uploadingDirMeta migration (Phase 5 complete!)</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -939,9 +939,14 @@
         // - This bug caused "Cannot read properties of undefined (reading 'ws')" error
         // - Affected waitForConfirmation and chunk upload BlockID retrieval
         // v5.5.37: FileState.uploadingMetaTx migration
-        // - Moved global isUploadingFile variable to FileState object
-        // - Updated all references (5 locations) to use FileState.isUploadingFile
+        // - Moved global uploadingMetaTx variable to FileState object
+        // - Updated all references (7 locations) to use FileState.uploadingMetaTx
         // - Added backward compatibility proxy for smooth transition
+        // v5.5.38: FileState.uploadingDirMeta migration - Phase 5 COMPLETE! 🎉
+        // - Moved final global variable uploadingDirMeta to FileState object
+        // - Updated all references (6 locations) to use FileState.uploadingDirMeta
+        // - Added backward compatibility proxy for smooth transition
+        // - Phase 5 now at 100% completion (all 11 FileState variables migrated)
         
         /*
          * ====================================================================
@@ -1026,7 +1031,7 @@
         // wsMonitorTimeout moved to AppState.monitoring.wsMonitorTimeout
         // let uploadingChunksCount = 0; // Number of chunks being uploaded - v5.5.36: Moved to FileState.uploadingChunksCount
         // let uploadingMetaTx = false; // Whether meta-tx is being uploaded - v5.5.37: Moved to FileState.uploadingMetaTx
-        let uploadingDirMeta = false; // Whether directory meta is being uploaded
+        // let uploadingDirMeta = false; // Whether directory meta is being uploaded - v5.5.38: Moved to FileState.uploadingDirMeta
         // let isUploadingFile = false; // Overall file upload status (v3.6.3 fix) - v5.5.34: Moved to FileState.isUploadingFile
         // let uploadSessionActive = false; // Upload session active flag (v5.3.6) - v5.5.35: Moved to FileState.uploadSessionActive
         
@@ -1096,7 +1101,7 @@
             uploadSessionActive: false, // Upload session active flag (v5.5.35)
             uploadingChunksCount: 0, // Number of chunks being uploaded (v5.5.36)
             uploadingMetaTx: false,  // Whether meta-tx is being uploaded (v5.5.37)
-            uploadingDirMeta: false  // Whether directory meta is being uploaded (v5.5.38-safe)
+            uploadingDirMeta: false  // Whether directory meta is being uploaded (v5.5.38)
         };
         
         // Expose FileState to window for global access
@@ -1378,6 +1383,20 @@
             });
         } catch (e) {
             console.warn('uploadingMetaTx proxy already defined:', e);
+        }
+        
+        // v5.5.38: uploadingDirMetaの後方互換性プロキシ
+        try {
+            Object.defineProperty(window, 'uploadingDirMeta', {
+                get() { return FileState.uploadingDirMeta; },
+                set(value) { 
+                    FileState.uploadingDirMeta = value;
+                },
+                configurable: true,
+                enumerable: true
+            });
+        } catch (e) {
+            console.warn('uploadingDirMeta proxy already defined:', e);
         }
         
         // v5.5.20: currentPasswordの後方互換性プロキシ
@@ -5695,9 +5714,7 @@
                 const txid = await sendTransaction(transaction);
                 
                 // Add to monitoring list
-                uploadingDirMeta = true;
-                FileState.uploadingDirMeta = true; // v5.5.38-safe: Parallel update for safety
-                log(`[DEBUG v5.5.38] uploadingDirMeta set to true (both global and FileState)`, 'debug');
+                FileState.uploadingDirMeta = true; // v5.5.38: Using FileState
                 NetworkState.ws.monitoredTransactions.set(txid, {
                     type: 'directory-meta',
                     timestamp: Date.now(),
@@ -5710,9 +5727,7 @@
                 
                 // Remove from monitoring list
                 NetworkState.ws.monitoredTransactions.delete(txid);
-                uploadingDirMeta = false;
-                FileState.uploadingDirMeta = false; // v5.5.38-safe: Parallel update for safety
-                log(`[DEBUG v5.5.38] uploadingDirMeta set to false (both global and FileState)`, 'debug');
+                FileState.uploadingDirMeta = false; // v5.5.38: Using FileState
                 log(`[DEBUG] WebSocket監視リストから削除: TxID: ${txid.substring(0, 16)}... (BlockID取得済み)`, 'debug');
                 checkMonitoringStop();
                 
@@ -5726,9 +5741,7 @@
             } catch (error) {
                 log(`ディレクトリメタデータアップロードエラー: ${error.message}`, 'error');
                 // Clean up on error
-                uploadingDirMeta = false;
-                FileState.uploadingDirMeta = false; // v5.5.38-safe: Parallel update for safety
-                log(`[DEBUG v5.5.38] uploadingDirMeta set to false on error (both global and FileState)`, 'debug');
+                FileState.uploadingDirMeta = false; // v5.5.38: Using FileState
                 checkMonitoringStop();
                 return {
                     success: false,
@@ -9639,11 +9652,11 @@
             }
             
             // v3.6.3 fix: Check overall upload status
-            if (FileState.uploadingChunksCount === 0 && !FileState.uploadingMetaTx && !uploadingDirMeta && !FileState.isUploadingFile) { // v5.5.34, v5.5.36 & v5.5.37: Using FileState
+            if (FileState.uploadingChunksCount === 0 && !FileState.uploadingMetaTx && !FileState.uploadingDirMeta && !FileState.isUploadingFile) { // v5.5.34, v5.5.36, v5.5.37 & v5.5.38: Using FileState
                 log(`[DEBUG] WebSocket監視: 残り0件 - 自動停止します`, 'debug');
                 await stopMonitoring();
             } else {
-                log(`[DEBUG] 監視継続: chunks=${FileState.uploadingChunksCount}, meta=${FileState.uploadingMetaTx}, dir=${uploadingDirMeta}, file=${FileState.isUploadingFile}`, 'debug'); // v5.5.34, v5.5.36 & v5.5.37: Using FileState
+                log(`[DEBUG] 監視継続: chunks=${FileState.uploadingChunksCount}, meta=${FileState.uploadingMetaTx}, dir=${FileState.uploadingDirMeta}, file=${FileState.isUploadingFile}`, 'debug'); // v5.5.34, v5.5.36, v5.5.37 & v5.5.38: Using FileState
             }
         }
         
@@ -10002,7 +10015,7 @@
                 }
                 AppState.monitoring.wsMonitorTimeout = setTimeout(async () => {
                     // v5.3.7: Enhanced check - Don't stop monitoring during any upload activity
-                    if (FileState.uploadSessionActive || FileState.isUploadingFile || FileState.uploadingChunksCount > 0 || FileState.uploadingMetaTx || uploadingDirMeta) { // v5.5.34, v5.5.35, v5.5.36 & v5.5.37: Using FileState
+                    if (FileState.uploadSessionActive || FileState.isUploadingFile || FileState.uploadingChunksCount > 0 || FileState.uploadingMetaTx || FileState.uploadingDirMeta) { // v5.5.34, v5.5.35, v5.5.36, v5.5.37 & v5.5.38: Using FileState
                         log(`[DEBUG] アップロード中 - WebSocket監視を継続 (session=${FileState.uploadSessionActive}, file=${FileState.isUploadingFile}, chunks=${FileState.uploadingChunksCount})`, 'debug'); // v5.5.34, v5.5.35 & v5.5.36: Using FileState
                         // Reset timeout
                         clearTimeout(AppState.monitoring.wsMonitorTimeout);
@@ -11076,17 +11089,12 @@
         
         // v5.3.6: Debug helper for upload status
         window.getUploadStatus = function() {
-            // v5.5.38-safe: Check synchronization
-            if (uploadingDirMeta !== FileState.uploadingDirMeta) {
-                console.warn(`[v5.5.38] SYNC ERROR: uploadingDirMeta=${uploadingDirMeta}, FileState.uploadingDirMeta=${FileState.uploadingDirMeta}`);
-            }
             return {
                 sessionActive: FileState.uploadSessionActive, // v5.5.35: Using FileState
                 wsMonitoring: wsMonitorActive,
                 uploadingChunks: FileState.uploadingChunksCount, // v5.5.36: Using FileState
                 uploadingMeta: FileState.uploadingMetaTx, // v5.5.37: Using FileState
-                uploadingDir: uploadingDirMeta,
-                uploadingDirFileState: FileState.uploadingDirMeta, // v5.5.38-safe: Show both values
+                uploadingDir: FileState.uploadingDirMeta, // v5.5.38: Using FileState
                 uploadingFile: FileState.isUploadingFile, // v5.5.34: Using FileState
                 monitoredTx: NetworkState.ws.monitoredTransactions.size
             };
@@ -11123,4 +11131,4 @@
         });
     </script>
 </body>
-</html><!-- Force GitHub Pages update: Wed Jul 16 2025 - v5.4.41: Fix rpcClient references -->
+</html><!-- Force GitHub Pages update: Sat Jul 19 2025 14:22 JST - v5.5.38: Phase 5 COMPLETE! All global state refactoring finished -->

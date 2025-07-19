@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.6.2 - Network Recovery Bug Fixes</title>
+    <title>Kaspa P2P File Storage v5.6.3 - Network Event Management Fix</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -954,7 +954,10 @@
         // - Added NetworkState.reconnection for recovery state management
         // - Implemented sleep() and network recovery helper functions
         // - Created createRpcClient() with node type support (archive/custom/standard)
-        // v5.6.2: Network Recovery Bug Fixes
+        // v5.6.3: Network Event Management Fix
+        // - Fixed offlineTimeout scope issue
+        // - Added debounce to prevent rapid online events
+        // - Improved WebSocket error handling
         // - Added handleNetworkError() unified error handler
         // - Improved offline/online event handling with 2-second delay
         // - Auto-resume uploads after network recovery
@@ -1108,7 +1111,9 @@
                 maxRetries: 5,          // Maximum reconnection attempts
                 baseDelay: 2000,        // Base delay in ms (2 seconds)
                 activeWaiters: new Set() // Track waiting promises
-            }
+            },
+            // v5.6.3: Network status monitoring
+            offlineTimeout: null        // Timer for offline detection delay
         };
         
         // Expose NetworkState to window for global access
@@ -7749,7 +7754,12 @@
                 
                 // v5.6.2: Check if network error to preserve ProgressManager
                 if (isNetworkError(error)) {
-                    log('ネットワークエラーを検出 - ProgressManagerを保持します', 'info');
+                    // v5.6.3: Check if actual network disconnection or just WebSocket issue
+                    if (navigator.onLine) {
+                        log('WebSocketエラーを検出（ネットワークは接続中） - ProgressManagerを保持します', 'info');
+                    } else {
+                        log('ネットワークエラーを検出 - ProgressManagerを保持します', 'info');
+                    }
                     FileState.networkErrorOccurred = true;
                 } else {
                     FileState.networkErrorOccurred = false;
@@ -10182,13 +10192,21 @@
             }, 1000);
             
             // Network status monitoring (v5.6.0 - Phase 3)
-            let offlineTimeout = null;
+            // v5.6.3: offlineTimeout moved to NetworkState
             
             window.addEventListener('online', async () => {
+                // v5.6.3: Add debounce to prevent multiple rapid fires
+                const now = Date.now();
+                if (NetworkState.lastOnlineEvent && (now - NetworkState.lastOnlineEvent) < 500) {
+                    // Ignore rapid-fire online events
+                    return;
+                }
+                NetworkState.lastOnlineEvent = now;
+                
                 // Clear offline timeout if exists
-                if (offlineTimeout) {
-                    clearTimeout(offlineTimeout);
-                    offlineTimeout = null;
+                if (NetworkState.offlineTimeout) {
+                    clearTimeout(NetworkState.offlineTimeout);
+                    NetworkState.offlineTimeout = null;
                     log('ネットワーク接続が復活しました（切断検知をキャンセル）', 'success');
                 } else {
                     log('ネットワーク接続が復活しました', 'success');
@@ -10238,8 +10256,14 @@
             });
             
             window.addEventListener('offline', () => {
+                // v5.6.3: Clear any existing timer first
+                if (NetworkState.offlineTimeout) {
+                    clearTimeout(NetworkState.offlineTimeout);
+                    NetworkState.offlineTimeout = null;
+                }
+                
                 // Delay detection to avoid false positives
-                offlineTimeout = setTimeout(async () => {
+                NetworkState.offlineTimeout = setTimeout(async () => {
                     if (!navigator.onLine) {
                         log('ネットワーク接続が切断されました（2秒経過）', 'error');
                         updateNetworkStatus('offline', 'オフライン');
@@ -10252,7 +10276,7 @@
                         }
                     }
                     // v5.6.2: Fix offline timer bug - clear reference after execution
-                    offlineTimeout = null;
+                    NetworkState.offlineTimeout = null;
                 }, 2000);  // 2 second delay
             });
             

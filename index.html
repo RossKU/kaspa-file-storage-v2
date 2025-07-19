@@ -5424,6 +5424,61 @@
             }
         }
 
+        // Network error handler (v5.6.0 - Phase 2a)
+        async function handleNetworkError(error, source) {
+            const reconnection = NetworkState.reconnection;
+            
+            // Already reconnecting - wait
+            if (reconnection.isReconnecting) {
+                log(`[${source}] 再接続中のため待機します`, 'info');
+                await waitForReconnection();
+                return true;
+            }
+            
+            // Skip non-network errors
+            if (!isNetworkError(error)) {
+                return false;
+            }
+            
+            reconnection.retryCount++;
+            
+            // Minor errors (first 2 attempts) - short wait
+            if (reconnection.retryCount <= 2) {
+                const delay = getBackoffDelay(reconnection.retryCount - 1);
+                log(`[${source}] ネットワーク応答遅延を検知。${delay}ms待機...`, 'warning');
+                await sleep(delay);
+                return false;
+            }
+            
+            // Major disconnection - start reconnection
+            log(`[${source}] ネットワーク完全切断を検知。再接続を開始...`, 'error');
+            reconnection.isReconnecting = true;
+            
+            try {
+                // Reconnect RPC
+                await initializeRpcClient();
+                
+                // Restart WebSocket monitoring if active
+                if (NetworkState.ws.monitorActive) {
+                    await restartMonitoring();
+                }
+                
+                log('ネットワーク再接続完了', 'success');
+                
+                // Resolve waiting promises
+                reconnection.activeWaiters.forEach(resolve => resolve());
+                reconnection.activeWaiters.clear();
+                
+                return true;
+            } catch (reconnectError) {
+                log(`再接続失敗: ${reconnectError.message}`, 'error');
+                throw reconnectError;
+            } finally {
+                reconnection.isReconnecting = false;
+                reconnection.retryCount = 0;
+            }
+        }
+
         // Moved to UI CONTROL & EVENT HANDLERS section
         // window.testConnection - Connection test handler
 

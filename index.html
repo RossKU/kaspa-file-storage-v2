@@ -1091,6 +1091,14 @@
                 reconnectInterval: null,// Reconnection interval
                 monitorActive: false,   // WebSocket monitoring state
                 monitoredTransactions: new Map()  // v5.4.52: Moved from global scope
+            },
+            // Network auto-recovery system (v5.6.0)
+            reconnection: {
+                isReconnecting: false,  // Whether reconnection is in progress
+                retryCount: 0,          // Current retry attempt count
+                maxRetries: 5,          // Maximum reconnection attempts
+                baseDelay: 2000,        // Base delay in ms (2 seconds)
+                activeWaiters: new Set() // Track waiting promises
             }
         };
         
@@ -2957,6 +2965,56 @@
         }
         
         // Utility functions
+        
+        // Sleep function for delays
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+        
+        // Network recovery helper functions (v5.6.0)
+        
+        // Wait for reconnection to complete
+        async function waitForReconnection() {
+            const reconnection = NetworkState.reconnection;
+            if (!reconnection.isReconnecting) return;
+            
+            // Create a promise that resolves when reconnection completes
+            return new Promise((resolve) => {
+                reconnection.activeWaiters.add(resolve);
+                
+                // Check periodically if reconnection completed
+                const checkInterval = setInterval(() => {
+                    if (!reconnection.isReconnecting) {
+                        clearInterval(checkInterval);
+                        reconnection.activeWaiters.delete(resolve);
+                        resolve();
+                    }
+                }, 100);
+            });
+        }
+        
+        // Check if error is network-related
+        function isNetworkError(error) {
+            if (!error) return false;
+            const message = error.message?.toLowerCase() || '';
+            return message.includes('network') || 
+                   message.includes('connection') || 
+                   message.includes('not connected') ||
+                   message.includes('offline') ||
+                   message.includes('timeout') ||
+                   message.includes('disconnected');
+        }
+        
+        // Calculate backoff delay with exponential increase
+        function getBackoffDelay(retryCount, baseDelay = 2000) {
+            // Exponential backoff: 2s, 4s, 8s, 16s, 32s (max)
+            const maxDelay = 32000; // 32 seconds max
+            const delay = Math.min(baseDelay * Math.pow(2, retryCount), maxDelay);
+            // Add jitter (±20%) to avoid thundering herd
+            const jitter = delay * 0.2 * (Math.random() - 0.5);
+            return Math.floor(delay + jitter);
+        }
+        
         function formatSize(bytes) {
             if (bytes === 0) return '0 B';
             const k = 1024;
@@ -5293,6 +5351,40 @@
                 updateNetworkStatus('offline', 'エラー');
             }
         };
+        
+        // Create RPC client based on node type configuration (v5.6.0)
+        async function createRpcClient() {
+            let endpoint = null;
+            
+            // Determine endpoint based on nodeType
+            if (config.nodeType === 'archive') {
+                // Use archive node endpoint
+                endpoint = config.archiveEndpoints[config.network];
+                log(`[RPC] アーカイブノードを使用: ${endpoint}`, 'info');
+            } else if (config.nodeType === 'custom' && config.customEndpoint) {
+                // Use custom endpoint
+                endpoint = config.customEndpoint;
+                log(`[RPC] カスタムエンドポイントを使用: ${endpoint}`, 'info');
+            } else {
+                // Use standard resolver (auto or standard mode)
+                log(`[RPC] 標準Resolverを使用 (${config.nodeType} mode)`, 'info');
+            }
+            
+            // Create RPC client with appropriate configuration
+            if (endpoint) {
+                // Direct connection to specific endpoint
+                return new NetworkState.kaspa.RpcClient({
+                    url: endpoint,
+                    networkId: config.network
+                });
+            } else {
+                // Use resolver for automatic node discovery
+                return new NetworkState.kaspa.RpcClient({
+                    resolver: new NetworkState.kaspa.Resolver(),
+                    networkId: config.network
+                });
+            }
+        }
         
         // Initialize or reinitialize RPC client
         async function initializeRpcClient() {

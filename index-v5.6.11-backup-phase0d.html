@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.6.12 - Coherent Connection Management</title>
+    <title>Kaspa P2P File Storage v5.6.11 - Fixed Upload Session Timing</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -3123,22 +3123,17 @@
             
             // Handle successful reconnection
             async handleReconnected() {
-                // Phase 0-D: 改善された接続状態管理
-                log('[ConnectionManager] 接続が安定しました', 'info');
+                log('[ConnectionManager] ネットワーク接続が復活しました', 'success');
                 
                 this.isConnected = true;
                 this.reconnectAttempts = 0;
                 this.lastError = null;
                 updateNetworkStatus('online', 'オンライン');
                 
-                // Phase 0-D: WebSocket監視の調整
-                if (NetworkState.ws.monitorActive && NetworkState.ws.connected) {
-                    log('[ConnectionManager] WebSocket監視は既に正常動作中', 'debug');
-                } else if (NetworkState.ws.monitorActive && !NetworkState.ws.connected) {
-                    log('[ConnectionManager] WebSocket監視を再構築します', 'info');
+                // Restart WebSocket monitoring if needed
+                if (NetworkState.ws.monitorActive && !NetworkState.ws.connected) {
+                    log('[ConnectionManager] WebSocket監視を再開します', 'info');
                     await restartMonitoring();
-                } else {
-                    log('[ConnectionManager] WebSocket監視は停止中', 'debug');
                 }
                 
                 // Auto-resume upload if in progress
@@ -10599,24 +10594,11 @@
         
         // Restart monitoring after network recovery
         async function restartMonitoring() {
-            // Phase 0-D: 改善された接続状態管理
-            if (!NetworkState.ws.monitorActive) {
-                log('[Monitor] 既に停止しているため、再起動不要', 'debug');
-                return;
-            }
-            
-            log('[Monitor] WebSocket監視を再構築します', 'info');
-            
-            // 停止処理
-            await stopMonitoring();
-            
-            // WebSocketが本当に準備できるまで待つ
-            if (NetworkState.rpcClient && NetworkState.rpcClient.isConnected) {
-                // Phase 0-D: 無駄な待機を削除、代わりに状態確認
-                log('[Monitor] RPC接続確認完了、監視を開始します', 'debug');
+            if (NetworkState.ws.monitorActive) {
+                log('WebSocket監視の再起動を試みます', 'info');
+                await stopMonitoring();
+                await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
                 await startMonitoring();
-            } else {
-                log('[Monitor] RPC接続が不安定なため、監視開始を延期', 'warning');
             }
         }
         

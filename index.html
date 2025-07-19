@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.6.1 - Enhanced Network Recovery</title>
+    <title>Kaspa P2P File Storage v5.6.2 - Network Recovery Bug Fixes</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -954,7 +954,7 @@
         // - Added NetworkState.reconnection for recovery state management
         // - Implemented sleep() and network recovery helper functions
         // - Created createRpcClient() with node type support (archive/custom/standard)
-        // v5.6.1: Enhanced Network Recovery
+        // v5.6.2: Network Recovery Bug Fixes
         // - Added handleNetworkError() unified error handler
         // - Improved offline/online event handling with 2-second delay
         // - Auto-resume uploads after network recovery
@@ -7746,6 +7746,14 @@
                 if (error?.stack) {
                     log(`[DEBUG] エラースタック: ${error.stack}`, 'debug');
                 }
+                
+                // v5.6.2: Check if network error to preserve ProgressManager
+                if (isNetworkError(error)) {
+                    log('ネットワークエラーを検出 - ProgressManagerを保持します', 'info');
+                    FileState.networkErrorOccurred = true;
+                } else {
+                    FileState.networkErrorOccurred = false;
+                }
             } finally {
                 // v3.6.3 fix: Clear upload flag
                 FileState.isUploadingFile = false; // v5.5.34: Using FileState
@@ -7766,8 +7774,15 @@
                 
                 // v4.7.13: Reset ProgressManager to prevent reuse
                 // v5.5.28: Fixed local variable reference - use FileState.progressManager
-                FileState.progressManager = null;
-                log('ProgressManagerをリセットしました', 'debug');
+                // v5.6.2: Do not reset ProgressManager on network errors
+                if (!FileState.networkErrorOccurred) {
+                    FileState.progressManager = null;
+                    log('ProgressManagerをリセットしました', 'debug');
+                } else {
+                    log('ネットワークエラーのため、ProgressManagerを保持します', 'info');
+                    // Clear the flag for next time
+                    FileState.networkErrorOccurred = false;
+                }
             }
         };
 
@@ -10236,6 +10251,8 @@
                             log('進捗を自動保存しました', 'info');
                         }
                     }
+                    // v5.6.2: Fix offline timer bug - clear reference after execution
+                    offlineTimeout = null;
                 }, 2000);  // 2 second delay
             });
             

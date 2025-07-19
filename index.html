@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.6.3 - Network Event Management Fix</title>
+    <title>Kaspa P2P File Storage v5.6.4 - Debug Logging for Network Analysis</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -954,10 +954,11 @@
         // - Added NetworkState.reconnection for recovery state management
         // - Implemented sleep() and network recovery helper functions
         // - Created createRpcClient() with node type support (archive/custom/standard)
-        // v5.6.3: Network Event Management Fix
-        // - Fixed offlineTimeout scope issue
-        // - Added debounce to prevent rapid online events
-        // - Improved WebSocket error handling
+        // v5.6.4: Debug Logging for Network Analysis
+        // - Added comprehensive debug logging for offline/online events
+        // - Track WebSocket state changes in detail
+        // - Monitor navigator.onLine and timer states
+        // Previous fixes from v5.6.3 included
         // - Added handleNetworkError() unified error handler
         // - Improved offline/online event handling with 2-second delay
         // - Auto-resume uploads after network recovery
@@ -7754,6 +7755,14 @@
                 
                 // v5.6.2: Check if network error to preserve ProgressManager
                 if (isNetworkError(error)) {
+                    // v5.6.4: Enhanced debug logging for network errors
+                    const errorTime = new Date().toISOString();
+                    log(`[DEBUG] ネットワークエラー詳細 - 時刻: ${errorTime}`, 'debug');
+                    log(`[DEBUG] エラーメッセージ: "${error.message}"`, 'debug');
+                    log(`[DEBUG] navigator.onLine: ${navigator.onLine}`, 'debug');
+                    log(`[DEBUG] WebSocket接続状態: ${NetworkState.ws.connected ? '接続中' : '切断'}`, 'debug');
+                    log(`[DEBUG] 既存offlineタイマー: ${NetworkState.offlineTimeout ? `あり(ID: ${NetworkState.offlineTimeout})` : 'なし'}`, 'debug');
+                    
                     // v5.6.3: Check if actual network disconnection or just WebSocket issue
                     if (navigator.onLine) {
                         log('WebSocketエラーを検出（ネットワークは接続中） - ProgressManagerを保持します', 'info');
@@ -10197,8 +10206,15 @@
             window.addEventListener('online', async () => {
                 // v5.6.3: Add debounce to prevent multiple rapid fires
                 const now = Date.now();
+                
+                // v5.6.4: Debug logging for online event
+                log(`[DEBUG] onlineイベント発火 - navigator.onLine: ${navigator.onLine}, ` +
+                    `WebSocket状態: ${NetworkState.ws.connected ? '接続中' : '切断'}, ` +
+                    `RPC接続: ${NetworkState.rpcClient ? '有効' : '無効'}`, 'debug');
+                
                 if (NetworkState.lastOnlineEvent && (now - NetworkState.lastOnlineEvent) < 500) {
                     // Ignore rapid-fire online events
+                    log(`[DEBUG] onlineイベントを無視 (${now - NetworkState.lastOnlineEvent}ms以内の再発火)`, 'debug');
                     return;
                 }
                 NetworkState.lastOnlineEvent = now;
@@ -10208,8 +10224,10 @@
                     clearTimeout(NetworkState.offlineTimeout);
                     NetworkState.offlineTimeout = null;
                     log('ネットワーク接続が復活しました（切断検知をキャンセル）', 'success');
+                    log(`[DEBUG] offlineタイマーをクリア - タイマーID: ${NetworkState.offlineTimeout}`, 'debug');
                 } else {
                     log('ネットワーク接続が復活しました', 'success');
+                    log('[DEBUG] offlineタイマーは設定されていませんでした', 'debug');
                 }
                 
                 if (rpcClient) {
@@ -10256,14 +10274,22 @@
             });
             
             window.addEventListener('offline', () => {
+                // v5.6.4: Debug logging for offline event
+                const timestamp = new Date().toISOString();
+                log(`[DEBUG] offlineイベント発火 - ${timestamp}, navigator.onLine: ${navigator.onLine}, ` +
+                    `WebSocket状態: ${NetworkState.ws.connected ? '接続中' : '切断'}, ` +
+                    `既存タイマー: ${NetworkState.offlineTimeout ? 'あり' : 'なし'}`, 'debug');
+                
                 // v5.6.3: Clear any existing timer first
                 if (NetworkState.offlineTimeout) {
                     clearTimeout(NetworkState.offlineTimeout);
+                    log(`[DEBUG] 既存のofflineタイマーをクリア (ID: ${NetworkState.offlineTimeout})`, 'debug');
                     NetworkState.offlineTimeout = null;
                 }
                 
                 // Delay detection to avoid false positives
-                NetworkState.offlineTimeout = setTimeout(async () => {
+                const timerId = setTimeout(async () => {
+                    log(`[DEBUG] offlineタイマー実行開始 - navigator.onLine: ${navigator.onLine}`, 'debug');
                     if (!navigator.onLine) {
                         log('ネットワーク接続が切断されました（2秒経過）', 'error');
                         updateNetworkStatus('offline', 'オフライン');
@@ -10274,10 +10300,15 @@
                             await FileState.progressManager.saveProgress();
                             log('進捗を自動保存しました', 'info');
                         }
+                    } else {
+                        log('[DEBUG] offlineタイマー実行時、既にオンラインに復帰していました', 'debug');
                     }
                     // v5.6.2: Fix offline timer bug - clear reference after execution
                     NetworkState.offlineTimeout = null;
                 }, 2000);  // 2 second delay
+                
+                NetworkState.offlineTimeout = timerId;
+                log(`[DEBUG] 新しいofflineタイマーを設定 (ID: ${timerId})`, 'debug');
             });
             
             // Periodic cleanup of old progress data
@@ -10330,6 +10361,10 @@
             }
             
             try {
+                // v5.6.4: Debug logging for WebSocket monitoring
+                log(`[DEBUG] WebSocket監視開始前の状態 - navigator.onLine: ${navigator.onLine}, ` +
+                    `既存offlineタイマー: ${NetworkState.offlineTimeout ? `あり(ID: ${NetworkState.offlineTimeout})` : 'なし'}`, 'debug');
+                
                 log('WebSocket監視を開始...', 'info');
                 NetworkState.ws.monitorActive = true;
                 
@@ -10359,9 +10394,16 @@
                     await stopMonitoring();
                 }, 5 * 60 * 1000);
                 
+                // v5.6.4: Debug logging before WebSocket subscription
+                log(`[DEBUG] WebSocket購読前の状態 - RPC接続: ${NetworkState.rpcClient ? '有効' : '無効'}, ` +
+                    `WebSocket内部状態: ${NetworkState.ws.connected ? '接続中' : '未接続'}`, 'debug');
+                
                 await NetworkState.rpcClient.subscribeBlockAdded();
+                NetworkState.ws.connected = true;  // v5.6.4: Mark WebSocket as connected
+                
                 log('Block Addedイベントを購読しました', 'success');
                 log('WebSocket経由でブロック追加イベントの監視を開始', 'info');
+                log(`[DEBUG] WebSocket購読完了 - navigator.onLine: ${navigator.onLine}`, 'debug');
                 
                 NetworkState.rpcClient.addEventListener('block-added', (event) => {
                     const block = event.data.block;
@@ -10443,9 +10485,16 @@
             
             try {
                 if (rpcClient) {
+                    // v5.6.4: Debug logging before stopping WebSocket
+                    log(`[DEBUG] WebSocket停止前の状態 - navigator.onLine: ${navigator.onLine}, ` +
+                        `WebSocket接続: ${NetworkState.ws.connected ? '接続中' : '切断'}`, 'debug');
+                    
                     await NetworkState.rpcClient.unsubscribeBlockAdded();
+                    NetworkState.ws.connected = false;  // v5.6.4: Mark WebSocket as disconnected
+                    
                     monitorLog('監視を停止しました', 'success');
                     log('WebSocket監視を停止しました', 'info');
+                    log(`[DEBUG] WebSocket停止完了 - navigator.onLine: ${navigator.onLine}`, 'debug');
                 }
                 NetworkState.ws.monitorActive = false;
                 

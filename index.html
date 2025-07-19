@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.6.5 - Smart Network Detection with False Positive Prevention</title>
+    <title>Kaspa P2P File Storage v5.6.6 - Error-Based Connection Management Without Browser Events</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -1112,9 +1112,8 @@
                 maxRetries: 5,          // Maximum reconnection attempts
                 baseDelay: 2000,        // Base delay in ms (2 seconds)
                 activeWaiters: new Set() // Track waiting promises
-            },
-            // v5.6.3: Network status monitoring
-            offlineTimeout: null        // Timer for offline detection delay
+            }
+            // v5.6.6: Removed offlineTimeout - now using ConnectionManager
         };
         
         // Expose NetworkState to window for global access
@@ -3020,60 +3019,136 @@
                    message.includes('disconnected');
         }
         
-        // v5.6.5: Verify actual network connectivity (not just WebSocket state)
-        async function verifyNetworkStatus() {
-            log('[DEBUG] 実際のネットワーク接続性を確認中...', 'debug');
+        // v5.6.6: Connection Manager - Error-based network management without browser events
+        const ConnectionManager = {
+            // Connection state independent of browser events
+            isConnected: true,
+            lastError: null,
+            reconnectTimer: null,
+            reconnectAttempts: 0,
+            maxReconnectAttempts: 5,
+            baseReconnectDelay: 2000,
             
-            // Multiple checks to verify actual connectivity
-            const checks = [];
+            // Initialize connection monitoring
+            init() {
+                log('[ConnectionManager] エラーベースの接続管理を初期化', 'info');
+                this.isConnected = true;
+            },
             
-            // Check 1: RPC connection (most reliable for our use case)
-            if (NetworkState.rpcClient) {
-                checks.push(
-                    NetworkState.rpcClient.getServerInfo()
-                        .then(() => {
-                            log('[DEBUG] RPC接続確認: 成功', 'debug');
-                            return true;
-                        })
-                        .catch(() => {
-                            log('[DEBUG] RPC接続確認: 失敗', 'debug');
-                            return false;
-                        })
-                );
-            }
-            
-            // Check 2: Simple fetch to known endpoint
-            checks.push(
-                fetch('https://www.google.com/favicon.ico', { 
-                    mode: 'no-cors',
-                    cache: 'no-cache'
-                })
-                .then(() => {
-                    log('[DEBUG] インターネット接続確認: 成功', 'debug');
-                    return true;
-                })
-                .catch(() => {
-                    log('[DEBUG] インターネット接続確認: 失敗', 'debug');
-                    return false;
-                })
-            );
-            
-            // Wait for all checks with timeout
-            try {
-                const results = await Promise.race([
-                    Promise.all(checks),
-                    new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 3000))
-                ]);
+            // Handle any network error
+            async handleError(error, source) {
+                const errorMessage = error?.message || '';
                 
-                // If any check succeeded, we have connectivity
-                const hasConnectivity = results.some(result => result === true);
-                log(`[DEBUG] ネットワーク接続性: ${hasConnectivity ? '有効' : '切断'}`, 'debug');
-                return hasConnectivity;
-            } catch (error) {
-                log('[DEBUG] ネットワーク接続性確認タイムアウト', 'debug');
-                return false;
+                // Only handle actual network errors
+                if (!isNetworkError(error)) {
+                    return false;
+                }
+                
+                log(`[ConnectionManager] ネットワークエラーを検出 - ${source}: ${errorMessage}`, 'warning');
+                
+                // Mark as disconnected
+                if (this.isConnected) {
+                    this.isConnected = false;
+                    this.lastError = error;
+                    updateNetworkStatus('offline', 'ネットワークエラー');
+                    
+                    // Save progress if needed
+                    if (FileState.progressManager?.progress) {
+                        await FileState.progressManager.saveProgress();
+                        log('[ConnectionManager] 進捗を自動保存しました', 'info');
+                    }
+                    
+                    // Start reconnection attempts
+                    this.scheduleReconnect();
+                }
+                
+                return true;
+            },
+            
+            // Schedule reconnection attempt
+            scheduleReconnect() {
+                // Clear any existing timer
+                if (this.reconnectTimer) {
+                    clearTimeout(this.reconnectTimer);
+                }
+                
+                if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+                    log('[ConnectionManager] 最大再接続試行回数に到達', 'error');
+                    return;
+                }
+                
+                const delay = this.baseReconnectDelay * Math.pow(2, this.reconnectAttempts);
+                log(`[ConnectionManager] ${delay}ms後に再接続を試行します（${this.reconnectAttempts + 1}/${this.maxReconnectAttempts}）`, 'info');
+                
+                this.reconnectTimer = setTimeout(() => {
+                    this.attemptReconnect();
+                }, delay);
+            },
+            
+            // Attempt to reconnect
+            async attemptReconnect() {
+                this.reconnectAttempts++;
+                log(`[ConnectionManager] 再接続試行 #${this.reconnectAttempts}`, 'info');
+                
+                try {
+                    // Test RPC connection
+                    if (NetworkState.rpcClient) {
+                        const info = await NetworkState.rpcClient.getServerInfo();
+                        log(`[ConnectionManager] RPC接続成功: ${info.serverVersion}`, 'success');
+                        
+                        // Connection restored
+                        this.handleReconnected();
+                    } else {
+                        // Try to initialize RPC
+                        await initializeRpcClient();
+                        this.handleReconnected();
+                    }
+                } catch (error) {
+                    log(`[ConnectionManager] 再接続失敗: ${error.message}`, 'error');
+                    this.scheduleReconnect();
+                }
+            },
+            
+            // Handle successful reconnection
+            async handleReconnected() {
+                log('[ConnectionManager] ネットワーク接続が復活しました', 'success');
+                
+                this.isConnected = true;
+                this.reconnectAttempts = 0;
+                this.lastError = null;
+                updateNetworkStatus('online', 'オンライン');
+                
+                // Restart WebSocket monitoring if needed
+                if (NetworkState.ws.monitorActive && !NetworkState.ws.connected) {
+                    log('[ConnectionManager] WebSocket監視を再開します', 'info');
+                    await restartMonitoring();
+                }
+                
+                // Auto-resume upload if in progress
+                if (FileState.progressManager?.progress && 
+                    FileState.progressManager.progress.metadata.completedChunks < 
+                    FileState.progressManager.progress.metadata.totalChunks) {
+                    
+                    log('[ConnectionManager] アップロードを自動的に再開します...', 'info');
+                    setTimeout(() => {
+                        const resumeBtn = document.querySelector('button[onclick*="resumeFromProgress"]');
+                        if (resumeBtn && !resumeBtn.disabled) {
+                            resumeBtn.click();
+                        }
+                    }, 1000);
+                }
+            },
+            
+            // Manual reconnect trigger
+            async forceReconnect() {
+                log('[ConnectionManager] 手動再接続を開始', 'info');
+                this.reconnectAttempts = 0;
+                await this.attemptReconnect();
             }
-        }
+        };
+        
+        // Initialize ConnectionManager
+        ConnectionManager.init();
         
         // Calculate backoff delay with exponential increase
         function getBackoffDelay(retryCount, baseDelay = 2000) {
@@ -7808,28 +7883,16 @@
                     log(`[DEBUG] エラースタック: ${error.stack}`, 'debug');
                 }
                 
-                // v5.6.2: Check if network error to preserve ProgressManager
+                // v5.6.6: Use ConnectionManager for network error handling
                 if (isNetworkError(error)) {
-                    // v5.6.4: Enhanced debug logging for network errors
-                    const errorTime = new Date().toISOString();
-                    log(`[DEBUG] ネットワークエラー詳細 - 時刻: ${errorTime}`, 'debug');
-                    log(`[DEBUG] エラーメッセージ: "${error.message}"`, 'debug');
-                    log(`[DEBUG] navigator.onLine: ${navigator.onLine}`, 'debug');
-                    log(`[DEBUG] WebSocket接続状態: ${NetworkState.ws.connected ? '接続中' : '切断'}`, 'debug');
-                    log(`[DEBUG] 既存offlineタイマー: ${NetworkState.offlineTimeout ? `あり(ID: ${NetworkState.offlineTimeout})` : 'なし'}`, 'debug');
-                    
-                    // v5.6.5: Update WebSocket state on WebSocket errors
+                    // Update WebSocket state on WebSocket errors
                     if (error.message && error.message.toLowerCase().includes('websocket')) {
                         NetworkState.ws.connected = false;
                         log('[DEBUG] WebSocketエラー検出 - 接続状態をfalseに更新', 'debug');
                     }
                     
-                    // v5.6.3: Check if actual network disconnection or just WebSocket issue
-                    if (navigator.onLine) {
-                        log('WebSocketエラーを検出（ネットワークは接続中） - ProgressManagerを保持します', 'info');
-                    } else {
-                        log('ネットワークエラーを検出 - ProgressManagerを保持します', 'info');
-                    }
+                    // Let ConnectionManager handle the error
+                    await ConnectionManager.handleError(error, 'processAndUpload');
                     FileState.networkErrorOccurred = true;
                 } else {
                     FileState.networkErrorOccurred = false;
@@ -10261,136 +10324,8 @@
                 }
             }, 1000);
             
-            // Network status monitoring (v5.6.0 - Phase 3)
-            // v5.6.3: offlineTimeout moved to NetworkState
-            
-            window.addEventListener('online', async () => {
-                // v5.6.3: Add debounce to prevent multiple rapid fires
-                const now = Date.now();
-                
-                // v5.6.4: Debug logging for online event
-                log(`[DEBUG] onlineイベント発火 - navigator.onLine: ${navigator.onLine}, ` +
-                    `WebSocket状態: ${NetworkState.ws.connected ? '接続中' : '切断'}, ` +
-                    `RPC接続: ${NetworkState.rpcClient ? '有効' : '無効'}`, 'debug');
-                
-                if (NetworkState.lastOnlineEvent && (now - NetworkState.lastOnlineEvent) < 500) {
-                    // Ignore rapid-fire online events
-                    log(`[DEBUG] onlineイベントを無視 (${now - NetworkState.lastOnlineEvent}ms以内の再発火)`, 'debug');
-                    return;
-                }
-                NetworkState.lastOnlineEvent = now;
-                
-                // Clear offline timeout if exists
-                if (NetworkState.offlineTimeout) {
-                    clearTimeout(NetworkState.offlineTimeout);
-                    NetworkState.offlineTimeout = null;
-                    log('ネットワーク接続が復活しました（切断検知をキャンセル）', 'success');
-                    log(`[DEBUG] offlineタイマーをクリア - タイマーID: ${NetworkState.offlineTimeout}`, 'debug');
-                } else {
-                    log('ネットワーク接続が復活しました', 'success');
-                    log('[DEBUG] offlineタイマーは設定されていませんでした', 'debug');
-                }
-                
-                if (rpcClient) {
-                    updateNetworkStatus('online', 'オンライン');
-                    
-                    // Check if we need to reconnect RPC client
-                    // v5.5.24: progressManager -> FileState.progressManager (10/11)
-                    if (FileState.progressManager && FileState.progressManager.progress && 
-                        FileState.progressManager.progress.metadata.completedChunks < FileState.progressManager.progress.metadata.totalChunks) {
-                        log('アップロード中 - RPC接続を確認します', 'info');
-                        
-                        // Test RPC connection
-                        try {
-                            const info = await NetworkState.rpcClient.getServerInfo();
-                            log(`RPC接続確認: ${info.serverVersion}`, 'success');
-                            
-                            // Auto-resume upload after connection confirmed
-                            log('アップロードを自動的に再開します...', 'info');
-                            setTimeout(async () => {
-                                try {
-                                    // Find and click resume button
-                                    const resumeBtn = document.querySelector('button[onclick*="resumeFromProgress"]');
-                                    if (resumeBtn && !resumeBtn.disabled) {
-                                        resumeBtn.click();
-                                    }
-                                } catch (e) {
-                                    log('自動再開エラー: ' + e.message, 'error');
-                                }
-                            }, 1000);  // Wait 1 second for network stability
-                            
-                        } catch (err) {
-                            log('RPC接続エラー - 再接続を試みます', 'error');
-                            // Reinitialize RPC client
-                            await initializeRpcClient();
-                            
-                            // Restart WebSocket monitoring if it was active
-                            if (NetworkState.ws.monitorActive) {
-                                log('WebSocket監視を再開します', 'info');
-                                await restartMonitoring();
-                            }
-                        }
-                    }
-                }
-            });
-            
-            window.addEventListener('offline', async () => {
-                // v5.6.4: Debug logging for offline event
-                const timestamp = new Date().toISOString();
-                log(`[DEBUG] offlineイベント発火 - ${timestamp}, navigator.onLine: ${navigator.onLine}, ` +
-                    `WebSocket状態: ${NetworkState.ws.connected ? '接続中' : '切断'}, ` +
-                    `既存タイマー: ${NetworkState.offlineTimeout ? 'あり' : 'なし'}`, 'debug');
-                
-                // v5.6.5: Smart filtering - verify actual network status
-                log('[DEBUG] ブラウザがofflineを報告 - 実際の接続性を確認します', 'debug');
-                
-                // v5.6.3: Clear any existing timer first
-                if (NetworkState.offlineTimeout) {
-                    clearTimeout(NetworkState.offlineTimeout);
-                    log(`[DEBUG] 既存のofflineタイマーをクリア (ID: ${NetworkState.offlineTimeout})`, 'debug');
-                    NetworkState.offlineTimeout = null;
-                }
-                
-                // v5.6.5: Quick check for WebSocket-only disconnection
-                if (NetworkState.ws.connected === false && navigator.onLine === false) {
-                    // Immediate verification for suspected false positive
-                    const hasConnectivity = await verifyNetworkStatus();
-                    if (hasConnectivity) {
-                        log('[DEBUG] WebSocket切断による誤検出を検知 - エラー表示を回避', 'info');
-                        // Update WebSocket state but don't show offline error
-                        updateNetworkStatus('online', 'オンライン（WebSocket再接続中）');
-                        return;  // Exit early - false positive
-                    }
-                }
-                
-                // Delay detection to avoid false positives
-                const timerId = setTimeout(async () => {
-                    log(`[DEBUG] offlineタイマー実行開始 - navigator.onLine: ${navigator.onLine}`, 'debug');
-                    
-                    // v5.6.5: Double-check with actual connectivity test
-                    const actuallyOffline = !navigator.onLine && !(await verifyNetworkStatus());
-                    
-                    if (actuallyOffline) {
-                        log('ネットワーク接続が切断されました（2秒経過・接続性確認済み）', 'error');
-                        updateNetworkStatus('offline', 'オフライン');
-                        
-                        // Save progress if uploading
-                        // v5.5.24: progressManager -> FileState.progressManager (11/11)
-                        if (FileState.progressManager && FileState.progressManager.progress) {
-                            await FileState.progressManager.saveProgress();
-                            log('進捗を自動保存しました', 'info');
-                        }
-                    } else {
-                        log('[DEBUG] ネットワーク接続は有効です（誤検出）', 'info');
-                        updateNetworkStatus('online', 'オンライン');
-                    }
-                    // v5.6.2: Fix offline timer bug - clear reference after execution
-                    NetworkState.offlineTimeout = null;
-                }, 2000);  // 2 second delay
-                
-                NetworkState.offlineTimeout = timerId;
-                log(`[DEBUG] 新しいofflineタイマーを設定 (ID: ${timerId})`, 'debug');
-            });
+            // v5.6.6: Removed browser offline/online event listeners - using error-based detection instead
+            // See ConnectionManager for new network management approach
             
             // Periodic cleanup of old progress data
             setInterval(() => {
@@ -10545,15 +10480,10 @@
             } catch (error) {
                 log(`WebSocket監視エラー: ${error.message}`, 'error');
                 NetworkState.ws.monitorActive = false;
-                
-                // v5.6.5: Mark WebSocket as disconnected on error
                 NetworkState.ws.connected = false;
-                log('[DEBUG] WebSocketエラー発生 - 接続状態をfalseに更新', 'debug');
                 
-                // Network error recovery - will retry on reconnect
-                if (error.message.includes('network') || error.message.includes('connection')) {
-                    log('ネットワークエラーを検出 - 再接続時に再試行します', 'warning');
-                }
+                // v5.6.6: Use ConnectionManager for error handling
+                await ConnectionManager.handleError(error, 'WebSocket監視');
             }
         };
 

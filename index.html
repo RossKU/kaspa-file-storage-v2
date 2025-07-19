@@ -10161,9 +10161,19 @@
                 }
             }, 1000);
             
-            // Network status monitoring
+            // Network status monitoring (v5.6.0 - Phase 3)
+            let offlineTimeout = null;
+            
             window.addEventListener('online', async () => {
-                log('ネットワーク接続が復活しました', 'success');
+                // Clear offline timeout if exists
+                if (offlineTimeout) {
+                    clearTimeout(offlineTimeout);
+                    offlineTimeout = null;
+                    log('ネットワーク接続が復活しました（切断検知をキャンセル）', 'success');
+                } else {
+                    log('ネットワーク接続が復活しました', 'success');
+                }
+                
                 if (rpcClient) {
                     updateNetworkStatus('online', 'オンライン');
                     
@@ -10177,6 +10187,21 @@
                         try {
                             const info = await NetworkState.rpcClient.getServerInfo();
                             log(`RPC接続確認: ${info.serverVersion}`, 'success');
+                            
+                            // Auto-resume upload after connection confirmed
+                            log('アップロードを自動的に再開します...', 'info');
+                            setTimeout(async () => {
+                                try {
+                                    // Find and click resume button
+                                    const resumeBtn = document.querySelector('button[onclick*="resumeFromProgress"]');
+                                    if (resumeBtn && !resumeBtn.disabled) {
+                                        resumeBtn.click();
+                                    }
+                                } catch (e) {
+                                    log('自動再開エラー: ' + e.message, 'error');
+                                }
+                            }, 1000);  // Wait 1 second for network stability
+                            
                         } catch (err) {
                             log('RPC接続エラー - 再接続を試みます', 'error');
                             // Reinitialize RPC client
@@ -10192,16 +10217,21 @@
                 }
             });
             
-            window.addEventListener('offline', async () => {
-                log('ネットワーク接続が切断されました', 'error');
-                updateNetworkStatus('offline', 'オフライン');
-                
-                // Save progress if uploading
-                // v5.5.24: progressManager -> FileState.progressManager (11/11)
-                if (FileState.progressManager && FileState.progressManager.progress) {
-                    await FileState.progressManager.saveProgress();
-                    log('進捗を自動保存しました', 'info');
-                }
+            window.addEventListener('offline', () => {
+                // Delay detection to avoid false positives
+                offlineTimeout = setTimeout(async () => {
+                    if (!navigator.onLine) {
+                        log('ネットワーク接続が切断されました（2秒経過）', 'error');
+                        updateNetworkStatus('offline', 'オフライン');
+                        
+                        // Save progress if uploading
+                        // v5.5.24: progressManager -> FileState.progressManager (11/11)
+                        if (FileState.progressManager && FileState.progressManager.progress) {
+                            await FileState.progressManager.saveProgress();
+                            log('進捗を自動保存しました', 'info');
+                        }
+                    }
+                }, 2000);  // 2 second delay
             });
             
             // Periodic cleanup of old progress data

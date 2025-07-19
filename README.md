@@ -6,6 +6,13 @@ A decentralized file storage system built on the Kaspa blockchain, enabling perm
 
 Visit: https://rossku.github.io/kaspa-file-storage-v2/
 
+## 📌 Latest Version
+
+**v5.5.38** - Global State Refactoring Complete! 🎉
+- All 5 phases of refactoring completed (100%)
+- Improved code organization and maintainability
+- Full backward compatibility maintained
+
 ## ✨ Features
 
 - 📤 Upload files of any size to Kaspa blockchain

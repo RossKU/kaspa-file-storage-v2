@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.6.6 - Error-Based Connection Management Without Browser Events</title>
+    <title>Kaspa P2P File Storage v5.6.7 - Fixed ConnectionManager Initialization Order</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -3147,8 +3147,7 @@
             }
         };
         
-        // Initialize ConnectionManager
-        ConnectionManager.init();
+        // v5.6.6: ConnectionManager.init() is called after log function is defined
         
         // Calculate backoff delay with exponential increase
         function getBackoffDelay(retryCount, baseDelay = 2000) {
@@ -11013,6 +11012,9 @@
             
             log('ページ読み込み完了 - システムを自動初期化します', 'info');
             window.loadParallelSetting(); // Load parallel download setting
+            
+            // v5.6.6: Initialize ConnectionManager after log function is available
+            ConnectionManager.init();
             
             try {
                 await initializeSystem();

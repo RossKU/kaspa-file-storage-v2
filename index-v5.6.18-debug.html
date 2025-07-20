@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.6.17-debug - Connection Debugging</title>
+    <title>Kaspa P2P File Storage v5.6.18-debug - Enhanced Debug Logging</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -458,7 +458,7 @@
 </head>
 <body>
     <div class="header">
-        <h1 id="appTitle">🚀 Kaspa P2P File Storage v5.6.17-debug - Loading...</h1>
+        <h1 id="appTitle">🚀 Kaspa P2P File Storage v5.6.18-debug - Loading...</h1>
         <p>実ネットワーク接続による完全なP2Pファイル共有システム（用語修正）</p>
         <p id="appSubtitle" style="font-size: 12px; color: #49EACB; margin-top: 5px;">📋 Loading version...</p>
         <div id="networkStatus" style="margin-top: 10px;">
@@ -3026,7 +3026,14 @@
         
         // Check if error is network-related
         function isNetworkError(error) {
-            log(`[DEBUG-isNetworkError] 入力: ${JSON.stringify(error)}, 型: ${typeof error}`, 'debug');
+            // WASMエラーオブジェクトはJSON.stringifyできないので、別の方法でログ出力
+            if (typeof error === 'string') {
+                log(`[DEBUG-isNetworkError] 入力: "${error}" (文字列)`, 'debug');
+            } else if (typeof error === 'object' && error !== null) {
+                log(`[DEBUG-isNetworkError] 入力: ${error.message || '[messageなし]'} (${error.constructor?.name || 'object'})`, 'debug');
+            } else {
+                log(`[DEBUG-isNetworkError] 入力: ${error} (${typeof error})`, 'debug');
+            }
             
             if (!error) {
                 log(`[DEBUG-isNetworkError] エラーがnull/undefined - false を返します`, 'debug');
@@ -3163,11 +3170,27 @@
                 }
                 
                 // Auto-resume upload if in progress
+                log(`[DEBUG-RESUME] 自動再開条件チェック開始`, 'debug');
+                log(`[DEBUG-RESUME] ProgressManager存在: ${!!FileState.progressManager}`, 'debug');
+                log(`[DEBUG-RESUME] progress存在: ${!!FileState.progressManager?.progress}`, 'debug');
+                
+                if (FileState.progressManager?.progress) {
+                    const metadata = FileState.progressManager.progress.metadata;
+                    log(`[DEBUG-RESUME] 進捗詳細:`, 'debug');
+                    log(`[DEBUG-RESUME]   - totalChunks: ${metadata.totalChunks}`, 'debug');
+                    log(`[DEBUG-RESUME]   - completedChunks: ${metadata.completedChunks}`, 'debug');
+                    log(`[DEBUG-RESUME]   - failedChunks: ${metadata.failedChunks?.length || 0}`, 'debug');
+                    log(`[DEBUG-RESUME]   - ファイル名: ${metadata.fileName}`, 'debug');
+                    log(`[DEBUG-RESUME]   - CID: ${metadata.cid}`, 'debug');
+                    log(`[DEBUG-RESUME]   - 完了率: ${((metadata.completedChunks / metadata.totalChunks) * 100).toFixed(1)}%`, 'debug');
+                }
+                
                 if (FileState.progressManager?.progress && 
                     FileState.progressManager.progress.metadata.completedChunks < 
                     FileState.progressManager.progress.metadata.totalChunks) {
                     
                     log('[ConnectionManager] アップロードを自動的に再開します...', 'info');
+                    log(`[DEBUG-RESUME] 条件を満たしました - 自動再開を実行`, 'debug');
                     log(`[DEBUG] 再開条件満たす - uploadSessionActive: ${FileState.uploadSessionActive}`, 'debug');
                     // Debug: Check current state
                     log(`[DEBUG] FileState.currentFile: ${FileState.currentFile ? FileState.currentFile.name : 'null'}`, 'debug');
@@ -3210,6 +3233,15 @@
                             }
                         }
                     }, 1000);
+                } else {
+                    log(`[DEBUG-RESUME] 自動再開条件を満たしません`, 'debug');
+                    if (!FileState.progressManager) {
+                        log(`[DEBUG-RESUME]   理由: ProgressManagerが存在しない`, 'debug');
+                    } else if (!FileState.progressManager.progress) {
+                        log(`[DEBUG-RESUME]   理由: progressデータが存在しない`, 'debug');
+                    } else if (FileState.progressManager.progress.metadata.completedChunks >= FileState.progressManager.progress.metadata.totalChunks) {
+                        log(`[DEBUG-RESUME]   理由: すでに完了している (${FileState.progressManager.progress.metadata.completedChunks}/${FileState.progressManager.progress.metadata.totalChunks})`, 'debug');
+                    }
                 }
                 
                 log('[DEBUG] handleReconnected完了', 'debug');
@@ -7467,7 +7499,12 @@
                                 retries++;
                                 const errorMessage = error?.message || error?.toString() || 'Unknown error';
                                 log(`ペイロード ${i + 1} エラー (試行 ${retries}/${config.retryCount}): ${errorMessage}`, 'error');
-                                log(`[DEBUG] エラーオブジェクト:`, 'debug', error);
+                                // WASMエラーの詳細をログ出力
+                                if (typeof error === 'object' && error !== null) {
+                                    log(`[DEBUG] エラーオブジェクト: ${error.message || '[messageなし]'} (${error.constructor?.name || 'object'})`, 'debug');
+                                } else {
+                                    log(`[DEBUG] エラーオブジェクト: ${error}`, 'debug');
+                                }
                                 log(`[DEBUG] エラータイプ: ${typeof error}`, 'debug');
                                 if (error?.stack) {
                                     log(`[DEBUG] スタックトレース: ${error.stack}`, 'debug');
@@ -7534,7 +7571,12 @@
                         log(`[DEBUG-新方式] catchブロックに到達 - エラー型: ${typeof error}`, 'debug');
                         const errorMessage = error?.message || error?.toString() || 'Unknown error';
                         log(`[新方式] エラーが発生しました: ${errorMessage}`, 'error');
-                        log(`[新方式] エラー詳細:`, 'error', error);
+                        // WASMエラーの詳細をログ出力
+                        if (typeof error === 'object' && error !== null) {
+                            log(`[新方式] エラー詳細: ${error.message || '[messageなし]'} (${error.constructor?.name || 'object'})`, 'error');
+                        } else {
+                            log(`[新方式] エラー詳細: ${error}`, 'error');
+                        }
                         log(`[新方式] 処理を中断します`, 'error');
                         log(`[DEBUG-新方式] エラーを再throwします`, 'debug');
                         throw error;
@@ -8007,7 +8049,12 @@
                 const errorMessage = error?.message || error?.toString() || 'Unknown error';
                 log(`アップロードエラー: ${errorMessage}`, 'error');
                 console.error('Upload error:', error);
-                log(`[DEBUG] エラーオブジェクト:`, 'debug', error);
+                // WASMエラーの詳細をログ出力（JSON.stringifyを使わない）
+                if (typeof error === 'object' && error !== null) {
+                    log(`[DEBUG] エラーオブジェクト: ${error.message || '[messageなし]'} (${error.constructor?.name || 'object'})`, 'debug');
+                } else {
+                    log(`[DEBUG] エラーオブジェクト: ${error}`, 'debug');
+                }
                 log(`[DEBUG] エラータイプ: ${typeof error}`, 'debug');
                 if (error?.stack) {
                     log(`[DEBUG] エラースタック: ${error.stack}`, 'debug');
@@ -10406,7 +10453,7 @@
             }
             
             log(`🚀 Kaspa P2P v${getAppVersion()} 準備完了！`, 'info');
-            log(`📋 v${getAppVersion()}: ConnectionManagerデバッグログ追加版`, 'info');
+            log(`📋 v${getAppVersion()}: WASMエラー処理改善＆自動再開デバッグ強化版`, 'info');
             log('✨ 並列ダウンロード: ' + (AppState.settings.parallelDownloadEnabled ? '有効' : '無効'), 'info');
             log('システムを初期化してください', 'info');
             

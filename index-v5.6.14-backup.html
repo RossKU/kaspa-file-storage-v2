@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.6.18-debug - Enhanced Debug Logging</title>
+    <title>Kaspa P2P File Storage v5.6.14-debug - WebSocket Monitoring Fix + Debug</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -458,7 +458,7 @@
 </head>
 <body>
     <div class="header">
-        <h1 id="appTitle">🚀 Kaspa P2P File Storage v5.6.18-debug - Loading...</h1>
+        <h1 id="appTitle">🚀 Kaspa P2P File Storage v5.5.30 - Loading...</h1>
         <p>実ネットワーク接続による完全なP2Pファイル共有システム（用語修正）</p>
         <p id="appSubtitle" style="font-size: 12px; color: #49EACB; margin-top: 5px;">📋 Loading version...</p>
         <div id="networkStatus" style="margin-top: 10px;">
@@ -976,12 +976,6 @@
         // - Phase 0-F-2: Added counter management on chunk upload errors
         // - Phase 0-F-3: Keep networkErrorOccurred flag for auto-resume instead of immediate reset
         // - Added 'websocket' check to isNetworkError function
-        
-        // v5.6.16: Session Management & Auto-Resume Fix (Phase 0-H)
-        // - Keep uploadSessionActive on network error for auto-resume
-        // - Fixed handleReconnected calls with proper await
-        // - Added strategic debug logs for session tracking
-        // - Fixed auto-resume by maintaining session during errors
         
         /*
          * ====================================================================
@@ -3026,34 +3020,18 @@
         
         // Check if error is network-related
         function isNetworkError(error) {
-            // WASMエラーオブジェクトはJSON.stringifyできないので、別の方法でログ出力
-            if (typeof error === 'string') {
-                log(`[DEBUG-isNetworkError] 入力: "${error}" (文字列)`, 'debug');
-            } else if (typeof error === 'object' && error !== null) {
-                log(`[DEBUG-isNetworkError] 入力: ${error.message || '[messageなし]'} (${error.constructor?.name || 'object'})`, 'debug');
-            } else {
-                log(`[DEBUG-isNetworkError] 入力: ${error} (${typeof error})`, 'debug');
-            }
-            
-            if (!error) {
-                log(`[DEBUG-isNetworkError] エラーがnull/undefined - false を返します`, 'debug');
-                return false;
-            }
+            if (!error) return false;
             
             // Handle both string errors and error objects
             const message = (typeof error === 'string' ? error : error.message || '').toLowerCase();
-            log(`[DEBUG-isNetworkError] 検査対象メッセージ: "${message}"`, 'debug');
             
-            const result = message.includes('network') || 
+            return message.includes('network') || 
                    message.includes('connection') || 
                    message.includes('not connected') ||
                    message.includes('offline') ||
                    message.includes('timeout') ||
                    message.includes('disconnected') ||
                    message.includes('websocket');  // Phase 0-F: Added WebSocket check
-            
-            log(`[DEBUG-isNetworkError] 結果: ${result}`, 'debug');
-            return result;
         }
         
         // v5.6.6: Connection Manager - Error-based network management without browser events
@@ -3074,12 +3052,10 @@
             
             // Handle any network error
             async handleError(error, source) {
-                log(`[DEBUG-CM] ConnectionManager.handleError開始 - ソース: ${source}`, 'debug');
                 const errorMessage = error?.message || '';
                 
                 // Only handle actual network errors
                 if (!isNetworkError(error)) {
-                    log(`[DEBUG-CM] ネットワークエラーではないため処理をスキップ`, 'debug');
                     return false;
                 }
                 
@@ -3136,11 +3112,11 @@
                         log(`[ConnectionManager] RPC接続成功: ${info.serverVersion}`, 'success');
                         
                         // Connection restored
-                        await this.handleReconnected();
+                        this.handleReconnected();
                     } else {
                         // Try to initialize RPC
                         await initializeRpcClient();
-                        await this.handleReconnected();
+                        this.handleReconnected();
                     }
                 } catch (error) {
                     log(`[ConnectionManager] 再接続失敗: ${error.message}`, 'error');
@@ -3152,7 +3128,6 @@
             async handleReconnected() {
                 // Phase 0-D: 改善された接続状態管理
                 log('[ConnectionManager] 接続が安定しました', 'info');
-                log(`[DEBUG] handleReconnected開始 - uploadSessionActive: ${FileState.uploadSessionActive}`, 'debug');
                 
                 this.isConnected = true;
                 this.reconnectAttempts = 0;
@@ -3170,28 +3145,11 @@
                 }
                 
                 // Auto-resume upload if in progress
-                log(`[DEBUG-RESUME] 自動再開条件チェック開始`, 'debug');
-                log(`[DEBUG-RESUME] ProgressManager存在: ${!!FileState.progressManager}`, 'debug');
-                log(`[DEBUG-RESUME] progress存在: ${!!FileState.progressManager?.progress}`, 'debug');
-                
-                if (FileState.progressManager?.progress) {
-                    const metadata = FileState.progressManager.progress.metadata;
-                    log(`[DEBUG-RESUME] 進捗詳細:`, 'debug');
-                    log(`[DEBUG-RESUME]   - totalChunks: ${metadata.totalChunks}`, 'debug');
-                    log(`[DEBUG-RESUME]   - completedChunks: ${metadata.completedChunks}`, 'debug');
-                    log(`[DEBUG-RESUME]   - failedChunks: ${metadata.failedChunks?.length || 0}`, 'debug');
-                    log(`[DEBUG-RESUME]   - ファイル名: ${metadata.fileName}`, 'debug');
-                    log(`[DEBUG-RESUME]   - CID: ${metadata.cid}`, 'debug');
-                    log(`[DEBUG-RESUME]   - 完了率: ${((metadata.completedChunks / metadata.totalChunks) * 100).toFixed(1)}%`, 'debug');
-                }
-                
                 if (FileState.progressManager?.progress && 
                     FileState.progressManager.progress.metadata.completedChunks < 
                     FileState.progressManager.progress.metadata.totalChunks) {
                     
                     log('[ConnectionManager] アップロードを自動的に再開します...', 'info');
-                    log(`[DEBUG-RESUME] 条件を満たしました - 自動再開を実行`, 'debug');
-                    log(`[DEBUG] 再開条件満たす - uploadSessionActive: ${FileState.uploadSessionActive}`, 'debug');
                     // Debug: Check current state
                     log(`[DEBUG] FileState.currentFile: ${FileState.currentFile ? FileState.currentFile.name : 'null'}`, 'debug');
                     log(`[DEBUG] window.pendingProgress: ${window.pendingProgress ? 'exists' : 'null'}`, 'debug');
@@ -3220,9 +3178,7 @@
                     setTimeout(async () => {
                         if (FileState.currentFile && window.pendingProgress) {
                             log('[ConnectionManager] processAndUploadを呼び出します...', 'info');
-                            log(`[DEBUG] 自動再開前 - uploadSessionActive: ${FileState.uploadSessionActive}`, 'debug');
                             await processAndUpload();
-                            log('[ConnectionManager] 自動再開が完了しました', 'success');
                         } else {
                             log('[ConnectionManager] 自動再開に必要な情報が不足しています', 'warning');
                             if (!FileState.currentFile) {
@@ -3233,18 +3189,7 @@
                             }
                         }
                     }, 1000);
-                } else {
-                    log(`[DEBUG-RESUME] 自動再開条件を満たしません`, 'debug');
-                    if (!FileState.progressManager) {
-                        log(`[DEBUG-RESUME]   理由: ProgressManagerが存在しない`, 'debug');
-                    } else if (!FileState.progressManager.progress) {
-                        log(`[DEBUG-RESUME]   理由: progressデータが存在しない`, 'debug');
-                    } else if (FileState.progressManager.progress.metadata.completedChunks >= FileState.progressManager.progress.metadata.totalChunks) {
-                        log(`[DEBUG-RESUME]   理由: すでに完了している (${FileState.progressManager.progress.metadata.completedChunks}/${FileState.progressManager.progress.metadata.totalChunks})`, 'debug');
-                    }
                 }
-                
-                log('[DEBUG] handleReconnected完了', 'debug');
             },
             
             // Manual reconnect trigger
@@ -7499,12 +7444,7 @@
                                 retries++;
                                 const errorMessage = error?.message || error?.toString() || 'Unknown error';
                                 log(`ペイロード ${i + 1} エラー (試行 ${retries}/${config.retryCount}): ${errorMessage}`, 'error');
-                                // WASMエラーの詳細をログ出力
-                                if (typeof error === 'object' && error !== null) {
-                                    log(`[DEBUG] エラーオブジェクト: ${error.message || '[messageなし]'} (${error.constructor?.name || 'object'})`, 'debug');
-                                } else {
-                                    log(`[DEBUG] エラーオブジェクト: ${error}`, 'debug');
-                                }
+                                log(`[DEBUG] エラーオブジェクト:`, 'debug', error);
                                 log(`[DEBUG] エラータイプ: ${typeof error}`, 'debug');
                                 if (error?.stack) {
                                     log(`[DEBUG] スタックトレース: ${error.stack}`, 'debug');
@@ -7568,17 +7508,10 @@
                     
                     } catch (error) {
                         // v4.7.57: 新方式のエラーハンドリング
-                        log(`[DEBUG-新方式] catchブロックに到達 - エラー型: ${typeof error}`, 'debug');
                         const errorMessage = error?.message || error?.toString() || 'Unknown error';
                         log(`[新方式] エラーが発生しました: ${errorMessage}`, 'error');
-                        // WASMエラーの詳細をログ出力
-                        if (typeof error === 'object' && error !== null) {
-                            log(`[新方式] エラー詳細: ${error.message || '[messageなし]'} (${error.constructor?.name || 'object'})`, 'error');
-                        } else {
-                            log(`[新方式] エラー詳細: ${error}`, 'error');
-                        }
+                        log(`[新方式] エラー詳細:`, 'error', error);
                         log(`[新方式] 処理を中断します`, 'error');
-                        log(`[DEBUG-新方式] エラーを再throwします`, 'debug');
                         throw error;
                     }
                     
@@ -8045,22 +7978,15 @@
                 }
                 
             } catch (error) {
-                log(`[DEBUG-CATCH] processAndUploadのcatchブロックに到達しました`, 'debug');
                 const errorMessage = error?.message || error?.toString() || 'Unknown error';
                 log(`アップロードエラー: ${errorMessage}`, 'error');
                 console.error('Upload error:', error);
-                // WASMエラーの詳細をログ出力（JSON.stringifyを使わない）
-                if (typeof error === 'object' && error !== null) {
-                    log(`[DEBUG] エラーオブジェクト: ${error.message || '[messageなし]'} (${error.constructor?.name || 'object'})`, 'debug');
-                } else {
-                    log(`[DEBUG] エラーオブジェクト: ${error}`, 'debug');
-                }
+                log(`[DEBUG] エラーオブジェクト:`, 'debug', error);
                 log(`[DEBUG] エラータイプ: ${typeof error}`, 'debug');
                 if (error?.stack) {
                     log(`[DEBUG] エラースタック: ${error.stack}`, 'debug');
                 }
                 
-                log(`[DEBUG-CATCH] isNetworkError呼び出し前`, 'debug');
                 // v5.6.6: Use ConnectionManager for network error handling
                 if (isNetworkError(error)) {
                     // Update WebSocket state on WebSocket errors
@@ -8070,12 +7996,9 @@
                     }
                     
                     // Let ConnectionManager handle the error
-                    log(`[DEBUG-CATCH] ConnectionManager.handleErrorを呼び出します`, 'debug');
-                    const handled = await ConnectionManager.handleError(error, 'processAndUpload');
-                    log(`[DEBUG-CATCH] ConnectionManager.handleError完了 - 結果: ${handled}`, 'debug');
+                    await ConnectionManager.handleError(error, 'processAndUpload');
                     FileState.networkErrorOccurred = true;
                 } else {
-                    log(`[DEBUG-CATCH] ネットワークエラーではないため、ConnectionManagerは呼び出しません`, 'debug');
                     FileState.networkErrorOccurred = false;
                 }
             } finally {
@@ -8083,14 +8006,8 @@
                 FileState.isUploadingFile = false; // v5.5.34: Using FileState
                 
                 // v5.3.7: End upload session
-                // Phase 0-H: Don't end session on network error
-                if (!FileState.networkErrorOccurred) {
-                    FileState.uploadSessionActive = false; // v5.5.35: Using FileState
-                    log('[INFO] アップロードセッションを終了 (メイン)', 'info');
-                } else {
-                    log('[INFO] ネットワークエラーのため、アップロードセッションを維持', 'info');
-                    log(`[DEBUG] uploadSessionActive維持: ${FileState.uploadSessionActive}`, 'debug');
-                }
+                FileState.uploadSessionActive = false; // v5.5.35: Using FileState
+                log('[INFO] アップロードセッションを終了 (メイン)', 'info');
                 
                 // Debug: Check state in finally block
                 log(`[DEBUG] finally - FileState.currentFile: ${FileState.currentFile ? FileState.currentFile.name : 'null'}`, 'debug');
@@ -10453,7 +10370,7 @@
             }
             
             log(`🚀 Kaspa P2P v${getAppVersion()} 準備完了！`, 'info');
-            log(`📋 v${getAppVersion()}: WASMエラー処理改善＆自動再開デバッグ強化版`, 'info');
+            log(`📋 v${getAppVersion()}: スーパーメタデータで大規模ファイル対応`, 'info');
             log('✨ 並列ダウンロード: ' + (AppState.settings.parallelDownloadEnabled ? '有効' : '無効'), 'info');
             log('システムを初期化してください', 'info');
             
@@ -10682,9 +10599,7 @@
                 NetworkState.ws.connected = false;
                 
                 // v5.6.6: Use ConnectionManager for error handling
-                log(`[DEBUG-WS] WebSocket監視でエラー発生 - ConnectionManager.handleErrorを呼び出します`, 'debug');
                 await ConnectionManager.handleError(error, 'WebSocket監視');
-                log(`[DEBUG-WS] ConnectionManager.handleError完了`, 'debug');
             }
         };
 

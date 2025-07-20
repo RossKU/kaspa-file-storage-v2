@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.6.11 - Fixed Upload Session Timing</title>
+    <title>Kaspa P2P File Storage v5.6.16 - Session Management & Auto-Resume Fix</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -970,13 +970,18 @@
         // - Fixed incorrect argument order in log() calls
         // - Changed log(message, detail, type) to log(message, type, detail)
         // - Now error objects are properly displayed in debug logs
-        // - Added debug logging for auto-resume troubleshooting
-        // - Added handleNetworkError() unified error handler
-        // - Improved offline/online event handling with 2-second delay
-        // - Auto-resume uploads after network recovery
-        // - Reduced false error messages by ~80%
-        // - Added backward compatibility proxies for all migrated variables
-        // - All global variables are now properly organized in state objects
+        
+        // v5.6.14: WebSocket Monitoring Fix (Phase 0-F)
+        // - Phase 0-F-1: Added network error check in checkMonitoringStop to prevent premature stop
+        // - Phase 0-F-2: Added counter management on chunk upload errors
+        // - Phase 0-F-3: Keep networkErrorOccurred flag for auto-resume instead of immediate reset
+        // - Added 'websocket' check to isNetworkError function
+        
+        // v5.6.16: Session Management & Auto-Resume Fix (Phase 0-H)
+        // - Keep uploadSessionActive on network error for auto-resume
+        // - Fixed handleReconnected calls with proper await
+        // - Added strategic debug logs for session tracking
+        // - Fixed auto-resume by maintaining session during errors
         
         /*
          * ====================================================================
@@ -3022,13 +3027,17 @@
         // Check if error is network-related
         function isNetworkError(error) {
             if (!error) return false;
-            const message = error.message?.toLowerCase() || '';
+            
+            // Handle both string errors and error objects
+            const message = (typeof error === 'string' ? error : error.message || '').toLowerCase();
+            
             return message.includes('network') || 
                    message.includes('connection') || 
                    message.includes('not connected') ||
                    message.includes('offline') ||
                    message.includes('timeout') ||
-                   message.includes('disconnected');
+                   message.includes('disconnected') ||
+                   message.includes('websocket');  // Phase 0-F: Added WebSocket check
         }
         
         // v5.6.6: Connection Manager - Error-based network management without browser events
@@ -3109,11 +3118,11 @@
                         log(`[ConnectionManager] RPC接続成功: ${info.serverVersion}`, 'success');
                         
                         // Connection restored
-                        this.handleReconnected();
+                        await this.handleReconnected();
                     } else {
                         // Try to initialize RPC
                         await initializeRpcClient();
-                        this.handleReconnected();
+                        await this.handleReconnected();
                     }
                 } catch (error) {
                     log(`[ConnectionManager] 再接続失敗: ${error.message}`, 'error');
@@ -3123,17 +3132,23 @@
             
             // Handle successful reconnection
             async handleReconnected() {
-                log('[ConnectionManager] ネットワーク接続が復活しました', 'success');
+                // Phase 0-D: 改善された接続状態管理
+                log('[ConnectionManager] 接続が安定しました', 'info');
+                log(`[DEBUG] handleReconnected開始 - uploadSessionActive: ${FileState.uploadSessionActive}`, 'debug');
                 
                 this.isConnected = true;
                 this.reconnectAttempts = 0;
                 this.lastError = null;
                 updateNetworkStatus('online', 'オンライン');
                 
-                // Restart WebSocket monitoring if needed
-                if (NetworkState.ws.monitorActive && !NetworkState.ws.connected) {
-                    log('[ConnectionManager] WebSocket監視を再開します', 'info');
+                // Phase 0-D: WebSocket監視の調整
+                if (NetworkState.ws.monitorActive && NetworkState.ws.connected) {
+                    log('[ConnectionManager] WebSocket監視は既に正常動作中', 'debug');
+                } else if (NetworkState.ws.monitorActive && !NetworkState.ws.connected) {
+                    log('[ConnectionManager] WebSocket監視を再構築します', 'info');
                     await restartMonitoring();
+                } else {
+                    log('[ConnectionManager] WebSocket監視は停止中', 'debug');
                 }
                 
                 // Auto-resume upload if in progress
@@ -3142,15 +3157,27 @@
                     FileState.progressManager.progress.metadata.totalChunks) {
                     
                     log('[ConnectionManager] アップロードを自動的に再開します...', 'info');
+                    log(`[DEBUG] 再開条件満たす - uploadSessionActive: ${FileState.uploadSessionActive}`, 'debug');
+                    // Debug: Check current state
+                    log(`[DEBUG] FileState.currentFile: ${FileState.currentFile ? FileState.currentFile.name : 'null'}`, 'debug');
+                    log(`[DEBUG] window.pendingProgress: ${window.pendingProgress ? 'exists' : 'null'}`, 'debug');
                     
                     // Load progress from localStorage if not already loaded
                     if (!window.pendingProgress) {
                         const savedProgress = loadProgressFromLocalStorage();
+                        log(`[DEBUG] savedProgress: ${savedProgress ? `found (${savedProgress.file?.name})` : 'null'}`, 'debug');
+                        
                         if (savedProgress) {
                             // Verify the progress matches current file
                             if (FileState.currentFile && savedProgress.file?.name === FileState.currentFile.name) {
                                 window.pendingProgress = savedProgress;
                                 log('[ConnectionManager] 進捗データを復元しました', 'info');
+                            } else if (!FileState.currentFile) {
+                                // If no current file, restore from progress
+                                log('[DEBUG] FileState.currentFileがnull - 進捗データから復元を試みます', 'debug');
+                                FileState.currentFile = savedProgress.file;
+                                window.pendingProgress = savedProgress;
+                                log('[ConnectionManager] ファイル情報を進捗データから復元しました', 'info');
                             }
                         }
                     }
@@ -3159,7 +3186,9 @@
                     setTimeout(async () => {
                         if (FileState.currentFile && window.pendingProgress) {
                             log('[ConnectionManager] processAndUploadを呼び出します...', 'info');
+                            log(`[DEBUG] 自動再開前 - uploadSessionActive: ${FileState.uploadSessionActive}`, 'debug');
                             await processAndUpload();
+                            log('[ConnectionManager] 自動再開が完了しました', 'success');
                         } else {
                             log('[ConnectionManager] 自動再開に必要な情報が不足しています', 'warning');
                             if (!FileState.currentFile) {
@@ -3171,6 +3200,8 @@
                         }
                     }, 1000);
                 }
+                
+                log('[DEBUG] handleReconnected完了', 'debug');
             },
             
             // Manual reconnect trigger
@@ -7753,6 +7784,18 @@
                             console.error('詳細エラー:', error);
                             console.error('スタックトレース:', error.stack);
                             
+                            // Phase 0-F-2: Manage counter on error
+                            if (FileState.uploadingChunksCount > 0) {
+                                FileState.uploadingChunksCount--;
+                                log(`[DEBUG] エラーによりカウンターを減算: ${FileState.uploadingChunksCount}`, 'debug');
+                            }
+                            
+                            // Remove from monitoring list if exists
+                            if (txid && NetworkState.ws.monitoredTransactions.has(txid)) {
+                                NetworkState.ws.monitoredTransactions.delete(txid);
+                                log(`[DEBUG] エラーにより監視リストから削除: ${txid.substring(0, 16)}...`, 'debug');
+                            }
+                            
                             if (retries >= config.retryCount) {
                                 document.getElementById(`chunk-status-${i}`).innerHTML = '<span class="error">❌ 失敗</span>';
                                 FileState.progressManager.markChunkFailed(i);
@@ -7975,8 +8018,18 @@
                 FileState.isUploadingFile = false; // v5.5.34: Using FileState
                 
                 // v5.3.7: End upload session
-                FileState.uploadSessionActive = false; // v5.5.35: Using FileState
-                log('[INFO] アップロードセッションを終了 (メイン)', 'info');
+                // Phase 0-H: Don't end session on network error
+                if (!FileState.networkErrorOccurred) {
+                    FileState.uploadSessionActive = false; // v5.5.35: Using FileState
+                    log('[INFO] アップロードセッションを終了 (メイン)', 'info');
+                } else {
+                    log('[INFO] ネットワークエラーのため、アップロードセッションを維持', 'info');
+                    log(`[DEBUG] uploadSessionActive維持: ${FileState.uploadSessionActive}`, 'debug');
+                }
+                
+                // Debug: Check state in finally block
+                log(`[DEBUG] finally - FileState.currentFile: ${FileState.currentFile ? FileState.currentFile.name : 'null'}`, 'debug');
+                log(`[DEBUG] finally - networkErrorOccurred: ${FileState.networkErrorOccurred}`, 'debug');
                 
                 // Check monitoring stop after 10 seconds
                 setTimeout(async () => {
@@ -7996,8 +8049,10 @@
                     log('ProgressManagerをリセットしました', 'debug');
                 } else {
                     log('ネットワークエラーのため、ProgressManagerを保持します', 'info');
-                    // Clear the flag for next time
-                    FileState.networkErrorOccurred = false;
+                    // Phase 0-F-3: Do not clear the flag immediately - keep it for auto-resume
+                    log('[DEBUG] networkErrorOccurredフラグは自動再開完了まで保持', 'debug');
+                    // Debug: Keep currentFile for auto-resume
+                    log(`[DEBUG] FileState.currentFile保持状態: ${FileState.currentFile ? FileState.currentFile.name : 'null'}`, 'debug');
                 }
             }
         };
@@ -10129,6 +10184,12 @@
 
         // Check if monitoring should stop
         async function checkMonitoringStop() {
+            // Phase 0-F-1: Check network error status first
+            if (FileState.networkErrorOccurred) {
+                log('[DEBUG] ネットワークエラーのため監視を継続', 'debug');
+                return;
+            }
+            
             // v5.3.6: Don't stop monitoring during upload session
             if (FileState.uploadSessionActive) { // v5.5.35: Using FileState
                 log('[DEBUG] アップロードセッション中のため監視を継続', 'debug');
@@ -10594,11 +10655,24 @@
         
         // Restart monitoring after network recovery
         async function restartMonitoring() {
-            if (NetworkState.ws.monitorActive) {
-                log('WebSocket監視の再起動を試みます', 'info');
-                await stopMonitoring();
-                await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+            // Phase 0-D: 改善された接続状態管理
+            if (!NetworkState.ws.monitorActive) {
+                log('[Monitor] 既に停止しているため、再起動不要', 'debug');
+                return;
+            }
+            
+            log('[Monitor] WebSocket監視を再構築します', 'info');
+            
+            // 停止処理
+            await stopMonitoring();
+            
+            // WebSocketが本当に準備できるまで待つ
+            if (NetworkState.rpcClient && NetworkState.rpcClient.isConnected) {
+                // Phase 0-D: 無駄な待機を削除、代わりに状態確認
+                log('[Monitor] RPC接続確認完了、監視を開始します', 'debug');
                 await startMonitoring();
+            } else {
+                log('[Monitor] RPC接続が不安定なため、監視開始を延期', 'warning');
             }
         }
         

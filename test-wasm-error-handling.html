@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WASM Error Handling Test - Phase 0-E</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #1e1e1e;
+            color: #d4d4d4;
+        }
+        #systemLog {
+            background: #2d2d2d;
+            border: 1px solid #3e3e3e;
+            padding: 10px;
+            height: 500px;
+            overflow-y: auto;
+            margin-bottom: 20px;
+        }
+        .log-entry {
+            margin-bottom: 5px;
+            white-space: pre-wrap;
+        }
+        .log-time {
+            color: #6a9955;
+        }
+        .log-info {
+            color: #9cdcfe;
+        }
+        .log-error {
+            color: #f48771;
+        }
+        .log-debug {
+            color: #b5cea8;
+        }
+        .log-warning {
+            color: #dcdcaa;
+        }
+        button {
+            margin: 5px;
+            padding: 10px;
+            background: #0e639c;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #1177bb;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 10px;
+            border: 1px solid #3e3e3e;
+        }
+        .success {
+            color: #4ec9b0;
+            font-weight: bold;
+        }
+        .failure {
+            color: #f48771;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>WASM Error Handling Test - Phase 0-E</h1>
+    
+    <div id="systemLog"></div>
+    
+    <div class="test-section">
+        <h2>WASMエラーシミュレーション</h2>
+        <button onclick="testWASMError()">WASMエラーをテスト</button>
+        <button onclick="testNormalError()">通常のエラーをテスト</button>
+        <button onclick="testComplexObject()">複雑なオブジェクトをテスト</button>
+        <button onclick="testActualWASMError()">実際のWASMエラー構造をテスト</button>
+    </div>
+    
+    <div class="test-section">
+        <h2>比較テスト</h2>
+        <button onclick="compareOldVsNew()">修正前後の比較</button>
+    </div>
+    
+    <button onclick="clearLog()" style="background: #cc3333;">ログクリア</button>
+    
+    <div id="results" class="test-section">
+        <h2>テスト結果</h2>
+        <div id="test-results"></div>
+    </div>
+
+    <script>
+        // Mock AppState for testing
+        window.AppState = {
+            history: {
+                systemLogs: []
+            }
+        };
+        
+        // Phase 0-E: 改善されたlog関数
+        window.log = function log(message, type = 'info', detail = null) {
+            const timestamp = new Date();
+            const logEntry = {
+                timestamp: timestamp.toISOString(),
+                time: timestamp.toLocaleTimeString(),
+                type: type,
+                message: message
+            };
+            
+            // Handle third parameter (detail) if provided
+            if (detail !== null) {
+                // For objects, try to stringify
+                if (typeof detail === 'object') {
+                    // Phase 0-E: WASMエラーの特別処理
+                    if (detail.constructor && detail.constructor.name.includes('Error')) {
+                        // WASMエラーの可能性
+                        if (detail.message) {
+                            logEntry.message += ' ' + detail.message;
+                        } else if (detail.toString && detail.toString() !== '[object Object]') {
+                            logEntry.message += ' ' + detail.toString();
+                        } else {
+                            // プロパティを列挙
+                            try {
+                                const props = Object.getOwnPropertyNames(detail);
+                                const values = {};
+                                for (const prop of props) {
+                                    try {
+                                        values[prop] = detail[prop];
+                                    } catch (e) {
+                                        values[prop] = '[アクセス不可]';
+                                    }
+                                }
+                                logEntry.message += ' ' + JSON.stringify(values, null, 2);
+                            } catch (e) {
+                                logEntry.message += ' [WASMオブジェクト - 詳細取得失敗]';
+                            }
+                        }
+                    } else {
+                        // 通常のオブジェクト処理
+                        try {
+                            // Pretty print with 2 space indentation
+                            const detailStr = JSON.stringify(detail, null, 2);
+                            // If it's a single line, append inline
+                            if (!detailStr.includes('\n')) {
+                                logEntry.message += ' ' + detailStr;
+                            } else {
+                                // For multi-line, add on new line
+                                logEntry.message += '\n' + detailStr;
+                            }
+                        } catch (e) {
+                            // Handle circular references or other stringify errors
+                            if (detail instanceof Error) {
+                                logEntry.message += ' ' + detail.toString();
+                                if (detail.stack) {
+                                    logEntry.message += '\nStack: ' + detail.stack;
+                                }
+                            } else {
+                                logEntry.message += ' [オブジェクトの文字列化に失敗]';
+                            }
+                        }
+                    }
+                } else {
+                    // For non-objects, just convert to string
+                    logEntry.message += ' ' + String(detail);
+                }
+            }
+            
+            AppState.history.systemLogs.push(logEntry);
+            
+            const logContainer = document.getElementById('systemLog');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            // Escape HTML and preserve newlines for display
+            const escapedMessage = logEntry.message
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;')
+                .replace(/\n/g, '<br>');
+            entry.innerHTML = `<span class="log-time">[${logEntry.time}]</span> <span class="log-${type}">${escapedMessage}</span>`;
+            logContainer.appendChild(entry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+            
+            return logEntry;
+        }
+        
+        // WASMエラーのモック
+        class WASMError {
+            constructor(message) {
+                this._message = message;
+                this._code = 'WASM_ERROR';
+            }
+            
+            get message() {
+                return this._message;
+            }
+            
+            toString() {
+                return `WASMError: ${this._message}`;
+            }
+        }
+        
+        // JSON.stringifyで{}になるオブジェクトのモック
+        class UnstringifiableError {
+            constructor(message) {
+                Object.defineProperty(this, 'message', {
+                    value: message,
+                    enumerable: false
+                });
+                Object.defineProperty(this, 'code', {
+                    value: 'UNSTRINGIFIABLE',
+                    enumerable: false
+                });
+            }
+            
+            toString() {
+                return '[object Object]';
+            }
+        }
+        
+        function testWASMError() {
+            log('=== WASMエラーテスト開始 ===', 'info');
+            
+            // 通常のWASMエラー
+            const wasmError = new WASMError('RPC Server (remote error) -> WebSocket disconnected');
+            log('[新方式] エラー詳細:', 'error', wasmError);
+            
+            // プロパティが取得できないエラー
+            const unstringifiableError = new UnstringifiableError('WebSocket is not connected');
+            log('[DEBUG] エラーオブジェクト:', 'debug', unstringifiableError);
+            
+            log('=== WASMエラーテスト完了 ===', 'info');
+        }
+        
+        function testNormalError() {
+            log('=== 通常のエラーテスト開始 ===', 'info');
+            
+            // 通常のError
+            const normalError = new Error('This is a normal error');
+            log('通常のエラー:', 'error', normalError);
+            
+            // オブジェクト
+            const obj = { foo: 'bar', baz: 123 };
+            log('通常のオブジェクト:', 'debug', obj);
+            
+            log('=== 通常のエラーテスト完了 ===', 'info');
+        }
+        
+        function testComplexObject() {
+            log('=== 複雑なオブジェクトテスト開始 ===', 'info');
+            
+            // 循環参照
+            const circular = { name: 'circular' };
+            circular.self = circular;
+            log('循環参照オブジェクト:', 'warning', circular);
+            
+            // 多層オブジェクト
+            const complex = {
+                level1: {
+                    level2: {
+                        level3: 'deep value'
+                    }
+                },
+                array: [1, 2, 3],
+                date: new Date()
+            };
+            log('複雑なオブジェクト:', 'debug', complex);
+            
+            log('=== 複雑なオブジェクトテスト完了 ===', 'info');
+        }
+        
+        function testActualWASMError() {
+            log('=== 実際のWASMエラー構造テスト開始 ===', 'info');
+            
+            // 実際のWASMエラーをシミュレート
+            const wasmLikeError = {};
+            Object.defineProperty(wasmLikeError, 'constructor', {
+                value: { name: 'RpcError' },
+                enumerable: false
+            });
+            Object.defineProperty(wasmLikeError, 'message', {
+                value: 'RPC Server (remote error) -> WebSocket disconnected',
+                enumerable: true
+            });
+            
+            log('[新方式] エラー詳細:', 'error', wasmLikeError);
+            
+            log('=== 実際のWASMエラー構造テスト完了 ===', 'info');
+        }
+        
+        function compareOldVsNew() {
+            log('=== 修正前後の比較 ===', 'info');
+            
+            const testError = new UnstringifiableError('WebSocket error');
+            
+            // 修正前の動作をシミュレート
+            try {
+                const result = JSON.stringify(testError);
+                log('修正前: JSON.stringify結果', 'warning', result);
+            } catch (e) {
+                log('修正前: JSON.stringifyエラー', 'error', e);
+            }
+            
+            // 修正後の動作
+            log('修正後: 改善されたログ出力', 'success', testError);
+            
+            log('=== 比較完了 ===', 'info');
+        }
+        
+        function clearLog() {
+            document.getElementById('systemLog').innerHTML = '';
+            document.getElementById('test-results').innerHTML = '';
+            AppState.history.systemLogs = [];
+            log('ログをクリアしました', 'info');
+        }
+        
+        // Initial message
+        log('WASM Error Handling Test Ready (Phase 0-E)', 'info');
+        log('各ボタンをクリックして、WASMエラー処理の改善を確認してください', 'info');
+    </script>
+</body>
+</html>

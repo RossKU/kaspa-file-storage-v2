@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.6.14-debug - WebSocket Monitoring Fix + Debug</title>
+    <title>Kaspa P2P File Storage v5.6.16 - Session Management & Auto-Resume Fix</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -976,6 +976,12 @@
         // - Phase 0-F-2: Added counter management on chunk upload errors
         // - Phase 0-F-3: Keep networkErrorOccurred flag for auto-resume instead of immediate reset
         // - Added 'websocket' check to isNetworkError function
+        
+        // v5.6.16: Session Management & Auto-Resume Fix (Phase 0-H)
+        // - Keep uploadSessionActive on network error for auto-resume
+        // - Fixed handleReconnected calls with proper await
+        // - Added strategic debug logs for session tracking
+        // - Fixed auto-resume by maintaining session during errors
         
         /*
          * ====================================================================
@@ -3112,11 +3118,11 @@
                         log(`[ConnectionManager] RPC接続成功: ${info.serverVersion}`, 'success');
                         
                         // Connection restored
-                        this.handleReconnected();
+                        await this.handleReconnected();
                     } else {
                         // Try to initialize RPC
                         await initializeRpcClient();
-                        this.handleReconnected();
+                        await this.handleReconnected();
                     }
                 } catch (error) {
                     log(`[ConnectionManager] 再接続失敗: ${error.message}`, 'error');
@@ -3128,6 +3134,7 @@
             async handleReconnected() {
                 // Phase 0-D: 改善された接続状態管理
                 log('[ConnectionManager] 接続が安定しました', 'info');
+                log(`[DEBUG] handleReconnected開始 - uploadSessionActive: ${FileState.uploadSessionActive}`, 'debug');
                 
                 this.isConnected = true;
                 this.reconnectAttempts = 0;
@@ -3150,6 +3157,7 @@
                     FileState.progressManager.progress.metadata.totalChunks) {
                     
                     log('[ConnectionManager] アップロードを自動的に再開します...', 'info');
+                    log(`[DEBUG] 再開条件満たす - uploadSessionActive: ${FileState.uploadSessionActive}`, 'debug');
                     // Debug: Check current state
                     log(`[DEBUG] FileState.currentFile: ${FileState.currentFile ? FileState.currentFile.name : 'null'}`, 'debug');
                     log(`[DEBUG] window.pendingProgress: ${window.pendingProgress ? 'exists' : 'null'}`, 'debug');
@@ -3178,7 +3186,9 @@
                     setTimeout(async () => {
                         if (FileState.currentFile && window.pendingProgress) {
                             log('[ConnectionManager] processAndUploadを呼び出します...', 'info');
+                            log(`[DEBUG] 自動再開前 - uploadSessionActive: ${FileState.uploadSessionActive}`, 'debug');
                             await processAndUpload();
+                            log('[ConnectionManager] 自動再開が完了しました', 'success');
                         } else {
                             log('[ConnectionManager] 自動再開に必要な情報が不足しています', 'warning');
                             if (!FileState.currentFile) {
@@ -3190,6 +3200,8 @@
                         }
                     }, 1000);
                 }
+                
+                log('[DEBUG] handleReconnected完了', 'debug');
             },
             
             // Manual reconnect trigger
@@ -8006,8 +8018,14 @@
                 FileState.isUploadingFile = false; // v5.5.34: Using FileState
                 
                 // v5.3.7: End upload session
-                FileState.uploadSessionActive = false; // v5.5.35: Using FileState
-                log('[INFO] アップロードセッションを終了 (メイン)', 'info');
+                // Phase 0-H: Don't end session on network error
+                if (!FileState.networkErrorOccurred) {
+                    FileState.uploadSessionActive = false; // v5.5.35: Using FileState
+                    log('[INFO] アップロードセッションを終了 (メイン)', 'info');
+                } else {
+                    log('[INFO] ネットワークエラーのため、アップロードセッションを維持', 'info');
+                    log(`[DEBUG] uploadSessionActive維持: ${FileState.uploadSessionActive}`, 'debug');
+                }
                 
                 // Debug: Check state in finally block
                 log(`[DEBUG] finally - FileState.currentFile: ${FileState.currentFile ? FileState.currentFile.name : 'null'}`, 'debug');

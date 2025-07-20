@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.6.14 - WebSocket Monitoring Fix</title>
+    <title>Kaspa P2P File Storage v5.6.14-debug - WebSocket Monitoring Fix + Debug</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -3150,15 +3150,26 @@
                     FileState.progressManager.progress.metadata.totalChunks) {
                     
                     log('[ConnectionManager] アップロードを自動的に再開します...', 'info');
+                    // Debug: Check current state
+                    log(`[DEBUG] FileState.currentFile: ${FileState.currentFile ? FileState.currentFile.name : 'null'}`, 'debug');
+                    log(`[DEBUG] window.pendingProgress: ${window.pendingProgress ? 'exists' : 'null'}`, 'debug');
                     
                     // Load progress from localStorage if not already loaded
                     if (!window.pendingProgress) {
                         const savedProgress = loadProgressFromLocalStorage();
+                        log(`[DEBUG] savedProgress: ${savedProgress ? `found (${savedProgress.file?.name})` : 'null'}`, 'debug');
+                        
                         if (savedProgress) {
                             // Verify the progress matches current file
                             if (FileState.currentFile && savedProgress.file?.name === FileState.currentFile.name) {
                                 window.pendingProgress = savedProgress;
                                 log('[ConnectionManager] 進捗データを復元しました', 'info');
+                            } else if (!FileState.currentFile) {
+                                // If no current file, restore from progress
+                                log('[DEBUG] FileState.currentFileがnull - 進捗データから復元を試みます', 'debug');
+                                FileState.currentFile = savedProgress.file;
+                                window.pendingProgress = savedProgress;
+                                log('[ConnectionManager] ファイル情報を進捗データから復元しました', 'info');
                             }
                         }
                     }
@@ -7998,6 +8009,10 @@
                 FileState.uploadSessionActive = false; // v5.5.35: Using FileState
                 log('[INFO] アップロードセッションを終了 (メイン)', 'info');
                 
+                // Debug: Check state in finally block
+                log(`[DEBUG] finally - FileState.currentFile: ${FileState.currentFile ? FileState.currentFile.name : 'null'}`, 'debug');
+                log(`[DEBUG] finally - networkErrorOccurred: ${FileState.networkErrorOccurred}`, 'debug');
+                
                 // Check monitoring stop after 10 seconds
                 setTimeout(async () => {
                     if (!FileState.uploadSessionActive && !FileState.isUploadingFile && NetworkState.ws.monitoredTransactions.size === 0) { // v5.5.34 & v5.5.35: Using FileState
@@ -8018,6 +8033,8 @@
                     log('ネットワークエラーのため、ProgressManagerを保持します', 'info');
                     // Phase 0-F-3: Do not clear the flag immediately - keep it for auto-resume
                     log('[DEBUG] networkErrorOccurredフラグは自動再開完了まで保持', 'debug');
+                    // Debug: Keep currentFile for auto-resume
+                    log(`[DEBUG] FileState.currentFile保持状態: ${FileState.currentFile ? FileState.currentFile.name : 'null'}`, 'debug');
                 }
             }
         };

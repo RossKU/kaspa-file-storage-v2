@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.6.12 - Coherent Connection Management</title>
+    <title>Kaspa P2P File Storage v5.6.14 - WebSocket Monitoring Fix</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -970,13 +970,12 @@
         // - Fixed incorrect argument order in log() calls
         // - Changed log(message, detail, type) to log(message, type, detail)
         // - Now error objects are properly displayed in debug logs
-        // - Added debug logging for auto-resume troubleshooting
-        // - Added handleNetworkError() unified error handler
-        // - Improved offline/online event handling with 2-second delay
-        // - Auto-resume uploads after network recovery
-        // - Reduced false error messages by ~80%
-        // - Added backward compatibility proxies for all migrated variables
-        // - All global variables are now properly organized in state objects
+        
+        // v5.6.14: WebSocket Monitoring Fix (Phase 0-F)
+        // - Phase 0-F-1: Added network error check in checkMonitoringStop to prevent premature stop
+        // - Phase 0-F-2: Added counter management on chunk upload errors
+        // - Phase 0-F-3: Keep networkErrorOccurred flag for auto-resume instead of immediate reset
+        // - Added 'websocket' check to isNetworkError function
         
         /*
          * ====================================================================
@@ -3022,13 +3021,17 @@
         // Check if error is network-related
         function isNetworkError(error) {
             if (!error) return false;
-            const message = error.message?.toLowerCase() || '';
+            
+            // Handle both string errors and error objects
+            const message = (typeof error === 'string' ? error : error.message || '').toLowerCase();
+            
             return message.includes('network') || 
                    message.includes('connection') || 
                    message.includes('not connected') ||
                    message.includes('offline') ||
                    message.includes('timeout') ||
-                   message.includes('disconnected');
+                   message.includes('disconnected') ||
+                   message.includes('websocket');  // Phase 0-F: Added WebSocket check
         }
         
         // v5.6.6: Connection Manager - Error-based network management without browser events
@@ -7758,6 +7761,18 @@
                             console.error('詳細エラー:', error);
                             console.error('スタックトレース:', error.stack);
                             
+                            // Phase 0-F-2: Manage counter on error
+                            if (FileState.uploadingChunksCount > 0) {
+                                FileState.uploadingChunksCount--;
+                                log(`[DEBUG] エラーによりカウンターを減算: ${FileState.uploadingChunksCount}`, 'debug');
+                            }
+                            
+                            // Remove from monitoring list if exists
+                            if (txid && NetworkState.ws.monitoredTransactions.has(txid)) {
+                                NetworkState.ws.monitoredTransactions.delete(txid);
+                                log(`[DEBUG] エラーにより監視リストから削除: ${txid.substring(0, 16)}...`, 'debug');
+                            }
+                            
                             if (retries >= config.retryCount) {
                                 document.getElementById(`chunk-status-${i}`).innerHTML = '<span class="error">❌ 失敗</span>';
                                 FileState.progressManager.markChunkFailed(i);
@@ -8001,8 +8016,8 @@
                     log('ProgressManagerをリセットしました', 'debug');
                 } else {
                     log('ネットワークエラーのため、ProgressManagerを保持します', 'info');
-                    // Clear the flag for next time
-                    FileState.networkErrorOccurred = false;
+                    // Phase 0-F-3: Do not clear the flag immediately - keep it for auto-resume
+                    log('[DEBUG] networkErrorOccurredフラグは自動再開完了まで保持', 'debug');
                 }
             }
         };
@@ -10134,6 +10149,12 @@
 
         // Check if monitoring should stop
         async function checkMonitoringStop() {
+            // Phase 0-F-1: Check network error status first
+            if (FileState.networkErrorOccurred) {
+                log('[DEBUG] ネットワークエラーのため監視を継続', 'debug');
+                return;
+            }
+            
             // v5.3.6: Don't stop monitoring during upload session
             if (FileState.uploadSessionActive) { // v5.5.35: Using FileState
                 log('[DEBUG] アップロードセッション中のため監視を継続', 'debug');

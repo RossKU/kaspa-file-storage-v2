@@ -9,18 +9,17 @@
         :root {
             /* Light Theme Colors */
             --bg-primary: #ffffff;
-            --bg-secondary: #f8f9fa;
+            --bg-secondary: #f7f7f7;
             --bg-tertiary: #ffffff;
-            --text-primary: #212529;
-            --text-secondary: #6c757d;
-            --border-color: #dee2e6;
+            --text-primary: #000000;
+            --text-secondary: #666666;
+            --border-color: #e0e0e0;
             --accent-color: #70C7BA;
             --accent-hover: #5fb0a9;
             --accent-light: rgba(112, 199, 186, 0.1);
             --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
             --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
-            --header-bg: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-            --code-bg: #f8f9fa;
+            --code-bg: #f5f5f5;
             --success-color: #28a745;
             --error-color: #dc3545;
             --warning-color: #ffc107;
@@ -29,19 +28,18 @@
 
         /* Dark Theme Colors */
         [data-theme="dark"] {
-            --bg-primary: #1a1a1a;
-            --bg-secondary: #2d2d2d;
-            --bg-tertiary: #242424;
-            --text-primary: #e0e0e0;
+            --bg-primary: #0d0d0d;
+            --bg-secondary: #1a1a1a;
+            --bg-tertiary: #141414;
+            --text-primary: #ffffff;
             --text-secondary: #999999;
-            --border-color: #404040;
+            --border-color: #333333;
             --accent-color: #70C7BA;
             --accent-hover: #5fb0a9;
             --accent-light: rgba(112, 199, 186, 0.15);
-            --shadow-sm: 0 1px 3px rgba(0,0,0,0.3);
-            --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
-            --header-bg: linear-gradient(135deg, #2d2d2d 0%, #1a1a1a 100%);
-            --code-bg: #1a1a1a;
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.5);
+            --shadow-md: 0 4px 12px rgba(0,0,0,0.6);
+            --code-bg: #0a0a0a;
             --success-color: #4CAF50;
             --error-color: #ff5252;
             --warning-color: #ffc107;
@@ -73,30 +71,35 @@
             width: 240px;
             background: var(--bg-secondary);
             border-right: 1px solid var(--border-color);
-            padding: 20px 0;
             position: fixed;
             height: 100vh;
-            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
             transition: all 0.3s ease;
         }
 
         .sidebar-header {
-            padding: 0 20px 20px;
+            padding: 24px 20px;
             border-bottom: 1px solid var(--border-color);
-            margin-bottom: 20px;
         }
 
         .sidebar h2 {
             margin: 0;
             font-size: 20px;
-            color: var(--accent-color);
+            color: var(--text-primary);
             font-weight: 600;
+        }
+
+        .sidebar-nav {
+            flex: 1;
+            padding: 20px 0;
+            overflow-y: auto;
         }
 
         .nav-item {
             display: block;
-            padding: 12px 20px;
-            color: var(--text-secondary);
+            padding: 12px 24px;
+            color: var(--text-primary);
             text-decoration: none;
             transition: all 0.2s ease;
             cursor: pointer;
@@ -105,66 +108,45 @@
             width: 100%;
             text-align: left;
             font-size: 15px;
+            position: relative;
         }
 
         .nav-item:hover {
-            background: var(--accent-light);
-            color: var(--accent-color);
-            border-left: 3px solid var(--accent-color);
-            padding-left: 17px;
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
         }
 
         .nav-item.active {
-            background: var(--accent-light);
-            color: var(--accent-color);
-            border-left: 3px solid var(--accent-color);
-            padding-left: 17px;
+            background: var(--accent-color);
+            color: white;
             font-weight: 500;
+        }
+
+        .nav-item.active:hover {
+            background: var(--accent-hover);
+        }
+
+        .sidebar-footer {
+            padding: 20px;
+            border-top: 1px solid var(--border-color);
+            font-size: 14px;
+            color: var(--text-secondary);
         }
 
         /* Main Content Area */
         .main-content {
             flex: 1;
             margin-left: 240px;
-            padding: 20px;
+            padding: 24px;
             max-width: 1200px;
             width: 100%;
         }
 
-        /* Header */
-        .header {
-            background: var(--header-bg);
-            padding: 24px;
-            border-radius: 8px;
-            margin-bottom: 24px;
-            box-shadow: var(--shadow-sm);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
         h1 {
-            margin: 0;
-            color: var(--accent-color);
-            font-size: 28px;
-            font-weight: 600;
-        }
-
-        /* Theme Toggle */
-        .theme-toggle {
-            background: var(--bg-tertiary);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 8px 16px;
-            cursor: pointer;
+            margin: 0 0 20px 0;
             color: var(--text-primary);
-            font-size: 14px;
-            transition: all 0.2s;
-        }
-
-        .theme-toggle:hover {
-            background: var(--accent-light);
-            border-color: var(--accent-color);
+            font-size: 24px;
+            font-weight: 600;
         }
 
         /* Container Styles */
@@ -811,13 +793,9 @@
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-header">
                 <h2>Kaspa Storage</h2>
-                <div id="networkStatus" style="margin-top: 10px; font-size: 14px;">
-                    <span class="status-indicator status-offline"></span>
-                    <span id="statusText" style="color: var(--text-secondary);">未接続</span>
-                </div>
             </div>
             
-            <nav>
+            <nav class="sidebar-nav">
                 <button class="nav-item active" onclick="switchTab('upload')">📤 Upload</button>
                 <button class="nav-item" onclick="switchTab('download')">📥 Download</button>
                 <button class="nav-item" onclick="switchTab('directory')">📁 Directory</button>
@@ -825,19 +803,18 @@
                 <button class="nav-item" onclick="switchTab('debug')">🐛 Debug</button>
                 <button class="nav-item" onclick="switchTab('settings')">⚙️ Settings</button>
             </nav>
+            
+            <div class="sidebar-footer">
+                <div id="networkStatus" style="margin-bottom: 8px;">
+                    <span class="status-indicator status-offline"></span>
+                    <span id="statusText">未接続</span>
+                </div>
+                <div id="appSubtitle" style="font-size: 12px;">Loading version...</div>
+            </div>
         </aside>
         
         <!-- Main Content Area -->
         <main class="main-content">
-            <div class="header">
-                <div>
-                    <h1 id="appTitle">Kaspa P2P File Storage</h1>
-                    <p id="appSubtitle" style="margin-top: 4px; color: var(--text-secondary); font-size: 14px;">Loading version...</p>
-                </div>
-                <button class="theme-toggle" onclick="toggleTheme()">
-                    <span id="themeIcon">🌙</span> <span id="themeText">Dark</span>
-                </button>
-            </div>
 
     <!-- Upload Tab -->
     <div id="upload-tab" class="tab-content active">
@@ -1105,6 +1082,20 @@
     <div id="settings-tab" class="tab-content">
         <div class="container">
             <h2>⚙️ 設定</h2>
+            
+            <div class="metric-box">
+                <h3>テーマ設定</h3>
+                <div class="setting-row">
+                    <div class="setting-label">
+                        <label>テーマ</label>
+                        <p style="font-size: 12px; margin: 4px 0 0 0; color: var(--text-secondary);">アプリケーションの外観を切り替えます</p>
+                    </div>
+                    <select id="themeSelect" onchange="changeTheme(this.value)" style="width: 150px;">
+                        <option value="light">☀️ ライト</option>
+                        <option value="dark">🌙 ダーク</option>
+                    </select>
+                </div>
+            </div>
             
             <div class="metric-box">
                 <h3>ネットワーク設定</h3>
@@ -10971,7 +10962,7 @@
                 const fullTitle = document.title;
                 const titleParts = fullTitle.match(/v[\d.]+\s*-\s*(.+)$/);
                 const subtitle = titleParts ? titleParts[1] : 'No LocalStorage Cache';
-                titleElement.textContent = `🚀 Kaspa P2P File Storage v${version} - ${subtitle}`;
+                titleElement.textContent = `Kaspa Storage v${version} - ${subtitle}`;
             }
             
             if (subtitleElement) {
@@ -12084,22 +12075,21 @@
                 window.directoryManager.updateFileSelector();
                 window.directoryManager.updateUI();
             }
+            
+            // Update theme dropdown when switching to settings
+            if (tab === 'settings') {
+                const currentTheme = document.body.getAttribute('data-theme') || 'dark';
+                const themeSelect = document.getElementById('themeSelect');
+                if (themeSelect) {
+                    themeSelect.value = currentTheme;
+                }
+            }
         };
 
-        // Theme toggle function
-        window.toggleTheme = function() {
-            const body = document.body;
-            const currentTheme = body.getAttribute('data-theme');
-            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-            
-            body.setAttribute('data-theme', newTheme);
-            
-            // Update theme button text and icon
-            document.getElementById('themeIcon').textContent = newTheme === 'dark' ? '🌙' : '☀️';
-            document.getElementById('themeText').textContent = newTheme === 'dark' ? 'Dark' : 'Light';
-            
-            // Save theme preference
-            localStorage.setItem('theme', newTheme);
+        // Theme change function
+        window.changeTheme = function(theme) {
+            document.body.setAttribute('data-theme', theme);
+            localStorage.setItem('theme', theme);
         };
 
         // Sidebar toggle for mobile
@@ -12121,8 +12111,12 @@
         document.addEventListener('DOMContentLoaded', function() {
             const savedTheme = localStorage.getItem('theme') || 'dark';
             document.body.setAttribute('data-theme', savedTheme);
-            document.getElementById('themeIcon').textContent = savedTheme === 'dark' ? '🌙' : '☀️';
-            document.getElementById('themeText').textContent = savedTheme === 'dark' ? 'Dark' : 'Light';
+            
+            // Set theme dropdown value when settings tab is shown
+            const themeSelect = document.getElementById('themeSelect');
+            if (themeSelect) {
+                themeSelect.value = savedTheme;
+            }
         });
         
         // Connection test function (moved from NETWORK & RPC FUNCTIONS)

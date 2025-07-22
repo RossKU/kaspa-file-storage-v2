@@ -98,6 +98,9 @@
         .sidebar-header {
             padding: 24px 20px;
             border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
         .sidebar h2 {
@@ -105,41 +108,29 @@
             font-size: 20px;
             color: white;
             font-weight: 600;
-            line-height: 1.2;
-            transition: all 0.3s ease;
-        }
-
-        .sidebar-title-word {
-            display: block;
-        }
-
-        .sidebar-toggle-container {
-            padding: 12px 20px;
-            border-top: 1px solid rgba(255, 255, 255, 0.2);
-            display: none;
-        }
-
-        @media (min-width: 769px) {
-            .sidebar-toggle-container {
-                display: block;
-            }
+            transition: opacity 0.3s ease;
         }
 
         .sidebar-toggle {
-            background: rgba(255, 255, 255, 0.1);
+            background: none;
             border: none;
             color: white;
-            font-size: 16px;
+            font-size: 18px;
             cursor: pointer;
-            padding: 8px;
+            padding: 4px 8px;
             border-radius: 4px;
             transition: all 0.2s;
-            width: 100%;
-            text-align: center;
+            display: none;
         }
 
         .sidebar-toggle:hover {
-            background: rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        @media (min-width: 769px) {
+            .sidebar-toggle {
+                display: block;
+            }
         }
 
         .sidebar-nav {
@@ -198,17 +189,12 @@
 
         /* Collapsed sidebar styles */
         .sidebar.collapsed {
-            width: 80px;
+            width: 60px;
         }
 
         .sidebar.collapsed .sidebar h2 {
-            font-size: 14px;
-            text-align: center;
-        }
-
-        .sidebar.collapsed .sidebar-title-word {
-            display: block;
-            margin: 2px 0;
+            opacity: 0;
+            visibility: hidden;
         }
 
         .sidebar.collapsed .nav-item {
@@ -236,13 +222,9 @@
             display: block;
         }
 
-        .sidebar.collapsed .sidebar-toggle {
-            padding: 8px 4px;
-        }
-
         /* Adjust main content for collapsed sidebar */
         .sidebar-collapsed .main-content {
-            margin-left: 80px;
+            margin-left: 60px;
         }
 
         /* Tooltip for collapsed state */
@@ -958,11 +940,8 @@
         <!-- Sidebar Navigation -->
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-header">
-                <h2>
-                    <span class="sidebar-title-word">Kaspa</span>
-                    <span class="sidebar-title-word">File</span>
-                    <span class="sidebar-title-word">Storage</span>
-                </h2>
+                <h2>Kaspa Storage</h2>
+                <button class="sidebar-toggle" onclick="toggleSidebarCollapse()" id="sidebarToggle">◀</button>
             </div>
             
             <nav class="sidebar-nav">
@@ -991,10 +970,6 @@
                     <span class="nav-item-text">Settings</span>
                 </button>
             </nav>
-            
-            <div class="sidebar-toggle-container">
-                <button class="sidebar-toggle" onclick="toggleSidebarCollapse()" id="sidebarToggle">◀</button>
-            </div>
             
             <div class="sidebar-footer">
                 <div id="networkStatus" style="margin-bottom: 8px;">

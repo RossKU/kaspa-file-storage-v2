@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
     <title>Kaspa P2P File Storage v5.6.25-debug - WebSocket Disconnect Event Detection via Kaspa-core</title>
     <style>
         /* CSS Variables for Theme System */
@@ -51,6 +51,11 @@
             box-sizing: border-box;
         }
 
+        html {
+            height: 100%;
+            -webkit-text-size-adjust: 100%;
+        }
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             margin: 0;
@@ -58,12 +63,18 @@
             background: var(--bg-primary);
             color: var(--text-primary);
             transition: background-color 0.3s ease, color 0.3s ease;
+            height: 100%;
+            overflow: hidden;
+            position: fixed;
+            width: 100%;
         }
 
         /* Layout Structure */
         .app-layout {
             display: flex;
-            min-height: 100vh;
+            height: 100%;
+            height: 100dvh; /* Dynamic viewport height for modern browsers */
+            position: relative;
         }
 
         /* Sidebar Navigation */
@@ -72,10 +83,16 @@
             background: var(--accent-color);
             border-right: none;
             position: fixed;
-            height: 100vh;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            height: 100%;
+            height: 100dvh;
+            height: -webkit-fill-available;
             display: flex;
             flex-direction: column;
             transition: all 0.3s ease;
+            overflow: hidden;
         }
 
         .sidebar-header {
@@ -130,6 +147,7 @@
 
         .sidebar-footer {
             padding: 20px;
+            padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
             border-top: 1px solid rgba(255, 255, 255, 0.2);
             font-size: 14px;
             color: white;
@@ -148,8 +166,12 @@
             flex: 1;
             margin-left: 240px;
             padding: 24px;
+            padding-bottom: env(safe-area-inset-bottom, 24px);
             max-width: 1200px;
             width: 100%;
+            height: 100%;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
         }
 
         h1 {
@@ -225,14 +247,20 @@
             .sidebar {
                 transform: translateX(-100%);
                 z-index: 1000;
+                width: 80%;
+                max-width: 280px;
             }
 
             .sidebar.open {
                 transform: translateX(0);
+                box-shadow: 2px 0 12px rgba(0,0,0,0.3);
             }
 
             .main-content {
                 margin-left: 0;
+                padding: 16px;
+                padding-top: 60px; /* Space for mobile menu button */
+                padding-bottom: env(safe-area-inset-bottom, 16px);
             }
 
             .mobile-menu-btn {

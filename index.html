@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.9.0 - New Status and File Tabs</title>
+    <title>Kaspa P2P File Storage v5.9.1 - Enhanced UI Elements</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -1075,6 +1075,84 @@
             background: var(--accent-light);
         }
         
+        /* Share Menu Dropdown */
+        .share-dropdown {
+            position: relative;
+            display: inline-block;
+        }
+        .share-menu {
+            position: absolute;
+            bottom: 100%;
+            left: 0;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 8px;
+            display: none;
+            min-width: 200px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            margin-bottom: 8px;
+        }
+        .share-menu.show {
+            display: block;
+        }
+        .share-option {
+            display: block;
+            width: 100%;
+            padding: 8px 12px;
+            text-align: left;
+            border: none;
+            background: transparent;
+            color: var(--text-primary);
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .share-option:hover {
+            background: var(--bg-tertiary);
+        }
+        
+        /* Password Dialog */
+        .password-dialog {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: var(--bg-secondary);
+            padding: 24px;
+            border-radius: 12px;
+            z-index: 1000;
+            min-width: 300px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+        }
+        .password-dialog h3 {
+            margin-top: 0;
+            color: var(--accent-color);
+        }
+        .password-dialog input {
+            width: 100%;
+            margin: 16px 0;
+            padding: 8px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            color: var(--text-primary);
+        }
+        .password-dialog-buttons {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+        }
+        .dialog-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 999;
+        }
+        
         /* Responsive Design for File Table */
         @media (max-width: 768px) {
             .file-table-wrapper {
@@ -1197,13 +1275,25 @@
                 <div class="status-row">
                     <div>
                         <strong>Archive Node:</strong>
-                        <span class="status-indicator-large status-disconnected"></span>
+                        <span class="status-indicator-large status-disconnected" id="archiveIndicator"></span>
                         <span id="archiveStatus">Not Connected</span>
                     </div>
                 </div>
                 <div class="status-row">
                     <div style="margin-left: 20px;">
                         <small id="archiveDetails">Status: -</small>
+                    </div>
+                </div>
+                <div class="status-row">
+                    <div style="margin-left: 20px;">
+                        <small id="archiveConnections">接続数: 0/5</small>
+                    </div>
+                </div>
+                <div class="status-row" id="archiveNodeInfo" style="display: none;">
+                    <div style="margin-left: 20px; font-size: 12px;">
+                        <div>Server: <span id="archiveServer">-</span></div>
+                        <div>Version: <span id="archiveVersion">-</span></div>
+                        <div>Blocks: <span id="archiveBlocks">-</span></div>
                     </div>
                 </div>
             </div>
@@ -1304,9 +1394,18 @@
                 <button class="file-action-btn" onclick="deleteSelected()">
                     🗑️ Delete
                 </button>
-                <button class="file-action-btn" onclick="shareSelected()">
-                    🔗 Share ▼
-                </button>
+                <div class="share-dropdown">
+                    <button class="file-action-btn" onclick="toggleShareMenu()">
+                        🔗 Share ▼
+                    </button>
+                    <div class="share-menu" id="shareMenu">
+                        <button class="share-option" onclick="shareAction('kaspa-password')">🔐 .kaspa (パスワード付き)</button>
+                        <button class="share-option" onclick="shareAction('kaspa-no-password')">🔓 .kaspa (パスワードなし)</button>
+                        <button class="share-option" onclick="shareAction('txid-password')">🔐 TxID (パスワード付き)</button>
+                        <button class="share-option" onclick="shareAction('txid-no-password')">🔓 TxID (パスワードなし)</button>
+                        <button class="share-option" onclick="shareAction('password')">🔑 Pass (パスワードのみ)</button>
+                    </div>
+                </div>
                 <button class="file-action-btn" onclick="renameSelected()">
                     ✏️ Rename
                 </button>
@@ -13104,6 +13203,13 @@
                 // TxID:BlockID format
                 fileInfo.metaTxId = parts[0];
                 fileInfo.name = `File_${parts[0].substring(0, 8)}`;
+                
+                // Check if password is provided
+                if (parts.length === 2 || (parts.length === 3 && !parts[2])) {
+                    // No password - show dialog (UI only)
+                    showAddFilePasswordDialog(fileInfo, info);
+                    return;
+                }
             }
             
             // Add to FileState
@@ -13209,6 +13315,179 @@
             
             // TODO: Implement share menu dropdown
             log('[File] Share menu not yet implemented', 'warning');
+        };
+        
+        // Toggle share menu
+        window.toggleShareMenu = function() {
+            const shareMenu = document.getElementById('shareMenu');
+            shareMenu.classList.toggle('show');
+            
+            // Close menu when clicking outside
+            if (shareMenu.classList.contains('show')) {
+                setTimeout(() => {
+                    document.addEventListener('click', closeShareMenu);
+                }, 100);
+            }
+        };
+        
+        // Close share menu
+        window.closeShareMenu = function(e) {
+            const shareMenu = document.getElementById('shareMenu');
+            const shareButton = e.target.closest('.file-action-btn');
+            
+            if (!shareMenu.contains(e.target) && !shareButton) {
+                shareMenu.classList.remove('show');
+                document.removeEventListener('click', closeShareMenu);
+            }
+        };
+        
+        // Handle share actions
+        window.shareAction = function(action) {
+            const selectedIds = Array.from(FileState.selectedFiles);
+            if (selectedIds.length === 0) return;
+            
+            // Close menu
+            document.getElementById('shareMenu').classList.remove('show');
+            
+            // Show placeholder message for now
+            log(`[File] Share action: ${action} (UI only - not implemented)`, 'info');
+            
+            // Show password dialog for actions that need password
+            if (action === 'kaspa-password' || action === 'txid-password') {
+                showPasswordDialog(action);
+            }
+        };
+        
+        // Show password dialog
+        window.showPasswordDialog = function(action) {
+            // Create dialog elements
+            const overlay = document.createElement('div');
+            overlay.className = 'dialog-overlay';
+            
+            const dialog = document.createElement('div');
+            dialog.className = 'password-dialog';
+            dialog.innerHTML = `
+                <h3>パスワード入力</h3>
+                <p>ファイルのパスワードを入力してください:</p>
+                <input type="password" id="filePassword" placeholder="パスワード">
+                <div class="password-dialog-buttons">
+                    <button onclick="closePasswordDialog()">キャンセル</button>
+                    <button onclick="submitPassword('${action}')">OK</button>
+                </div>
+            `;
+            
+            document.body.appendChild(overlay);
+            document.body.appendChild(dialog);
+            
+            // Focus password input
+            setTimeout(() => {
+                document.getElementById('filePassword').focus();
+            }, 100);
+        };
+        
+        // Close password dialog
+        window.closePasswordDialog = function() {
+            const overlay = document.querySelector('.dialog-overlay');
+            const dialog = document.querySelector('.password-dialog');
+            if (overlay) overlay.remove();
+            if (dialog) dialog.remove();
+        };
+        
+        // Submit password
+        window.submitPassword = function(action) {
+            const password = document.getElementById('filePassword').value;
+            if (password) {
+                log(`[File] Password submitted for ${action} (UI only)`, 'info');
+            }
+            closePasswordDialog();
+        };
+        
+        // Update Archive Node display (dummy function for UI)
+        window.updateArchiveNodeDisplay = function() {
+            // Simulated display update
+            const status = Math.random() > 0.5;
+            const indicator = document.getElementById('archiveIndicator');
+            const statusText = document.getElementById('archiveStatus');
+            const details = document.getElementById('archiveDetails');
+            const connections = document.getElementById('archiveConnections');
+            const nodeInfo = document.getElementById('archiveNodeInfo');
+            
+            if (status) {
+                indicator.className = 'status-indicator-large status-connected';
+                statusText.textContent = 'Connected';
+                details.textContent = 'Status: Active';
+                connections.textContent = '接続数: 3/5';
+                nodeInfo.style.display = 'block';
+                document.getElementById('archiveServer').textContent = 'wss://archive-mainnet.kaspa.org';
+                document.getElementById('archiveVersion').textContent = 'rusty-kaspa/0.15.2';
+                document.getElementById('archiveBlocks').textContent = '85.3M';
+            } else {
+                indicator.className = 'status-indicator-large status-disconnected';
+                statusText.textContent = 'Not Connected';
+                details.textContent = 'Status: -';
+                connections.textContent = '接続数: 0/5';
+                nodeInfo.style.display = 'none';
+            }
+        };
+        
+        // Show password dialog for adding file
+        window.showAddFilePasswordDialog = function(fileInfo, originalInfo) {
+            const overlay = document.createElement('div');
+            overlay.className = 'dialog-overlay';
+            
+            const dialog = document.createElement('div');
+            dialog.className = 'password-dialog';
+            dialog.innerHTML = `
+                <h3>パスワード入力</h3>
+                <p>パスワードが設定されていないようです。<br>パスワードを入力してリストへ登録しますか？</p>
+                <input type="password" id="addFilePassword" placeholder="パスワード（省略可）">
+                <div class="password-dialog-buttons">
+                    <button onclick="cancelAddFile()">キャンセル</button>
+                    <button onclick="confirmAddFile('${fileInfo.id}', '${originalInfo}')">登録</button>
+                </div>
+            `;
+            
+            // Store fileInfo temporarily
+            window.tempFileInfo = fileInfo;
+            
+            document.body.appendChild(overlay);
+            document.body.appendChild(dialog);
+            
+            setTimeout(() => {
+                const input = document.getElementById('addFilePassword');
+                if (input) input.focus();
+            }, 100);
+        };
+        
+        // Cancel add file
+        window.cancelAddFile = function() {
+            const overlay = document.querySelector('.dialog-overlay');
+            const dialog = document.querySelector('.password-dialog');
+            if (overlay) overlay.remove();
+            if (dialog) dialog.remove();
+            delete window.tempFileInfo;
+        };
+        
+        // Confirm add file with password
+        window.confirmAddFile = function(fileId, originalInfo) {
+            const password = document.getElementById('addFilePassword').value;
+            const fileInfo = window.tempFileInfo;
+            
+            if (fileInfo) {
+                // Add password if provided
+                if (password) {
+                    fileInfo.password = password;
+                    log(`[File] Added with password: ${fileInfo.name} (UI only)`, 'info');
+                } else {
+                    log(`[File] Added without password: ${fileInfo.name} (UI only)`, 'info');
+                }
+                
+                // Add to FileState
+                FileState.fileList.push(fileInfo);
+                updateFileListUI();
+            }
+            
+            cancelAddFile();
         };
         
         // Rename selected file

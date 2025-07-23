@@ -9507,6 +9507,7 @@
                         const boundaries = FileState.kaspaMetadata.metadata.chunkBoundaries;
                         log(`[SuperMeta v5.9.4] 全chunkBoundaries数: ${boundaries.length}`, 'debug');
                         log(`[SuperMeta v5.9.4] chunkBoundariesインデックス: [${boundaries.map(b => b.index).join(', ')}]`, 'debug');
+                        log(`[SuperMeta v5.9.4] payloadIndexリスト: [${boundaries.map(b => b.payloadIndex).join(', ')}]`, 'debug');
                     }
                     
                     // Create intermediate meta-txs
@@ -9833,17 +9834,18 @@
                             // デバッグログ：管理範囲を表示
                             log(`[SuperMeta v5.9.4] 中間メタ ${groupIndex + 1} の管理範囲: チャンク ${startChunk} - ${endChunk}`, 'debug');
                             
-                            // この中間メタが管理するチャンクに対応するバウンダリーのみをフィルタリング
+                            // この中間メタが管理するペイロードに対応するバウンダリーのみをフィルタリング
                             const boundariesForGroup = fileMetadata.metadata.chunkBoundaries.filter(boundary => {
-                                // boundary.indexは、そのバウンダリーが適用されるチャンクのインデックス
-                                const chunkIndex = boundary.index;
-                                return chunkIndex >= startChunk && chunkIndex <= endChunk;
+                                // boundary.payloadIndexは、そのバウンダリーが開始するペイロードのインデックス
+                                const payloadStartIndex = boundary.payloadIndex;
+                                return payloadStartIndex >= startChunk && payloadStartIndex <= endChunk;
                             });
                             
                             // デバッグログ：フィルタリング結果
                             log(`[SuperMeta v5.9.4] 中間メタ ${groupIndex + 1} に割り当てられたバウンダリー数: ${boundariesForGroup.length}`, 'debug');
                             if (boundariesForGroup.length > 0) {
                                 log(`[SuperMeta v5.9.4] バウンダリーインデックス: [${boundariesForGroup.map(b => b.index).join(', ')}]`, 'debug');
+                                log(`[SuperMeta v5.9.4] payloadIndexリスト: [${boundariesForGroup.map(b => b.payloadIndex).join(', ')}]`, 'debug');
                             }
                             
                             return { chunkBoundaries: boundariesForGroup };

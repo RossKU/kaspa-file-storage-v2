@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.9.2 - Enhanced UI Elements</title>
+    <title>Kaspa P2P File Storage v5.9.3 - Enhanced UI Layout</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -1050,17 +1050,26 @@
         .file-actions {
             position: fixed;
             bottom: 0;
-            left: 0;
+            left: 240px;  /* Match sidebar width */
             right: 0;
             background: var(--bg-secondary);
             border-top: 1px solid var(--border-color);
             padding: 12px;
-            display: none;
+            display: flex;  /* Always visible */
+            justify-content: center;  /* Center align buttons */
             gap: 8px;
             z-index: 100;
+            transition: left 0.3s ease;  /* Smooth transition */
         }
-        .file-actions.show {
-            display: flex;
+        
+        /* Adjust for collapsed sidebar */
+        .sidebar-collapsed .file-actions {
+            left: 60px;  /* Match collapsed sidebar width */
+        }
+        
+        /* Add padding to file tab content to avoid overlap with actions bar */
+        #file-tab .container {
+            padding-bottom: 80px;  /* Space for fixed file actions bar */
         }
         .file-action-btn {
             padding: 8px 16px;
@@ -1172,6 +1181,7 @@
             .file-actions {
                 flex-wrap: wrap;
                 padding: 8px;
+                left: 0;  /* No sidebar offset on mobile */
             }
             .file-action-btn {
                 padding: 6px 12px;
@@ -13260,17 +13270,6 @@
         
         // Update file actions bar visibility
         window.updateFileActions = function() {
-            const selected = document.querySelectorAll('.file-checkbox:checked').length;
-            const fileActions = document.getElementById('fileActions');
-            
-            if (fileActions) {
-                if (selected > 0) {
-                    fileActions.classList.add('show');
-                } else {
-                    fileActions.classList.remove('show');
-                }
-            }
-            
             // Update selected files set
             FileState.selectedFiles.clear();
             document.querySelectorAll('.file-checkbox:checked').forEach(cb => {

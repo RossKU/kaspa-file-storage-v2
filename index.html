@@ -2,191 +2,562 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa P2P File Storage v5.6.18-debug - Enhanced Debug Logging</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
+    <title>Kaspa P2P File Storage v5.9.0 - New Status and File Tabs</title>
     <style>
+        /* CSS Variables for Theme System */
+        :root {
+            /* Light Theme Colors */
+            --bg-primary: #ffffff;
+            --bg-secondary: #f7f7f7;
+            --bg-tertiary: #ffffff;
+            --text-primary: #000000;
+            --text-secondary: #666666;
+            --border-color: #e0e0e0;
+            --accent-color: #70C7BA;
+            --accent-hover: #5fb0a9;
+            --accent-light: rgba(112, 199, 186, 0.1);
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
+            --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+            --code-bg: #f5f5f5;
+            --success-color: #28a745;
+            --error-color: #dc3545;
+            --warning-color: #ffc107;
+            --info-color: #17a2b8;
+        }
+
+        /* Dark Theme Colors */
+        [data-theme="dark"] {
+            --bg-primary: #0d0d0d;
+            --bg-secondary: #1a1a1a;
+            --bg-tertiary: #141414;
+            --text-primary: #ffffff;
+            --text-secondary: #999999;
+            --border-color: #333333;
+            --accent-color: #70C7BA;
+            --accent-hover: #5fb0a9;
+            --accent-light: rgba(112, 199, 186, 0.15);
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.5);
+            --shadow-md: 0 4px 12px rgba(0,0,0,0.6);
+            --code-bg: #0a0a0a;
+            --success-color: #4CAF50;
+            --error-color: #ff5252;
+            --warning-color: #ffc107;
+            --info-color: #2196F3;
+        }
+
+        /* Base Styles */
+        * {
+            box-sizing: border-box;
+        }
+
+        html {
+            height: 100%;
+            -webkit-text-size-adjust: 100%;
+        }
+
         body {
-            font-family: 'Arial', sans-serif;
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 20px;
-            background: #1a1a2e;
-            color: #eee;
-        }
-        .header {
-            background: linear-gradient(135deg, #16213e 0%, #0f3460 100%);
-            padding: 30px;
-            border-radius: 10px;
-            text-align: center;
-            margin-bottom: 30px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-        }
-        h1 {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             margin: 0;
-            color: #e94560;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            padding: 0;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            transition: background-color 0.3s ease, color 0.3s ease;
+            height: 100%;
+            overflow: hidden;
+            position: fixed;
+            width: 100%;
         }
-        .container {
-            background: #0f3460;
-            padding: 25px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-        }
-        .tab-buttons {
+
+        /* Layout Structure */
+        .app-layout {
             display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
+            height: 100%;
+            height: 100dvh; /* Dynamic viewport height for modern browsers */
+            position: relative;
         }
-        .tab-btn {
-            flex: 1;
-            background: #16213e;
-            color: #e94560;
-            border: 2px solid #e94560;
-            padding: 15px;
-            border-radius: 5px;
-            cursor: pointer;
+
+        /* Sidebar Navigation */
+        .sidebar {
+            width: 240px;
+            background: var(--accent-color);
+            border-right: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            height: 100%;
+            height: 100dvh;
+            height: -webkit-fill-available;
+            display: flex;
+            flex-direction: column;
+            transition: all 0.3s ease;
+            overflow: hidden;
+        }
+
+        .sidebar-header {
+            padding: 24px 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+        }
+
+        .sidebar h2 {
+            margin: 0;
+            font-size: 20px;
+            color: white;
+            font-weight: 600;
+        }
+
+        .sidebar-toggle-wrapper {
+            padding: 8px 20px;
+            display: none;
+            text-align: right;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.3);
+        }
+
+        @media (min-width: 769px) {
+            .sidebar-toggle-wrapper {
+                display: block;
+            }
+        }
+
+        .sidebar-toggle {
+            background: none !important;
+            border: none !important;
+            color: white;
             font-size: 16px;
-            transition: all 0.3s;
+            cursor: pointer;
+            padding: 8px;
+            transition: all 0.2s;
+            opacity: 0.7;
+            outline: none !important;
+            box-shadow: none !important;
+            border-radius: 0 !important;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
         }
-        .tab-btn:hover {
-            background: #1a2540;
-            transform: translateY(-2px);
+        
+        button.sidebar-toggle,
+        button#sidebarToggle.sidebar-toggle {
+            background: none !important;
+            border: none !important;
+            outline: none !important;
+            box-shadow: none !important;
+            border-radius: 0 !important;
         }
-        .tab-btn.active {
-            background: #e94560;
+        
+        .sidebar-toggle:focus,
+        .sidebar-toggle:active,
+        .sidebar-toggle:hover:focus,
+        .sidebar-toggle:hover:active {
+            outline: none !important;
+            box-shadow: none !important;
+            border: none !important;
+        }
+
+        .sidebar-toggle:hover {
+            opacity: 1;
+            transform: translateX(-2px);
+        }
+
+        .sidebar-nav {
+            flex: 1;
+            padding: 20px 0;
+            overflow-y: auto;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 24px;
+            color: white;
+            text-decoration: none;
+            transition: opacity 0.2s ease;
+            cursor: pointer;
+            border: none !important;
+            background: transparent;
+            width: 100%;
+            text-align: left;
+            font-size: 15px;
+            position: relative;
+            opacity: 0.9;
+            overflow: hidden;
+            white-space: nowrap;
+            font-family: inherit;
+            outline: none !important;
+            box-shadow: none !important;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+        }
+
+        .nav-item:hover {
+            opacity: 1;
+        }
+
+        .nav-item.active {
+            background: var(--accent-hover);
+            color: white;
+            font-weight: 500;
+            opacity: 1;
+        }
+
+        .nav-item.active:hover {
+            background: var(--accent-hover);
+        }
+
+        .nav-item-icon {
+            font-size: 18px;
+            width: 20px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+
+        .nav-item-text {
+            flex: 1;
+            transition: opacity 0.3s ease;
+        }
+
+        /* Collapsed sidebar styles */
+        .sidebar.collapsed {
+            width: 60px;
+        }
+
+        .sidebar.collapsed .sidebar-header {
+            padding: 0;
+            height: 0;
+            overflow: hidden;
+            border-bottom: none;
+        }
+
+        .sidebar.collapsed .nav-item {
+            padding: 12px 20px;
+            justify-content: center;
+        }
+
+        .sidebar.collapsed .nav-item-text {
+            opacity: 0;
+            visibility: hidden;
+            width: 0;
+        }
+
+        .sidebar.collapsed .sidebar-footer {
+            padding: 16px 8px;
+            text-align: center;
+        }
+
+        .sidebar.collapsed .sidebar-footer > div {
+            font-size: 0;
+        }
+
+        .sidebar.collapsed .status-indicator {
+            margin: 0 auto 8px;
+            display: block;
+        }
+
+        .sidebar.collapsed .sidebar-toggle-wrapper {
+            padding: 8px;
+            text-align: center;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .sidebar.collapsed .sidebar-toggle {
+            transform: none;
+        }
+
+        .sidebar.collapsed .sidebar-toggle:hover {
+            transform: none;
+        }
+
+        /* Adjust main content for collapsed sidebar */
+        .sidebar-collapsed .main-content {
+            margin-left: 60px;
+        }
+
+        /* Tooltip for collapsed state */
+        .sidebar.collapsed .nav-item {
+            position: relative;
+        }
+
+        .sidebar.collapsed .nav-item::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            left: 100%;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 14px;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+            margin-left: 10px;
+        }
+
+        .sidebar.collapsed .nav-item:hover::after {
+            opacity: 1;
+        }
+
+        .sidebar-footer {
+            padding: 20px;
+            padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+            font-size: 14px;
             color: white;
         }
+
+        .sidebar-footer #statusText {
+            color: white;
+        }
+
+        .sidebar-footer #appSubtitle {
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        /* Main Content Area */
+        .main-content {
+            flex: 1;
+            margin-left: 240px;
+            padding: 24px;
+            padding-bottom: env(safe-area-inset-bottom, 24px);
+            max-width: 1200px;
+            width: 100%;
+            height: 100%;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        h1 {
+            margin: 0 0 20px 0;
+            color: var(--text-primary);
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        /* Container Styles */
+        .container {
+            background: var(--bg-tertiary);
+            padding: 24px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--border-color);
+        }
+
+        /* Tab Content */
         .tab-content {
             display: none;
         }
+
         .tab-content.active {
             display: block;
         }
+
+        /* Button Styles */
         button {
-            background: #e94560;
+            background: var(--accent-color);
             color: white;
             border: none;
-            padding: 12px 24px;
-            border-radius: 5px;
+            padding: 10px 20px;
+            border-radius: 6px;
             cursor: pointer;
-            font-size: 16px;
-            margin: 5px;
-            transition: all 0.3s;
+            font-size: 15px;
+            margin: 4px;
+            transition: all 0.2s;
+            font-weight: 500;
         }
+
         button:hover {
-            background: #c13651;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(233, 69, 96, 0.3);
+            background: var(--accent-hover);
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-sm);
         }
+
         button:disabled {
-            background: #666;
+            background: var(--text-secondary);
             cursor: not-allowed;
             transform: none;
         }
+
         .small-button {
-            background: #16213e;
-            color: #49EACB;
-            border: 1px solid #49EACB;
-            padding: 8px 16px;
-            font-size: 14px;
-            border-radius: 5px;
+            background: transparent;
+            color: var(--accent-color);
+            border: 1px solid var(--accent-color);
+            padding: 6px 12px;
+            font-size: 13px;
+            border-radius: 4px;
             cursor: pointer;
-            transition: all 0.3s;
+            transition: all 0.2s;
         }
+
         .small-button:hover {
-            background: #49EACB;
-            color: #16213e;
+            background: var(--accent-color);
+            color: white;
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+                z-index: 1000;
+                width: 80%;
+                max-width: 280px;
+            }
+
+            .sidebar.open {
+                transform: translateX(0);
+                box-shadow: 2px 0 12px rgba(0,0,0,0.3);
+            }
+
+            .main-content {
+                margin-left: 0;
+                padding: 16px;
+                padding-top: 60px; /* Space for mobile menu button */
+                padding-bottom: env(safe-area-inset-bottom, 16px);
+            }
+
+            .mobile-menu-btn {
+                display: block;
+                position: fixed;
+                top: 20px;
+                left: 20px;
+                z-index: 1001;
+                background: white;
+                color: var(--accent-color);
+                border: none;
+                padding: 10px;
+                border-radius: 6px;
+                cursor: pointer;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            }
+        }
+
+        @media (min-width: 769px) {
+            .mobile-menu-btn {
+                display: none;
+            }
         }
         .small-button.disabled,
         .small-button:disabled {
             pointer-events: none !important;
             opacity: 0.5;
-            background: #666 !important;
+            background: var(--text-secondary) !important;
             cursor: not-allowed !important;
         }
+
+        /* History Items */
         .history-item {
-            background: #16213e;
-            border: 1px solid #333;
-            padding: 15px;
-            margin-bottom: 10px;
-            border-radius: 5px;
-            transition: all 0.3s;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            padding: 16px;
+            margin-bottom: 12px;
+            border-radius: 8px;
+            transition: all 0.2s;
         }
+
         .history-item:hover {
-            border-color: #e94560;
+            border-color: var(--accent-color);
+            box-shadow: var(--shadow-sm);
         }
+
         .history-item-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
             margin-bottom: 10px;
         }
+
         .history-item-actions button {
             margin-left: 5px;
             padding: 5px 10px;
             font-size: 12px;
         }
+
+        /* Form Elements */
         input[type="text"], input[type="password"], input[type="number"], select, textarea {
             width: 100%;
-            background: #16213e;
-            color: #eee;
-            border: 1px solid #e94560;
-            padding: 10px;
-            border-radius: 5px;
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            padding: 10px 12px;
+            border-radius: 6px;
             margin: 5px 0;
-            font-family: 'Consolas', monospace;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            transition: all 0.2s;
         }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: var(--accent-color);
+            box-shadow: 0 0 0 3px var(--accent-light);
+        }
+
         input[type="file"] {
             display: none;
         }
+
         .file-input-label {
             display: inline-block;
-            background: #16213e;
-            color: #e94560;
-            border: 2px dashed #e94560;
-            padding: 30px;
-            border-radius: 5px;
+            background: var(--bg-tertiary);
+            color: var(--accent-color);
+            border: 2px dashed var(--border-color);
+            padding: 40px;
+            border-radius: 8px;
             cursor: pointer;
             text-align: center;
-            transition: all 0.3s;
+            transition: all 0.2s;
             width: 100%;
             box-sizing: border-box;
             margin: 10px 0;
         }
+
         .file-input-label:hover {
-            background: #1a2540;
-            border-color: #ff5c7c;
+            background: var(--accent-light);
+            border-color: var(--accent-color);
         }
+
+        /* Metric Box */
         .metric-box {
-            background: rgba(233, 69, 96, 0.1);
-            border: 1px solid #e94560;
-            padding: 15px;
-            border-radius: 5px;
+            border: 1px solid var(--accent-color);
+            padding: 16px;
+            border-radius: 8px;
             margin: 10px 0;
         }
-        .success { color: #4CAF50; }
-        .error { color: #ff5252; }
-        .warning { color: #ffc107; }
-        .info { color: #2196F3; }
+
+        /* Status Colors */
+        .success { color: var(--success-color); }
+        .error { color: var(--error-color); }
+        .warning { color: var(--warning-color); }
+        .info { color: var(--info-color); }
+
+        /* Progress Bar */
         .progress-bar {
             width: 100%;
-            height: 30px;
-            background: #16213e;
-            border-radius: 15px;
+            height: 28px;
+            background: var(--bg-secondary);
+            border-radius: 14px;
             overflow: hidden;
             margin: 10px 0;
+            border: 1px solid var(--border-color);
         }
+
         .progress-fill {
             height: 100%;
-            background: linear-gradient(90deg, #e94560, #ff5c7c);
+            background: linear-gradient(90deg, var(--accent-color), var(--accent-hover));
             transition: width 0.3s;
             display: flex;
             align-items: center;
             justify-content: center;
             color: white;
-            font-weight: bold;
+            font-weight: 500;
+            font-size: 14px;
         }
+
+        /* Status Indicators */
         .status-indicator {
             display: inline-block;
             width: 10px;
@@ -194,52 +565,73 @@
             border-radius: 50%;
             margin-right: 5px;
         }
-        .status-online { background: #4CAF50; }
-        .status-offline { background: #ff5252; }
-        .status-connecting { background: #ffc107; animation: pulse 1s infinite; }
+
+        .status-online { background: #4CAF50; box-shadow: 0 0 6px rgba(76, 175, 80, 0.5); }
+        .status-offline { background: #ff5252; box-shadow: 0 0 6px rgba(255, 82, 82, 0.5); }
+        .status-connecting { background: #ffc107; box-shadow: 0 0 6px rgba(255, 193, 7, 0.5); animation: pulse 1s infinite; }
+
         @keyframes pulse {
             0% { opacity: 1; }
             50% { opacity: 0.5; }
             100% { opacity: 1; }
         }
+
+        /* Log Container */
         .log-container {
-            background: #0a0a0a;
-            color: #0f0;
-            font-family: 'Consolas', monospace;
-            font-size: 12px;
-            padding: 10px;
-            height: 200px;
+            background: var(--code-bg);
+            color: var(--text-primary);
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 13px;
+            padding: 12px;
+            height: 400px;
             overflow-y: auto;
-            border-radius: 5px;
+            border-radius: 6px;
             margin: 10px 0;
             white-space: pre-wrap;
             word-wrap: break-word;
+            border: 1px solid var(--border-color);
         }
+
         .log-entry {
-            margin: 2px 0;
+            margin: 3px 0;
+            line-height: 1.4;
         }
+
         .log-time {
-            color: #888;
+            color: var(--text-secondary);
         }
+
         .log-error {
-            color: #ff5252;
+            color: var(--error-color);
         }
+
         .log-success {
-            color: #4CAF50;
+            color: var(--success-color);
         }
-        /* Toggle switch styles */
+        .log-info {
+            color: var(--info-color);
+        }
+
+        .log-warning {
+            color: var(--warning-color);
+        }
+
+        /* Toggle Switch */
         .toggle-switch {
             position: relative;
             display: inline-block;
-            width: 50px;
+            width: 48px;
             height: 24px;
             vertical-align: middle;
+            margin-left: 10px;
         }
+
         .toggle-switch input {
             opacity: 0;
             width: 0;
             height: 0;
         }
+
         .toggle-slider {
             position: absolute;
             cursor: pointer;
@@ -247,10 +639,11 @@
             left: 0;
             right: 0;
             bottom: 0;
-            background-color: #ccc;
-            transition: .4s;
+            background-color: var(--border-color);
+            transition: .3s;
             border-radius: 24px;
         }
+
         .toggle-slider:before {
             position: absolute;
             content: "";
@@ -259,145 +652,149 @@
             left: 3px;
             bottom: 3px;
             background-color: white;
-            transition: .4s;
+            transition: .3s;
             border-radius: 50%;
         }
+
         input:checked + .toggle-slider {
-            background-color: #49EACB;
+            background-color: var(--accent-color);
         }
+
         input:checked + .toggle-slider:before {
-            transform: translateX(26px);
+            transform: translateX(24px);
         }
+
+        /* Settings Row */
         .setting-row {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin: 15px 0;
-            padding: 10px;
-            background: #16213e;
-            border-radius: 5px;
+            margin: 16px 0;
+            padding: 12px;
+            background: var(--bg-tertiary);
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
         }
+
         .setting-label {
             flex: 1;
+            color: var(--text-primary);
         }
-        .log-info {
-            color: #2196F3;
-        }
-        .log-warning {
-            color: #ffc107;
-        }
+
+        /* Chunk Items */
         .chunk-item {
-            background: #16213e;
-            padding: 10px;
-            margin: 5px 0;
-            border-radius: 5px;
+            background: var(--bg-tertiary);
+            padding: 12px;
+            margin: 6px 0;
+            border-radius: 6px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            border: 1px solid rgba(233, 69, 96, 0.3);
+            border: 1px solid var(--border-color);
+            transition: all 0.2s;
         }
+
+        .chunk-item:hover {
+            border-color: var(--accent-color);
+        }
+
         .chunk-status {
             display: flex;
             align-items: center;
             gap: 10px;
         }
-        .chunk-status.pending { color: #888; }
-        .chunk-status.uploading { color: #ffc107; }
-        .chunk-status.success { color: #4CAF50; }
-        .chunk-status.error { color: #ff5252; }
+
+        .chunk-status.pending { color: var(--text-secondary); }
+        .chunk-status.uploading { color: var(--warning-color); }
+        .chunk-status.success { color: var(--success-color); }
+        .chunk-status.error { color: var(--error-color); }
+
+        /* JSON View */
         .json-view {
-            background: #0a0a0a;
-            color: #4CAF50;
-            padding: 15px;
-            border-radius: 5px;
+            background: var(--code-bg);
+            color: var(--text-primary);
+            padding: 16px;
+            border-radius: 6px;
             overflow-x: auto;
-            font-family: 'Consolas', monospace;
-            font-size: 14px;
-            line-height: 1.5;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 13px;
+            line-height: 1.6;
             max-height: 400px;
             overflow-y: auto;
+            border: 1px solid var(--border-color);
         }
+
+        /* Grid Layout */
         .grid-2 {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 20px;
         }
+
+        @media (max-width: 768px) {
+            .grid-2 {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Checkbox Label */
         .checkbox-label {
             display: flex;
             align-items: center;
             gap: 10px;
             margin: 10px 0;
+            cursor: pointer;
         }
+
         .checkbox-label input[type="checkbox"] {
             width: auto;
+            cursor: pointer;
         }
+
+        /* File Drop Zone */
         .kaspa-file-drop {
-            background: #16213e;
-            border: 2px dashed #e94560;
-            padding: 40px;
+            background: var(--bg-tertiary);
+            border: 2px dashed var(--border-color);
+            padding: 48px;
             text-align: center;
-            border-radius: 10px;
-            transition: all 0.3s;
+            border-radius: 8px;
+            transition: all 0.2s;
+            cursor: pointer;
         }
+
         .kaspa-file-drop:hover {
-            background: #1a2540;
-            border-color: #ff5c7c;
+            background: var(--accent-light);
+            border-color: var(--accent-color);
         }
+
         .kaspa-file-drop.dragover {
-            background: #1a2540;
-            border-color: #4CAF50;
+            background: var(--accent-light);
+            border-color: var(--accent-color);
+            transform: scale(1.02);
         }
+
+        /* Copy Button */
         .copy-btn {
-            background: #16213e;
-            color: #e94560;
-            border: 1px solid #e94560;
-            padding: 5px 10px;
+            background: transparent;
+            color: var(--accent-color);
+            border: 1px solid var(--accent-color);
+            padding: 4px 8px;
             font-size: 12px;
             cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.2s;
         }
+
         .copy-btn:hover {
-            background: #e94560;
+            background: var(--accent-color);
+            color: white;
         }
-        /* Toggle switch styles for parallel download */
-        .toggle-switch {
-            position: relative;
-            display: inline-block;
-            width: 50px;
-            height: 24px;
-            margin-left: 10px;
-            vertical-align: middle;
-        }
-        .toggle-switch input {
-            opacity: 0;
-            width: 0;
-            height: 0;
-        }
-        .toggle-slider {
-            position: absolute;
-            cursor: pointer;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: #666;
-            transition: .4s;
-            border-radius: 24px;
-        }
-        .toggle-slider:before {
-            position: absolute;
-            content: "";
-            height: 18px;
-            width: 18px;
-            left: 3px;
-            bottom: 3px;
-            background-color: white;
-            transition: .4s;
-            border-radius: 50%;
-        }
-        input:checked + .toggle-slider {
-            background-color: #49EACB;
-        }
-        input:checked + .toggle-slider:before {
+
+        /* Utility Classes */
+        .text-center { text-align: center; }
+        .mt-4 { margin-top: 16px; }
+        .mb-4 { margin-bottom: 16px; }
+        .p-4 { padding: 16px; }
             transform: translateX(26px);
         }
         .setting-row {
@@ -408,85 +805,523 @@
         }
         .setting-label {
             font-size: 14px;
-            color: #eee;
-            color: white;
+            color: var(--text-primary);
         }
+
+        /* Table Styles */
         table {
             width: 100%;
             border-collapse: collapse;
-            margin: 15px 0;
+            margin: 16px 0;
         }
+
         th, td {
             padding: 12px;
             text-align: left;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
+            border-bottom: 1px solid var(--border-color);
         }
+
         th {
-            background: rgba(233, 69, 96, 0.2);
-            color: #e94560;
+            background: var(--accent-light);
+            color: var(--accent-color);
+            font-weight: 600;
         }
+
+        /* Section Divider */
         .section-divider {
-            border-top: 2px solid #e94560;
-            margin: 20px 0;
-            padding-top: 20px;
+            border-top: 2px solid var(--accent-color);
+            margin: 24px 0;
+            padding-top: 24px;
         }
-        .history-item {
-            background: #16213e;
-            border: 1px solid rgba(233, 69, 96, 0.3);
-            padding: 15px;
-            margin: 10px 0;
+
+        /* Directory Items (additional styles) */
+        .directory-item {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            padding: 20px;
+            margin-bottom: 16px;
             border-radius: 8px;
-            transition: all 0.3s;
+            transition: all 0.2s;
         }
-        .history-item:hover {
-            border-color: #e94560;
-            background: #1a2540;
+
+        .directory-item:hover {
+            border-color: var(--accent-color);
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-sm);
         }
-        .history-item-header {
+
+        .directory-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            flex-wrap: wrap;
-            gap: 10px;
+            margin-bottom: 16px;
         }
-        .history-item-actions {
+
+        .directory-name {
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--accent-color);
+        }
+
+        .directory-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        @media (max-width: 768px) {
+            .directory-stats {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .stat-box {
+            background: var(--accent-light);
+            padding: 12px;
+            border-radius: 6px;
+            text-align: center;
+        }
+
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 12px;
+        }
+
+        .stat-value {
+            color: var(--accent-color);
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .directory-files {
+            margin-top: 12px;
+        }
+
+        .file-list-item {
+            background: var(--bg-secondary);
+            padding: 8px 12px;
+            margin: 6px 0;
+            border-radius: 6px;
             display: flex;
-            gap: 5px;
-            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.2s;
+        }
+
+        .file-list-item:hover {
+            background: var(--accent-light);
+        }
+
+        /* Recovery Mode Styles */
+        .recovery-indicator {
+            background: var(--warning-color);
+            color: #000;
+            padding: 12px;
+            border-radius: 6px;
+            margin: 12px 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 500;
+        }
+
+        .recovery-details {
+            background: rgba(255, 193, 7, 0.1);
+            border: 1px solid var(--warning-color);
+            padding: 16px;
+            border-radius: 6px;
+            margin: 12px 0;
+        }
+
+        /* Connection Status Styles */
+        .connection-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+
+        .connection-modal {
+            background: var(--bg-secondary);
+            padding: 32px;
+            border-radius: 8px;
+            text-align: center;
+            max-width: 400px;
+            border: 1px solid var(--border-color);
+        }
+
+        .connection-spinner {
+            width: 48px;
+            height: 48px;
+            border: 3px solid var(--border-color);
+            border-top: 3px solid var(--accent-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* File size formatting */
+        .file-size {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+        
+        /* Status Tab Styles */
+        .status-section {
+            margin-bottom: 20px;
+        }
+        .status-box {
+            border: 1px solid var(--accent-color);
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+        }
+        .status-box h3 {
+            margin-top: 0;
+            margin-bottom: 12px;
+            font-size: 16px;
+            color: var(--accent-color);
+        }
+        .status-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 8px 0;
+            font-size: 14px;
+        }
+        .status-indicator-large {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .status-connected { background: #49EACB; }
+        .status-disconnected { background: #e94560; }
+        
+        /* File Tab Styles */
+        .file-table-wrapper {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        .file-table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 800px;
+        }
+        .file-table th,
+        .file-table td {
+            padding: 12px 8px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .file-table th {
+            font-weight: 600;
+            color: var(--accent-color);
+            position: sticky;
+            top: 0;
+            background: var(--bg-primary);
+            z-index: 10;
+        }
+        .file-table tr:hover {
+            background: var(--bg-tertiary);
+        }
+        .file-checkbox {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+        .file-icon {
+            font-size: 20px;
+            margin-right: 8px;
+        }
+        .file-actions {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--border-color);
+            padding: 12px;
+            display: none;
+            gap: 8px;
+            z-index: 100;
+        }
+        .file-actions.show {
+            display: flex;
+        }
+        .file-action-btn {
+            padding: 8px 16px;
+            border-radius: 4px;
+            border: 1px solid var(--accent-color);
+            background: transparent;
+            color: var(--accent-color);
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .file-action-btn:hover {
+            background: var(--accent-light);
+        }
+        
+        /* Responsive Design for File Table */
+        @media (max-width: 768px) {
+            .file-table-wrapper {
+                margin: 0 -16px;
+            }
+            .file-table {
+                font-size: 12px;
+            }
+            .file-table th,
+            .file-table td {
+                padding: 8px 4px;
+            }
+            .file-icon {
+                font-size: 16px;
+                margin-right: 4px;
+            }
+            .file-actions {
+                flex-wrap: wrap;
+                padding: 8px;
+            }
+            .file-action-btn {
+                padding: 6px 12px;
+                font-size: 12px;
+            }
+            /* Hide less important columns on mobile */
+            .file-table .hide-mobile {
+                display: none;
+            }
         }
     </style>
 </head>
-<body>
-    <div class="header">
-        <h1 id="appTitle">🚀 Kaspa P2P File Storage v5.6.18-debug - Loading...</h1>
-        <p>実ネットワーク接続による完全なP2Pファイル共有システム（用語修正）</p>
-        <p id="appSubtitle" style="font-size: 12px; color: #49EACB; margin-top: 5px;">📋 Loading version...</p>
-        <div id="networkStatus" style="margin-top: 10px;">
-            <span class="status-indicator status-offline"></span>
-            <span id="statusText">未接続</span>
+<body data-theme="dark">
+    <div class="app-layout">
+        <!-- Mobile Menu Button -->
+        <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+        
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <h2>Kaspa Storage</h2>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <div class="nav-item active" onclick="switchTab('status')" data-tooltip="Status">
+                    <span class="nav-item-icon">📊</span>
+                    <span class="nav-item-text">Status</span>
+                </div>
+                <div class="nav-item" onclick="switchTab('file')" data-tooltip="File">
+                    <span class="nav-item-icon">📂</span>
+                    <span class="nav-item-text">File</span>
+                </div>
+                <div class="nav-item" onclick="switchTab('download')" data-tooltip="Download">
+                    <span class="nav-item-icon">📥</span>
+                    <span class="nav-item-text">Download</span>
+                </div>
+                <div class="nav-item" onclick="switchTab('upload')" data-tooltip="Upload File">
+                    <span class="nav-item-icon">📤</span>
+                    <span class="nav-item-text">Upload File</span>
+                </div>
+                <div class="nav-item" onclick="switchTab('directory')" data-tooltip="Upload Dir">
+                    <span class="nav-item-icon">📁</span>
+                    <span class="nav-item-text">Upload Dir</span>
+                </div>
+                <div class="nav-item" onclick="switchTab('history')" data-tooltip="History">
+                    <span class="nav-item-icon">📜</span>
+                    <span class="nav-item-text">History</span>
+                </div>
+                <div class="nav-item" onclick="switchTab('debug')" data-tooltip="Debug">
+                    <span class="nav-item-icon">🐛</span>
+                    <span class="nav-item-text">Debug</span>
+                </div>
+                <div class="nav-item" onclick="switchTab('settings')" data-tooltip="Settings">
+                    <span class="nav-item-icon">⚙️</span>
+                    <span class="nav-item-text">Settings</span>
+                </div>
+            </nav>
+            
+            <div class="sidebar-toggle-wrapper">
+                <button class="sidebar-toggle" onclick="toggleSidebarCollapse()" id="sidebarToggle">◀</button>
+            </div>
+            
+            <div class="sidebar-footer">
+                <div id="networkStatus" style="margin-bottom: 8px;">
+                    <span class="status-indicator status-offline"></span>
+                    <span id="statusText">未接続</span>
+                </div>
+                <div id="appSubtitle" style="font-size: 12px;">Loading version...</div>
+            </div>
+        </aside>
+        
+        <!-- Main Content Area -->
+        <main class="main-content">
+
+    <!-- Status Tab -->
+    <div id="status-tab" class="tab-content active">
+        <div class="container">
+            <h2>📊 ステータス</h2>
+            
+            <!-- Network Connection Status -->
+            <div class="status-box">
+                <h3>🌐 ネットワーク接続状況</h3>
+                
+                <!-- Default RPC Client -->
+                <div class="status-row">
+                    <div>
+                        <strong>RPC Client:</strong>
+                        <span class="status-indicator-large status-disconnected"></span>
+                        <span id="rpcStatus">Not Connected</span>
+                    </div>
+                </div>
+                <div class="status-row">
+                    <div style="margin-left: 20px;">
+                        <small id="rpcNode">Node: -</small>
+                    </div>
+                </div>
+                
+                <div style="margin: 16px 0; border-top: 1px solid var(--border-color);"></div>
+                
+                <!-- Archive Node -->
+                <div class="status-row">
+                    <div>
+                        <strong>Archive Node:</strong>
+                        <span class="status-indicator-large status-disconnected"></span>
+                        <span id="archiveStatus">Not Connected</span>
+                    </div>
+                </div>
+                <div class="status-row">
+                    <div style="margin-left: 20px;">
+                        <small id="archiveDetails">Status: -</small>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Workspace Folder -->
+            <div class="status-box">
+                <h3>📁 作業フォルダ</h3>
+                <div class="status-row">
+                    <div id="workspaceFolderStatus">
+                        <span>📁 未設定</span>
+                    </div>
+                    <button onclick="setupWorkspace()">設定</button>
+                </div>
+            </div>
+            
+            <!-- Wallet Settings -->
+            <div class="status-box">
+                <h3>💰 Wallet設定</h3>
+                <div style="margin-bottom: 12px;">
+                    <label>秘密鍵:</label>
+                    <input type="password" id="walletPrivateKey" placeholder="秘密鍵を入力" style="width: 100%; margin-top: 8px;">
+                </div>
+                <button onclick="connectWallet()" style="width: 100%; margin-bottom: 12px;">接続</button>
+                
+                <div class="status-row">
+                    <strong>アドレス:</strong>
+                    <span id="walletAddress">-</span>
+                </div>
+                <div class="status-row">
+                    <strong>残高:</strong>
+                    <span id="walletBalance">-</span>
+                </div>
+            </div>
         </div>
     </div>
 
-    <!-- Tab Navigation -->
-    <div class="tab-buttons">
-        <button class="tab-btn active" onclick="switchTab('upload')">📤 Upload</button>
-        <button class="tab-btn" onclick="switchTab('download')">📥 Download</button>
-        <button class="tab-btn" onclick="switchTab('directory')">📁 Directory</button>
-        <button class="tab-btn" onclick="switchTab('history')">📜 History</button>
-        <button class="tab-btn" onclick="switchTab('settings')">⚙️ Settings</button>
+    <!-- File Tab -->
+    <div id="file-tab" class="tab-content">
+        <div class="container">
+            <h2>📂 ファイル管理</h2>
+            
+            <div style="margin-bottom: 16px;">
+                <button onclick="addFile()" style="padding: 10px 20px;">
+                    ➕ Add File
+                </button>
+            </div>
+            
+            <div class="file-table-wrapper">
+                <table class="file-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 40px;">
+                                <input type="checkbox" id="selectAll" onchange="toggleSelectAll()">
+                            </th>
+                            <th style="width: 50px;">Icon</th>
+                            <th>ファイル名</th>
+                            <th>容量</th>
+                            <th class="hide-mobile">CID</th>
+                            <th class="hide-mobile">MetaTxID</th>
+                            <th class="hide-mobile">アップローダー</th>
+                            <th>UP日</th>
+                            <th class="hide-mobile">登録日</th>
+                        </tr>
+                    </thead>
+                    <tbody id="fileListBody">
+                        <!-- Sample data for UI preview -->
+                        <tr>
+                            <td><input type="checkbox" class="file-checkbox"></td>
+                            <td><span class="file-icon">📄</span></td>
+                            <td>sample.txt</td>
+                            <td>1.2 KB</td>
+                            <td class="hide-mobile">Qm...</td>
+                            <td class="hide-mobile">a1b2c3...</td>
+                            <td class="hide-mobile">kaspa:...</td>
+                            <td>12/25</td>
+                            <td class="hide-mobile">12/25</td>
+                        </tr>
+                        <tr>
+                            <td><input type="checkbox" class="file-checkbox"></td>
+                            <td><span class="file-icon">📁</span></td>
+                            <td>docs</td>
+                            <td>5.3 MB</td>
+                            <td class="hide-mobile">Qm...</td>
+                            <td class="hide-mobile">-</td>
+                            <td class="hide-mobile">kaspa:...</td>
+                            <td>12/24</td>
+                            <td class="hide-mobile">12/24</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- File Actions Bar -->
+            <div class="file-actions" id="fileActions">
+                <button class="file-action-btn" onclick="downloadSelected()">
+                    📥 Download
+                </button>
+                <button class="file-action-btn" onclick="deleteSelected()">
+                    🗑️ Delete
+                </button>
+                <button class="file-action-btn" onclick="shareSelected()">
+                    🔗 Share ▼
+                </button>
+                <button class="file-action-btn" onclick="renameSelected()">
+                    ✏️ Rename
+                </button>
+            </div>
+        </div>
     </div>
 
     <!-- Upload Tab -->
-    <div id="upload-tab" class="tab-content active">
-        <!-- WASM Initialization -->
-        <div class="container">
-            <h2>🔧 システム初期化</h2>
-            <div class="grid-2">
-                <button onclick="initializeSystem()" id="initBtn">システムを初期化</button>
-                <button onclick="setupWorkspace()" id="workspaceBtn">作業フォルダ設定</button>
-                <button onclick="testConnection()" id="testBtn" disabled>接続テスト</button>
+    <div id="upload-tab" class="tab-content">
+        <!-- Workspace Status (Always Visible) -->
+        <div class="container" style="padding: 16px; margin-bottom: 20px; border-radius: 8px;">
+            <div id="workspaceStatusDisplay" style="color: #ffcc66; font-size: 14px;">
+                作業フォルダ: 未設定 (ブラウザ内保存のみ)
+                <button onclick="setupWorkspace()" style="margin-left: 10px; padding: 5px 10px; font-size: 12px;">設定</button>
             </div>
-            <div id="initStatus" class="metric-box" style="display: none;"></div>
         </div>
 
         <!-- File Upload -->
@@ -502,7 +1337,7 @@
             <!-- Resume Section -->
             <div class="section-divider" style="margin: 20px 0;">
                 <p style="text-align: center; color: #999;">または</p>
-                <button onclick="loadProgressFile()" style="background: #16213e; color: #e94560; border: 2px solid #e94560;">
+                <button onclick="loadProgressFile()">
                     📂 進捗ファイル (.kprogress) から再開
                 </button>
                 <input type="file" id="progressFileInput" accept=".kprogress" style="display: none;" onchange="handleProgressFileSelect(event)">
@@ -567,7 +1402,7 @@
             <!-- Unified input option -->
             <div class="section-divider">
                 <h3>🔗 TxID / MetaTxID / ディレクトリTxIDから復元</h3>
-                <div style="background: #0a2540; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                <div style="padding: 15px; border-radius: 8px; margin-bottom: 15px;">
                     <input type="text" id="unifiedTxIdInput" placeholder="任意のTxIDを入力（自動判別）" style="width: 100%; font-size: 16px;">
                     <input type="password" id="unifiedPassword" placeholder="パスワード（必要な場合）" style="width: 100%; margin-top: 10px;">
                     <button onclick="loadFromUnifiedInput()" style="margin-top: 10px; width: 100%; padding: 12px; font-size: 16px;">
@@ -649,26 +1484,26 @@
                     <h3>📤 履歴からディレクトリ作成</h3>
                 </div>
                 
-                <input type="text" id="directoryName" placeholder="ディレクトリ名を入力" style="width: 100%; padding: 10px; margin-bottom: 10px; background: #16213e; color: #eee; border: 1px solid #49EACB; border-radius: 5px;">
+                <input type="text" id="directoryName" placeholder="ディレクトリ名を入力" style="width: 100%; padding: 10px; margin-bottom: 10px; color: #eee; border: 1px solid #49EACB; border-radius: 5px;">
                 
-                <button onclick="showHistoryForDirectory()" style="width: 100%; margin-bottom: 15px; background: #16213e; color: #49EACB; border: 2px solid #49EACB;">
+                <button onclick="showHistoryForDirectory()" style="width: 100%; margin-bottom: 15px;">
                     📄 履歴からファイルを選択
                 </button>
                 
                 <div id="historyFileSelector" style="display: none; margin-bottom: 15px;">
                     <h4>ファイルを選択:</h4>
-                    <div id="historyFileList" style="max-height: 300px; overflow-y: auto; border: 1px solid #49EACB; border-radius: 5px; padding: 10px; background: #16213e;">
+                    <div id="historyFileList" style="max-height: 300px; overflow-y: auto; border: 1px solid #49EACB; border-radius: 5px; padding: 10px;">
                         <!-- 履歴ファイルリストがここに表示されます -->
                     </div>
                 </div>
                 
-                <div id="selectedFilesInfo" style="margin-bottom: 10px; padding: 10px; background: #16213e; border-radius: 5px; display: none;">
+                <div id="selectedFilesInfo" style="margin-bottom: 10px; padding: 10px; border-radius: 5px; display: none;">
                     <strong>選択されたファイル:</strong> <span id="selectedCount">0</span>個
                 </div>
                 
                 <div style="margin-bottom: 10px;">
                     <label>パスワード (8文字以上)</label>
-                    <input type="password" id="directoryPassword" placeholder="強力なパスワードを入力" style="width: 100%; padding: 10px; margin-top: 5px; background: #0a2540; color: #eee; border: 1px solid #49EACB; border-radius: 5px;">
+                    <input type="password" id="directoryPassword" placeholder="強力なパスワードを入力" style="width: 100%; padding: 10px; margin-top: 5px; color: #eee; border: 1px solid #49EACB; border-radius: 5px;">
                 </div>
                 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
@@ -688,7 +1523,7 @@
                 
                 <div style="margin-bottom: 10px;">
                     <label>親ディレクトリ（オプション）:</label>
-                    <select id="parentDirectory" style="width: 100%; padding: 10px; background: #16213e; color: #eee; border: 1px solid #49EACB; border-radius: 5px;">
+                    <select id="parentDirectory" style="width: 100%; padding: 10px; color: #eee; border: 1px solid #49EACB; border-radius: 5px;">
                         <option value="">ルートディレクトリ</option>
                     </select>
                 </div>
@@ -725,7 +1560,7 @@
                     </div>
                 </div>
                 
-                <div id="historyStats" style="margin-bottom: 15px; padding: 10px; background: #0f3460; border-radius: 5px;">
+                <div id="historyStats" style="margin-bottom: 15px; padding: 10px; border-radius: 5px;">
                     <span>総アップロード: <strong id="totalUploads">0</strong></span> | 
                     <span>総容量: <strong id="totalSize">0 KB</strong></span> | 
                     <span>総コスト: <strong id="totalCost">0 KAS</strong></span>
@@ -742,6 +1577,20 @@
     <div id="settings-tab" class="tab-content">
         <div class="container">
             <h2>⚙️ 設定</h2>
+            
+            <div class="metric-box">
+                <h3>テーマ設定</h3>
+                <div class="setting-row">
+                    <div class="setting-label">
+                        <label>テーマ</label>
+                        <p style="font-size: 12px; margin: 4px 0 0 0; color: var(--text-secondary);">アプリケーションの外観を切り替えます</p>
+                    </div>
+                    <select id="themeSelect" onchange="changeTheme(this.value)" style="width: 150px;">
+                        <option value="light">☀️ ライト</option>
+                        <option value="dark">🌙 ダーク</option>
+                    </select>
+                </div>
+            </div>
             
             <div class="metric-box">
                 <h3>ネットワーク設定</h3>
@@ -761,10 +1610,10 @@
                 
                 <div id="customEndpointSection" style="display: none; margin-top: 10px;">
                     <label>カスタムRPCエンドポイント</label>
-                    <input type="text" id="customRpcEndpoint" placeholder="wss://your-node.example.com:17210" style="width: 100%; padding: 8px; background: #16213e; color: #eee; border: 1px solid #49EACB; border-radius: 5px;">
+                    <input type="text" id="customRpcEndpoint" placeholder="wss://your-node.example.com:17210" style="width: 100%; padding: 8px; color: #eee; border: 1px solid #49EACB; border-radius: 5px;">
                 </div>
                 
-                <div id="nodeConnectionStatus" style="margin-top: 10px; padding: 10px; background: #16213e; border-radius: 5px; display: none;">
+                <div id="nodeConnectionStatus" style="margin-top: 10px; padding: 10px; border-radius: 5px; display: none;">
                     <strong>接続状態:</strong> <span id="nodeConnectionInfo">未接続</span>
                 </div>
                 
@@ -789,19 +1638,8 @@
                 </div>
             </div>
             
-            <div class="metric-box">
-                <h3>ログエクスポート</h3>
-                <button onclick="exportLogs()">ログをJSON形式でエクスポート</button>
-                <button onclick="clearLogs()">ログをクリア</button>
-            </div>
-            
-            <div class="metric-box">
-                <h3>アップロード履歴</h3>
-                <div id="uploadHistory"></div>
-            </div>
-            
             <!-- Multi-Wallet Phase 1 Test -->
-            <div class="metric-box" style="margin-top: 30px; background: rgba(73, 234, 203, 0.1); border: 2px solid #49EACB;">
+            <div class="metric-box" style="margin-top: 30px;">
                 <h3>🧪 Multi-Wallet Phase 1 Test</h3>
                 <p style="color: #999; font-size: 14px; margin-bottom: 15px;">
                     実験的機能: マルチウォレットによる並列アップロード高速化のテスト
@@ -823,9 +1661,6 @@
                     
                     <button onclick="viewTestResults()" style="
                         padding: 10px 20px;
-                        background: #16213e;
-                        color: #49EACB;
-                        border: 2px solid #49EACB;
                         border-radius: 5px;
                         cursor: pointer;
                         font-size: 16px;
@@ -836,9 +1671,6 @@
                     
                     <button onclick="clearPhase1Data()" style="
                         padding: 10px 20px;
-                        background: #16213e;
-                        color: #e94560;
-                        border: 2px solid #e94560;
                         border-radius: 5px;
                         cursor: pointer;
                         font-size: 16px;
@@ -864,11 +1696,32 @@
         </div>
     </div>
 
-    <!-- System Log -->
-    <div class="container">
-        <h3>📝 システムログ</h3>
-        <div class="log-container" id="systemLog"></div>
-        <button class="copy-btn" onclick="copyLog()">ログをコピー</button>
+    <!-- Debug Tab -->
+    <div id="debug-tab" class="tab-content">
+        <!-- System Initialization -->
+        <div class="container">
+            <h2>🔧 システム初期化</h2>
+            <div class="grid-2">
+                <button onclick="initializeSystem()" id="initBtn">システムを初期化</button>
+                <button onclick="setupWorkspace()" id="workspaceBtn">作業フォルダ設定</button>
+                <button onclick="testConnection()" id="testBtn" disabled>接続テスト</button>
+            </div>
+            <div id="initStatus" class="metric-box" style="display: none;"></div>
+        </div>
+        
+        <!-- Debug Log -->
+        <div class="container">
+            <h2>🐛 デバッグログ</h2>
+            <div class="log-container" id="systemLog"></div>
+            <div style="margin-top: 12px; display: flex; gap: 8px;">
+                <button onclick="copyLog()">ログをコピー</button>
+                <button onclick="exportLogs()">ログをJSON形式でエクスポート</button>
+                <button onclick="clearLog()">ログをクリア</button>
+            </div>
+        </div>
+    </div>
+
+        </main>
     </div>
 
     <script type="module">
@@ -982,6 +1835,152 @@
         // - Fixed handleReconnected calls with proper await
         // - Added strategic debug logs for session tracking
         // - Fixed auto-resume by maintaining session during errors
+        
+        // v5.6.22: Multiple Network Errors Fix (Phase 0-N)
+        // - Handle "already accepted" errors as success instead of failure
+        // - Check ConnectionManager.isConnected before retry attempts
+        // - Prevent retry during disconnected state to avoid cascading errors
+        // - Extract transaction ID from "already accepted" error messages
+        
+        // v5.6.23: Silent Stop Fix & Unlimited Retries (Phase 0-O)
+        // - Fixed silent stop when network disconnects after transaction submission
+        // - Added ConnectionManager.isConnected checks in all BlockID wait loops
+        // - Changed maxReconnectAttempts to null (unlimited retries)
+        // - Increased max backoff delay from 32s to 128s for long disconnections
+        // - Fixed meta and super-meta BlockID wait loops
+        
+        // v5.6.24: Enhanced Network Detection with WebSocket Check (Phase 0-O-2)
+        // - Added NetworkState.ws.connected check alongside ConnectionManager.isConnected
+        // - WebSocket state provides immediate disconnect detection
+        // - All BlockID wait loops now check both CM and WS status
+        // - RPC→WebSocket recovery already exists in sendTransaction
+        // - Works for all TX types: payload, meta, super-meta, directory
+        
+        // v5.6.25: WebSocket Disconnect Event Detection via kaspa-core (Phase 0-O-3)
+        // - Added 'disconnect' event listener in startMonitoring
+        // - Direct detection from kaspa-core WebSocket events
+        // - Updates NetworkState.ws.connected immediately on disconnect
+        // - Notifies ConnectionManager for unified error handling
+        // - Minimal change for maximum effect - only 10 lines added
+        
+        // v5.7.0: Upload Session Management Fix
+        // - Fixed uploadSessionActive flag not clearing on network errors
+        // - Prevents WebSocket monitoring from getting stuck
+        // - Always clears session flag in processAndUpload finally block
+        // - Clears networkErrorOccurred flag after session cleanup
+        // - Resolves "Request interrupted by user" and 5-minute timeout issues
+        
+        // v5.7.1: WebSocket Event Listener Fix
+        // - Fixed disconnect event logs appearing after monitoring stopped
+        // - Added monitorActive check in disconnect event handler
+        // - Prevents "[WebSocket] 切断イベントを検出" after upload completion
+        // - Minimal 4-line change for maximum effect
+        
+        // v5.7.2: Timer Cleanup Fix
+        // - Fixed 5-minute timer not being cleared in stopMonitoring
+        // - Moved timer clearing outside conditional block
+        // - Fixed variable reference from rpcClient to NetworkState.rpcClient
+        // - Resolves "WebSocket監視: 5分タイムアウト" error after monitoring stopped
+        
+        // v5.7.3: Event Listener Memory Leak Fix
+        // - Added removeAllEventListeners() in stopMonitoring
+        // - Prevents event listener accumulation on repeated monitoring cycles
+        // - Resolves memory leak and performance degradation
+        // - Makes v5.7.1 workaround unnecessary
+        
+        // v5.7.4: Code Cleanup
+        // - Removed v5.7.1 workaround (monitorActive check in disconnect handler)
+        // - This check is no longer needed since v5.7.3 removes all listeners
+        // - Simplifies code and improves readability
+        // - No functional changes
+        
+        // v5.7.5: RPC Connection Cleanup Fix
+        // - Fixed "Attempt to use a disposed resource" error
+        // - Added proper RPC client cleanup in handleError
+        // - Modified attemptReconnect to always create new RPC client
+        // - Added RPC cleanup in WebSocket disconnect event
+        // - Prevents zombie RPC client instances
+        
+        // v5.7.6: HandleError Condition Fix
+        // - Moved RPC client cleanup outside of isConnected condition
+        // - Ensures RPC cleanup happens even when already disconnected
+        // - Fixes issue where handleError was called after WebSocket disconnect
+        // - Prevents RPC client leak when multiple disconnect events occur
+        
+        // v5.7.7: Critical Reconnection Fix
+        // - Removed undefined updateNodeConnectionStatus function call
+        // - Added null check before getServerInfo to prevent null reference error
+        // - Implemented reconnection lock to prevent concurrent attempts
+        // - Fixes complete reconnection failure introduced in v5.7.6
+        
+        // v5.7.8: Error Handling Improvements
+        // - Added special handling for "output already spent" errors
+        // - Checks if spent by our own transaction and treats as success
+        // - Improves handling of network disconnection during transaction processing
+        // - Prevents confusion from false error messages
+        
+        // v5.7.9: Session Management Fix
+        // - Fixed upload session being cleared on network errors
+        // - Ensures ProgressManager is retained during reconnection
+        // - Enables automatic resume after network recovery
+        // - Addresses regression introduced in v5.7.0
+        
+        // v5.7.10: Dual Execution Fix
+        // - Prevents processAndUpload from running twice simultaneously
+        // - Removes attemptReconnect call to avoid dual execution
+        // - Relies on ConnectionManager's auto-resume functionality
+        // - Fixes transaction duplication and UI display issues
+        
+        // v5.7.11: ProgressManager Retention Fix
+        // - Fixes networkErrorOccurred flag being cleared too early
+        // - Moves flag clearing to the end of finally block
+        // - Ensures ProgressManager is retained during network errors
+        // - Enables proper auto-resume functionality
+        
+        // v5.7.12: Property Redefinition Fix
+        // - Removes duplicate currentPassword property definition
+        // - Fixes TypeError: Cannot redefine property
+        // - Keeps only the configurable definition with try-catch
+        
+        // v5.7.13: WASM Initialization Update
+        // - Updates kaspa-core WASM initialization to new format
+        // - Fixes deprecated parameters warning
+        // - Uses object parameter instead of direct string
+        
+        // v5.8.0: UI Reorganization
+        // - Move system initialization section to Debug tab
+        // - Keep workspace folder status always visible in Upload tab
+        // - Improve UI organization for better user experience
+        
+        // v5.8.1: Settings Tab Cleanup
+        // - Move log export functionality to Debug tab
+        // - Remove redundant upload history section (available in History tab)
+        // - Consolidate all log-related functions in one place
+        
+        // v5.8.2: Fix Upload History Error
+        // - Remove setInterval code that references deleted uploadHistory element
+        // - Fix "Cannot set properties of null" error
+        // - Clean up orphaned upload history display code
+        
+        // v5.8.3: Remove Background Colors
+        // - Remove all blue background colors (#2a3654, #16213e)
+        // - Remove green transparent backgrounds
+        // - Remove background from metric-box class
+        // - Keep accent color buttons unchanged
+        
+        // v5.8.4: Remove Additional Styles
+        // - Remove red border and color from progress file button
+        // - Remove blue background from TxID restore section
+        // - Remove green border and color from history select button
+        // - Remove blue background from upload stats
+        // - Fix Multi-Wallet Test section styling
+        
+        // v5.9.0: New Status and File Tabs
+        // - Add new Status tab with network, wallet, and folder status
+        // - Add new File tab for file management
+        // - Rename Upload to Upload File
+        // - Rename Directory to Upload Dir
+        // - Implement responsive design for mobile and desktop
         
         /*
          * ====================================================================
@@ -1152,7 +2151,10 @@
             uploadingDirMeta: false,  // Whether directory meta is being uploaded (v5.5.38-safe)
             pendingProgress: null,    // Progress data for resume functionality (v5.5.39)
             currentFileCID: null,     // Current file's short CID (v5.5.39)
-            currentFileCIDFull: null  // Current file's full CID (v5.5.39)
+            currentFileCIDFull: null,  // Current file's full CID (v5.5.39)
+            // v5.9.0: File list management
+            fileList: [],             // List of files displayed in File tab
+            selectedFiles: new Set()  // Set of selected file IDs
         };
         
         // Expose FileState to window for global access
@@ -1320,14 +2322,6 @@
         } catch (e) {
             console.warn('directoryMetadata proxy already defined:', e);
         }
-        
-        // v5.5.3: Define getter/setter for currentPassword
-        Object.defineProperty(window, 'currentPassword', {
-            get() { return FileState.currentPassword; },
-            set(value) { 
-                FileState.currentPassword = value;
-            }
-        });
         
         // v5.5.4: Define getter/setter for processedChunks
         // v5.5.22: Added configurable: true and try-catch
@@ -1534,6 +2528,7 @@
         
         // v5.5.20: currentPasswordの後方互換性プロキシ
         // v5.5.21: configurableオプションを追加して再定義エラーを回避
+        // v5.7.12: 重複定義を削除（v5.5.3の定義を削除し、このtry-catch付きの定義のみを残す）
         try {
             Object.defineProperty(window, 'currentPassword', {
                 get() { return FileState.currentPassword; },
@@ -3063,8 +4058,9 @@
             lastError: null,
             reconnectTimer: null,
             reconnectAttempts: 0,
-            maxReconnectAttempts: 5,
+            maxReconnectAttempts: null,  // Phase 0-O: Unlimited retries
             baseReconnectDelay: 2000,
+            isReconnecting: false,  // v5.7.7: Prevent concurrent reconnection attempts
             
             // Initialize connection monitoring
             init() {
@@ -3084,6 +4080,18 @@
                 }
                 
                 log(`[ConnectionManager] ネットワークエラーを検出 - ${source}: ${errorMessage}`, 'warning');
+                
+                // v5.7.6: Always cleanup RPC client first, regardless of connection state
+                if (NetworkState.rpcClient) {
+                    try {
+                        await NetworkState.rpcClient.disconnect();
+                        log('[ConnectionManager] RPC接続を切断しました', 'info');
+                    } catch (disconnectError) {
+                        log(`[ConnectionManager] RPC切断エラー: ${disconnectError.message}`, 'debug');
+                    }
+                    NetworkState.rpcClient = null;
+                    log('[ConnectionManager] RPCクライアントをクリアしました', 'debug');
+                }
                 
                 // Mark as disconnected
                 if (this.isConnected) {
@@ -3111,13 +4119,17 @@
                     clearTimeout(this.reconnectTimer);
                 }
                 
-                if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+                // Phase 0-O: Support unlimited retries
+                if (this.maxReconnectAttempts !== null && this.reconnectAttempts >= this.maxReconnectAttempts) {
                     log('[ConnectionManager] 最大再接続試行回数に到達', 'error');
                     return;
                 }
                 
                 const delay = this.baseReconnectDelay * Math.pow(2, this.reconnectAttempts);
-                log(`[ConnectionManager] ${delay}ms後に再接続を試行します（${this.reconnectAttempts + 1}/${this.maxReconnectAttempts}）`, 'info');
+                const attemptInfo = this.maxReconnectAttempts === null 
+                    ? `${this.reconnectAttempts + 1}` 
+                    : `${this.reconnectAttempts + 1}/${this.maxReconnectAttempts}`;
+                log(`[ConnectionManager] ${delay}ms後に再接続を試行します（${attemptInfo}）`, 'info');
                 
                 this.reconnectTimer = setTimeout(() => {
                     this.attemptReconnect();
@@ -3126,24 +4138,52 @@
             
             // Attempt to reconnect
             async attemptReconnect() {
+                // v5.7.7: Prevent concurrent reconnection attempts
+                if (this.isReconnecting) {
+                    log('[ConnectionManager] 既に再接続中です', 'debug');
+                    return;
+                }
+                
+                this.isReconnecting = true;
                 this.reconnectAttempts++;
                 log(`[ConnectionManager] 再接続試行 #${this.reconnectAttempts}`, 'info');
                 
                 try {
-                    // Test RPC connection
-                    if (NetworkState.rpcClient) {
-                        const info = await NetworkState.rpcClient.getServerInfo();
-                        log(`[ConnectionManager] RPC接続成功: ${info.serverVersion}`, 'success');
-                        
-                        // Connection restored
-                        await this.handleReconnected();
-                    } else {
-                        // Try to initialize RPC
+                    // v5.7.5: Always create new RPC client on reconnect
+                    if (!NetworkState.rpcClient) {
+                        log('[ConnectionManager] 新規RPCクライアントを作成します', 'info');
                         await initializeRpcClient();
-                        await this.handleReconnected();
+                    } else {
+                        // This should not happen if handleError works correctly
+                        log('[ConnectionManager] 警告: RPCクライアントが残存していました', 'warning');
+                        log('[ConnectionManager] 既存のRPCクライアントを破棄して新規作成します', 'info');
+                        try {
+                            await NetworkState.rpcClient.disconnect();
+                        } catch (disconnectError) {
+                            log(`[ConnectionManager] 既存RPC切断エラー: ${disconnectError.message}`, 'debug');
+                        }
+                        NetworkState.rpcClient = null;
+                        await initializeRpcClient();
                     }
+                    
+                    // v5.7.7: Null check before getServerInfo
+                    if (!NetworkState.rpcClient) {
+                        throw new Error('RPC client initialization failed');
+                    }
+                    
+                    // Test connection
+                    const info = await NetworkState.rpcClient.getServerInfo();
+                    log(`[ConnectionManager] RPC接続成功: ${info.serverVersion}`, 'success');
+                    
+                    await this.handleReconnected();
+                    
+                    // v5.7.7: Reset reconnecting flag on success
+                    this.isReconnecting = false;
                 } catch (error) {
                     log(`[ConnectionManager] 再接続失敗: ${error.message}`, 'error');
+                    
+                    // v5.7.7: Reset reconnecting flag before scheduling next attempt
+                    this.isReconnecting = false;
                     this.scheduleReconnect();
                 }
             },
@@ -3175,19 +4215,19 @@
                 log(`[DEBUG-RESUME] progress存在: ${!!FileState.progressManager?.progress}`, 'debug');
                 
                 if (FileState.progressManager?.progress) {
-                    const metadata = FileState.progressManager.progress.metadata;
+                    const progress = FileState.progressManager.progress;
                     log(`[DEBUG-RESUME] 進捗詳細:`, 'debug');
-                    log(`[DEBUG-RESUME]   - totalChunks: ${metadata.totalChunks}`, 'debug');
-                    log(`[DEBUG-RESUME]   - completedChunks: ${metadata.completedChunks}`, 'debug');
-                    log(`[DEBUG-RESUME]   - failedChunks: ${metadata.failedChunks?.length || 0}`, 'debug');
-                    log(`[DEBUG-RESUME]   - ファイル名: ${metadata.fileName}`, 'debug');
-                    log(`[DEBUG-RESUME]   - CID: ${metadata.cid}`, 'debug');
-                    log(`[DEBUG-RESUME]   - 完了率: ${((metadata.completedChunks / metadata.totalChunks) * 100).toFixed(1)}%`, 'debug');
+                    log(`[DEBUG-RESUME]   - totalChunks: ${progress.recovery.totalChunks}`, 'debug');
+                    log(`[DEBUG-RESUME]   - completedChunks: ${progress._progress.completedChunks}`, 'debug');
+                    log(`[DEBUG-RESUME]   - failedChunks: ${progress._progress.resume?.failedChunks?.length || 0}`, 'debug');
+                    log(`[DEBUG-RESUME]   - ファイル名: ${progress.file.name}`, 'debug');
+                    log(`[DEBUG-RESUME]   - CID: ${progress._progress.cid}`, 'debug');
+                    log(`[DEBUG-RESUME]   - 完了率: ${((progress._progress.completedChunks / progress.recovery.totalChunks) * 100).toFixed(1)}%`, 'debug');
                 }
                 
                 if (FileState.progressManager?.progress && 
-                    FileState.progressManager.progress.metadata.completedChunks < 
-                    FileState.progressManager.progress.metadata.totalChunks) {
+                    FileState.progressManager.progress._progress.completedChunks < 
+                    FileState.progressManager.progress.recovery.totalChunks) {
                     
                     log('[ConnectionManager] アップロードを自動的に再開します...', 'info');
                     log(`[DEBUG-RESUME] 条件を満たしました - 自動再開を実行`, 'debug');
@@ -3222,6 +4262,10 @@
                             log('[ConnectionManager] processAndUploadを呼び出します...', 'info');
                             log(`[DEBUG] 自動再開前 - uploadSessionActive: ${FileState.uploadSessionActive}`, 'debug');
                             await processAndUpload();
+                            // Phase 0-M: Move completion message after processAndUpload to ensure proper timing
+                            // Phase 0-L: Clear network error flag after successful auto-resume
+                            FileState.networkErrorOccurred = false;
+                            log('[DEBUG] 自動再開成功 - networkErrorOccurredフラグをクリア', 'debug');
                             log('[ConnectionManager] 自動再開が完了しました', 'success');
                         } else {
                             log('[ConnectionManager] 自動再開に必要な情報が不足しています', 'warning');
@@ -3239,8 +4283,8 @@
                         log(`[DEBUG-RESUME]   理由: ProgressManagerが存在しない`, 'debug');
                     } else if (!FileState.progressManager.progress) {
                         log(`[DEBUG-RESUME]   理由: progressデータが存在しない`, 'debug');
-                    } else if (FileState.progressManager.progress.metadata.completedChunks >= FileState.progressManager.progress.metadata.totalChunks) {
-                        log(`[DEBUG-RESUME]   理由: すでに完了している (${FileState.progressManager.progress.metadata.completedChunks}/${FileState.progressManager.progress.metadata.totalChunks})`, 'debug');
+                    } else if (FileState.progressManager.progress._progress.completedChunks >= FileState.progressManager.progress.recovery.totalChunks) {
+                        log(`[DEBUG-RESUME]   理由: すでに完了している (${FileState.progressManager.progress._progress.completedChunks}/${FileState.progressManager.progress.recovery.totalChunks})`, 'debug');
                     }
                 }
                 
@@ -3259,8 +4303,8 @@
         
         // Calculate backoff delay with exponential increase
         function getBackoffDelay(retryCount, baseDelay = 2000) {
-            // Exponential backoff: 2s, 4s, 8s, 16s, 32s (max)
-            const maxDelay = 32000; // 32 seconds max
+            // Phase 0-O: Exponential backoff: 2s, 4s, 8s, 16s, 32s, 64s, 128s (max)
+            const maxDelay = 128000; // 128 seconds max
             const delay = Math.min(baseDelay * Math.pow(2, retryCount), maxDelay);
             // Add jitter (±20%) to avoid thundering herd
             const jitter = delay * 0.2 * (Math.random() - 0.5);
@@ -4435,33 +5479,31 @@
         }
         
         function showWorkspaceStatus() {
-            const statusDiv = document.getElementById('workspaceStatus');
-            if (!statusDiv) {
-                const div = document.createElement('div');
-                div.id = 'workspaceStatus';
-                div.style.cssText = 'background: #16213e; border: 1px solid #e94560; padding: 10px; margin: 10px 0; border-radius: 5px;';
-                const container = document.querySelector('.container');
-                if (container) {
-                    container.insertBefore(div, container.firstChild);
-                }
-            }
-            
-            const status = document.getElementById('workspaceStatus');
+            // v5.8.0: Update the new workspaceStatusDisplay element
+            const status = document.getElementById('workspaceStatusDisplay');
             if (status) {
                 if (WorkspaceState.handle) {
                     status.innerHTML = `
-                        <p style="margin: 0; color: #49EACB;">
-                            ✓ 作業フォルダ: ${WorkspaceState.handle.name}
-                            <button onclick="setupWorkspace()" style="margin-left: 10px; padding: 5px 10px; font-size: 12px;">変更</button>
-                        </p>
+                        ✓ 作業フォルダ: ${WorkspaceState.handle.name}
+                        <button onclick="setupWorkspace()" style="margin-left: 10px; padding: 5px 10px; font-size: 12px;">変更</button>
                     `;
+                    status.style.color = '#49EACB';
                 } else {
                     status.innerHTML = `
-                        <p style="margin: 0; color: #ffcc66;">
-                            作業フォルダ: 未設定 (ブラウザ内保存のみ)
-                            <button onclick="setupWorkspace()" style="margin-left: 10px; padding: 5px 10px; font-size: 12px;">設定</button>
-                        </p>
+                        作業フォルダ: 未設定 (ブラウザ内保存のみ)
+                        <button onclick="setupWorkspace()" style="margin-left: 10px; padding: 5px 10px; font-size: 12px;">設定</button>
                     `;
+                    status.style.color = '#ffcc66';
+                }
+            }
+            
+            // v5.9.0: Also update the status tab workspace folder
+            const statusFolder = document.getElementById('workspaceFolderStatus');
+            if (statusFolder) {
+                if (WorkspaceState.handle) {
+                    statusFolder.innerHTML = `<span>📁 ${WorkspaceState.handle.name}</span>`;
+                } else {
+                    statusFolder.innerHTML = `<span>📁 未設定</span>`;
                 }
             }
         }
@@ -5574,7 +6616,8 @@
                 log('kaspa-core.jsをインポートしました');
                 
                 // Initialize WASM binary
-                await NetworkState.kaspa.default('./kaspa-core_bg.wasm');
+                // v5.7.13: Use new initialization format to avoid deprecated parameters warning
+                await NetworkState.kaspa.default({ module_or_path: './kaspa-core_bg.wasm' });
                 log('WASMバイナリを初期化しました');
                 
                 // Verify functions
@@ -5683,7 +6726,8 @@
                 log('RPCクライアントを初期化中...');
                 
                 // Close existing connection if any
-                if (rpcClient) {
+                // v5.7.5: Fixed variable reference - use NetworkState.rpcClient
+                if (NetworkState.rpcClient) {
                     try {
                         await NetworkState.rpcClient.disconnect();
                     } catch (err) {
@@ -5695,7 +6739,8 @@
                 NetworkState.rpcClient = await createRpcClient();
                 
                 await NetworkState.rpcClient.connect();
-                updateNodeConnectionStatus(config.nodeType, config.currentEndpoint);
+                // v5.7.7: Commented out undefined function call
+                // updateNodeConnectionStatus(config.nodeType, config.currentEndpoint);
                 
                 // Test connection
                 const info = await NetworkState.rpcClient.getServerInfo();
@@ -6500,6 +7545,12 @@
             
             // Active polling loop
             while (!blockId && waitTime < maxWaitTime) {
+                // Phase 0-O-2: Check both ConnectionManager and WebSocket status
+                if (!ConnectionManager.isConnected || !NetworkState.ws.connected) {
+                    log(`[DEBUG] ネットワーク切断を検出 - BlockID待機を中断 (CM: ${ConnectionManager.isConnected}, WS: ${NetworkState.ws.connected})`, 'debug');
+                    throw new Error('Network disconnected while waiting for BlockID');
+                }
+                
                 // Check WebSocket monitor first
                 if (NetworkState.ws.monitorActive && NetworkState.ws.monitoredTransactions && NetworkState.ws.monitoredTransactions.has(txid)) {
                     const monitorData = NetworkState.ws.monitoredTransactions.get(txid);
@@ -7187,7 +8238,7 @@
                     // v5.5.19: totalChunksは後で設定されるため、初期化時は未計算
                     log(`ProgressManager初期化完了 - ペイロード分割前のため総チャンク数は未計算`);
                 } else {
-                    log(`既存のProgressManagerを使用 - 完了済み: ${FileState.progressManager.progress.metadata.completedChunks}/${FileState.progressManager.progress.metadata.totalChunks}`);
+                    log(`既存のProgressManagerを使用 - 完了済み: ${FileState.progressManager.progress._progress.completedChunks}/${FileState.progressManager.progress.recovery.totalChunks}`);
                     
                     // Verify existing chunks on blockchain
                     const verified = await verifyProgressChunks(FileState.progressManager.progress);
@@ -7442,6 +8493,12 @@
                                 const maxWaitTime = 30000;
                                 
                                 while (!blockId && waitTime < maxWaitTime) {
+                                    // Phase 0-O-2: Check both ConnectionManager and WebSocket status
+                                    if (!ConnectionManager.isConnected || !NetworkState.ws.connected) {
+                                        log(`[DEBUG] ネットワーク切断を検出 - BlockID待機を中断 (CM: ${ConnectionManager.isConnected}, WS: ${NetworkState.ws.connected})`, 'debug');
+                                        throw new Error('Network disconnected while waiting for BlockID');
+                                    }
+                                    
                                     if (NetworkState.ws.monitorActive && NetworkState.ws.monitoredTransactions.has(txid)) {
                                         const monitorData = NetworkState.ws.monitoredTransactions.get(txid);
                                         if (monitorData.blockId) {
@@ -7498,6 +8555,45 @@
                             } catch (error) {
                                 retries++;
                                 const errorMessage = error?.message || error?.toString() || 'Unknown error';
+                                
+                                // Phase 0-N: Check for already accepted error
+                                if (errorMessage.includes('already accepted')) {
+                                    const match = errorMessage.match(/transaction ([a-f0-9]{64}) was already accepted/);
+                                    if (match) {
+                                        txid = match[1];
+                                        log(`ペイロード ${i + 1} は既に承認済み: ${txid.substring(0, 16)}...`, 'info');
+                                        // Extract blockId from error message if available
+                                        const blockMatch = errorMessage.match(/by the consensus.*?([a-f0-9]{64})/);
+                                        if (blockMatch) {
+                                            blockId = blockMatch[1];
+                                        } else {
+                                            // If blockId not in error, use a placeholder
+                                            blockId = 'already-accepted-' + Date.now();
+                                        }
+                                        break; // Success - exit retry loop
+                                    }
+                                }
+                                
+                                // v5.7.8: Check for output already spent error
+                                if (errorMessage.includes('already spent')) {
+                                    const spentMatch = errorMessage.match(/spent by transaction ([a-f0-9]{64})/);
+                                    if (spentMatch) {
+                                        const spentByTxId = spentMatch[1];
+                                        // Check if this is our own transaction
+                                        if (NetworkState.ws.monitoredTransactions && NetworkState.ws.monitoredTransactions.has(spentByTxId)) {
+                                            txid = spentByTxId;
+                                            log(`ペイロード ${i + 1} は既に自分のトランザクションで処理済み: ${txid.substring(0, 16)}...`, 'info');
+                                            const monitorData = NetworkState.ws.monitoredTransactions.get(spentByTxId);
+                                            if (monitorData && monitorData.blockId) {
+                                                blockId = monitorData.blockId;
+                                            } else {
+                                                blockId = 'already-spent-' + Date.now();
+                                            }
+                                            break; // Success - exit retry loop
+                                        }
+                                    }
+                                }
+                                
                                 log(`ペイロード ${i + 1} エラー (試行 ${retries}/${config.retryCount}): ${errorMessage}`, 'error');
                                 // WASMエラーの詳細をログ出力
                                 if (typeof error === 'object' && error !== null) {
@@ -7521,12 +8617,20 @@
                                     await FileState.progressManager.saveProgress();
                                     throw error;
                                 }
+                                
+                                // Phase 0-N: Check connection before retry
+                                // v5.7.10: Don't call attemptReconnect to prevent dual execution
+                                if (!ConnectionManager.isConnected) {
+                                    log(`[DEBUG] ネットワーク切断 - 自動再開に任せます`, 'debug');
+                                    throw new Error('Network disconnected - waiting for auto-resume');
+                                }
+                                
                                 await new Promise(resolve => setTimeout(resolve, 2000));
                             }
                         }
                         
                         // Update progress display
-                        const completedChunks = FileState.progressManager.progress.metadata.completedChunks;
+                        const completedChunks = FileState.progressManager.progress._progress.completedChunks;
                         const totalPayloads = payloads.length;
                         const percentage = (completedChunks / totalPayloads * 100).toFixed(1);
                         
@@ -7734,6 +8838,12 @@
                             const maxWaitTime = 30000; // 30 seconds for RPC check
                             
                             while (!blockId && waitTime < maxWaitTime) {
+                                // Phase 0-O: Check network connection
+                                if (!ConnectionManager.isConnected) {
+                                    log(`[DEBUG] ネットワーク切断を検出 - BlockID待機を中断`, 'debug');
+                                    throw new Error('Network disconnected while waiting for BlockID');
+                                }
+                                
                                 // Check WebSocket monitor first
                                 if (NetworkState.ws.monitorActive && NetworkState.ws.monitoredTransactions && NetworkState.ws.monitoredTransactions.has(txid)) {
                                     const monitorData = NetworkState.ws.monitoredTransactions.get(txid);
@@ -7835,6 +8945,46 @@
                             
                         } catch (error) {
                             retries++;
+                            const errorMessage = error?.message || error?.toString() || 'Unknown error';
+                            
+                            // Phase 0-N: Check for already accepted error (old method)
+                            if (errorMessage.includes('already accepted')) {
+                                const match = errorMessage.match(/transaction ([a-f0-9]{64}) was already accepted/);
+                                if (match) {
+                                    txid = match[1];
+                                    log(`チャンク ${i + 1} は既に承認済み: ${txid.substring(0, 16)}...`, 'info');
+                                    // Extract blockId from error message if available
+                                    const blockMatch = errorMessage.match(/by the consensus.*?([a-f0-9]{64})/);
+                                    if (blockMatch) {
+                                        blockId = blockMatch[1];
+                                    } else {
+                                        // If blockId not in error, use a placeholder
+                                        blockId = 'already-accepted-' + Date.now();
+                                    }
+                                    break; // Success - exit retry loop
+                                }
+                            }
+                            
+                            // v5.7.8: Check for output already spent error (old method)
+                            if (errorMessage.includes('already spent')) {
+                                const spentMatch = errorMessage.match(/spent by transaction ([a-f0-9]{64})/);
+                                if (spentMatch) {
+                                    const spentByTxId = spentMatch[1];
+                                    // Check if this is our own transaction
+                                    if (NetworkState.ws.monitoredTransactions && NetworkState.ws.monitoredTransactions.has(spentByTxId)) {
+                                        txid = spentByTxId;
+                                        log(`チャンク ${i + 1} は既に自分のトランザクションで処理済み: ${txid.substring(0, 16)}...`, 'info');
+                                        const monitorData = NetworkState.ws.monitoredTransactions.get(spentByTxId);
+                                        if (monitorData && monitorData.blockId) {
+                                            blockId = monitorData.blockId;
+                                        } else {
+                                            blockId = 'already-spent-' + Date.now();
+                                        }
+                                        break; // Success - exit retry loop
+                                    }
+                                }
+                            }
+                            
                             log(`チャンク ${i + 1} エラー (試行 ${retries}/${config.retryCount}): ${error.message || error}`, 'error');
                             console.error('詳細エラー:', error);
                             console.error('スタックトレース:', error.stack);
@@ -7858,6 +9008,13 @@
                                 await FileState.progressManager.saveProgress(); // Save progress on failure
                                 throw error;
                             }
+                            
+                            // Phase 0-N: Check connection before retry (old method)
+                            if (!ConnectionManager.isConnected) {
+                                log(`[DEBUG] 再接続を待機中...`, 'debug');
+                                await ConnectionManager.attemptReconnect();
+                            }
+                            
                             log(`2秒待機後にリトライ...`);
                             await new Promise(resolve => setTimeout(resolve, 2000));
                         }
@@ -7922,7 +9079,7 @@
                     // v5.5.22: window.processedChunks -> FileState.processedChunks (8-10/18)
                     chunks: FileState.processedChunks.map(c => c.txid),
                     chunkBlockIds: FileState.processedChunks.map(c => c.blockId),
-                    chunkSizes: FileState.processedChunks.map(c => c.originalSize), // v4.7.36: 各チャンクの実際のサイズ
+                    chunkSizes: FileState.processedChunks.map(c => c.originalSize || c.payloadSize), // v4.7.36: 各チャンクの実際のサイズ (Phase 0-M: 新方式対応)
                     
                     // Recovery information
                     recovery: {
@@ -7953,6 +9110,10 @@
                 });
                 
                 log(`アップロード完了! 総コスト: ${totalCost.toFixed(5)} KAS`, 'success');
+                
+                // Phase 0-L: Clear network error flag on successful completion
+                FileState.networkErrorOccurred = false;
+                log('[DEBUG] アップロード正常完了 - networkErrorOccurredフラグをクリア', 'debug');
                 
                 // Debug log for kaspaMetadata
                 log(`[DEBUG] kaspaMetadata is: ${FileState.kaspaMetadata ? 'defined' : 'null'}`, 'debug');
@@ -8083,13 +9244,13 @@
                 FileState.isUploadingFile = false; // v5.5.34: Using FileState
                 
                 // v5.3.7: End upload session
-                // Phase 0-H: Don't end session on network error
+                // v5.7.9: Check network error BEFORE clearing session
                 if (!FileState.networkErrorOccurred) {
+                    // v5.7.0: Clear session flag only on normal completion
                     FileState.uploadSessionActive = false; // v5.5.35: Using FileState
-                    log('[INFO] アップロードセッションを終了 (メイン)', 'info');
+                    log('[INFO] アップロードセッションを終了', 'info');
                 } else {
-                    log('[INFO] ネットワークエラーのため、アップロードセッションを維持', 'info');
-                    log(`[DEBUG] uploadSessionActive維持: ${FileState.uploadSessionActive}`, 'debug');
+                    log('[INFO] ネットワークエラーのためセッションを維持', 'info');
                 }
                 
                 // Debug: Check state in finally block
@@ -8099,8 +9260,13 @@
                 // Check monitoring stop after 10 seconds
                 setTimeout(async () => {
                     if (!FileState.uploadSessionActive && !FileState.isUploadingFile && NetworkState.ws.monitoredTransactions.size === 0) { // v5.5.34 & v5.5.35: Using FileState
-                        log('[DEBUG] アップロード完了から10秒経過 - 監視停止を検討', 'debug');
-                        await checkMonitoringStop();
+                        // Phase 0-M: Check if monitoring is still active before calling checkMonitoringStop
+                        if (NetworkState.ws.monitorActive) {
+                            log('[DEBUG] アップロード完了から10秒経過 - 監視停止を検討', 'debug');
+                            await checkMonitoringStop();
+                        } else {
+                            log('[DEBUG] アップロード完了から10秒経過 - 監視はすでに停止済み', 'debug');
+                        }
                     }
                 }, 10000);
                 
@@ -8118,6 +9284,13 @@
                     log('[DEBUG] networkErrorOccurredフラグは自動再開完了まで保持', 'debug');
                     // Debug: Keep currentFile for auto-resume
                     log(`[DEBUG] FileState.currentFile保持状態: ${FileState.currentFile ? FileState.currentFile.name : 'null'}`, 'debug');
+                }
+                
+                // v5.7.11: Clear network error flag AFTER ProgressManager check
+                // This ensures ProgressManager is retained during network errors
+                if (FileState.networkErrorOccurred) {
+                    log('[INFO] ネットワークエラーフラグをクリア', 'info');
+                    FileState.networkErrorOccurred = false;
                 }
             }
         };
@@ -8397,6 +9570,12 @@
                 const maxWaitTime = 30000; // 30 seconds max
                 
                 while (!metaBlockId && waitTime < maxWaitTime) {
+                    // Phase 0-O-2: Check both ConnectionManager and WebSocket status
+                    if (!ConnectionManager.isConnected || !NetworkState.ws.connected) {
+                        log(`[DEBUG] ネットワーク切断を検出 - メタBlockID待機を中断 (CM: ${ConnectionManager.isConnected}, WS: ${NetworkState.ws.connected})`, 'debug');
+                        throw new Error('Network disconnected while waiting for meta BlockID');
+                    }
+                    
                     if (NetworkState.ws.monitoredTransactions.has(metaTxId)) {
                         const monitorData = NetworkState.ws.monitoredTransactions.get(metaTxId);
                         if (monitorData.blockId) {
@@ -8630,6 +9809,12 @@
                 const maxWaitTime = 30000; // 30 seconds max
                 
                 while (!metaBlockId && waitTime < maxWaitTime) {
+                    // Phase 0-O-2: Check both ConnectionManager and WebSocket status
+                    if (!ConnectionManager.isConnected || !NetworkState.ws.connected) {
+                        log(`[DEBUG] ネットワーク切断を検出 - メタBlockID待機を中断 (CM: ${ConnectionManager.isConnected}, WS: ${NetworkState.ws.connected})`, 'debug');
+                        throw new Error('Network disconnected while waiting for meta BlockID');
+                    }
+                    
                     if (NetworkState.ws.monitoredTransactions.has(metaTxId)) {
                         const monitorData = NetworkState.ws.monitoredTransactions.get(metaTxId);
                         if (monitorData.blockId) {
@@ -8774,6 +9959,12 @@
                 let superMetaBlockId = null;
                 let waitTime = 0;
                 while (!superMetaBlockId && waitTime < 30000) {
+                    // Phase 0-O-2: Check both ConnectionManager and WebSocket status
+                    if (!ConnectionManager.isConnected || !NetworkState.ws.connected) {
+                        log(`[DEBUG] ネットワーク切断を検出 - スーパーメタBlockID待機を中断 (CM: ${ConnectionManager.isConnected}, WS: ${NetworkState.ws.connected})`, 'debug');
+                        throw new Error('Network disconnected while waiting for super meta BlockID');
+                    }
+                    
                     if (NetworkState.ws.monitoredTransactions.has(superMetaTxId)) {
                         const monitorData = NetworkState.ws.monitoredTransactions.get(superMetaTxId);
                         if (monitorData.blockId) {
@@ -8826,7 +10017,7 @@
                 if (dirMetadata.entries && dirMetadata.entries.length > 0) {
                     log(`ファイル一覧を生成中: ${dirMetadata.entries.length}件`, 'info');
                     let fileListHtml = '<br><strong>📋 ファイル一覧:</strong><br>';
-                    fileListHtml += '<div style="max-height: 300px; overflow-y: auto; border: 1px solid #333; padding: 10px; margin-top: 10px; background: #0a2540;">';
+                    fileListHtml += '<div style="max-height: 300px; overflow-y: auto; border: 1px solid #333; padding: 10px; margin-top: 10px;">';
                     
                     dirMetadata.entries.forEach((entry, index) => {
                         log(`エントリ${index}: ${entry.name}, MetaTxID: ${entry.metaTxId ? '有' : '無'}`, 'debug');
@@ -10393,6 +11584,9 @@
 
         // File upload drag and drop
         document.addEventListener('DOMContentLoaded', () => {
+            // v5.8.0: Show workspace status on page load
+            showWorkspaceStatus();
+            
             const fileLabel = document.querySelector('.file-input-label');
             
             fileLabel.addEventListener('dragover', handleDragOver);
@@ -10424,22 +11618,6 @@
                 log(`タイムアウト変更: ${config.timeout/1000}秒`, 'info');
             });
             
-            // Display upload history
-            setInterval(() => {
-                const historyDiv = document.getElementById('uploadHistory');
-                if (AppState.history.uploadHistory.length > 0) {
-                    historyDiv.innerHTML = AppState.history.uploadHistory.slice(-5).reverse().map(item => `
-                        <div class="metric-box">
-                            <strong>${item.filename}</strong><br>
-                            ${new Date(item.timestamp).toLocaleString()}<br>
-                            ${item.metadata?.chunks?.length || item.fileCount || 0} ${item.type === 'directory' ? 'ファイル' : 'チャンク'}
-                        </div>
-                    `).join('');
-                } else {
-                    historyDiv.innerHTML = '<p>アップロード履歴はありません</p>';
-                }
-            }, 5000);
-            
             // Debug: Add event listener to file input
             const kaspaFileInput = document.getElementById('kaspaFileInput');
             if (kaspaFileInput) {
@@ -10453,7 +11631,7 @@
             }
             
             log(`🚀 Kaspa P2P v${getAppVersion()} 準備完了！`, 'info');
-            log(`📋 v${getAppVersion()}: WASMエラー処理改善＆自動再開デバッグ強化版`, 'info');
+            log(`📋 v${getAppVersion()}: kaspa-core切断イベント検出＆自動リカバリ版`, 'info');
             log('✨ 並列ダウンロード: ' + (AppState.settings.parallelDownloadEnabled ? '有効' : '無効'), 'info');
             log('システムを初期化してください', 'info');
             
@@ -10467,7 +11645,7 @@
                 const fullTitle = document.title;
                 const titleParts = fullTitle.match(/v[\d.]+\s*-\s*(.+)$/);
                 const subtitle = titleParts ? titleParts[1] : 'No LocalStorage Cache';
-                titleElement.textContent = `🚀 Kaspa P2P File Storage v${version} - ${subtitle}`;
+                titleElement.textContent = `Kaspa Storage v${version} - ${subtitle}`;
             }
             
             if (subtitleElement) {
@@ -10620,6 +11798,30 @@
                 log('WebSocket経由でブロック追加イベントの監視を開始', 'info');
                 log(`[DEBUG] WebSocket購読完了 - navigator.onLine: ${navigator.onLine}`, 'debug');
                 
+                // Phase 0-O-3: WebSocket disconnect detection
+                NetworkState.rpcClient.addEventListener('disconnect', (event) => {
+                    // v5.7.4: Removed v5.7.1 workaround - no longer needed since v5.7.3 
+                    // removes all event listeners in stopMonitoring
+                    
+                    log('[WebSocket] 切断イベントを検出', 'warning');
+                    NetworkState.ws.connected = false;
+                    
+                    // Notify ConnectionManager
+                    if (ConnectionManager.isConnected) {
+                        ConnectionManager.isConnected = false;
+                        ConnectionManager.lastError = new Error('WebSocket disconnected via event');
+                        updateNetworkStatus('offline', 'WebSocket切断');
+                        
+                        // v5.7.5: Ensure RPC client is cleaned up on WebSocket disconnect
+                        if (NetworkState.rpcClient) {
+                            NetworkState.rpcClient = null;
+                            log('[WebSocket] RPCクライアントをクリアしました', 'debug');
+                        }
+                        
+                        ConnectionManager.scheduleReconnect();
+                    }
+                });
+                
                 NetworkState.rpcClient.addEventListener('block-added', (event) => {
                     const block = event.data.block;
                     const blockId = block.header.hash;
@@ -10700,12 +11902,25 @@
             }
             
             try {
-                if (rpcClient) {
+                // v5.7.2: Clear timeout first to ensure it's always cleared
+                if (AppState.monitoring.wsMonitorTimeout) {
+                    clearTimeout(AppState.monitoring.wsMonitorTimeout);
+                    AppState.monitoring.wsMonitorTimeout = null;
+                    log('[DEBUG] 5分タイマーをクリアしました', 'debug');
+                }
+                
+                // v5.7.2: Fixed rpcClient check - use NetworkState.rpcClient
+                if (NetworkState.rpcClient) {
                     // v5.6.4: Debug logging before stopping WebSocket
                     log(`[DEBUG] WebSocket停止前の状態 - navigator.onLine: ${navigator.onLine}, ` +
                         `WebSocket接続: ${NetworkState.ws.connected ? '接続中' : '切断'}`, 'debug');
                     
                     await NetworkState.rpcClient.unsubscribeBlockAdded();
+                    
+                    // v5.7.3: Remove all event listeners to prevent memory leak
+                    NetworkState.rpcClient.removeAllEventListeners();
+                    log('[DEBUG] イベントリスナーをクリアしました', 'debug');
+                    
                     NetworkState.ws.connected = false;  // v5.6.4: Mark WebSocket as disconnected
                     
                     monitorLog('監視を停止しました', 'success');
@@ -10713,6 +11928,10 @@
                     log(`[DEBUG] WebSocket停止完了 - navigator.onLine: ${navigator.onLine}`, 'debug');
                 }
                 NetworkState.ws.monitorActive = false;
+                
+                // v5.7.2: Reset counters after clearing timer
+                FileState.uploadingChunksCount = 0;
+                FileState.uploadingMetaTx = false;
                 
             } catch (error) {
                 monitorLog(`監視停止エラー: ${error.message}`, 'error');
@@ -10774,7 +11993,7 @@
                 historyFileList.innerHTML = '<p style="text-align: center; color: #999;">パスワード付きでTxIDがあるファイルがありません</p>';
             } else {
                 historyFileList.innerHTML = fileHistory.map(item => `
-                    <div style="padding: 8px; margin-bottom: 5px; background: #0f3460; border-radius: 5px; cursor: pointer;">
+                    <div style="padding: 8px; margin-bottom: 5px; border-radius: 5px; cursor: pointer;">
                         <label style="display: flex; align-items: center; cursor: pointer;">
                             <input type="checkbox" value="${item.id}" onchange="toggleFileSelection('${item.id}')" style="margin-right: 10px;">
                             <span>
@@ -11534,12 +12753,28 @@
         
         // Tab switching function (moved from FILE OPERATIONS)
         window.switchTab = function(tab) {
-            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            // Update nav items
+            document.querySelectorAll('.nav-item').forEach(btn => btn.classList.remove('active'));
             document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
             
-            const tabIndex = ['upload', 'download', 'directory', 'history', 'settings'].indexOf(tab);
-            document.querySelectorAll('.tab-btn')[tabIndex].classList.add('active');
-            document.getElementById(`${tab}-tab`).classList.add('active');
+            // Find and activate the clicked nav item
+            const navItems = document.querySelectorAll('.nav-item');
+            const tabNames = ['status', 'file', 'download', 'upload', 'directory', 'history', 'debug', 'settings'];
+            const tabIndex = tabNames.indexOf(tab);
+            if (tabIndex !== -1 && navItems[tabIndex]) {
+                navItems[tabIndex].classList.add('active');
+            }
+            
+            // Show the selected tab content
+            const tabContent = document.getElementById(`${tab}-tab`);
+            if (tabContent) {
+                tabContent.classList.add('active');
+            }
+            
+            // Close sidebar on mobile after selection
+            if (window.innerWidth <= 768) {
+                document.getElementById('sidebar').classList.remove('open');
+            }
             
             // Update history tab when switching to it
             if (tab === 'history' && WorkspaceState.historyManager) {
@@ -11551,7 +12786,75 @@
                 window.directoryManager.updateFileSelector();
                 window.directoryManager.updateUI();
             }
+            
+            // Update theme dropdown when switching to settings
+            if (tab === 'settings') {
+                const currentTheme = document.body.getAttribute('data-theme') || 'dark';
+                const themeSelect = document.getElementById('themeSelect');
+                if (themeSelect) {
+                    themeSelect.value = currentTheme;
+                }
+            }
         };
+
+        // Theme change function
+        window.changeTheme = function(theme) {
+            document.body.setAttribute('data-theme', theme);
+            localStorage.setItem('theme', theme);
+        };
+
+        // Sidebar toggle for mobile
+        window.toggleSidebar = function() {
+            const sidebar = document.getElementById('sidebar');
+            sidebar.classList.toggle('open');
+        };
+
+        // Sidebar collapse toggle for desktop
+        window.toggleSidebarCollapse = function() {
+            const sidebar = document.getElementById('sidebar');
+            const body = document.body;
+            const toggleBtn = document.getElementById('sidebarToggle');
+            
+            sidebar.classList.toggle('collapsed');
+            body.classList.toggle('sidebar-collapsed');
+            
+            // Update toggle button icon
+            toggleBtn.textContent = sidebar.classList.contains('collapsed') ? '▶' : '◀';
+            
+            // Save state to localStorage
+            localStorage.setItem('sidebarCollapsed', sidebar.classList.contains('collapsed'));
+        };
+
+        // Clear log function
+        window.clearLog = function() {
+            const logContainer = document.getElementById('systemLog');
+            if (logContainer) {
+                logContainer.innerHTML = '';
+                log('ログをクリアしました', 'info');
+            }
+        };
+
+        // Initialize theme on load
+        document.addEventListener('DOMContentLoaded', function() {
+            const savedTheme = localStorage.getItem('theme') || 'dark';
+            document.body.setAttribute('data-theme', savedTheme);
+            
+            // Set theme dropdown value when settings tab is shown
+            const themeSelect = document.getElementById('themeSelect');
+            if (themeSelect) {
+                themeSelect.value = savedTheme;
+            }
+            
+            // Restore sidebar collapsed state
+            const sidebarCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+            if (sidebarCollapsed && window.innerWidth > 768) {
+                const sidebar = document.getElementById('sidebar');
+                const toggleBtn = document.getElementById('sidebarToggle');
+                sidebar.classList.add('collapsed');
+                document.body.classList.add('sidebar-collapsed');
+                toggleBtn.textContent = '▶';
+            }
+        });
         
         // Connection test function (moved from NETWORK & RPC FUNCTIONS)
         window.testConnection = async function() {
@@ -11712,6 +13015,219 @@
                 uploadingFile: FileState.isUploadingFile, // v5.5.34: Using FileState
                 monitoredTx: NetworkState.ws.monitoredTransactions.size
             };
+        };
+        
+        // ===== v5.9.0: Status Tab Functions =====
+        // Wallet connection handler
+        window.connectWallet = async function() {
+            const privateKey = document.getElementById('walletPrivateKey').value;
+            if (!privateKey) {
+                alert('秘密鍵を入力してください');
+                return;
+            }
+            
+            try {
+                // Set the private key
+                UserState.privateKey = privateKey;
+                
+                // Initialize wallet with SDK
+                if (!NetworkState.kaspa) {
+                    throw new Error('Kaspa SDK not initialized');
+                }
+                
+                // Create wallet from private key
+                const publicKey = await NetworkState.kaspa.derivePublicKey(privateKey);
+                const address = await NetworkState.kaspa.publicKeyToAddress(publicKey, config.network);
+                UserState.address = address;
+                
+                // Update UI
+                document.getElementById('walletAddress').textContent = address;
+                
+                // Get balance
+                if (NetworkState.rpcClient) {
+                    const balanceResponse = await NetworkState.rpcClient.getBalanceByAddress(address);
+                    const balance = balanceResponse.balance / 100000000; // Convert from sompi to KAS
+                    document.getElementById('walletBalance').textContent = `${balance.toFixed(8)} KAS`;
+                }
+                
+                log(`[Wallet] Connected: ${address}`, 'success');
+            } catch (error) {
+                log(`[Wallet] Connection error: ${error.message}`, 'error');
+                alert(`Wallet接続エラー: ${error.message}`);
+            }
+        };
+        
+        // ===== v5.9.0: File Tab Functions =====
+        // Add file dialog handler
+        window.addFile = async function() {
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.placeholder = 'TxID:BlockID:Pass または .kaspa ファイルURL';
+            
+            const dialog = document.createElement('div');
+            dialog.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--bg-secondary);padding:20px;border-radius:8px;z-index:1000';
+            dialog.innerHTML = `
+                <h3>ファイルを追加</h3>
+                <p>ダウンロード情報を入力してください:</p>
+                ${input.outerHTML}
+                <div style="margin-top:10px">
+                    <button onclick="this.parentElement.parentElement.remove()">キャンセル</button>
+                    <button onclick="addFileToList(this.parentElement.previousElementSibling.value);this.parentElement.parentElement.remove()">追加</button>
+                </div>
+            `;
+            document.body.appendChild(dialog);
+        };
+        
+        // Add file to list
+        window.addFileToList = function(info) {
+            if (!info) return;
+            
+            // Parse the info
+            const parts = info.split(':');
+            let fileInfo = {
+                id: Date.now().toString(),
+                type: 'file',
+                name: 'Unknown',
+                size: '-',
+                cid: '-',
+                metaTxId: '-',
+                uploader: '-',
+                uploadDate: '-',
+                addedDate: new Date().toLocaleDateString('ja-JP')
+            };
+            
+            if (info.endsWith('.kaspa')) {
+                // .kaspa file
+                fileInfo.name = info.split('/').pop().replace('.kaspa', '');
+                fileInfo.cid = 'Qm' + fileInfo.name;
+            } else if (parts.length >= 2) {
+                // TxID:BlockID format
+                fileInfo.metaTxId = parts[0];
+                fileInfo.name = `File_${parts[0].substring(0, 8)}`;
+            }
+            
+            // Add to FileState
+            FileState.fileList.push(fileInfo);
+            
+            // Update UI
+            updateFileListUI();
+            log(`[File] Added to list: ${fileInfo.name}`, 'info');
+        };
+        
+        // Update file list UI
+        window.updateFileListUI = function() {
+            const tbody = document.getElementById('fileListBody');
+            if (!tbody) return;
+            
+            tbody.innerHTML = FileState.fileList.map(file => `
+                <tr data-file-id="${file.id}">
+                    <td><input type="checkbox" class="file-checkbox" data-id="${file.id}" onchange="updateFileActions()"></td>
+                    <td><span class="file-icon">${file.type === 'folder' ? '📁' : '📄'}</span></td>
+                    <td>${file.name}</td>
+                    <td>${file.size}</td>
+                    <td class="hide-mobile">${file.cid}</td>
+                    <td class="hide-mobile">${file.metaTxId}</td>
+                    <td class="hide-mobile">${file.uploader}</td>
+                    <td>${file.uploadDate}</td>
+                    <td class="hide-mobile">${file.addedDate}</td>
+                </tr>
+            `).join('');
+        };
+        
+        // Toggle select all files
+        window.toggleSelectAll = function() {
+            const selectAll = document.getElementById('selectAll');
+            const checkboxes = document.querySelectorAll('.file-checkbox');
+            
+            checkboxes.forEach(cb => {
+                cb.checked = selectAll.checked;
+                const fileId = cb.getAttribute('data-id');
+                if (selectAll.checked) {
+                    FileState.selectedFiles.add(fileId);
+                } else {
+                    FileState.selectedFiles.delete(fileId);
+                }
+            });
+            
+            updateFileActions();
+        };
+        
+        // Update file actions bar visibility
+        window.updateFileActions = function() {
+            const selected = document.querySelectorAll('.file-checkbox:checked').length;
+            const fileActions = document.getElementById('fileActions');
+            
+            if (fileActions) {
+                if (selected > 0) {
+                    fileActions.classList.add('show');
+                } else {
+                    fileActions.classList.remove('show');
+                }
+            }
+            
+            // Update selected files set
+            FileState.selectedFiles.clear();
+            document.querySelectorAll('.file-checkbox:checked').forEach(cb => {
+                FileState.selectedFiles.add(cb.getAttribute('data-id'));
+            });
+        };
+        
+        // Download selected files
+        window.downloadSelected = async function() {
+            const selectedIds = Array.from(FileState.selectedFiles);
+            if (selectedIds.length === 0) return;
+            
+            log(`[File] Downloading ${selectedIds.length} files...`, 'info');
+            
+            for (const id of selectedIds) {
+                const file = FileState.fileList.find(f => f.id === id);
+                if (file && file.metaTxId !== '-') {
+                    // TODO: Implement actual download logic
+                    log(`[File] Would download: ${file.name}`, 'info');
+                }
+            }
+        };
+        
+        // Delete selected files from list
+        window.deleteSelected = function() {
+            const selectedIds = Array.from(FileState.selectedFiles);
+            if (selectedIds.length === 0) return;
+            
+            if (confirm(`${selectedIds.length}個のファイルをリストから削除しますか？`)) {
+                FileState.fileList = FileState.fileList.filter(f => !selectedIds.includes(f.id));
+                FileState.selectedFiles.clear();
+                updateFileListUI();
+                updateFileActions();
+                log(`[File] Deleted ${selectedIds.length} files from list`, 'info');
+            }
+        };
+        
+        // Share selected files
+        window.shareSelected = function() {
+            const selectedIds = Array.from(FileState.selectedFiles);
+            if (selectedIds.length === 0) return;
+            
+            // TODO: Implement share menu dropdown
+            log('[File] Share menu not yet implemented', 'warning');
+        };
+        
+        // Rename selected file
+        window.renameSelected = function() {
+            const selectedIds = Array.from(FileState.selectedFiles);
+            if (selectedIds.length !== 1) {
+                alert('リネームは1つのファイルのみ選択してください');
+                return;
+            }
+            
+            const file = FileState.fileList.find(f => f.id === selectedIds[0]);
+            if (!file) return;
+            
+            const newName = prompt('新しいファイル名を入力:', file.name);
+            if (newName && newName !== file.name) {
+                file.name = newName;
+                updateFileListUI();
+                log(`[File] Renamed to: ${newName}`, 'info');
+            }
         };
         
         // Initialize event handlers

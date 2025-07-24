@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.10.4 - ディレクトリCID対応版</title>
+    <title>Kaspa P2P File Storage v5.10.5 - 完全仕様準拠版</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -7191,14 +7191,15 @@
                         
                         if (fileResult.success) {
                             uploadedFiles.push({
-                                name: relativePath.split('/').pop(),
+                                name: file.name,  // v5.10.5: Use original filename instead of path
                                 path: relativePath,
                                 type: 'file',
                                 metaTxId: fileResult.metaTxId || fileResult.chunks[0].txid,
                                 blockId: fileResult.metaTxBlockId || fileResult.chunks[0].blockId,
                                 size: file.size,
-                                chunks: fileResult.chunks.length,
-                                cost: fileResult.cost
+                                cid: useRandomCid ? null : cidInfo.full,  // v5.10.5: Add CID field
+                                password: individualPassword || null  // v5.10.5: Add password field
+                                // v5.10.5: Removed chunks and cost fields (not in spec)
                             });
                             totalCost += fileResult.cost;
                             log(`✅ アップロード完了: ${relativePath}`, 'success');
@@ -7358,9 +7359,8 @@
                     name: dirName,
                     totalSize: uploadedFiles.reduce((sum, f) => sum + f.size, 0),
                     fileCount: uploadedFiles.length,
-                    directoryCount: new Set(uploadedFiles.map(f => f.path.split('/').slice(0, -1).join('/'))).size,
-                    merkleRoot: merkleRoot
-                },
+                    directoryCount: new Set(uploadedFiles.map(f => f.path.split('/').slice(0, -1).join('/'))).size
+                    // v5.10.5: merkleRoot moved to extensions
                 
                 // v5.10.4: Add CID field (v3.3.0 specification)
                 cid: directoryCID.full,
@@ -7380,12 +7380,22 @@
                     metaTxBlockId: null,
                     uploadDate: new Date().toISOString(),
                     blockTime: null,
+                    payloadSplit: false,  // v5.10.5: Added missing field
+                    segmentBoundaries: []  // v5.10.5: Added missing field
                 },
                 
                 auth: {
                     passwordIncluded: false,
                     password: null,
                     warning: null
+                },
+                
+                // v5.10.5: Add extensions field for future compatibility
+                extensions: {
+                    v4_5_6_compat: true,
+                    custom: {
+                        merkleRoot: merkleRoot  // Moved from directory for spec compliance
+                    }
                 }
             };
             
@@ -12276,12 +12286,14 @@
                     }
                     
                     selectedFiles.push({
-                        name: item.fileName || item.name,
-                        path: item.fileName || item.name,
+                        name: item.originalFileName || item.fileName || item.name,  // v5.10.5: Use original filename
+                        path: item.originalFileName || item.fileName || item.name,
                         type: 'file',
                         metaTxId: metaTxId || '',
                         blockId: blockId || (item.chunkBlockIds && item.chunkBlockIds[0]) || '',
-                        size: item.fileSize || item.totalSize || 0
+                        size: item.fileSize || item.totalSize || 0,
+                        cid: item.cidFull || item.cid || null,  // v5.10.5: Include CID if available
+                        password: item.password || null  // v5.10.5: Include password if available
                     });
                 }
             }
@@ -12387,12 +12399,14 @@
                     }
                     
                     selectedFiles.push({
-                        name: item.fileName || item.name,
-                        path: item.fileName || item.name,
+                        name: item.originalFileName || item.fileName || item.name,  // v5.10.5: Use original filename
+                        path: item.originalFileName || item.fileName || item.name,
                         type: 'file',
                         metaTxId: metaTxId || '',
                         blockId: blockId || (item.chunkBlockIds && item.chunkBlockIds[0]) || '',
-                        size: item.fileSize || item.totalSize || 0
+                        size: item.fileSize || item.totalSize || 0,
+                        cid: item.cidFull || item.cid || null,  // v5.10.5: Include CID if available
+                        password: item.password || null  // v5.10.5: Include password if available
                     });
                 }
             }
@@ -13633,4 +13647,4 @@
         });
     </script>
 </body>
-</html><!-- Force GitHub Pages update: Wed Jul 24 2025 - v5.10.0: Rename chunkBoundaries to segmentBoundaries for clarity -->
+</html><!-- Force GitHub Pages update: Wed Jul 24 2025 - v5.10.5: Full v3.3.0 spec compliance with CID/password fields -->

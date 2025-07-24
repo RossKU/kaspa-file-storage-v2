@@ -7361,6 +7361,7 @@
                     fileCount: uploadedFiles.length,
                     directoryCount: new Set(uploadedFiles.map(f => f.path.split('/').slice(0, -1).join('/'))).size
                     // v5.10.5: merkleRoot moved to extensions
+                },
                 
                 // v5.10.4: Add CID field (v3.3.0 specification)
                 cid: directoryCID.full,
@@ -13638,7 +13639,9 @@
             }
             
             // Initialize parallel download setting
-            window.loadParallelSetting();
+            if (typeof window.loadParallelSetting === 'function') {
+                window.loadParallelSetting();
+            }
             
             // Log archive node feature availability
             log(`[システム] アーカイブノード接続機能が利用可能です`, 'info');

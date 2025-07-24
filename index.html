@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.10.7 - v3.4.0メタトランザクション対応版</title>
+    <title>Kaspa P2P File Storage v5.10.8 - ディレクトリエントリー対応版</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -10231,9 +10231,20 @@
                     fileListHtml += '<div style="max-height: 300px; overflow-y: auto; border: 1px solid #333; padding: 10px; margin-top: 10px;">';
                     
                     dirMetadata.entries.forEach((entry, index) => {
-                        log(`エントリ${index}: ${entry.name}, MetaTxID: ${entry.metaTxId ? '有' : '無'}`, 'debug');
+                        log(`エントリ${index}: ${entry.name}, Type: ${entry.type}, MetaTxID: ${entry.metaTxId ? '有' : '無'}`, 'debug');
                         const icon = entry.type === 'directory' ? '📁' : '📄';
-                        const size = entry.size ? `${(entry.size/1024).toFixed(1)}KB` : '-';
+                        
+                        // v5.10.8: ディレクトリエントリーのサイズ表示対応
+                        let sizeDisplay = '-';
+                        if (entry.type === 'directory') {
+                            const fileCount = entry.fileCount || 0;
+                            const dirCount = entry.directoryCount || 0;
+                            const totalSize = entry.totalSize || 0;
+                            sizeDisplay = `${fileCount}ファイル, ${dirCount}ディレクトリ, ${(totalSize/1024/1024).toFixed(1)}MB`;
+                        } else {
+                            sizeDisplay = entry.size ? `${(entry.size/1024).toFixed(1)}KB` : '-';
+                        }
+                        
                         const hasMetaTx = entry.metaTxId ? '✅' : '❌';
                         
                         const borderStyle = index === dirMetadata.entries.length - 1 ? 'border-bottom: none;' : '';
@@ -10278,7 +10289,7 @@
                         fileListHtml += '<span>' + icon + ' ' + (entry.path || entry.name) + '</span>';
                         // v4.6.29: rightSpanをプレースホルダーIDで一時的に置き換え
                         const placeholderId = `buttons_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-                        const rightSpan = `<span style="font-size: 12px; color: #999;">${size} | MetaTx: ${hasMetaTx} <span id="${placeholderId}"></span></span>`;
+                        const rightSpan = `<span style="font-size: 12px; color: #999;">${sizeDisplay} | MetaTx: ${hasMetaTx} <span id="${placeholderId}"></span></span>`;
                         fileListHtml += rightSpan;
                         
                         // ボタンコンテナを後で挿入するために保存（buttonsContainerが存在する場合のみ）
@@ -10390,6 +10401,44 @@
                 
                 // v4.6.33: ディレクトリタイプでもダウンロードセクションを表示
                 document.getElementById('downloadSection').style.display = 'block';
+                
+                // v5.10.8: Add entries to FileState for File tab display
+                if (dirMetadata.entries && dirMetadata.entries.length > 0) {
+                    // Clear existing file list
+                    FileState.fileList = [];
+                    
+                    dirMetadata.entries.forEach((entry) => {
+                        const fileItem = {
+                            id: `${entry.type}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                            type: entry.type || 'file',
+                            name: entry.name,
+                            path: entry.path || '',
+                            cid: entry.cid || '-',
+                            metaTxId: entry.metaTxId || '-',
+                            blockId: entry.blockId || '-',
+                            password: entry.password || dirMetadata.auth?.password || null
+                        };
+                        
+                        if (entry.type === 'directory') {
+                            // Add directory-specific fields
+                            fileItem.fileCount = entry.fileCount || 0;
+                            fileItem.directoryCount = entry.directoryCount || 0;
+                            fileItem.totalSize = entry.totalSize || 0;
+                        } else {
+                            // Add file-specific fields
+                            fileItem.size = entry.size || 0;
+                        }
+                        
+                        FileState.fileList.push(fileItem);
+                    });
+                    
+                    // Update File tab UI
+                    if (window.updateFileListUI) {
+                        window.updateFileListUI();
+                    }
+                    
+                    log(`[File] Added ${dirMetadata.entries.length} entries to File tab`, 'info');
+                }
                 
                 log('ディレクトリ情報の表示完了', 'success');
                 
@@ -13282,22 +13331,105 @@
         // ===== v5.9.0: File Tab Functions =====
         // Add file dialog handler
         window.addFile = async function() {
-            const input = document.createElement('input');
-            input.type = 'text';
-            input.placeholder = 'TxID:BlockID:Pass または .kaspa ファイルURL';
-            
             const dialog = document.createElement('div');
-            dialog.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--bg-secondary);padding:20px;border-radius:8px;z-index:1000';
+            dialog.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--bg-secondary);padding:20px;border-radius:8px;z-index:1000;width:450px';
             dialog.innerHTML = `
-                <h3>ファイルを追加</h3>
-                <p>ダウンロード情報を入力してください:</p>
-                ${input.outerHTML}
-                <div style="margin-top:10px">
+                <h3>エントリーを追加</h3>
+                <div style="margin-bottom:15px">
+                    <label style="display:block;margin-bottom:5px">タイプ:</label>
+                    <select id="addEntryType" onchange="updateAddEntryForm()" style="width:100%;padding:8px">
+                        <option value="file">📄 ファイル</option>
+                        <option value="directory">📁 ディレクトリ</option>
+                    </select>
+                </div>
+                <div id="fileEntryForm">
+                    <label style="display:block;margin-bottom:5px">ダウンロード情報:</label>
+                    <input id="addEntryInfo" type="text" style="width:100%;padding:8px;margin-bottom:10px" 
+                           placeholder="TxID:BlockID:Pass または .kaspa ファイルURL">
+                </div>
+                <div id="directoryEntryForm" style="display:none">
+                    <label style="display:block;margin-bottom:5px">ディレクトリ名:</label>
+                    <input id="addDirName" type="text" style="width:100%;padding:8px;margin-bottom:10px" 
+                           placeholder="ディレクトリ名">
+                    <label style="display:block;margin-bottom:5px">ディレクトリメタデータ (オプション):</label>
+                    <input id="addDirMeta" type="text" style="width:100%;padding:8px;margin-bottom:10px" 
+                           placeholder="TxID:BlockID:Pass (空の場合は空ディレクトリ)">
+                </div>
+                <div style="margin-top:15px;text-align:right">
                     <button onclick="this.parentElement.parentElement.remove()">キャンセル</button>
-                    <button onclick="addFileToList(this.parentElement.previousElementSibling.value);this.parentElement.parentElement.remove()">追加</button>
+                    <button onclick="addEntryToList();this.parentElement.parentElement.remove()" style="margin-left:10px">追加</button>
                 </div>
             `;
             document.body.appendChild(dialog);
+        };
+        
+        // v5.10.8: Update form based on entry type
+        window.updateAddEntryForm = function() {
+            const type = document.getElementById('addEntryType').value;
+            const fileForm = document.getElementById('fileEntryForm');
+            const dirForm = document.getElementById('directoryEntryForm');
+            
+            if (type === 'directory') {
+                fileForm.style.display = 'none';
+                dirForm.style.display = 'block';
+            } else {
+                fileForm.style.display = 'block';
+                dirForm.style.display = 'none';
+            }
+        };
+        
+        // v5.10.8: Add entry to list (file or directory)
+        window.addEntryToList = function() {
+            const type = document.getElementById('addEntryType').value;
+            
+            if (type === 'file') {
+                const info = document.getElementById('addEntryInfo').value;
+                addFileToList(info);
+            } else {
+                // Add directory entry
+                const dirName = document.getElementById('addDirName').value;
+                const dirMeta = document.getElementById('addDirMeta').value;
+                
+                if (!dirName) {
+                    log('[File] ディレクトリ名を入力してください', 'error');
+                    return;
+                }
+                
+                const dirEntry = {
+                    id: `dir_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                    type: 'directory',
+                    name: dirName,
+                    path: '',
+                    fileCount: 0,
+                    directoryCount: 0,
+                    totalSize: 0,
+                    cid: '-',
+                    metaTxId: '-',
+                    blockId: '-',
+                    password: null,
+                    uploadDate: '-',
+                    addedDate: new Date().toLocaleDateString('ja-JP')
+                };
+                
+                // Parse directory metadata if provided
+                if (dirMeta) {
+                    const parts = dirMeta.split(':');
+                    if (parts.length >= 2) {
+                        dirEntry.metaTxId = parts[0];
+                        dirEntry.blockId = parts[1] || '-';
+                        if (parts[2]) {
+                            dirEntry.password = parts[2];
+                        }
+                        // Mark as downloadable
+                        dirEntry.downloadable = true;
+                    }
+                }
+                
+                // Add to FileState
+                FileState.fileList.push(dirEntry);
+                updateFileListUI();
+                log(`[File] Added directory to list: ${dirName}`, 'info');
+            }
         };
         
         // Add file to list
@@ -13348,19 +13480,34 @@
             const tbody = document.getElementById('fileListBody');
             if (!tbody) return;
             
-            tbody.innerHTML = FileState.fileList.map(file => `
-                <tr data-file-id="${file.id}">
-                    <td><input type="checkbox" class="file-checkbox" data-id="${file.id}" onchange="updateFileActions()"></td>
-                    <td><span class="file-icon">${file.type === 'folder' ? '📁' : '📄'}</span></td>
-                    <td>${file.name}</td>
-                    <td>${file.size}</td>
-                    <td class="hide-mobile">${file.cid}</td>
-                    <td class="hide-mobile">${file.metaTxId}</td>
-                    <td class="hide-mobile">${file.uploader}</td>
-                    <td>${file.uploadDate}</td>
-                    <td class="hide-mobile">${file.addedDate}</td>
-                </tr>
-            `).join('');
+            tbody.innerHTML = FileState.fileList.map(file => {
+                // v5.10.8: Support directory entries
+                const icon = file.type === 'directory' ? '📁' : '📄';
+                let sizeDisplay = '-';
+                
+                if (file.type === 'directory') {
+                    const fileCount = file.fileCount || 0;
+                    const dirCount = file.directoryCount || 0;
+                    const totalSize = file.totalSize || 0;
+                    sizeDisplay = `${fileCount}ファイル, ${dirCount}ディレクトリ, ${(totalSize/1024/1024).toFixed(1)}MB`;
+                } else {
+                    sizeDisplay = file.size ? `${(file.size/1024).toFixed(1)}KB` : '-';
+                }
+                
+                return `
+                    <tr data-file-id="${file.id}">
+                        <td><input type="checkbox" class="file-checkbox" data-id="${file.id}" onchange="updateFileActions()"></td>
+                        <td><span class="file-icon">${icon}</span></td>
+                        <td>${file.name}</td>
+                        <td>${sizeDisplay}</td>
+                        <td class="hide-mobile">${file.cid}</td>
+                        <td class="hide-mobile">${file.metaTxId}</td>
+                        <td class="hide-mobile">${file.uploader || '-'}</td>
+                        <td>${file.uploadDate || '-'}</td>
+                        <td class="hide-mobile">${file.addedDate || '-'}</td>
+                    </tr>
+                `;
+            }).join('');
         };
         
         // Toggle select all files
@@ -13395,13 +13542,29 @@
             const selectedIds = Array.from(FileState.selectedFiles);
             if (selectedIds.length === 0) return;
             
-            log(`[File] Downloading ${selectedIds.length} files...`, 'info');
+            log(`[File] Downloading ${selectedIds.length} items...`, 'info');
             
             for (const id of selectedIds) {
-                const file = FileState.fileList.find(f => f.id === id);
-                if (file && file.metaTxId !== '-') {
-                    // TODO: Implement actual download logic
-                    log(`[File] Would download: ${file.name}`, 'info');
+                const item = FileState.fileList.find(f => f.id === id);
+                if (item && item.metaTxId !== '-') {
+                    try {
+                        // v5.10.8: Support directory downloads
+                        if (item.type === 'directory') {
+                            log(`[File] Downloading directory: ${item.name}`, 'info');
+                            // Set download info and trigger download
+                            const info = `${item.metaTxId}:${item.blockId}:${item.password || ''}`;
+                            document.getElementById('downloadInfo').value = info;
+                            await downloadFileWithRetry();
+                        } else {
+                            log(`[File] Downloading file: ${item.name}`, 'info');
+                            // Set download info and trigger download
+                            const info = `${item.metaTxId}:${item.blockId}:${item.password || ''}`;
+                            document.getElementById('downloadInfo').value = info;
+                            await downloadFileWithRetry();
+                        }
+                    } catch (error) {
+                        log(`[File] Download error for ${item.name}: ${error.message}`, 'error');
+                    }
                 }
             }
         };

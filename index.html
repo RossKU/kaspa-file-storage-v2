@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.10.3 - SuperMeta軽量化版</title>
+    <title>Kaspa P2P File Storage v5.10.4 - ディレクトリCID対応版</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -7278,6 +7278,47 @@
             }
         };
         
+        // v5.10.4: Generate directory CID according to v3.3.0 specification
+        async function generateDirectoryCID(uploadedFiles) {
+            // 1. Extract (metaTxId, directoryPath) pairs from all entries
+            const pairs = uploadedFiles.map(file => {
+                // 2. Remove filename from path (use directory path only)
+                const pathParts = file.path.split('/');
+                pathParts.pop(); // Remove filename
+                const dirPath = pathParts.join('/') || '.'; // Root directory as '.'
+                
+                return `${file.metaTxId}:${dirPath}`;
+            });
+            
+            // 3. Sort lexicographically (case-sensitive)
+            pairs.sort();
+            
+            // 4. Remove duplicates
+            const uniquePairs = [...new Set(pairs)];
+            
+            // 5. Join with newline character
+            const concatenated = uniquePairs.join('\n');
+            
+            // 6. UTF-8 encode
+            const encoder = new TextEncoder();
+            const bytes = encoder.encode(concatenated);
+            
+            // 7. Calculate SHA-256 hash
+            const hash = await crypto.subtle.digest('SHA-256', bytes);
+            const hashArray = new Uint8Array(hash);
+            
+            // 8. Base64 URL-safe encode (remove +, /, =)
+            const base64 = btoa(String.fromCharCode(...hashArray))
+                .replace(/\+/g, '-')
+                .replace(/\//g, '_')
+                .replace(/=/g, '');
+            
+            return {
+                full: base64,              // Full CID for metadata
+                display: base64.slice(0, 8) // Short version for display (8 chars)
+            };
+        }
+        
         // Create directory metadata in .kaspa format
         async function createDirectoryMetadata(dirName, uploadedFiles, password) {
             // Calculate merkle root of entries
@@ -7294,9 +7335,12 @@
             const saltHash = await sha256(saltData);
             const salt = new Uint8Array(saltHash.match(/.{2}/g).map(byte => parseInt(byte, 16))).slice(0, 16);
             
+            // v5.10.4: Generate directory CID according to v3.3.0 specification
+            const directoryCID = await generateDirectoryCID(uploadedFiles);
+            
             const metadata = {
                 type: 'kaspa-directory',
-                version: '3.1.1',
+                version: '3.3',  // v5.10.4: Updated to v3.3.0 specification
                 created: new Date().toISOString(),
                 network: config.network,
                 
@@ -7317,6 +7361,9 @@
                     directoryCount: new Set(uploadedFiles.map(f => f.path.split('/').slice(0, -1).join('/'))).size,
                     merkleRoot: merkleRoot
                 },
+                
+                // v5.10.4: Add CID field (v3.3.0 specification)
+                cid: directoryCID.full,
                 
                 entries: uploadedFiles,
                 

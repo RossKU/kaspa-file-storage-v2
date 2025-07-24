@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.10.1 - TypeError修正版</title>
+    <title>Kaspa P2P File Storage v5.10.2 - SuperMeta最適化版</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -9537,6 +9537,7 @@
                         type: 'super',
                         txid: superMeta.txId,
                         blockId: superMeta.blockId,
+                        blockTime: superMeta.blockTime,
                         reference: superMeta.blockId ? `${superMeta.txId}:${superMeta.blockId}` : superMeta.txId,
                         createdAt: Date.now(),
                         singleMetaTxs: singleMetaTxs
@@ -10012,6 +10013,9 @@
                     encryption: fileMetadata.encryption,
                     file: fileMetadata.file,
                     
+                    // v5.10.2: Add CID field to super metadata
+                    cid: fileMetadata.cid || null,
+                    
                     // chunks array contains intermediate meta-tx IDs
                     chunks: singleMetaTxs.map(m => m.txId),
                     chunkBlockIds: singleMetaTxs.map(m => m.blockId || ''),
@@ -10033,7 +10037,12 @@
                         },
                         // SuperMetaにはチャンクバウンダリを含めない（容量制限のため）
                         // 各中間メタデータが管轄するチャンクのバウンダリを保持
-                        payloadSplit: fileMetadata.metadata?.payloadSplit || false
+                        payloadSplit: fileMetadata.metadata?.payloadSplit || false,
+                        
+                        // v5.10.2: Add upload information to super metadata
+                        uploadedBy: UserState.address?.toString() || null,
+                        uploadDate: new Date().toISOString(),
+                        blockTime: null  // Will be set when block is confirmed
                     }
                 };
                 
@@ -10096,6 +10105,7 @@
                 await new Promise(resolve => setTimeout(resolve, 2000));
                 
                 let superMetaBlockId = null;
+                let superMetaBlockTime = null;
                 let waitTime = 0;
                 while (!superMetaBlockId && waitTime < 30000) {
                     // Phase 0-O-2: Check both ConnectionManager and WebSocket status
@@ -10108,7 +10118,11 @@
                         const monitorData = NetworkState.ws.monitoredTransactions.get(superMetaTxId);
                         if (monitorData.blockId) {
                             superMetaBlockId = monitorData.blockId;
+                            superMetaBlockTime = monitorData.blockTime || null;
                             log(`[SuperMeta] スーパーメタBlockID取得: ${superMetaBlockId.substring(0, 16)}...`, 'success');
+                            if (superMetaBlockTime) {
+                                log(`[SuperMeta] スーパーメタBlockTime取得: ${superMetaBlockTime.toISOString()}`, 'debug');
+                            }
                             break;
                         }
                     }
@@ -10123,6 +10137,7 @@
                 return {
                     txId: superMetaTxId,
                     blockId: superMetaBlockId,
+                    blockTime: superMetaBlockTime,
                     type: 'super',
                     metaCount: singleMetaTxs.length
                 };
@@ -11117,7 +11132,7 @@
                                 },
                                 // Merge metadata with payloadSplit flag
                                 metadata: {
-                                    ...metaData.metadata,
+                                    ...metaData.metadata,  // v5.10.2: includes uploadedBy, uploadDate, blockTime from super meta
                                     payloadSplit: payloadSplitFlag,
                                     // セグメントバウンダリは階層的に管理（中間メタデータから収集）
                                     ...(allChunkBoundaries.length > 0 ? { segmentBoundaries: allChunkBoundaries } : {})

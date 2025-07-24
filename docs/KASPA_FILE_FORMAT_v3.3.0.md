@@ -11,6 +11,18 @@ Kaspaブロックチェーンを利用した分散型ファイルストレージ
 - **作成日**: 2025-07-07
 - **更新日**: 2025-07-21
 
+## 用語定義
+
+### チャンク (Chunk)
+- 暗号化・転送の基本単位（22KB）
+- ブロックチェーン上の1トランザクションに対応
+- ペイロードとも呼ばれる
+
+### セグメント (Segment)
+- 圧縮・復号化の処理単位（1MB）
+- 複数のチャンクを含む大きな単位
+- payloadSplitモードで効率的な処理を実現
+
 ## ファイルタイプ定義
 
 ### 1. ファイルタイプ (`kaspa-file`)
@@ -98,14 +110,14 @@ Kaspaブロックチェーンを利用した分散型ファイルストレージ
         blockTime: "2025-01-07T12:34:57Z",  // [必須] ブロック確定時刻
         uploader: "kaspatest:qqk8...", // [オプション] アップローダーアドレス
         payloadSplit: false,          // [オプション] ペイロード分割最適化フラグ
-        chunkBoundaries: [            // [オプション] 可変チャンクサイズ対応の境界情報
+        segmentBoundaries: [          // [オプション] セグメント（1MB圧縮単位）の境界情報
             {
-                index: 0,             // チャンクインデックス
+                index: 0,             // セグメントインデックス
                 offset: 0,            // オフセット位置
                 size: 12288,          // 暗号化後サイズ
                 originalSize: 10000,  // 元のサイズ
                 compressedSize: 8000, // 圧縮後サイズ
-                payloadIndex: 0       // ペイロードインデックス
+                payloadIndex: 0       // 開始チャンク（ペイロード）インデックス
             },
             // ...
         ]
@@ -197,7 +209,7 @@ Kaspaブロックチェーンを利用した分散型ファイルストレージ
         uploadDate: "2025-01-07T12:34:56Z",
         blockTime: "2025-01-07T12:34:57Z",
         payloadSplit: false,          // [オプション] ペイロード分割最適化フラグ
-        chunkBoundaries: []           // [オプション] ディレクトリでは通常空配列
+        segmentBoundaries: []         // [オプション] ディレクトリでは通常空配列
     },
     
     // === 認証情報（ファイルと共通） ===
@@ -272,7 +284,7 @@ Kaspaブロックチェーンを利用した分散型ファイルストレージ
         uploadDate: "2025-01-07T12:34:56Z",
         blockTime: "",               // 未完了のため空
         payloadSplit: false,
-        chunkBoundaries: []
+        segmentBoundaries: []
     },
     
     // === 進捗情報（.kprogressファイル専用） ===
@@ -364,9 +376,10 @@ MetaTxIDは以下の形式をサポート：
    - true: ペイロード分割が有効
    - false: 通常のチャンク分割
 
-5. **metadata.chunkBoundaries**: 可変チャンクサイズ対応（v3.3追加）
-   - 各チャンクの境界情報を記録
+5. **metadata.segmentBoundaries**: セグメント境界情報（v3.3追加）
+   - 各セグメント（1MB圧縮単位）の境界情報を記録
    - 暗号化後の実際のサイズを保持
+   - payloadSplitモードでの効率的な復号化に使用
 
 6. **_progress**: 進捗情報（.kprogressファイル専用）
    - アップロード進捗の追跡と再開に使用
@@ -502,9 +515,9 @@ MetaTxIDは以下の形式をサポート：
    - アップロード完了時に_progressセクションを削除して.kaspaへ変換
    - 再開時は_progress.resume情報を使用
 
-6. **可変チャンクサイズの処理（v3.3）**
-   - payloadSplitがtrueの場合、chunkBoundaries情報を使用
-   - 各チャンクの実際のサイズとオフセットを考慮した復号化
+6. **セグメント単位の処理（v3.3）**
+   - payloadSplitがtrueの場合、segmentBoundaries情報を使用
+   - 各セグメント（1MB圧縮単位）の実際のサイズとオフセットを考慮した復号化
 
 7. **階層的メタデータの処理**
    - チャンク数に応じて自動的に構造を決定
@@ -574,7 +587,7 @@ MetaTxIDは以下の形式をサポート：
 - **バージョンの不整合**: 実装ではversion: '3.1.1'がハードコード、ドキュメントではv3.3
 - **CIDフィールドの欠落**: ディレクトリメタデータにCIDが含まれていない
 - **CID計算ロジック**: DirectoryManagerは旧方式（JSON全体のハッシュ）を使用、新方式（metaTxId:path）未実装
-- **metadataフィールドの不完全性**: 実装ではpayloadSplitとchunkBoundariesフィールド（v3.3）が欠落
+- **metadataフィールドの不完全性**: 実装ではpayloadSplitとsegmentBoundariesフィールド（v3.3）が欠落
 - **個別パスワード管理**: entriesのpasswordフィールドが実装されていない
 
 

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.10.5 - 完全仕様準拠版</title>
+    <title>Kaspa P2P File Storage v5.10.6 - v3.4.0仕様対応版</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -7190,16 +7190,20 @@
                         const fileResult = await uploadFileChunks(file, password, fileProgressManager);
                         
                         if (fileResult.success) {
+                            // v5.10.6: Extract directory path from relative path
+                            const pathParts = relativePath.split('/');
+                            const fileName = pathParts.pop();
+                            const dirPath = pathParts.join('/');
+                            
                             uploadedFiles.push({
-                                name: file.name,  // v5.10.5: Use original filename instead of path
-                                path: relativePath,
+                                path: dirPath || '',  // v5.10.6: Directory path only (v3.4 spec)
                                 type: 'file',
+                                name: file.name,
+                                size: file.size,
+                                cid: useRandomCid ? null : cidInfo.full,  // Full CID
                                 metaTxId: fileResult.metaTxId || fileResult.chunks[0].txid,
                                 blockId: fileResult.metaTxBlockId || fileResult.chunks[0].blockId,
-                                size: file.size,
-                                cid: useRandomCid ? null : cidInfo.full,  // v5.10.5: Add CID field
-                                password: individualPassword || null  // v5.10.5: Add password field
-                                // v5.10.5: Removed chunks and cost fields (not in spec)
+                                password: individualPassword || null
                             });
                             totalCost += fileResult.cost;
                             log(`✅ アップロード完了: ${relativePath}`, 'success');
@@ -7341,7 +7345,7 @@
             
             const metadata = {
                 type: 'kaspa-directory',
-                version: '3.3',  // v5.10.4: Updated to v3.3.0 specification
+                version: '3.4',  // v5.10.6: Updated to v3.4.0 specification
                 created: new Date().toISOString(),
                 network: config.network,
                 
@@ -7359,7 +7363,7 @@
                     name: dirName,
                     totalSize: uploadedFiles.reduce((sum, f) => sum + f.size, 0),
                     fileCount: uploadedFiles.length,
-                    directoryCount: new Set(uploadedFiles.map(f => f.path.split('/').slice(0, -1).join('/'))).size
+                    directoryCount: new Set(uploadedFiles.map(f => f.path).filter(p => p !== '')).size
                     // v5.10.5: merkleRoot moved to extensions
                 },
                 
@@ -12287,14 +12291,14 @@
                     }
                     
                     selectedFiles.push({
-                        name: item.originalFileName || item.fileName || item.name,  // v5.10.5: Use original filename
-                        path: item.originalFileName || item.fileName || item.name,
+                        path: '',  // v5.10.6: Root directory for history files
                         type: 'file',
+                        name: item.originalFileName || item.fileName || item.name,
+                        size: item.fileSize || item.totalSize || 0,
+                        cid: item.cidFull || item.cid || null,
                         metaTxId: metaTxId || '',
                         blockId: blockId || (item.chunkBlockIds && item.chunkBlockIds[0]) || '',
-                        size: item.fileSize || item.totalSize || 0,
-                        cid: item.cidFull || item.cid || null,  // v5.10.5: Include CID if available
-                        password: item.password || null  // v5.10.5: Include password if available
+                        password: item.password || null
                     });
                 }
             }
@@ -12400,14 +12404,14 @@
                     }
                     
                     selectedFiles.push({
-                        name: item.originalFileName || item.fileName || item.name,  // v5.10.5: Use original filename
-                        path: item.originalFileName || item.fileName || item.name,
+                        path: '',  // v5.10.6: Root directory for history files
                         type: 'file',
+                        name: item.originalFileName || item.fileName || item.name,
+                        size: item.fileSize || item.totalSize || 0,
+                        cid: item.cidFull || item.cid || null,
                         metaTxId: metaTxId || '',
                         blockId: blockId || (item.chunkBlockIds && item.chunkBlockIds[0]) || '',
-                        size: item.fileSize || item.totalSize || 0,
-                        cid: item.cidFull || item.cid || null,  // v5.10.5: Include CID if available
-                        password: item.password || null  // v5.10.5: Include password if available
+                        password: item.password || null
                     });
                 }
             }
@@ -13648,4 +13652,4 @@
         });
     </script>
 </body>
-</html><!-- Force GitHub Pages update: Wed Jul 24 2025 - v5.10.5: Full v3.3.0 spec compliance with CID/password fields -->
+</html><!-- Force GitHub Pages update: Wed Jul 24 2025 - v5.10.6: v3.4.0 spec with directory-only paths and field reordering -->

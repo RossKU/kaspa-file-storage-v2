@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.10.2 - SuperMeta最適化版</title>
+    <title>Kaspa P2P File Storage v5.10.3 - SuperMeta軽量化版</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -10027,14 +10027,9 @@
                     },
                     
                     metadata: {
-                        hierarchy: {
-                            childMetadata: singleMetaTxs.map(m => ({
-                                index: m.groupIndex,
-                                range: m.chunkRange,
-                                txId: m.txId,
-                                blockId: m.blockId
-                            }))
-                        },
+                        // v5.10.3: Removed childMetadata to reduce redundancy
+                        // Child metadata TxIDs and BlockIDs are already in chunks/chunkBlockIds arrays
+                        
                         // SuperMetaにはチャンクバウンダリを含めない（容量制限のため）
                         // 各中間メタデータが管轄するチャンクのバウンダリを保持
                         payloadSplit: fileMetadata.metadata?.payloadSplit || false,

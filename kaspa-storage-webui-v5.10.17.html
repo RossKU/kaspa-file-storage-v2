@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.10.16 - サブディレクトリ作成機能復活版</title>
+    <title>Kaspa P2P File Storage v5.10.17 - ディレクトリビルダーUI改善版</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -1208,6 +1208,14 @@
                 display: none;
             }
         }
+        
+        /* Toggle Switch Styles */
+        .switch input:checked + span {
+            background-color: var(--accent-color);
+        }
+        .switch input:checked + span span {
+            transform: translateX(26px);
+        }
     </style>
 </head>
 <body data-theme="dark">
@@ -1727,25 +1735,29 @@
 
                 <!-- Tree View -->
                 <div style="margin-bottom: 15px;">
-                    <label>ディレクトリ構造:</label>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <label>ディレクトリ構造:</label>
+                        <!-- View Toggle Switch -->
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span style="font-size: 14px;">🌳</span>
+                            <label class="switch" style="display: inline-block; width: 50px; height: 24px; position: relative;">
+                                <input type="checkbox" id="view-toggle" onchange="DirectoryBuilderState.toggleView()" style="display: none;">
+                                <span style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--accent-color); transition: .4s; border-radius: 24px;">
+                                    <span style="position: absolute; content: ''; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%;"></span>
+                                </span>
+                            </label>
+                            <span style="font-size: 14px;">{ }</span>
+                        </div>
+                    </div>
                     <div id="dirbuilder-tree" style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 6px; padding: 12px; max-height: 400px; overflow-y: auto; font-family: monospace;">
                         <!-- Tree structure will be rendered here -->
                     </div>
+                    <pre id="dirbuilder-json-view" style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 6px; padding: 12px; max-height: 400px; overflow-y: auto; display: none;"></pre>
                 </div>
 
                 <!-- Metadata Preview -->
                 <div style="margin-bottom: 15px;">
                     <label>プレビュー:</label>
-                    
-                    <!-- Preview Tabs -->
-                    <div style="display: flex; gap: 10px; margin: 10px 0;">
-                        <button id="visual-preview-tab" class="button-small" style="background: var(--accent-color); color: white;" onclick="DirectoryBuilderState.showVisualPreview()">
-                            <span class="icon">👁️</span> ビジュアル
-                        </button>
-                        <button id="json-preview-tab" class="button-small" style="background: var(--bg-secondary);" onclick="DirectoryBuilderState.showJsonPreview()">
-                            <span class="icon">{ }</span> JSON
-                        </button>
-                    </div>
                     
                     <!-- Visual Preview -->
                     <div id="dirbuilder-visual-preview" style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px; max-height: 400px; overflow-y: auto;">
@@ -1762,13 +1774,6 @@
                             </div>
                         </div>
                         
-                        <!-- Entry List -->
-                        <div style="border-top: 1px solid var(--border-color); padding-top: 12px;">
-                            <h4 style="margin: 0 0 12px 0; font-size: 16px;">エントリー一覧</h4>
-                            <div id="visual-entry-list" style="display: flex; flex-direction: column; gap: 8px;">
-                                <!-- Entries will be added here -->
-                            </div>
-                        </div>
                     </div>
                     
                     <!-- JSON Preview -->
@@ -2659,7 +2664,8 @@
                             metaTxId: txId,
                             blockId: blockId,
                             cid: result.cid || null,
-                            password: password || null
+                            password: password || null,
+                            verified: true  // メタデータが取得できたので検証済み
                         };
                         this.entries.push(newEntry);
                         showStatus(`ファイル「${newEntry.name}」を追加しました`, 'success');
@@ -2676,7 +2682,8 @@
                             cid: result.cid || null,
                             fileCount: result.directory?.fileCount || 0,
                             totalSize: result.directory?.totalSize || 0,
-                            password: password || null
+                            password: password || null,
+                            verified: true  // メタデータが取得できたので検証済み
                         };
                         this.entries.push(newEntry);
                         showStatus(`ディレクトリ「${newEntry.name}」を追加しました`, 'success');
@@ -2775,8 +2782,7 @@
                 const tree = this.buildTreeStructure();
                 const container = document.getElementById('dirbuilder-tree');
                 
-                const renderNode = (node, level = 0) => {
-                    const indent = '  '.repeat(level);
+                const renderNode = (node, level = 0, isLast = true, parentPrefix = '') => {
                     const icon = node.type === 'root' ? '📁' : 
                                 node.type === 'directory' ? '📁' : 
                                 node.type === 'folder' ? '📁' : '📄';
@@ -2787,13 +2793,40 @@
                     let html = '';
                     
                     if (node.type !== 'root' || level === 0) {
-                        html += `<div style="padding: 2px; cursor: pointer; ${isSelected ? 'background: var(--accent-light);' : ''}" 
+                        // Calculate tree prefix
+                        const prefix = level === 0 ? '' : parentPrefix + (isLast ? '└─ ' : '├─ ');
+                        
+                        html += `<div style="padding: 4px 2px; cursor: pointer; display: flex; align-items: center; ${isSelected ? 'background: var(--accent-light);' : ''}" 
                                      onclick="DirectoryBuilderState.selectNode('${node.fullPath || ''}', '${node.type}')">`;
-                        html += `${indent}${icon} ${node.name}`;
+                        
+                        // Add padding and prefix
+                        if (level > 0) {
+                            html += `<span style="font-family: monospace; white-space: pre; color: var(--text-secondary);">${prefix}</span>`;
+                        }
+                        
+                        html += `${icon} ${node.name}`;
+                        
+                        // Add verification checkmark
+                        if (node.verified) {
+                            html += ' <span style="color: var(--success-color);" title="検証済み">✓</span>';
+                        }
                         
                         // Add size info for files
                         if (node.type === 'file' && node.size) {
                             html += ` <span style="color: var(--text-secondary); font-size: 12px;">(${(node.size / 1024).toFixed(1)}KB)</span>`;
+                        }
+                        
+                        // Add delete button inline
+                        if (node.type !== 'root') {
+                            const index = this.entries.findIndex(e => 
+                                (e.path ? `${e.path}/${e.name}` : e.name) === node.fullPath
+                            );
+                            if (index !== -1) {
+                                html += ` <button onclick="event.stopPropagation(); DirectoryBuilderState.removeEntry(${index})" 
+                                         style="margin-left: auto; padding: 2px 6px; font-size: 12px; background: var(--error-color); 
+                                                color: white; border: none; border-radius: 3px; cursor: pointer;" 
+                                         title="削除">✕</button>`;
+                            }
                         }
                         
                         html += '</div>';
@@ -2802,27 +2835,28 @@
                     // Render children
                     if (node.children && node.children.length > 0) {
                         if (node.type === 'root') {
-                            node.children.forEach(child => {
-                                html += renderNode(child, level);
+                            node.children.forEach((child, index) => {
+                                html += renderNode(child, level, index === node.children.length - 1, '');
                             });
                         } else {
-                            html += `<div style="display: block;">`;
-                            node.children.forEach(child => {
-                                html += renderNode(child, level + 1);
+                            const newPrefix = level === 0 ? '' : parentPrefix + (isLast ? '   ' : '│  ');
+                            
+                            node.children.forEach((child, index) => {
+                                html += renderNode(child, level + 1, index === node.children.length - 1, newPrefix);
                             });
                             
                             // Add "add here" option for directories
                             if (isSelected && (node.type === 'directory' || node.type === 'folder' || node.type === 'root')) {
-                                html += `<div style="padding: 2px; color: var(--text-secondary); font-style: italic;">`;
-                                html += `${indent}  └─ [ここに追加...]`;
+                                html += `<div style="padding: 4px 2px; color: var(--text-secondary); font-style: italic;">`;
+                                html += `<span style="font-family: monospace; white-space: pre;">${newPrefix}└─ </span>[ここに追加...]`;
                                 html += '</div>';
                             }
-                            html += '</div>';
                         }
                     } else if (isSelected && (node.type === 'directory' || node.type === 'folder' || node.type === 'root')) {
                         // Empty directory
-                        html += `<div style="padding: 2px; color: var(--text-secondary); font-style: italic;">`;
-                        html += `${indent}  └─ [ここに追加...]`;
+                        const newPrefix = level === 0 ? '' : parentPrefix + (isLast ? '   ' : '│  ');
+                        html += `<div style="padding: 4px 2px; color: var(--text-secondary); font-style: italic;">`;
+                        html += `<span style="font-family: monospace; white-space: pre;">${newPrefix}└─ </span>[ここに追加...]`;
                         html += '</div>';
                     }
                     
@@ -2930,72 +2964,58 @@
                 document.getElementById('visual-file-count').textContent = metadata.directory.fileCount;
                 document.getElementById('visual-dir-count').textContent = metadata.directory.directoryCount;
                 document.getElementById('visual-total-size').textContent = (metadata.directory.totalSize / 1024 / 1024).toFixed(2) + ' MB';
-                
-                // Update entry list
-                const entryListContainer = document.getElementById('visual-entry-list');
-                
-                if (this.entries.length === 0) {
-                    entryListContainer.innerHTML = `
-                        <div style="text-align: center; color: var(--text-secondary); padding: 20px;">
-                            エントリーがありません
-                        </div>
-                    `;
-                    return;
-                }
-                
-                entryListContainer.innerHTML = this.entries.map((entry, index) => {
-                    const icon = entry.type === 'directory' ? '📁' : '📄';
-                    const name = entry.name || '(名前未設定)';
-                    const size = entry.type === 'directory' 
-                        ? `${entry.fileCount || 0}ファイル, ${((entry.totalSize || 0) / 1024 / 1024).toFixed(1)}MB`
-                        : `${((entry.size || 0) / 1024).toFixed(1)}KB`;
-                    
-                    const pathInfo = entry.path ? `
-                        <div style="font-size: 12px; color: var(--text-secondary);">
-                            📍 ${entry.path}/
-                        </div>
-                    ` : '';
-                    
-                    const txInfo = entry.metaTxId ? `
-                        <div style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">
-                            🔗 TxID: ${entry.metaTxId.substring(0, 16)}...
-                        </div>
-                    ` : '';
-                    
-                    return `
-                        <div style="background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 12px; display: flex; align-items: center;">
-                            <span style="font-size: 20px; margin-right: 12px;">${icon}</span>
-                            <div style="flex: 1;">
-                                <div style="font-weight: 500;">${name}</div>
-                                <div style="font-size: 14px; color: var(--text-secondary);">${size}</div>
-                                ${pathInfo}
-                                ${txInfo}
-                            </div>
-                            ${entry.password ? '<span style="color: var(--warning-color); margin-right: 8px;" title="パスワード保護">🔒</span>' : ''}
-                            <button onclick="DirectoryBuilderState.removeEntry(${index})" class="button-small" style="background: var(--error-color); padding: 4px 8px;" title="削除">
-                                <span style="font-size: 14px;">✕</span>
-                            </button>
-                        </div>
-                    `;
-                }).join('');
             },
             
             showVisualPreview() {
                 document.getElementById('dirbuilder-visual-preview').style.display = 'block';
                 document.getElementById('dirbuilder-preview').style.display = 'none';
-                document.getElementById('visual-preview-tab').style.background = 'var(--accent-color)';
-                document.getElementById('visual-preview-tab').style.color = 'white';
-                document.getElementById('json-preview-tab').style.background = 'var(--bg-secondary)';
-                document.getElementById('json-preview-tab').style.color = 'var(--text-primary)';
             },
             
             showJsonPreview() {
                 document.getElementById('dirbuilder-visual-preview').style.display = 'none';
                 document.getElementById('dirbuilder-preview').style.display = 'block';
-                document.getElementById('json-preview-tab').style.background = 'var(--accent-color)';
-                document.getElementById('json-preview-tab').style.color = 'white';
-                document.getElementById('visual-preview-tab').style.background = 'var(--bg-secondary)';
-                document.getElementById('visual-preview-tab').style.color = 'var(--text-primary)';
+            },
+            
+            toggleView() {
+                const isJsonView = document.getElementById('view-toggle').checked;
+                if (isJsonView) {
+                    // Show JSON view
+                    document.getElementById('dirbuilder-tree').style.display = 'none';
+                    document.getElementById('dirbuilder-json-view').style.display = 'block';
+                    // Update JSON content with the same structure as updatePreview
+                    const metadata = {
+                        type: 'kaspa-directory',
+                        version: '3.4',
+                        created: new Date().toISOString(),
+                        network: 'testnet-10',
+                        directory: {
+                            name: this.name || '未設定',
+                            totalSize: this.entries.reduce((sum, e) => sum + (e.size || 0), 0),
+                            fileCount: this.entries.filter(e => e.type === 'file').length,
+                            directoryCount: this.entries.filter(e => e.type === 'directory').length
+                        },
+                        entries: this.entries,
+                        metadata: {
+                            metaTxId: null,
+                            metaTxBlockId: null,
+                            uploadDate: null,
+                            blockTime: null,
+                            payloadSplit: false,
+                            segmentBoundaries: []
+                        },
+                        extensions: {
+                            v4_5_6_compat: true,
+                            custom: {
+                                merkleRoot: null
+                            }
+                        }
+                    };
+                    document.getElementById('dirbuilder-json-view').textContent = JSON.stringify(metadata, null, 2);
+                } else {
+                    // Show tree view
+                    document.getElementById('dirbuilder-tree').style.display = 'block';
+                    document.getElementById('dirbuilder-json-view').style.display = 'none';
+                }
             },
             
             resetBuilder() {

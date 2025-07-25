@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.10.19 - ディレクトリビルダーUI最適化版</title>
+    <title>Kaspa P2P File Storage v5.10.20 - ディレクトリエントリー最適化版</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -2900,6 +2900,31 @@
                 this.selectNode(fullPath, 'directory');
             },
             
+            // v5.10.20: Optimize directory entries according to v3.4.2 specification
+            optimizeEntries() {
+                const optimized = [];
+                
+                this.entries.forEach(entry => {
+                    if (entry.type === 'directory') {
+                        // Check if this directory has children
+                        const dirPath = entry.path ? `${entry.path}/${entry.name}` : entry.name;
+                        const hasChildren = this.entries.some(e => e.path === dirPath);
+                        
+                        // Keep directory if:
+                        // 1. It has metaTxId/blockId (real directory metadata)
+                        // 2. It has no children (explicitly created empty folder)
+                        if (entry.metaTxId || !hasChildren) {
+                            optimized.push(entry);
+                        }
+                        // Otherwise skip (intermediate directory that can be reconstructed from paths)
+                    } else {
+                        // Always keep file entries
+                        optimized.push(entry);
+                    }
+                });
+                
+                return optimized;
+            },
             
             updatePreview() {
                 const name = document.getElementById('dirbuilder-name').value || '未設定';
@@ -2907,7 +2932,7 @@
                 
                 const metadata = {
                     type: 'kaspa-directory',
-                    version: '3.4',
+                    version: '3.4.2',
                     created: new Date().toISOString(),
                     network: 'testnet-10',
                     directory: {
@@ -2968,7 +2993,7 @@
                     // Update JSON content with the same structure as updatePreview
                     const metadata = {
                         type: 'kaspa-directory',
-                        version: '3.4',
+                        version: '3.4.2',
                         created: new Date().toISOString(),
                         network: 'testnet-10',
                         directory: {
@@ -3065,8 +3090,11 @@
                         return;
                     }
                     
+                    // v5.10.20: Optimize entries before creating metadata
+                    const optimizedEntries = this.optimizeEntries();
+                    
                     // Create directory metadata using existing function
-                    const metadata = await createDirectoryMetadata(this.name, this.entries, password);
+                    const metadata = await createDirectoryMetadata(this.name, optimizedEntries, password);
                     
                     // Store in DirectoryBuilderState
                     this.generatedMetadata = {
@@ -3097,8 +3125,11 @@
                         return;
                     }
                     
+                    // v5.10.20: Optimize entries before creating metadata
+                    const optimizedEntries = this.optimizeEntries();
+                    
                     // First generate
-                    const metadata = await createDirectoryMetadata(this.name, this.entries, password);
+                    const metadata = await createDirectoryMetadata(this.name, optimizedEntries, password);
                     
                     showStatus('ディレクトリメタデータをブロックチェーンにアップロード中...', 'info');
                     
@@ -8242,7 +8273,7 @@
             
             const metadata = {
                 type: 'kaspa-directory',
-                version: '3.4',  // v5.10.6: Updated to v3.4.0 specification
+                version: '3.4.2',  // v5.10.20: Updated to v3.4.2 specification
                 created: new Date().toISOString(),
                 network: config.network,
                 

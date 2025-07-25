@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.10.14 - グローバル変数修正版</title>
+    <title>Kaspa P2P File Storage v5.10.15 - エクスプローラー型ツリービュー版</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -1706,15 +1706,23 @@
                     <input type="text" id="dirbuilder-name" placeholder="ディレクトリ名を入力" style="width: 100%; padding: 8px;" oninput="DirectoryBuilderState.updatePreview()">
                 </div>
 
-                <!-- Entry Actions -->
+                <!-- TxID Input -->
                 <div style="margin-bottom: 15px;">
-                    <div style="display: flex; gap: 10px;">
-                        <button onclick="DirectoryBuilderState.addFileEntry()" class="button" style="flex: 1;">
-                            <span class="icon">📄</span> ファイル追加
+                    <label>エントリー追加 (TxID:BlockID:Password):</label>
+                    <div style="display: flex; gap: 10px; margin-top: 5px;">
+                        <input type="text" id="dirbuilder-txid-input" placeholder="TxID:BlockID:Password を入力" style="flex: 1; padding: 8px;">
+                        <button onclick="DirectoryBuilderState.addFromTxId()" class="button">
+                            <span class="icon">➕</span> 追加
                         </button>
-                        <button onclick="DirectoryBuilderState.addDirectoryEntry()" class="button" style="flex: 1;">
-                            <span class="icon">📁</span> ディレクトリ追加
-                        </button>
+                    </div>
+                    <small style="color: var(--text-secondary);">※ 自動的にメタデータタイプを判別します</small>
+                </div>
+
+                <!-- Tree View -->
+                <div style="margin-bottom: 15px;">
+                    <label>ディレクトリ構造:</label>
+                    <div id="dirbuilder-tree" style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 6px; padding: 12px; max-height: 400px; overflow-y: auto; font-family: monospace;">
+                        <!-- Tree structure will be rendered here -->
                     </div>
                 </div>
 
@@ -2428,6 +2436,8 @@
             name: '',
             mode: 'new', // 'new', 'edit'
             generatedMetadata: null, // Store generated metadata internally
+            currentPath: '', // Currently selected path in tree
+            selectedNode: null, // Currently selected node
             
             // Methods
             reset() {
@@ -2435,6 +2445,8 @@
                 this.name = '';
                 this.mode = 'new';
                 this.generatedMetadata = null;
+                this.currentPath = '';
+                this.selectedNode = null;
             },
             
             startNew() {
@@ -2519,6 +2531,10 @@
                 
                 // Show visual preview by default
                 this.showVisualPreview();
+                
+                // Initialize tree with root selected
+                this.currentPath = '';
+                this.renderTree();
             },
             
             addFileEntry() {
@@ -2602,6 +2618,223 @@
                 }
             },
             
+            async addFromTxId() {
+                const input = document.getElementById('dirbuilder-txid-input').value.trim();
+                if (!input) return;
+                
+                const parts = input.split(':');
+                if (parts.length < 2) {
+                    showStatus('形式が正しくありません。TxID:BlockID:Password形式で入力してください。', 'error');
+                    return;
+                }
+                
+                const [txId, blockId, password] = parts;
+                
+                try {
+                    showStatus('メタデータを取得中...', 'info');
+                    
+                    // Try to get metadata using download functionality
+                    const result = await downloadFromTxId(txId, blockId, password || '');
+                    
+                    if (!result) {
+                        showStatus('メタデータの取得に失敗しました', 'error');
+                        return;
+                    }
+                    
+                    // Determine type and add to current path
+                    if (result.type === 'kaspa-file' || result.isSuperMeta) {
+                        // File or SuperMeta
+                        const newEntry = {
+                            type: 'file',
+                            name: result.name || 'unknown',
+                            path: this.currentPath,
+                            size: result.size || 0,
+                            metaTxId: txId,
+                            blockId: blockId,
+                            cid: result.cid || null,
+                            password: password || null
+                        };
+                        this.entries.push(newEntry);
+                        showStatus(`ファイル「${newEntry.name}」を追加しました`, 'success');
+                        
+                    } else if (result.type === 'kaspa-directory') {
+                        // Directory metadata
+                        const newEntry = {
+                            type: 'directory',
+                            name: result.directory?.name || 'unknown',
+                            path: this.currentPath,
+                            size: 0,
+                            metaTxId: txId,
+                            blockId: blockId,
+                            cid: result.cid || null,
+                            fileCount: result.directory?.fileCount || 0,
+                            totalSize: result.directory?.totalSize || 0,
+                            password: password || null
+                        };
+                        this.entries.push(newEntry);
+                        showStatus(`ディレクトリ「${newEntry.name}」を追加しました`, 'success');
+                        
+                        // Optionally expand directory contents
+                        if (result.entries && confirm(`ディレクトリ「${newEntry.name}」の中身も展開しますか？`)) {
+                            const dirPath = this.currentPath ? `${this.currentPath}/${newEntry.name}` : newEntry.name;
+                            result.entries.forEach(entry => {
+                                this.entries.push({
+                                    ...entry,
+                                    path: dirPath
+                                });
+                            });
+                        }
+                    }
+                    
+                    // Clear input and update view
+                    document.getElementById('dirbuilder-txid-input').value = '';
+                    this.updatePreview();
+                    
+                } catch (error) {
+                    showStatus(`エラー: ${error.message}`, 'error');
+                    console.error('addFromTxId error:', error);
+                }
+            },
+            
+            buildTreeStructure() {
+                // Build hierarchical structure from flat entries
+                const root = {
+                    name: this.name || 'ルート',
+                    type: 'root',
+                    children: [],
+                    path: ''
+                };
+                
+                // Create a map for quick access
+                const nodeMap = new Map();
+                nodeMap.set('', root);
+                
+                // Sort entries by path to ensure parents are created before children
+                const sortedEntries = [...this.entries].sort((a, b) => {
+                    const pathA = a.path || '';
+                    const pathB = b.path || '';
+                    return pathA.localeCompare(pathB);
+                });
+                
+                // Build tree
+                sortedEntries.forEach(entry => {
+                    const parentPath = entry.path || '';
+                    let parent = nodeMap.get(parentPath);
+                    
+                    // Create parent folders if they don't exist
+                    if (!parent && parentPath) {
+                        const pathParts = parentPath.split('/');
+                        let currentPath = '';
+                        
+                        pathParts.forEach(part => {
+                            const parentOfCurrent = currentPath;
+                            currentPath = currentPath ? `${currentPath}/${part}` : part;
+                            
+                            if (!nodeMap.has(currentPath)) {
+                                const folder = {
+                                    name: part,
+                                    type: 'folder',
+                                    children: [],
+                                    path: currentPath
+                                };
+                                
+                                const parentNode = nodeMap.get(parentOfCurrent) || root;
+                                parentNode.children.push(folder);
+                                nodeMap.set(currentPath, folder);
+                            }
+                        });
+                        
+                        parent = nodeMap.get(parentPath);
+                    }
+                    
+                    // Add entry to parent
+                    const node = {
+                        ...entry,
+                        children: entry.type === 'directory' ? [] : undefined,
+                        fullPath: parentPath ? `${parentPath}/${entry.name}` : entry.name
+                    };
+                    
+                    (parent || root).children.push(node);
+                    
+                    if (entry.type === 'directory') {
+                        nodeMap.set(node.fullPath, node);
+                    }
+                });
+                
+                return root;
+            },
+            
+            renderTree() {
+                const tree = this.buildTreeStructure();
+                const container = document.getElementById('dirbuilder-tree');
+                
+                const renderNode = (node, level = 0) => {
+                    const indent = '  '.repeat(level);
+                    const icon = node.type === 'root' ? '📁' : 
+                                node.type === 'directory' ? '📁' : 
+                                node.type === 'folder' ? '📁' : '📄';
+                    
+                    const isSelected = node.fullPath === this.currentPath || 
+                                     (node.path === '' && this.currentPath === '' && node.type === 'root');
+                    
+                    let html = '';
+                    
+                    if (node.type !== 'root' || level === 0) {
+                        html += `<div style="padding: 2px; cursor: pointer; ${isSelected ? 'background: var(--accent-light);' : ''}" 
+                                     onclick="DirectoryBuilderState.selectNode('${node.fullPath || ''}', '${node.type}')">`;
+                        html += `${indent}${icon} ${node.name}`;
+                        
+                        // Add size info for files
+                        if (node.type === 'file' && node.size) {
+                            html += ` <span style="color: var(--text-secondary); font-size: 12px;">(${(node.size / 1024).toFixed(1)}KB)</span>`;
+                        }
+                        
+                        html += '</div>';
+                    }
+                    
+                    // Render children
+                    if (node.children && node.children.length > 0) {
+                        if (node.type === 'root') {
+                            node.children.forEach(child => {
+                                html += renderNode(child, level);
+                            });
+                        } else {
+                            html += `<div style="display: block;">`;
+                            node.children.forEach(child => {
+                                html += renderNode(child, level + 1);
+                            });
+                            
+                            // Add "add here" option for directories
+                            if (isSelected && (node.type === 'directory' || node.type === 'folder' || node.type === 'root')) {
+                                html += `<div style="padding: 2px; color: var(--text-secondary); font-style: italic;">`;
+                                html += `${indent}  └─ [ここに追加...]`;
+                                html += '</div>';
+                            }
+                            html += '</div>';
+                        }
+                    } else if (isSelected && (node.type === 'directory' || node.type === 'folder' || node.type === 'root')) {
+                        // Empty directory
+                        html += `<div style="padding: 2px; color: var(--text-secondary); font-style: italic;">`;
+                        html += `${indent}  └─ [ここに追加...]`;
+                        html += '</div>';
+                    }
+                    
+                    return html;
+                };
+                
+                container.innerHTML = renderNode(tree);
+            },
+            
+            selectNode(path, type) {
+                this.currentPath = path;
+                this.selectedNode = { path, type };
+                this.renderTree();
+                
+                // Show current path
+                const pathDisplay = path || 'ルート';
+                showStatus(`選択中: ${pathDisplay}`, 'info');
+            },
+            
             
             updatePreview() {
                 const name = document.getElementById('dirbuilder-name').value || '未設定';
@@ -2639,6 +2872,9 @@
                 
                 // Update visual preview
                 this.updateVisualPreview(metadata);
+                
+                // Update tree view
+                this.renderTree();
             },
             
             updateVisualPreview(metadata) {

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.10.12 - ディレクトリビルダービジュアルプレビュー版</title>
+    <title>Kaspa P2P File Storage v5.10.13 - ディレクトリビルダー機能拡張版</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -395,6 +395,22 @@
         }
 
         .small-button:hover {
+            background: var(--accent-color);
+            color: white;
+        }
+        
+        .button-small {
+            background: transparent;
+            color: var(--accent-color);
+            border: 1px solid var(--accent-color);
+            padding: 6px 12px;
+            font-size: 13px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .button-small:hover {
             background: var(--accent-color);
             color: white;
         }
@@ -1690,25 +1706,15 @@
                     <input type="text" id="dirbuilder-name" placeholder="ディレクトリ名を入力" style="width: 100%; padding: 8px;" oninput="DirectoryBuilderState.updatePreview()">
                 </div>
 
-                <!-- Entry List -->
+                <!-- Entry Actions -->
                 <div style="margin-bottom: 15px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                        <label>エントリー一覧:</label>
-                        <div>
-                            <button onclick="DirectoryBuilderState.addFileEntry()" class="button-small">
-                                <span class="icon">📄</span> ファイル追加
-                            </button>
-                            <button onclick="DirectoryBuilderState.addDirectoryEntry()" class="button-small">
-                                <span class="icon">📁</span> ディレクトリ追加
-                            </button>
-                        </div>
-                    </div>
-                    
-                    <div id="dirbuilder-entries" style="border: 1px solid var(--border-color); padding: 10px; max-height: 400px; overflow-y: auto;">
-                        <!-- Entries will be added here dynamically -->
-                        <div class="empty-state" style="text-align: center; color: var(--text-secondary); padding: 20px;">
-                            エントリーがありません
-                        </div>
+                    <div style="display: flex; gap: 10px;">
+                        <button onclick="DirectoryBuilderState.addFileEntry()" class="button" style="flex: 1;">
+                            <span class="icon">📄</span> ファイル追加
+                        </button>
+                        <button onclick="DirectoryBuilderState.addDirectoryEntry()" class="button" style="flex: 1;">
+                            <span class="icon">📁</span> ディレクトリ追加
+                        </button>
                     </div>
                 </div>
 
@@ -1771,14 +1777,30 @@
             <!-- Phase 3: Export Section -->
             <div class="metric-box" id="dirbuilder-export-section" style="display: none;">
                 <h3>📤 エクスポート</h3>
+                
+                <!-- Password Input -->
+                <div style="margin-bottom: 15px;">
+                    <label for="dirbuilder-password">パスワード (8文字以上):</label>
+                    <input type="password" id="dirbuilder-password" placeholder="強力なパスワードを入力" style="width: 100%; padding: 8px; margin-top: 5px;">
+                    <small style="color: var(--text-secondary);">※ 空欄の場合はパスワード保護なし</small>
+                </div>
+                
+                <!-- Main Actions -->
+                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                    <button onclick="DirectoryBuilderState.generateOnly()" class="button" style="flex: 1;">
+                        <span class="icon">🔧</span> ディレクトリメタデータを生成のみ
+                    </button>
+                    <button onclick="DirectoryBuilderState.generateAndUpload()" class="button button-primary" style="flex: 1;">
+                        <span class="icon">📤</span> 生成してアップロード
+                    </button>
+                </div>
+                
+                <!-- Additional Actions -->
                 <div style="display: flex; gap: 10px;">
-                    <button onclick="DirectoryBuilderState.exportAsKaspa()" class="button" style="flex: 1;">
-                        <span class="icon">📄</span> .kaspaファイル生成
+                    <button onclick="DirectoryBuilderState.exportAsKaspa()" class="button button-secondary" style="flex: 1;">
+                        <span class="icon">📄</span> .kaspaファイル保存
                     </button>
-                    <button onclick="DirectoryBuilderState.uploadToBlockchain()" class="button" style="flex: 1;">
-                        <span class="icon">⛓️</span> ブロックチェーンアップロード
-                    </button>
-                    <button onclick="DirectoryBuilderState.addToFileTab()" class="button" style="flex: 1;">
+                    <button onclick="DirectoryBuilderState.addToFileTab()" class="button button-secondary" style="flex: 1;">
                         <span class="icon">📂</span> Fileタブへ登録
                     </button>
                 </div>
@@ -2491,7 +2513,6 @@
                 
                 // Update UI
                 document.getElementById('dirbuilder-name').value = this.name;
-                this.updateEntryList();
                 this.updatePreview();
                 
                 // Show visual preview by default
@@ -2510,12 +2531,16 @@
                 
                 const [txId, blockId, password] = parts;
                 
+                // Ask for file details
+                const fileName = prompt('ファイル名を入力してください:') || 'untitled';
+                const filePath = prompt('パス (省略可能、例: folder1/folder2):') || '';
+                
                 // Create new file entry
                 const newEntry = {
                     type: 'file',
-                    name: '', // Will be set later from metadata
-                    path: '',
-                    size: 0,
+                    name: fileName,
+                    path: filePath,
+                    size: 0, // Will be updated when metadata is fetched
                     metaTxId: txId,
                     blockId: blockId,
                     cid: null,
@@ -2523,22 +2548,41 @@
                 };
                 
                 this.entries.push(newEntry);
-                this.updateEntryList();
                 this.updatePreview();
+                
+                // TODO: Fetch actual file metadata from blockchain
             },
             
             addDirectoryEntry() {
                 const name = prompt('ディレクトリ名を入力してください:');
                 if (!name) return;
                 
+                const path = prompt('親ディレクトリパス (省略可能、例: parent/folder):') || '';
+                
+                // Ask if this should reference an existing directory metadata
+                const hasTxId = confirm('既存のディレクトリメタデータを参照しますか？');
+                let metaTxId = null;
+                let blockId = null;
+                
+                if (hasTxId) {
+                    const txInfo = prompt('ディレクトリのTxID:BlockID形式で入力してください:');
+                    if (txInfo) {
+                        const parts = txInfo.split(':');
+                        if (parts.length >= 2) {
+                            metaTxId = parts[0];
+                            blockId = parts[1];
+                        }
+                    }
+                }
+                
                 // Create new directory entry
                 const newEntry = {
                     type: 'directory',
                     name: name,
-                    path: '',
+                    path: path,
                     size: 0,
-                    metaTxId: null,
-                    blockId: null,
+                    metaTxId: metaTxId,
+                    blockId: blockId,
                     cid: null,
                     fileCount: 0,
                     totalSize: 0,
@@ -2546,40 +2590,16 @@
                 };
                 
                 this.entries.push(newEntry);
-                this.updateEntryList();
                 this.updatePreview();
             },
             
             removeEntry(index) {
                 if (confirm('このエントリーを削除しますか？')) {
                     this.entries.splice(index, 1);
-                    this.updateEntryList();
                     this.updatePreview();
                 }
             },
             
-            updateEntryList() {
-                const container = document.getElementById('dirbuilder-entries');
-                
-                if (this.entries.length === 0) {
-                    container.innerHTML = `<div class="empty-state" style="text-align: center; color: var(--text-secondary); padding: 20px;">エントリーがありません</div>`;
-                    return;
-                }
-                
-                container.innerHTML = this.entries.map((entry, index) => {
-                    const icon = entry.type === 'directory' ? '📁' : '📄';
-                    const name = entry.name || '(名前未設定)';
-                    const canDelete = !entry.metaTxId || entry.type === 'directory';
-                    
-                    return `
-                        <div style="display: flex; align-items: center; padding: 8px; border-bottom: 1px solid var(--border-color);">
-                            <span style="margin-right: 8px;">${icon}</span>
-                            <span style="flex: 1;">${name}</span>
-                            ${canDelete ? `<button onclick="DirectoryBuilderState.removeEntry(${index})" class="button-small" style="background: var(--error-color);">削除</button>` : ''}
-                        </div>
-                    `;
-                }).join('');
-            },
             
             updatePreview() {
                 const name = document.getElementById('dirbuilder-name').value || '未設定';
@@ -2640,7 +2660,7 @@
                     return;
                 }
                 
-                entryListContainer.innerHTML = this.entries.map(entry => {
+                entryListContainer.innerHTML = this.entries.map((entry, index) => {
                     const icon = entry.type === 'directory' ? '📁' : '📄';
                     const name = entry.name || '(名前未設定)';
                     const size = entry.type === 'directory' 
@@ -2668,7 +2688,10 @@
                                 ${pathInfo}
                                 ${txInfo}
                             </div>
-                            ${entry.password ? '<span style="color: var(--warning-color);" title="パスワード保護">🔒</span>' : ''}
+                            ${entry.password ? '<span style="color: var(--warning-color); margin-right: 8px;" title="パスワード保護">🔒</span>' : ''}
+                            <button onclick="DirectoryBuilderState.removeEntry(${index})" class="button-small" style="background: var(--error-color); padding: 4px 8px;" title="削除">
+                                <span style="font-size: 14px;">✕</span>
+                            </button>
                         </div>
                     `;
                 }).join('');
@@ -2737,7 +2760,9 @@
             
             exportAsKaspa() {
                 const name = this.name;
-                const metadata = JSON.parse(document.getElementById('dirbuilder-preview').textContent);
+                // Use generated metadata if available, otherwise use preview
+                const metadata = window.tempDirectoryMetadata?.metadata || 
+                                JSON.parse(document.getElementById('dirbuilder-preview').textContent);
                 
                 const blob = new Blob([JSON.stringify(metadata, null, 2)], { type: 'application/json' });
                 const url = URL.createObjectURL(blob);
@@ -2750,9 +2775,71 @@
                 showStatus('.kaspaファイルを生成しました', 'success');
             },
             
-            async uploadToBlockchain() {
-                showStatus('この機能は準備中です', 'info');
-                // TODO: Implement blockchain upload using uploadDirectoryMetadata
+            async generateOnly() {
+                try {
+                    const password = document.getElementById('dirbuilder-password').value;
+                    if (password && password.length < 8) {
+                        showStatus('パスワードは8文字以上で入力してください', 'error');
+                        return;
+                    }
+                    
+                    // Create directory metadata using existing function
+                    const metadata = await createDirectoryMetadata(this.name, this.entries, password);
+                    
+                    // Store in temporary location
+                    window.tempDirectoryMetadata = {
+                        metadata: metadata,
+                        password: password
+                    };
+                    
+                    showStatus('ディレクトリメタデータを生成しました', 'success');
+                    
+                    // Enable additional actions
+                    this.exportAsKaspa();
+                } catch (error) {
+                    showStatus(`生成エラー: ${error.message}`, 'error');
+                }
+            },
+            
+            async generateAndUpload() {
+                try {
+                    const password = document.getElementById('dirbuilder-password').value;
+                    if (password && password.length < 8) {
+                        showStatus('パスワードは8文字以上で入力してください', 'error');
+                        return;
+                    }
+                    
+                    // First generate
+                    const metadata = await createDirectoryMetadata(this.name, this.entries, password);
+                    
+                    showStatus('ディレクトリメタデータをブロックチェーンにアップロード中...', 'info');
+                    
+                    // Upload to blockchain
+                    const result = await uploadDirectoryMetadata(metadata, password);
+                    
+                    if (result.success) {
+                        // Update metadata with blockchain info
+                        metadata.metadata.metaTxId = result.txid;
+                        metadata.metadata.metaTxBlockId = result.blockId;
+                        metadata.metadata.uploadDate = new Date().toISOString();
+                        
+                        // Store updated metadata
+                        window.tempDirectoryMetadata = {
+                            metadata: metadata,
+                            password: password
+                        };
+                        
+                        showStatus(`アップロード完了: TxID ${result.txid}`, 'success');
+                        
+                        // Show copy button for TxID
+                        const txInfo = `${result.txid}:${result.blockId}${password ? ':' + password : ''}`;
+                        showStatus(`📋 ダウンロード情報: ${txInfo}`, 'info');
+                    } else {
+                        showStatus(`アップロードエラー: ${result.error}`, 'error');
+                    }
+                } catch (error) {
+                    showStatus(`エラー: ${error.message}`, 'error');
+                }
             },
             
             addToFileTab() {

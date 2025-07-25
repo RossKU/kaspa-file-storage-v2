@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.10.13 - ディレクトリビルダー機能拡張版</title>
+    <title>Kaspa P2P File Storage v5.10.14 - グローバル変数修正版</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -2427,12 +2427,14 @@
             entries: [],
             name: '',
             mode: 'new', // 'new', 'edit'
+            generatedMetadata: null, // Store generated metadata internally
             
             // Methods
             reset() {
                 this.entries = [];
                 this.name = '';
                 this.mode = 'new';
+                this.generatedMetadata = null;
             },
             
             startNew() {
@@ -2761,7 +2763,7 @@
             exportAsKaspa() {
                 const name = this.name;
                 // Use generated metadata if available, otherwise use preview
-                const metadata = window.tempDirectoryMetadata?.metadata || 
+                const metadata = this.generatedMetadata?.metadata || 
                                 JSON.parse(document.getElementById('dirbuilder-preview').textContent);
                 
                 const blob = new Blob([JSON.stringify(metadata, null, 2)], { type: 'application/json' });
@@ -2786,8 +2788,8 @@
                     // Create directory metadata using existing function
                     const metadata = await createDirectoryMetadata(this.name, this.entries, password);
                     
-                    // Store in temporary location
-                    window.tempDirectoryMetadata = {
+                    // Store in DirectoryBuilderState
+                    this.generatedMetadata = {
                         metadata: metadata,
                         password: password
                     };
@@ -2824,7 +2826,7 @@
                         metadata.metadata.uploadDate = new Date().toISOString();
                         
                         // Store updated metadata
-                        window.tempDirectoryMetadata = {
+                        this.generatedMetadata = {
                             metadata: metadata,
                             password: password
                         };

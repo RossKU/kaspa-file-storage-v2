@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.10.10 - ダークモードカラー調整版</title>
+    <title>Kaspa P2P File Storage v5.10.11 - ディレクトリビルダー実装版</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -1226,6 +1226,10 @@
                     <span class="nav-item-icon">📁</span>
                     <span class="nav-item-text">Upload Dir</span>
                 </div>
+                <div class="nav-item" onclick="switchTab('dirbuilder')" data-tooltip="Dir Builder">
+                    <span class="nav-item-icon">🛠️</span>
+                    <span class="nav-item-text">Dir Builder</span>
+                </div>
                 <div class="nav-item" onclick="switchTab('history')" data-tooltip="History">
                     <span class="nav-item-icon">📜</span>
                     <span class="nav-item-text">History</span>
@@ -1650,6 +1654,97 @@
                 <h3>📂 既存のディレクトリ</h3>
                 <div id="directoryList" style="margin-top: 15px;">
                     <!-- ディレクトリリストがここに表示されます -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Directory Builder Tab -->
+    <div id="dirbuilder-tab" class="tab-content">
+        <div class="container">
+            <h2>🛠️ ディレクトリビルダー</h2>
+            
+            <!-- Phase 1: Import Section -->
+            <div class="metric-box" id="dirbuilder-import-section">
+                <h3>📥 インポート</h3>
+                <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                    <button onclick="DirectoryBuilderState.startNew()" class="button" style="flex: 1;">
+                        <span class="icon">🆕</span> 新規作成
+                    </button>
+                    <button onclick="DirectoryBuilderState.importFromTxId()" class="button" style="flex: 1;">
+                        <span class="icon">🔗</span> TxIDから読込
+                    </button>
+                    <button onclick="DirectoryBuilderState.importFromKaspa()" class="button" style="flex: 1;">
+                        <span class="icon">📄</span> .kaspaから読込
+                    </button>
+                </div>
+            </div>
+
+            <!-- Phase 2: Edit Section -->
+            <div class="metric-box" id="dirbuilder-edit-section" style="display: none;">
+                <h3>📝 編集</h3>
+                
+                <!-- Directory Name -->
+                <div style="margin-bottom: 15px;">
+                    <label>ディレクトリ名:</label>
+                    <input type="text" id="dirbuilder-name" placeholder="ディレクトリ名を入力" style="width: 100%; padding: 8px;" oninput="DirectoryBuilderState.updatePreview()">
+                </div>
+
+                <!-- Entry List -->
+                <div style="margin-bottom: 15px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <label>エントリー一覧:</label>
+                        <div>
+                            <button onclick="DirectoryBuilderState.addFileEntry()" class="button-small">
+                                <span class="icon">📄</span> ファイル追加
+                            </button>
+                            <button onclick="DirectoryBuilderState.addDirectoryEntry()" class="button-small">
+                                <span class="icon">📁</span> ディレクトリ追加
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div id="dirbuilder-entries" style="border: 1px solid var(--border-color); padding: 10px; max-height: 400px; overflow-y: auto;">
+                        <!-- Entries will be added here dynamically -->
+                        <div class="empty-state" style="text-align: center; color: var(--text-secondary); padding: 20px;">
+                            エントリーがありません
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Metadata Preview -->
+                <div style="margin-bottom: 15px;">
+                    <label>メタデータプレビュー:</label>
+                    <pre id="dirbuilder-preview" style="background: var(--code-bg); padding: 10px; overflow-x: auto; max-height: 200px;"></pre>
+                </div>
+
+                <!-- Action Buttons -->
+                <div style="display: flex; gap: 10px;">
+                    <button onclick="DirectoryBuilderState.resetBuilder()" class="button button-secondary">
+                        <span class="icon">↩️</span> リセット
+                    </button>
+                    <button onclick="DirectoryBuilderState.validate()" class="button">
+                        <span class="icon">✓</span> 検証
+                    </button>
+                    <button onclick="DirectoryBuilderState.saveOptions()" class="button button-primary">
+                        <span class="icon">💾</span> 保存
+                    </button>
+                </div>
+            </div>
+
+            <!-- Phase 3: Export Section -->
+            <div class="metric-box" id="dirbuilder-export-section" style="display: none;">
+                <h3>📤 エクスポート</h3>
+                <div style="display: flex; gap: 10px;">
+                    <button onclick="DirectoryBuilderState.exportAsKaspa()" class="button" style="flex: 1;">
+                        <span class="icon">📄</span> .kaspaファイル生成
+                    </button>
+                    <button onclick="DirectoryBuilderState.uploadToBlockchain()" class="button" style="flex: 1;">
+                        <span class="icon">⛓️</span> ブロックチェーンアップロード
+                    </button>
+                    <button onclick="DirectoryBuilderState.addToFileTab()" class="button" style="flex: 1;">
+                        <span class="icon">📂</span> Fileタブへ登録
+                    </button>
                 </div>
             </div>
         </div>
@@ -2268,6 +2363,318 @@
         
         // Expose FileState to window for global access
         window.FileState = FileState;
+        
+        // ===== Directory Builder State (v5.10.11) =====
+        const DirectoryBuilderState = {
+            entries: [],
+            name: '',
+            mode: 'new', // 'new', 'edit'
+            
+            // Methods
+            reset() {
+                this.entries = [];
+                this.name = '';
+                this.mode = 'new';
+            },
+            
+            startNew() {
+                this.reset();
+                this.showEditSection();
+            },
+            
+            async importFromTxId() {
+                const txInfo = prompt('TxID:BlockID:Password形式で入力してください:');
+                if (!txInfo) return;
+                
+                const parts = txInfo.split(':');
+                if (parts.length < 2) {
+                    alert('形式が正しくありません。TxID:BlockID:Password形式で入力してください。');
+                    return;
+                }
+                
+                const [txId, blockId, password] = parts;
+                
+                try {
+                    showStatus('TxIDからディレクトリメタデータを読み込み中...', 'info');
+                    
+                    // Use existing download functionality
+                    const result = await downloadFromTxId(txId, blockId, password || '');
+                    
+                    if (result && result.type === 'directory') {
+                        // Load metadata into builder
+                        this.entries = result.entries || [];
+                        this.name = result.directory?.name || '';
+                        this.mode = 'edit';
+                        this.showEditSection();
+                        this.updatePreview();
+                        showStatus('ディレクトリメタデータを読み込みました', 'success');
+                    } else {
+                        showStatus('指定されたTxIDはディレクトリメタデータではありません', 'error');
+                    }
+                } catch (error) {
+                    showStatus(`読み込みエラー: ${error.message}`, 'error');
+                }
+            },
+            
+            importFromKaspa() {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = '.kaspa';
+                const self = this;
+                input.onchange = async (e) => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    
+                    try {
+                        const text = await file.text();
+                        const metadata = JSON.parse(text);
+                        
+                        if (metadata.type !== 'kaspa-directory') {
+                            showStatus('.kaspaファイルがディレクトリメタデータではありません', 'error');
+                            return;
+                        }
+                        
+                        self.entries = metadata.entries || [];
+                        self.name = metadata.directory?.name || file.name.replace('.kaspa', '');
+                        self.mode = 'edit';
+                        
+                        self.showEditSection();
+                        self.updatePreview();
+                        showStatus('.kaspaファイルを読み込みました', 'success');
+                    } catch (error) {
+                        showStatus(`ファイル読み込みエラー: ${error.message}`, 'error');
+                    }
+                };
+                input.click();
+            },
+            
+            showEditSection() {
+                document.getElementById('dirbuilder-import-section').style.display = 'none';
+                document.getElementById('dirbuilder-edit-section').style.display = 'block';
+                document.getElementById('dirbuilder-export-section').style.display = 'none';
+                
+                // Update UI
+                document.getElementById('dirbuilder-name').value = this.name;
+                this.updateEntryList();
+                this.updatePreview();
+            },
+            
+            addFileEntry() {
+                const entry = prompt('ファイルエントリーのTxID:BlockID:Password形式で入力してください:');
+                if (!entry) return;
+                
+                const parts = entry.split(':');
+                if (parts.length < 2) {
+                    alert('形式が正しくありません。TxID:BlockID:Password形式で入力してください。');
+                    return;
+                }
+                
+                const [txId, blockId, password] = parts;
+                
+                // Create new file entry
+                const newEntry = {
+                    type: 'file',
+                    name: '', // Will be set later from metadata
+                    path: '',
+                    size: 0,
+                    metaTxId: txId,
+                    blockId: blockId,
+                    cid: null,
+                    password: password || null
+                };
+                
+                this.entries.push(newEntry);
+                this.updateEntryList();
+                this.updatePreview();
+            },
+            
+            addDirectoryEntry() {
+                const name = prompt('ディレクトリ名を入力してください:');
+                if (!name) return;
+                
+                // Create new directory entry
+                const newEntry = {
+                    type: 'directory',
+                    name: name,
+                    path: '',
+                    size: 0,
+                    metaTxId: null,
+                    blockId: null,
+                    cid: null,
+                    fileCount: 0,
+                    totalSize: 0,
+                    password: null
+                };
+                
+                this.entries.push(newEntry);
+                this.updateEntryList();
+                this.updatePreview();
+            },
+            
+            removeEntry(index) {
+                if (confirm('このエントリーを削除しますか？')) {
+                    this.entries.splice(index, 1);
+                    this.updateEntryList();
+                    this.updatePreview();
+                }
+            },
+            
+            updateEntryList() {
+                const container = document.getElementById('dirbuilder-entries');
+                
+                if (this.entries.length === 0) {
+                    container.innerHTML = `<div class="empty-state" style="text-align: center; color: var(--text-secondary); padding: 20px;">エントリーがありません</div>`;
+                    return;
+                }
+                
+                container.innerHTML = this.entries.map((entry, index) => {
+                    const icon = entry.type === 'directory' ? '📁' : '📄';
+                    const name = entry.name || '(名前未設定)';
+                    const canDelete = !entry.metaTxId || entry.type === 'directory';
+                    
+                    return `
+                        <div style="display: flex; align-items: center; padding: 8px; border-bottom: 1px solid var(--border-color);">
+                            <span style="margin-right: 8px;">${icon}</span>
+                            <span style="flex: 1;">${name}</span>
+                            ${canDelete ? `<button onclick="DirectoryBuilderState.removeEntry(${index})" class="button-small" style="background: var(--error-color);">削除</button>` : ''}
+                        </div>
+                    `;
+                }).join('');
+            },
+            
+            updatePreview() {
+                const name = document.getElementById('dirbuilder-name').value || '未設定';
+                this.name = name;
+                
+                const metadata = {
+                    type: 'kaspa-directory',
+                    version: '3.4',
+                    created: new Date().toISOString(),
+                    network: 'testnet-10',
+                    directory: {
+                        name: name,
+                        totalSize: this.entries.reduce((sum, e) => sum + (e.size || 0), 0),
+                        fileCount: this.entries.filter(e => e.type === 'file').length,
+                        directoryCount: this.entries.filter(e => e.type === 'directory').length
+                    },
+                    entries: this.entries,
+                    metadata: {
+                        metaTxId: null,
+                        metaTxBlockId: null,
+                        uploadDate: null,
+                        blockTime: null,
+                        payloadSplit: false,
+                        segmentBoundaries: []
+                    },
+                    extensions: {
+                        v4_5_6_compat: true,
+                        custom: {
+                            merkleRoot: null
+                        }
+                    }
+                };
+                
+                document.getElementById('dirbuilder-preview').textContent = JSON.stringify(metadata, null, 2);
+            },
+            
+            resetBuilder() {
+                if (confirm('すべての変更を破棄してリセットしますか？')) {
+                    this.reset();
+                    document.getElementById('dirbuilder-import-section').style.display = 'block';
+                    document.getElementById('dirbuilder-edit-section').style.display = 'none';
+                    document.getElementById('dirbuilder-export-section').style.display = 'none';
+                }
+            },
+            
+            async validate() {
+                if (!this.name) {
+                    showStatus('ディレクトリ名を入力してください', 'error');
+                    return false;
+                }
+                
+                if (this.entries.length === 0) {
+                    showStatus('少なくとも1つのエントリーを追加してください', 'error');
+                    return false;
+                }
+                
+                // Check for duplicates
+                const names = this.entries.map(e => e.name);
+                const duplicates = names.filter((name, index) => names.indexOf(name) !== index);
+                if (duplicates.length > 0) {
+                    showStatus(`重複するエントリー名があります: ${duplicates.join(', ')}`, 'error');
+                    return false;
+                }
+                
+                showStatus('検証に成功しました', 'success');
+                return true;
+            },
+            
+            async saveOptions() {
+                const valid = await this.validate();
+                if (!valid) {
+                    showStatus('保存する前に検証を実行してください', 'error');
+                    return;
+                }
+                
+                document.getElementById('dirbuilder-edit-section').style.display = 'none';
+                document.getElementById('dirbuilder-export-section').style.display = 'block';
+            },
+            
+            exportAsKaspa() {
+                const name = this.name;
+                const metadata = JSON.parse(document.getElementById('dirbuilder-preview').textContent);
+                
+                const blob = new Blob([JSON.stringify(metadata, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${name}.kaspa`;
+                a.click();
+                URL.revokeObjectURL(url);
+                
+                showStatus('.kaspaファイルを生成しました', 'success');
+            },
+            
+            async uploadToBlockchain() {
+                showStatus('この機能は準備中です', 'info');
+                // TODO: Implement blockchain upload using uploadDirectoryMetadata
+            },
+            
+            addToFileTab() {
+                const metadata = JSON.parse(document.getElementById('dirbuilder-preview').textContent);
+                
+                // Create file entry
+                const fileEntry = {
+                    name: this.name,
+                    type: 'directory',
+                    size: metadata.directory.totalSize,
+                    fileCount: metadata.directory.fileCount,
+                    directoryCount: metadata.directory.directoryCount,
+                    metaTxId: null,
+                    blockId: null,
+                    cid: null,
+                    uploadDate: new Date().toISOString(),
+                    password: null,
+                    metadata: metadata
+                };
+                
+                FileState.fileList.push(fileEntry);
+                FileState.lastUpdate = new Date().toISOString();
+                
+                // Update File tab UI
+                if (typeof updateFileListUI === 'function') {
+                    updateFileListUI();
+                }
+                
+                showStatus('Fileタブに登録しました', 'success');
+                
+                // Reset builder
+                this.resetBuilder();
+            }
+        };
+        
+        // Expose DirectoryBuilderState to window for onclick handlers
+        window.DirectoryBuilderState = DirectoryBuilderState;
         
         // Backward compatibility proxies (to be removed in future versions)
         let parallelDownloadEnabled = AppState.settings.parallelDownloadEnabled;
@@ -13030,7 +13437,7 @@
             
             // Find and activate the clicked nav item
             const navItems = document.querySelectorAll('.nav-item');
-            const tabNames = ['status', 'file', 'download', 'upload', 'directory', 'history', 'debug', 'settings'];
+            const tabNames = ['status', 'file', 'download', 'upload', 'directory', 'dirbuilder', 'history', 'debug', 'settings'];
             const tabIndex = tabNames.indexOf(tab);
             if (tabIndex !== -1 && navItems[tabIndex]) {
                 navItems[tabIndex].classList.add('active');

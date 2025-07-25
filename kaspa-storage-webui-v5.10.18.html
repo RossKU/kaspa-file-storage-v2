@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.10.17 - ディレクトリビルダーUI改善版</title>
+    <title>Kaspa P2P File Storage v5.10.18 - ディレクトリビルダー統合UI版</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -1780,51 +1780,31 @@
                     <pre id="dirbuilder-preview" style="background: var(--code-bg); padding: 10px; overflow-x: auto; max-height: 400px; display: none;"></pre>
                 </div>
 
-                <!-- Action Buttons -->
-                <div style="display: flex; gap: 10px;">
-                    <button onclick="DirectoryBuilderState.resetBuilder()" class="button button-secondary">
-                        <span class="icon">↩️</span> リセット
-                    </button>
-                    <button onclick="DirectoryBuilderState.validate()" class="button">
-                        <span class="icon">✓</span> 検証
-                    </button>
-                    <button onclick="DirectoryBuilderState.saveOptions()" class="button button-primary">
-                        <span class="icon">💾</span> 保存
-                    </button>
+                <!-- Password and Export Section -->
+                <div style="margin-bottom: 15px; padding: 15px; background: var(--bg-secondary); border-radius: 8px;">
+                    <div style="margin-bottom: 15px;">
+                        <label for="dirbuilder-password">パスワード保護 (オプション):</label>
+                        <input type="password" id="dirbuilder-password" placeholder="8文字以上のパスワード（空欄 = 保護なし）" style="width: 100%; padding: 8px; margin-top: 5px;">
+                    </div>
+                    
+                    <!-- Action Buttons -->
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        <button onclick="DirectoryBuilderState.resetBuilder()" class="button button-secondary">
+                            <span class="icon">↩️</span> リセット
+                        </button>
+                        <button onclick="DirectoryBuilderState.validate()" class="button">
+                            <span class="icon">✓</span> 検証
+                        </button>
+                        <button onclick="DirectoryBuilderState.generateOnly()" class="button">
+                            <span class="icon">🔧</span> 生成のみ
+                        </button>
+                        <button onclick="DirectoryBuilderState.generateAndUpload()" class="button button-primary">
+                            <span class="icon">📤</span> 生成してアップロード
+                        </button>
+                    </div>
                 </div>
             </div>
 
-            <!-- Phase 3: Export Section -->
-            <div class="metric-box" id="dirbuilder-export-section" style="display: none;">
-                <h3>📤 エクスポート</h3>
-                
-                <!-- Password Input -->
-                <div style="margin-bottom: 15px;">
-                    <label for="dirbuilder-password">パスワード (8文字以上):</label>
-                    <input type="password" id="dirbuilder-password" placeholder="強力なパスワードを入力" style="width: 100%; padding: 8px; margin-top: 5px;">
-                    <small style="color: var(--text-secondary);">※ 空欄の場合はパスワード保護なし</small>
-                </div>
-                
-                <!-- Main Actions -->
-                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                    <button onclick="DirectoryBuilderState.generateOnly()" class="button" style="flex: 1;">
-                        <span class="icon">🔧</span> ディレクトリメタデータを生成のみ
-                    </button>
-                    <button onclick="DirectoryBuilderState.generateAndUpload()" class="button button-primary" style="flex: 1;">
-                        <span class="icon">📤</span> 生成してアップロード
-                    </button>
-                </div>
-                
-                <!-- Additional Actions -->
-                <div style="display: flex; gap: 10px;">
-                    <button onclick="DirectoryBuilderState.exportAsKaspa()" class="button button-secondary" style="flex: 1;">
-                        <span class="icon">📄</span> .kaspaファイル保存
-                    </button>
-                    <button onclick="DirectoryBuilderState.addToFileTab()" class="button button-secondary" style="flex: 1;">
-                        <span class="icon">📂</span> Fileタブへ登録
-                    </button>
-                </div>
-            </div>
         </div>
     </div>
 
@@ -2535,7 +2515,6 @@
             showEditSection() {
                 document.getElementById('dirbuilder-import-section').style.display = 'none';
                 document.getElementById('dirbuilder-edit-section').style.display = 'block';
-                document.getElementById('dirbuilder-export-section').style.display = 'none';
                 
                 // Update UI
                 document.getElementById('dirbuilder-name').value = this.name;
@@ -2792,7 +2771,14 @@
                     
                     let html = '';
                     
-                    if (node.type !== 'root' || level === 0) {
+                    // Only show root at level 0, skip it at other levels
+                    if (node.type === 'root' && level === 0) {
+                        // Show root directory
+                        html += `<div style="padding: 4px 2px; cursor: pointer; display: flex; align-items: center; ${isSelected ? 'background: var(--accent-light);' : ''}" 
+                                     onclick="DirectoryBuilderState.selectNode('', 'root')">`;
+                        html += `${icon} ${node.name}`;
+                        html += '</div>';
+                    } else if (node.type !== 'root') {
                         // Calculate tree prefix
                         const prefix = level === 0 ? '' : parentPrefix + (isLast ? '└─ ' : '├─ ');
                         
@@ -2817,16 +2803,14 @@
                         }
                         
                         // Add delete button inline
-                        if (node.type !== 'root') {
-                            const index = this.entries.findIndex(e => 
-                                (e.path ? `${e.path}/${e.name}` : e.name) === node.fullPath
-                            );
-                            if (index !== -1) {
-                                html += ` <button onclick="event.stopPropagation(); DirectoryBuilderState.removeEntry(${index})" 
-                                         style="margin-left: auto; padding: 2px 6px; font-size: 12px; background: var(--error-color); 
-                                                color: white; border: none; border-radius: 3px; cursor: pointer;" 
-                                         title="削除">✕</button>`;
-                            }
+                        const index = this.entries.findIndex(e => 
+                            (e.path ? `${e.path}/${e.name}` : e.name) === node.fullPath
+                        );
+                        if (index !== -1) {
+                            html += ` <button onclick="event.stopPropagation(); DirectoryBuilderState.removeEntry(${index})" 
+                                     style="margin-left: auto; padding: 2px 6px; font-size: 12px; background: var(--error-color); 
+                                            color: white; border: none; border-radius: 3px; cursor: pointer;" 
+                                     title="削除">✕</button>`;
                         }
                         
                         html += '</div>';
@@ -2835,8 +2819,9 @@
                     // Render children
                     if (node.children && node.children.length > 0) {
                         if (node.type === 'root') {
+                            // For root, render children with level 1
                             node.children.forEach((child, index) => {
-                                html += renderNode(child, level, index === node.children.length - 1, '');
+                                html += renderNode(child, 1, index === node.children.length - 1, '');
                             });
                         } else {
                             const newPrefix = level === 0 ? '' : parentPrefix + (isLast ? '   ' : '│  ');
@@ -2853,11 +2838,17 @@
                             }
                         }
                     } else if (isSelected && (node.type === 'directory' || node.type === 'folder' || node.type === 'root')) {
-                        // Empty directory
-                        const newPrefix = level === 0 ? '' : parentPrefix + (isLast ? '   ' : '│  ');
-                        html += `<div style="padding: 4px 2px; color: var(--text-secondary); font-style: italic;">`;
-                        html += `<span style="font-family: monospace; white-space: pre;">${newPrefix}└─ </span>[ここに追加...]`;
-                        html += '</div>';
+                        // Empty directory or root
+                        if (node.type === 'root') {
+                            html += `<div style="padding: 4px 2px; color: var(--text-secondary); font-style: italic;">`;
+                            html += `└─ [ここに追加...]`;
+                            html += '</div>';
+                        } else {
+                            const newPrefix = level === 0 ? '' : parentPrefix + (isLast ? '   ' : '│  ');
+                            html += `<div style="padding: 4px 2px; color: var(--text-secondary); font-style: italic;">`;
+                            html += `<span style="font-family: monospace; white-space: pre;">${newPrefix}└─ </span>[ここに追加...]`;
+                            html += '</div>';
+                        }
                     }
                     
                     return html;
@@ -3023,7 +3014,7 @@
                     this.reset();
                     document.getElementById('dirbuilder-import-section').style.display = 'block';
                     document.getElementById('dirbuilder-edit-section').style.display = 'none';
-                    document.getElementById('dirbuilder-export-section').style.display = 'none';
+                    document.getElementById('dirbuilder-password').value = '';
                 }
             },
             
@@ -3050,16 +3041,6 @@
                 return true;
             },
             
-            async saveOptions() {
-                const valid = await this.validate();
-                if (!valid) {
-                    showStatus('保存する前に検証を実行してください', 'error');
-                    return;
-                }
-                
-                document.getElementById('dirbuilder-edit-section').style.display = 'none';
-                document.getElementById('dirbuilder-export-section').style.display = 'block';
-            },
             
             exportAsKaspa() {
                 const name = this.name;
@@ -3079,6 +3060,12 @@
             },
             
             async generateOnly() {
+                // Validate first
+                const valid = await this.validate();
+                if (!valid) {
+                    return;
+                }
+                
                 try {
                     const password = document.getElementById('dirbuilder-password').value;
                     if (password && password.length < 8) {
@@ -3105,6 +3092,12 @@
             },
             
             async generateAndUpload() {
+                // Validate first
+                const valid = await this.validate();
+                if (!valid) {
+                    return;
+                }
+                
                 try {
                     const password = document.getElementById('dirbuilder-password').value;
                     if (password && password.length < 8) {

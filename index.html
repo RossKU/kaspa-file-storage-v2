@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.10.15 - エクスプローラー型ツリービュー版</title>
+    <title>Kaspa P2P File Storage v5.10.16 - サブディレクトリ作成機能復活版</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -1718,6 +1718,13 @@
                     <small style="color: var(--text-secondary);">※ 自動的にメタデータタイプを判別します</small>
                 </div>
 
+                <!-- Folder Creation -->
+                <div style="margin-bottom: 15px;">
+                    <button onclick="DirectoryBuilderState.createEmptyFolder()" class="button" style="width: 100%;">
+                        <span class="icon">📁</span> 選択中の場所に新規フォルダを作成
+                    </button>
+                </div>
+
                 <!-- Tree View -->
                 <div style="margin-bottom: 15px;">
                     <label>ディレクトリ構造:</label>
@@ -2833,6 +2840,44 @@
                 // Show current path
                 const pathDisplay = path || 'ルート';
                 showStatus(`選択中: ${pathDisplay}`, 'info');
+            },
+            
+            createEmptyFolder() {
+                const folderName = prompt('新規フォルダ名を入力してください:');
+                if (!folderName) return;
+                
+                // Check if folder already exists
+                const fullPath = this.currentPath ? `${this.currentPath}/${folderName}` : folderName;
+                const exists = this.entries.some(e => {
+                    const entryPath = e.path ? `${e.path}/${e.name}` : e.name;
+                    return entryPath === fullPath;
+                });
+                
+                if (exists) {
+                    showStatus('同名のフォルダが既に存在します', 'error');
+                    return;
+                }
+                
+                // Create new folder entry
+                const newFolder = {
+                    type: 'directory',
+                    name: folderName,
+                    path: this.currentPath,
+                    size: 0,
+                    metaTxId: null,
+                    blockId: null,
+                    cid: null,
+                    fileCount: 0,
+                    totalSize: 0,
+                    password: null
+                };
+                
+                this.entries.push(newFolder);
+                this.updatePreview();
+                showStatus(`フォルダ「${folderName}」を作成しました`, 'success');
+                
+                // Auto-select the new folder
+                this.selectNode(fullPath, 'directory');
             },
             
             

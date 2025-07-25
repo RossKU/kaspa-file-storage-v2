@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.10.20 - ディレクトリエントリー最適化版</title>
+    <title>Kaspa P2P File Storage v5.10.21 - アーカイブノード統合版</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -1960,6 +1960,45 @@
             <div id="initStatus" class="metric-box" style="display: none;"></div>
         </div>
         
+        <!-- Archive Node Monitor -->
+        <div class="container">
+            <h2>🗄️ アーカイブノードモニター</h2>
+            <div class="metric-box">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <h3>接続状態</h3>
+                    <div>
+                        <button onclick="NetworkState.archiveManager?.startDiscovery()" id="archiveStartBtn">探索開始</button>
+                        <button onclick="NetworkState.archiveManager?.stop()" id="archiveStopBtn">停止</button>
+                    </div>
+                </div>
+                
+                <div id="archiveMonitorStatus" style="margin-bottom: 15px;">
+                    <div class="status-row">
+                        <span>アクティブワーカー:</span>
+                        <span id="archiveActiveWorkers">0</span>
+                    </div>
+                    <div class="status-row">
+                        <span>接続済みノード:</span>
+                        <span id="archiveConnectedNodes">0/5</span>
+                    </div>
+                    <div class="status-row">
+                        <span>平均応答時間:</span>
+                        <span id="archiveAvgResponse">-</span>
+                    </div>
+                </div>
+                
+                <h4>ノード詳細:</h4>
+                <div id="archiveNodeDetails" style="max-height: 200px; overflow-y: auto; font-size: 12px; font-family: monospace;">
+                    <div style="color: #666;">アーカイブノードが見つかりません</div>
+                </div>
+                
+                <div style="margin-top: 10px;">
+                    <button onclick="testArchiveNodes()" disabled id="archiveTestBtn">応答時間テスト</button>
+                    <button onclick="refreshArchiveStatus()">ステータス更新</button>
+                </div>
+            </div>
+        </div>
+        
         <!-- Debug Log -->
         <div class="container">
             <h2>🐛 デバッグログ</h2>
@@ -2383,8 +2422,270 @@
             // v5.6.6: Removed offlineTimeout - now using ConnectionManager
         };
         
+        // Initialize Archive Manager
+        NetworkState.archiveManager = null;
+        
         // Expose NetworkState to window for global access
         window.NetworkState = NetworkState;
+        
+        // ===== Archive Node Manager (v5.10.21) =====
+        class ArchiveNodeManager {
+            constructor(config = {}) {
+                // Configuration
+                this.baselineHours = config.baselineHours || 30;
+                this.blocksPerSecond = 10;
+                this.requiredBlocks = this.calculateRequiredBlocks();
+                this.fullArchiveThreshold = 100000000; // 100M blocks
+                
+                // Node management
+                this.connections = new Map(); // nodeId => { client, stats }
+                this.activeWorkers = 0;
+                this.maxWorkers = 5;
+                this.isDiscovering = false;
+                this.maintainConnections = false;
+                
+                // Response time tracking
+                this.responseTimeWindow = 10;
+                
+                // Debug logging
+                this.debugMode = true;
+            }
+            
+            calculateRequiredBlocks() {
+                const hoursInSeconds = this.baselineHours * 3600;
+                return hoursInSeconds * this.blocksPerSecond;
+            }
+            
+            async initialize() {
+                if (this.isInitialized) return;
+                
+                this.log('Archive Node Manager initializing...', 'info');
+                this.log(`Required blocks: ${this.requiredBlocks} (${this.baselineHours}h coverage)`, 'info');
+                
+                this.isInitialized = true;
+                this.startDiscovery();
+            }
+            
+            async startDiscovery() {
+                if (this.isDiscovering) return;
+                
+                this.isDiscovering = true;
+                this.maintainConnections = true;
+                this.log('Starting archive node discovery...', 'info');
+                
+                // Start discovery workers
+                this.spawnWorkers();
+            }
+            
+            async spawnWorkers() {
+                const needed = Math.max(0, 5 - this.connections.size);
+                if (needed === 0) {
+                    this.log('Already have 5 archive nodes', 'success');
+                    return;
+                }
+                
+                for (let i = 0; i < Math.min(needed, this.maxWorkers); i++) {
+                    this.discoverNode();
+                }
+            }
+            
+            async discoverNode() {
+                if (!this.maintainConnections) return;
+                
+                this.activeWorkers++;
+                
+                try {
+                    // Create new RPC client to random node
+                    const client = new NetworkState.kaspa.RpcClient({
+                        resolver: new NetworkState.kaspa.Resolver(),
+                        networkId: 'mainnet'
+                    });
+                    
+                    await client.connect();
+                    const validation = await this.validateArchiveNode(client);
+                    
+                    if (validation.isArchive) {
+                        const nodeId = `archive_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+                        this.connections.set(nodeId, {
+                            client,
+                            stats: {
+                                ...validation,
+                                responseTimes: [],
+                                isHealthy: true,
+                                connectedAt: Date.now()
+                            }
+                        });
+                        
+                        this.log(`Archive node found! Total: ${this.connections.size}/5`, 'success');
+                        updateArchiveNodeStatus();
+                        
+                        if (this.connections.size >= 5) {
+                            this.isDiscovering = false;
+                            this.log('Target of 5 archive nodes reached', 'success');
+                        }
+                    } else {
+                        await client.disconnect();
+                    }
+                } catch (error) {
+                    this.log(`Discovery error: ${error.message}`, 'error');
+                } finally {
+                    this.activeWorkers--;
+                    
+                    // Continue discovery if needed
+                    if (this.maintainConnections && this.connections.size < 5) {
+                        setTimeout(() => this.discoverNode(), 2000);
+                    }
+                }
+            }
+            
+            async validateArchiveNode(client) {
+                try {
+                    const dagInfo = await client.getBlockDagInfo();
+                    const blockCount = Number(dagInfo.blockCount || 0);
+                    
+                    // Check if meets required blocks threshold
+                    const isArchive = blockCount >= this.requiredBlocks;
+                    
+                    if (isArchive) {
+                        // Test actual data retrieval
+                        const targetHeight = blockCount - Math.floor(this.requiredBlocks * 0.9);
+                        const hasData = await this.testBlockRetrieval(client, targetHeight);
+                        
+                        return {
+                            isArchive: hasData,
+                            blockCount,
+                            type: blockCount >= this.fullArchiveThreshold ? 'full' : 'partial',
+                            coverage: Math.floor(blockCount / this.blocksPerSecond / 3600) + ' hours'
+                        };
+                    }
+                    
+                    return { isArchive: false, blockCount };
+                } catch (error) {
+                    return { isArchive: false, error: error.message };
+                }
+            }
+            
+            async testBlockRetrieval(client, height) {
+                try {
+                    const block = await client.getBlock({ height, includeTransactions: false });
+                    return !!block;
+                } catch {
+                    return false;
+                }
+            }
+            
+            async getOptimalClient() {
+                if (this.connections.size === 0) return null;
+                
+                // Filter healthy nodes and sort by response time
+                const sorted = Array.from(this.connections.entries())
+                    .filter(([_, node]) => node.client && node.stats.isHealthy)
+                    .sort((a, b) => {
+                        const avgA = this.calculateAvgResponseTime(a[1].stats);
+                        const avgB = this.calculateAvgResponseTime(b[1].stats);
+                        return avgA - avgB;
+                    });
+                
+                if (sorted.length === 0) return null;
+                
+                // Load balancing: 70% to fastest, 30% to second fastest
+                const useSecondBest = sorted.length > 1 && Math.random() < 0.3;
+                const selected = sorted[useSecondBest ? 1 : 0];
+                
+                return selected[1].client;
+            }
+            
+            calculateAvgResponseTime(stats) {
+                const times = stats.responseTimes || [];
+                if (times.length === 0) return 0;
+                return times.reduce((a, b) => a + b, 0) / times.length;
+            }
+            
+            recordResponseTime(nodeId, duration) {
+                const node = this.connections.get(nodeId);
+                if (!node) return;
+                
+                node.stats.responseTimes.push(duration);
+                
+                // Maintain window size
+                if (node.stats.responseTimes.length > this.responseTimeWindow) {
+                    node.stats.responseTimes.shift();
+                }
+                
+                // Health check
+                const avg = this.calculateAvgResponseTime(node.stats);
+                node.stats.isHealthy = avg < 5000; // 5 second threshold
+            }
+            
+            getNodeIdByClient(client) {
+                for (const [nodeId, node] of this.connections) {
+                    if (node.client === client) return nodeId;
+                }
+                return null;
+            }
+            
+            markUnhealthy(nodeId) {
+                const node = this.connections.get(nodeId);
+                if (node) {
+                    node.stats.isHealthy = false;
+                    this.log(`Node ${nodeId} marked as unhealthy`, 'warning');
+                }
+            }
+            
+            getStats() {
+                const stats = {
+                    totalNodes: this.connections.size,
+                    healthyNodes: 0,
+                    avgResponseTime: 0,
+                    nodes: []
+                };
+                
+                let totalResponseTime = 0;
+                let responseCount = 0;
+                
+                for (const [nodeId, node] of this.connections) {
+                    const avgTime = this.calculateAvgResponseTime(node.stats);
+                    if (node.stats.isHealthy) stats.healthyNodes++;
+                    
+                    stats.nodes.push({
+                        id: nodeId,
+                        healthy: node.stats.isHealthy,
+                        blockCount: node.stats.blockCount,
+                        type: node.stats.type,
+                        coverage: node.stats.coverage,
+                        avgResponseTime: avgTime
+                    });
+                    
+                    if (avgTime > 0) {
+                        totalResponseTime += avgTime;
+                        responseCount++;
+                    }
+                }
+                
+                stats.avgResponseTime = responseCount > 0 ? totalResponseTime / responseCount : 0;
+                return stats;
+            }
+            
+            log(message, type = 'info') {
+                if (!this.debugMode) return;
+                log(`[ArchiveManager] ${message}`, type);
+            }
+            
+            async stop() {
+                this.maintainConnections = false;
+                this.isDiscovering = false;
+                
+                // Disconnect all nodes
+                for (const [nodeId, node] of this.connections) {
+                    try {
+                        await node.client.disconnect();
+                    } catch {}
+                }
+                
+                this.connections.clear();
+                this.log('Archive Node Manager stopped', 'info');
+            }
+        }
         
         // ===== Phase 5: File State Refactoring (v5.5.0) =====
         // Starting with progressManager only - minimal safe step
@@ -7646,6 +7947,165 @@
         }
 
         // System initialization
+        // Archive Node UI Functions
+        function updateArchiveNodeStatus() {
+            const manager = NetworkState.archiveManager;
+            if (!manager) {
+                document.getElementById('archiveStatus').textContent = 'Not Initialized';
+                document.getElementById('archiveConnections').textContent = '接続数: 0/5';
+                return;
+            }
+            
+            const stats = manager.getStats();
+            const activeCount = stats.totalNodes;
+            const healthyCount = stats.healthyNodes;
+            
+            // Status tab updates
+            document.getElementById('archiveConnections').textContent = 
+                `接続数: ${activeCount}/5 (健全: ${healthyCount})`;
+            
+            if (activeCount > 0) {
+                document.getElementById('archiveIndicator').className = 
+                    'status-indicator-large status-connected';
+                document.getElementById('archiveStatus').textContent = 'Connected';
+                document.getElementById('archiveDetails').textContent = 
+                    `Response: ${stats.avgResponseTime.toFixed(0)}ms`;
+            } else {
+                document.getElementById('archiveIndicator').className = 
+                    'status-indicator-large status-disconnected';
+                document.getElementById('archiveStatus').textContent = manager.isDiscovering ? 'Searching...' : 'Not Connected';
+                document.getElementById('archiveDetails').textContent = 'Status: -';
+            }
+            
+            // Debug tab updates
+            document.getElementById('archiveActiveWorkers').textContent = manager.activeWorkers;
+            document.getElementById('archiveConnectedNodes').textContent = `${activeCount}/5`;
+            document.getElementById('archiveAvgResponse').textContent = 
+                stats.avgResponseTime > 0 ? `${stats.avgResponseTime.toFixed(0)}ms` : '-';
+            
+            // Node details
+            const detailsDiv = document.getElementById('archiveNodeDetails');
+            if (stats.nodes.length === 0) {
+                detailsDiv.innerHTML = '<div style="color: #666;">アーカイブノードが見つかりません</div>';
+            } else {
+                let html = '';
+                stats.nodes.forEach((node, idx) => {
+                    html += `<div style="margin-bottom: 8px; padding: 5px; border: 1px solid ${node.healthy ? '#49EACB' : '#e94560'}; border-radius: 4px;">`;
+                    html += `<strong>Node ${idx + 1}:</strong> `;
+                    html += `${node.type} (${node.coverage}), `;
+                    html += `Blocks: ${(node.blockCount / 1000000).toFixed(1)}M, `;
+                    html += `Avg: ${node.avgResponseTime.toFixed(0)}ms `;
+                    html += node.healthy ? '✅' : '❌';
+                    html += '</div>';
+                });
+                detailsDiv.innerHTML = html;
+            }
+            
+            // Enable/disable test button
+            document.getElementById('archiveTestBtn').disabled = activeCount === 0;
+        }
+        
+        window.refreshArchiveStatus = function() {
+            updateArchiveNodeStatus();
+            log('[UI] アーカイブノードステータスを更新しました', 'info');
+        }
+        
+        window.testArchiveNodes = async function() {
+            const manager = NetworkState.archiveManager;
+            if (!manager || manager.connections.size === 0) {
+                log('テスト可能なアーカイブノードがありません', 'warning');
+                return;
+            }
+            
+            log('アーカイブノード応答時間テストを開始...', 'info');
+            
+            for (const [nodeId, node] of manager.connections) {
+                if (!node.stats.isHealthy) continue;
+                
+                try {
+                    const startTime = Date.now();
+                    const info = await node.client.getServerInfo();
+                    const duration = Date.now() - startTime;
+                    
+                    manager.recordResponseTime(nodeId, duration);
+                    log(`Node ${nodeId}: ${duration}ms (${info.serverVersion})`, 'success');
+                } catch (error) {
+                    manager.markUnhealthy(nodeId);
+                    log(`Node ${nodeId}: エラー - ${error.message}`, 'error');
+                }
+            }
+            
+            updateArchiveNodeStatus();
+            log('テスト完了', 'info');
+        }
+        
+        // Initialize Archive Manager when system initializes
+        async function initializeArchiveManager() {
+            if (!NetworkState.kaspa) {
+                log('Kaspaモジュールが初期化されていません', 'error');
+                return;
+            }
+            
+            log('Archive Node Managerを初期化中...', 'info');
+            NetworkState.archiveManager = new ArchiveNodeManager();
+            await NetworkState.archiveManager.initialize();
+            
+            // Start periodic status updates
+            setInterval(updateArchiveNodeStatus, 2000);
+        }
+        
+        // Enhanced getTransaction with archive node fallback
+        async function getTransactionWithArchive(txId, blockId = null) {
+            const startTime = Date.now();
+            
+            // First try with normal RPC client
+            try {
+                const result = await NetworkState.rpcClient.getTransaction({
+                    transactionId: txId,
+                    includeBlockInfo: true
+                });
+                return result;
+            } catch (error) {
+                // Check if error indicates pruned data
+                if (error.message && (
+                    error.message.includes('pruned') || 
+                    error.message.includes('not found') ||
+                    error.message.includes('does not exist')
+                )) {
+                    log('通常ノードでデータが見つかりません。アーカイブノードを使用します。', 'info');
+                    
+                    if (!NetworkState.archiveManager || NetworkState.archiveManager.connections.size === 0) {
+                        throw new Error('利用可能なアーカイブノードがありません');
+                    }
+                    
+                    const archiveClient = await NetworkState.archiveManager.getOptimalClient();
+                    if (!archiveClient) {
+                        throw new Error('健全なアーカイブノードが見つかりません');
+                    }
+                    
+                    const nodeId = NetworkState.archiveManager.getNodeIdByClient(archiveClient);
+                    try {
+                        const result = await archiveClient.getTransaction({
+                            transactionId: txId,
+                            includeBlockInfo: true
+                        });
+                        
+                        // Record response time
+                        const duration = Date.now() - startTime;
+                        NetworkState.archiveManager.recordResponseTime(nodeId, duration);
+                        log(`アーカイブノードからトランザクションを取得しました (${duration}ms)`, 'success');
+                        
+                        return result;
+                    } catch (archiveError) {
+                        // Mark this node as unhealthy
+                        NetworkState.archiveManager.markUnhealthy(nodeId);
+                        throw archiveError;
+                    }
+                }
+                throw error;
+            }
+        }
+        
         window.initializeSystem = async function() {
             try {
                 log('システム初期化を開始...');
@@ -7719,6 +8179,9 @@
                 }
                 
                 updateNetworkStatus('online', 'オンライン');
+                
+                // Initialize Archive Manager
+                await initializeArchiveManager();
                 
             } catch (error) {
                 log(`初期化エラー: ${error.message}`, 'error');
@@ -9964,10 +10427,7 @@
                                 if (waitTime >= 30000) {
                                     try {
                                         log('30秒経過 - RPCで確認を試みます...');
-                                        const txInfo = await NetworkState.rpcClient.getTransaction({
-                                            transactionId: txid,
-                                            includeBlockInfo: true
-                                        });
+                                        const txInfo = await getTransactionWithArchive(txid);
                                         
                                         if (txInfo && txInfo.blockHash) {
                                             blockId = txInfo.blockHash;

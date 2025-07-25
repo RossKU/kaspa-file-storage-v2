@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.10.11 - ディレクトリビルダー実装版</title>
+    <title>Kaspa P2P File Storage v5.10.12 - ディレクトリビルダービジュアルプレビュー版</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -1714,8 +1714,44 @@
 
                 <!-- Metadata Preview -->
                 <div style="margin-bottom: 15px;">
-                    <label>メタデータプレビュー:</label>
-                    <pre id="dirbuilder-preview" style="background: var(--code-bg); padding: 10px; overflow-x: auto; max-height: 200px;"></pre>
+                    <label>プレビュー:</label>
+                    
+                    <!-- Preview Tabs -->
+                    <div style="display: flex; gap: 10px; margin: 10px 0;">
+                        <button id="visual-preview-tab" class="button-small" style="background: var(--accent-color); color: white;" onclick="DirectoryBuilderState.showVisualPreview()">
+                            <span class="icon">👁️</span> ビジュアル
+                        </button>
+                        <button id="json-preview-tab" class="button-small" style="background: var(--bg-secondary);" onclick="DirectoryBuilderState.showJsonPreview()">
+                            <span class="icon">{ }</span> JSON
+                        </button>
+                    </div>
+                    
+                    <!-- Visual Preview -->
+                    <div id="dirbuilder-visual-preview" style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px; max-height: 400px; overflow-y: auto;">
+                        <!-- Directory Info -->
+                        <div style="margin-bottom: 16px;">
+                            <h3 style="margin: 0 0 8px 0; display: flex; align-items: center;">
+                                <span style="font-size: 24px; margin-right: 8px;">📁</span>
+                                <span id="visual-dir-name">ディレクトリ名</span>
+                            </h3>
+                            <div style="display: flex; gap: 20px; color: var(--text-secondary); font-size: 14px;">
+                                <span>📄 ファイル: <strong id="visual-file-count">0</strong></span>
+                                <span>📁 ディレクトリ: <strong id="visual-dir-count">0</strong></span>
+                                <span>💾 合計サイズ: <strong id="visual-total-size">0 MB</strong></span>
+                            </div>
+                        </div>
+                        
+                        <!-- Entry List -->
+                        <div style="border-top: 1px solid var(--border-color); padding-top: 12px;">
+                            <h4 style="margin: 0 0 12px 0; font-size: 16px;">エントリー一覧</h4>
+                            <div id="visual-entry-list" style="display: flex; flex-direction: column; gap: 8px;">
+                                <!-- Entries will be added here -->
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- JSON Preview -->
+                    <pre id="dirbuilder-preview" style="background: var(--code-bg); padding: 10px; overflow-x: auto; max-height: 400px; display: none;"></pre>
                 </div>
 
                 <!-- Action Buttons -->
@@ -2457,6 +2493,9 @@
                 document.getElementById('dirbuilder-name').value = this.name;
                 this.updateEntryList();
                 this.updatePreview();
+                
+                // Show visual preview by default
+                this.showVisualPreview();
             },
             
             addFileEntry() {
@@ -2575,6 +2614,82 @@
                 };
                 
                 document.getElementById('dirbuilder-preview').textContent = JSON.stringify(metadata, null, 2);
+                
+                // Update visual preview
+                this.updateVisualPreview(metadata);
+            },
+            
+            updateVisualPreview(metadata) {
+                // Update directory name
+                document.getElementById('visual-dir-name').textContent = metadata.directory.name || '未設定';
+                
+                // Update stats
+                document.getElementById('visual-file-count').textContent = metadata.directory.fileCount;
+                document.getElementById('visual-dir-count').textContent = metadata.directory.directoryCount;
+                document.getElementById('visual-total-size').textContent = (metadata.directory.totalSize / 1024 / 1024).toFixed(2) + ' MB';
+                
+                // Update entry list
+                const entryListContainer = document.getElementById('visual-entry-list');
+                
+                if (this.entries.length === 0) {
+                    entryListContainer.innerHTML = `
+                        <div style="text-align: center; color: var(--text-secondary); padding: 20px;">
+                            エントリーがありません
+                        </div>
+                    `;
+                    return;
+                }
+                
+                entryListContainer.innerHTML = this.entries.map(entry => {
+                    const icon = entry.type === 'directory' ? '📁' : '📄';
+                    const name = entry.name || '(名前未設定)';
+                    const size = entry.type === 'directory' 
+                        ? `${entry.fileCount || 0}ファイル, ${((entry.totalSize || 0) / 1024 / 1024).toFixed(1)}MB`
+                        : `${((entry.size || 0) / 1024).toFixed(1)}KB`;
+                    
+                    const pathInfo = entry.path ? `
+                        <div style="font-size: 12px; color: var(--text-secondary);">
+                            📍 ${entry.path}/
+                        </div>
+                    ` : '';
+                    
+                    const txInfo = entry.metaTxId ? `
+                        <div style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">
+                            🔗 TxID: ${entry.metaTxId.substring(0, 16)}...
+                        </div>
+                    ` : '';
+                    
+                    return `
+                        <div style="background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 12px; display: flex; align-items: center;">
+                            <span style="font-size: 20px; margin-right: 12px;">${icon}</span>
+                            <div style="flex: 1;">
+                                <div style="font-weight: 500;">${name}</div>
+                                <div style="font-size: 14px; color: var(--text-secondary);">${size}</div>
+                                ${pathInfo}
+                                ${txInfo}
+                            </div>
+                            ${entry.password ? '<span style="color: var(--warning-color);" title="パスワード保護">🔒</span>' : ''}
+                        </div>
+                    `;
+                }).join('');
+            },
+            
+            showVisualPreview() {
+                document.getElementById('dirbuilder-visual-preview').style.display = 'block';
+                document.getElementById('dirbuilder-preview').style.display = 'none';
+                document.getElementById('visual-preview-tab').style.background = 'var(--accent-color)';
+                document.getElementById('visual-preview-tab').style.color = 'white';
+                document.getElementById('json-preview-tab').style.background = 'var(--bg-secondary)';
+                document.getElementById('json-preview-tab').style.color = 'var(--text-primary)';
+            },
+            
+            showJsonPreview() {
+                document.getElementById('dirbuilder-visual-preview').style.display = 'none';
+                document.getElementById('dirbuilder-preview').style.display = 'block';
+                document.getElementById('json-preview-tab').style.background = 'var(--accent-color)';
+                document.getElementById('json-preview-tab').style.color = 'white';
+                document.getElementById('visual-preview-tab').style.background = 'var(--bg-secondary)';
+                document.getElementById('visual-preview-tab').style.color = 'var(--text-primary)';
             },
             
             resetBuilder() {

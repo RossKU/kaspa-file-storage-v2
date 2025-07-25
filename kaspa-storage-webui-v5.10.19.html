@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.10.18 - ディレクトリビルダー統合UI版</title>
+    <title>Kaspa P2P File Storage v5.10.19 - ディレクトリビルダーUI最適化版</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -1706,8 +1706,6 @@
 
             <!-- Phase 2: Edit Section -->
             <div class="metric-box" id="dirbuilder-edit-section" style="display: none;">
-                <h3>📝 編集</h3>
-                
                 <!-- Directory Name -->
                 <div style="margin-bottom: 15px;">
                     <label>ディレクトリ名:</label>
@@ -1757,23 +1755,14 @@
 
                 <!-- Metadata Preview -->
                 <div style="margin-bottom: 15px;">
-                    <label>プレビュー:</label>
-                    
                     <!-- Visual Preview -->
                     <div id="dirbuilder-visual-preview" style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px; max-height: 400px; overflow-y: auto;">
-                        <!-- Directory Info -->
-                        <div style="margin-bottom: 16px;">
-                            <h3 style="margin: 0 0 8px 0; display: flex; align-items: center;">
-                                <span style="font-size: 24px; margin-right: 8px;">📁</span>
-                                <span id="visual-dir-name">ディレクトリ名</span>
-                            </h3>
-                            <div style="display: flex; gap: 20px; color: var(--text-secondary); font-size: 14px;">
-                                <span>📄 ファイル: <strong id="visual-file-count">0</strong></span>
-                                <span>📁 ディレクトリ: <strong id="visual-dir-count">0</strong></span>
-                                <span>💾 合計サイズ: <strong id="visual-total-size">0 MB</strong></span>
-                            </div>
+                        <!-- Directory Stats -->
+                        <div style="display: flex; gap: 20px; color: var(--text-secondary); font-size: 14px;">
+                            <span>📄 ファイル: <strong id="visual-file-count">0</strong></span>
+                            <span>📁 ディレクトリ: <strong id="visual-dir-count">0</strong></span>
+                            <span>💾 合計サイズ: <strong id="visual-total-size">0 MB</strong></span>
                         </div>
-                        
                     </div>
                     
                     <!-- JSON Preview -->
@@ -2823,6 +2812,12 @@
                             node.children.forEach((child, index) => {
                                 html += renderNode(child, 1, index === node.children.length - 1, '');
                             });
+                            // Add "add here" option for root
+                            if (isSelected) {
+                                html += `<div style="padding: 4px 2px; color: var(--text-secondary);">`;
+                                html += `└─ [ここに追加...]`;
+                                html += '</div>';
+                            }
                         } else {
                             const newPrefix = level === 0 ? '' : parentPrefix + (isLast ? '   ' : '│  ');
                             
@@ -2832,7 +2827,7 @@
                             
                             // Add "add here" option for directories
                             if (isSelected && (node.type === 'directory' || node.type === 'folder' || node.type === 'root')) {
-                                html += `<div style="padding: 4px 2px; color: var(--text-secondary); font-style: italic;">`;
+                                html += `<div style="padding: 4px 2px; color: var(--text-secondary);">`;
                                 html += `<span style="font-family: monospace; white-space: pre;">${newPrefix}└─ </span>[ここに追加...]`;
                                 html += '</div>';
                             }
@@ -2840,12 +2835,12 @@
                     } else if (isSelected && (node.type === 'directory' || node.type === 'folder' || node.type === 'root')) {
                         // Empty directory or root
                         if (node.type === 'root') {
-                            html += `<div style="padding: 4px 2px; color: var(--text-secondary); font-style: italic;">`;
+                            html += `<div style="padding: 4px 2px; color: var(--text-secondary);">`;
                             html += `└─ [ここに追加...]`;
                             html += '</div>';
                         } else {
                             const newPrefix = level === 0 ? '' : parentPrefix + (isLast ? '   ' : '│  ');
-                            html += `<div style="padding: 4px 2px; color: var(--text-secondary); font-style: italic;">`;
+                            html += `<div style="padding: 4px 2px; color: var(--text-secondary);">`;
                             html += `<span style="font-family: monospace; white-space: pre;">${newPrefix}└─ </span>[ここに追加...]`;
                             html += '</div>';
                         }
@@ -2948,9 +2943,6 @@
             },
             
             updateVisualPreview(metadata) {
-                // Update directory name
-                document.getElementById('visual-dir-name').textContent = metadata.directory.name || '未設定';
-                
                 // Update stats
                 document.getElementById('visual-file-count').textContent = metadata.directory.fileCount;
                 document.getElementById('visual-dir-count').textContent = metadata.directory.directoryCount;

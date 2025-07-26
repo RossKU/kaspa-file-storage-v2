@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.1 - アーカイブノード統合版（推定値対応）</title>
+    <title>Kaspa P2P File Storage v5.11.1 - アーカイブノード統合版（デバッグ版）</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -2493,8 +2493,7 @@
             async initialize() {
                 if (this.isInitialized) return;
                 
-                this.log('Archive Node Manager initializing...', 'info');
-                this.log(`Archive threshold: ${this.archiveThreshold / 1000000}M blocks`, 'info');
+                // Reduce log output - only show important events
                 
                 this.isInitialized = true;
                 this.stats.startTime = Date.now();
@@ -2506,7 +2505,7 @@
                 
                 this.isDiscovering = true;
                 this.maintainConnections = true;
-                this.log('Starting archive node discovery...', 'info');
+                // Starting discovery silently
                 
                 // Start discovery workers
                 this.spawnWorkers();
@@ -2547,21 +2546,18 @@
                     const dagInfo = await client.getBlockDagInfo();
                     const blockCount = Number(dagInfo.blockCount || 0);
                     
-                    // Use estimate_block_count logic
-                    const blockEstimate = this.estimateBlockCount(dagInfo, nodeInfo);
-                    const estimatedBlockCount = blockEstimate.value;
-                    const blockCountM = blockEstimate.displayValue;
+                    // Use actual block count
+                    const blockCountM = (blockCount / 1000000).toFixed(1);
                     
                     // Update checking status with block count
                     this.currentChecking = {
                         status: 'checking',
                         blockCount: blockCount,
-                        estimatedBlockCount: estimatedBlockCount,
                         version: nodeInfo.serverVersion,
                         blockCountM: blockCountM
                     };
                     
-                    this.addEvent(`Checking: ${blockCountM} blocks${blockEstimate.estimated ? ' (est)' : ''}`, '🔍');
+                    this.addEvent(`Checking: ${blockCountM}M blocks`, '🔍');
                     
                     // Validate if it's an archive node
                     const validation = await this.validateArchiveNode(client);
@@ -2661,25 +2657,17 @@
                     const serverInfo = await client.getServerInfo();
                     const height = Number(dagInfo.blockCount || 0);
                     
-                    // Use estimate_block_count logic
-                    const blockEstimate = this.estimateBlockCount(dagInfo, serverInfo);
-                    const estimatedHeight = blockEstimate.value;
+                    // Use actual block count instead of estimate for now
+                    // TODO: Fix estimate logic for better pruned node detection
                     
-                    this.log(`Block count: ${height} (estimated: ${blockEstimate.displayValue})`, 'info');
-                    if (blockEstimate.estimated) {
-                        this.log(`Note: ${blockEstimate.note || 'Using estimated value'}`, 'debug');
-                    }
-                    
-                    // First check: estimated height > archiveThreshold
-                    let isArchive = estimatedHeight > this.archiveThreshold;
+                    // First check: height > archiveThreshold
+                    let isArchive = height > this.archiveThreshold;
                     
                     if (!isArchive) {
                         return { 
                             isArchive: false, 
                             blockCount: height,
-                            estimatedBlockCount: estimatedHeight,
-                            estimated: blockEstimate.estimated,
-                            reason: `Height ${(estimatedHeight/1000000).toFixed(1)}M < threshold ${(this.archiveThreshold/1000000).toFixed(0)}M`
+                            reason: `Height ${(height/1000000).toFixed(1)}M < threshold ${(this.archiveThreshold/1000000).toFixed(0)}M`
                         };
                     }
                     
@@ -2694,8 +2682,6 @@
                             return {
                                 isArchive: false,
                                 blockCount: height,
-                                estimatedBlockCount: estimatedHeight,
-                                estimated: blockEstimate.estimated,
                                 reason: 'Cannot retrieve half-height blocks'
                             };
                         }
@@ -2731,12 +2717,25 @@
             
             async testBlockRetrieval(client, height) {
                 try {
-                    // Exactly like v29's testBlock function
+                    // Test block retrieval with detailed logging
+                    // Testing block retrieval
+                    
+                    let block;
                     if (client.getBlockByHeight) {
-                        return !!(await client.getBlockByHeight(height));
+                        block = await client.getBlockByHeight(height);
+                        if (!block) {
+                            this.log(`getBlockByHeight(${height}): FAILED - block not found`, 'error');
+                        }
+                    } else {
+                        block = await client.getBlock({ height, includeTransactions: false });
+                        if (!block) {
+                            this.log(`getBlock(${height}): FAILED - block not found`, 'error');
+                        }
                     }
-                    return !!(await client.getBlock({ height, includeTransactions: false }));
-                } catch {
+                    
+                    return !!block;
+                } catch (error) {
+                    this.log(`Block retrieval failed at ${height}: ${error.message}`, 'error');
                     return false;
                 }
             }
@@ -2864,7 +2863,7 @@
                 }
                 
                 this.connections.clear();
-                this.log('Archive Node Manager stopped', 'info');
+                // Archive Node Manager stopped
             }
             
             loadThreshold() {
@@ -2879,7 +2878,7 @@
             saveThreshold(thresholdM) {
                 localStorage.setItem(`archiveThreshold_${this.networkId}`, thresholdM.toString());
                 this.archiveThreshold = thresholdM * 1000000;
-                this.log(`Threshold updated to ${thresholdM}M blocks`, 'info');
+                // Threshold updated
             }
             
             updateNetwork(networkId) {
@@ -2887,11 +2886,11 @@
                 
                 this.networkId = networkId;
                 this.archiveThreshold = this.loadThreshold();
-                this.log(`Network switched to ${networkId}`, 'info');
+                // Network switched
                 
                 // Clear current connections as they're for wrong network
                 if (this.connections.size > 0) {
-                    this.log('Clearing connections for network switch', 'info');
+                    // Clearing connections
                     this.stop();
                 }
             }

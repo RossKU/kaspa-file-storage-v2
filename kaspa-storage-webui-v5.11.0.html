@@ -2431,11 +2431,11 @@
         // ===== Archive Node Manager (v5.10.21) =====
         class ArchiveNodeManager {
             constructor(config = {}) {
-                // Configuration
-                this.baselineHours = config.baselineHours || 30;
+                // Configuration (matching v29)
+                this.archiveThreshold = 50000000; // 50M blocks - same as v29
+                this.testOldBlocks = true; // Enable old block testing
                 this.blocksPerSecond = 10;
-                this.requiredBlocks = this.calculateRequiredBlocks();
-                this.fullArchiveThreshold = 100000000; // 100M blocks
+                this.blocksPerDay = 864000; // 10 blocks/sec * 86400 sec - for 1 day test
                 
                 // Node management
                 this.connections = new Map(); // nodeId => { client, stats }
@@ -2475,16 +2475,12 @@
                 };
             }
             
-            calculateRequiredBlocks() {
-                const hoursInSeconds = this.baselineHours * 3600;
-                return hoursInSeconds * this.blocksPerSecond;
-            }
             
             async initialize() {
                 if (this.isInitialized) return;
                 
                 this.log('Archive Node Manager initializing...', 'info');
-                this.log(`Required blocks: ${this.requiredBlocks} (${this.baselineHours}h coverage)`, 'info');
+                this.log(`Archive threshold: ${this.archiveThreshold / 1000000}M blocks`, 'info');
                 
                 this.isInitialized = true;
                 this.stats.startTime = Date.now();
@@ -2597,65 +2593,77 @@
             async validateArchiveNode(client) {
                 try {
                     const dagInfo = await client.getBlockDagInfo();
-                    const currentHeight = Number(dagInfo.blockCount || 0);
+                    const height = Number(dagInfo.blockCount || 0);
                     
-                    // Calculate target height (30 hours ago)
-                    const targetHeight = currentHeight - this.requiredBlocks;
+                    // First check: height > archiveThreshold (exactly like v29)
+                    let isArchive = height > this.archiveThreshold;
                     
-                    // Test if node can retrieve blocks from 30 hours ago
-                    let canRetrieve30h = false;
-                    try {
-                        const block = await client.getBlock({ 
-                            height: targetHeight, 
-                            includeTransactions: false 
-                        });
-                        canRetrieve30h = !!block;
-                    } catch (error) {
-                        if (error.message && error.message.includes('pruned')) {
-                            this.log(`Node pruned at 30h mark`, 'info');
-                            canRetrieve30h = false;
-                        }
-                    }
-                    
-                    if (!canRetrieve30h) {
+                    if (!isArchive) {
                         return { 
                             isArchive: false, 
-                            blockCount: currentHeight,
-                            reason: 'Cannot retrieve 30h old blocks'
+                            blockCount: height,
+                            reason: `Height ${(height/1000000).toFixed(1)}M < threshold ${(this.archiveThreshold/1000000).toFixed(0)}M`
                         };
                     }
                     
-                    // Test for full archive (can retrieve very old blocks)
-                    let isFullArchive = false;
-                    const veryOldHeight = Math.floor(currentHeight / 2);
-                    try {
-                        const oldBlock = await client.getBlock({ 
-                            height: veryOldHeight, 
-                            includeTransactions: false 
-                        });
-                        isFullArchive = !!oldBlock;
-                    } catch {
-                        isFullArchive = false;
+                    // If testOldBlocks is enabled, verify actual data availability (exactly like v29)
+                    if (this.testOldBlocks) {
+                        const depths = [this.blocksPerDay, Math.floor(height / 2)]; // [1 day, half chain] - same as v29
+                        let confirmedDepth = 0;
+                        let confirmedDays = 0;
+                        
+                        for (const depth of depths) {
+                            const testHeight = height - depth;
+                            if (testHeight < 0) continue;
+                            
+                            if (await this.testBlockRetrieval(client, testHeight)) {
+                                confirmedDepth = depth;
+                                confirmedDays = depth / this.blocksPerDay;
+                                this.log(`✓ Archive confirmed - ${confirmedDays.toFixed(1)}d history`, 'archive');
+                                break;
+                            }
+                        }
+                        
+                        if (confirmedDepth === 0) {
+                            return {
+                                isArchive: false,
+                                blockCount: height,
+                                reason: 'Failed old block tests'
+                            };
+                        }
+                        
+                        // Determine type based on confirmed depth
+                        const isFullArchive = confirmedDepth >= Math.floor(height / 2);
+                        
+                        return {
+                            isArchive: true,
+                            blockCount: height,
+                            type: isFullArchive ? 'full' : 'partial',
+                            coverage: isFullArchive ? 'Full' : `${confirmedDays.toFixed(1)}d+`,
+                            confirmedDepth: confirmedDepth
+                        };
                     }
                     
-                    const coverageHours = Math.floor((currentHeight - targetHeight) / this.blocksPerSecond / 3600);
-                    
+                    // If testOldBlocks is disabled, just use height threshold
                     return {
                         isArchive: true,
-                        blockCount: currentHeight,
-                        type: isFullArchive ? 'full' : 'partial',
-                        coverage: isFullArchive ? 'Full' : `${coverageHours}+ hours`,
-                        pruningPoint: isFullArchive ? 0 : targetHeight
+                        blockCount: height,
+                        type: 'height-based',
+                        coverage: 'Not tested'
                     };
                 } catch (error) {
+                    this.log(`Validation error: ${error.message}`, 'error');
                     return { isArchive: false, error: error.message };
                 }
             }
             
             async testBlockRetrieval(client, height) {
                 try {
-                    const block = await client.getBlock({ height, includeTransactions: false });
-                    return !!block;
+                    // Exactly like v29's testBlock function
+                    if (client.getBlockByHeight) {
+                        return !!(await client.getBlockByHeight(height));
+                    }
+                    return !!(await client.getBlock({ height, includeTransactions: false }));
                 } catch {
                     return false;
                 }

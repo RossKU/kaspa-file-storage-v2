@@ -1972,6 +1972,20 @@
                     </div>
                 </div>
                 
+                <!-- Network and Threshold Settings -->
+                <div style="font-size: 11px; margin-bottom: 8px; display: flex; align-items: center; gap: 10px;">
+                    <select id="archiveNetworkSelect" onchange="updateArchiveNetwork()" style="padding: 2px 4px; font-size: 11px;">
+                        <option value="mainnet">Mainnet</option>
+                        <option value="testnet-10">Testnet</option>
+                    </select>
+                    <div style="display: flex; align-items: center; gap: 4px;">
+                        <label>閾値:</label>
+                        <input type="number" id="archiveThresholdInput" value="50" step="0.1" style="width: 50px; padding: 2px; font-size: 11px;" onchange="updateArchiveThreshold()">
+                        <span>M blocks</span>
+                    </div>
+                    <span style="color: #888; font-size: 10px;">(0.864M = 1日分)</span>
+                </div>
+                
                 <!-- Compact Statistics -->
                 <div style="font-size: 12px; line-height: 1.4; margin-bottom: 8px; font-family: monospace;">
                     <div id="archiveStats">探索: - | 発見: -/- | 速度: -</div>
@@ -2431,11 +2445,12 @@
         // ===== Archive Node Manager (v5.10.21) =====
         class ArchiveNodeManager {
             constructor(config = {}) {
-                // Configuration (matching v29)
-                this.archiveThreshold = 50000000; // 50M blocks - same as v29
+                // Configuration (customizable)
+                this.networkId = config.networkId || 'mainnet';
+                this.archiveThreshold = this.loadThreshold(); // Load saved threshold
                 this.testOldBlocks = true; // Enable old block testing
                 this.blocksPerSecond = 10;
-                this.blocksPerDay = 864000; // 10 blocks/sec * 86400 sec - for 1 day test
+                this.blocksPerDay = 864000; // 10 blocks/sec * 86400 sec = 0.864M blocks = 1 day
                 
                 // Node management
                 this.connections = new Map(); // nodeId => { client, stats }
@@ -2462,8 +2477,7 @@
                 this.eventLog = [];
                 this.maxEventLogSize = 5;
                 
-                // Network info
-                this.networkId = 'mainnet';
+                // Resolver info  
                 this.resolver = 'kaspa.stream';
                 
                 // Current checking status
@@ -2523,7 +2537,7 @@
                     // Create new RPC client to random node
                     const client = new NetworkState.kaspa.RpcClient({
                         resolver: new NetworkState.kaspa.Resolver(),
-                        networkId: 'mainnet'
+                        networkId: this.networkId
                     });
                     
                     await client.connect();
@@ -2606,41 +2620,30 @@
                         };
                     }
                     
-                    // If testOldBlocks is enabled, verify actual data availability (exactly like v29)
+                    // If testOldBlocks is enabled, test half-height block retrieval
                     if (this.testOldBlocks) {
-                        const depths = [this.blocksPerDay, Math.floor(height / 2)]; // [1 day, half chain] - same as v29
-                        let confirmedDepth = 0;
-                        let confirmedDays = 0;
+                        const halfHeight = Math.floor(height / 2);
                         
-                        for (const depth of depths) {
-                            const testHeight = height - depth;
-                            if (testHeight < 0) continue;
-                            
-                            if (await this.testBlockRetrieval(client, testHeight)) {
-                                confirmedDepth = depth;
-                                confirmedDays = depth / this.blocksPerDay;
-                                this.log(`✓ Archive confirmed - ${confirmedDays.toFixed(1)}d history`, 'archive');
-                                break;
-                            }
-                        }
+                        // Test if can retrieve block at half the chain height
+                        const canRetrieveHalf = await this.testBlockRetrieval(client, halfHeight);
                         
-                        if (confirmedDepth === 0) {
+                        if (!canRetrieveHalf) {
                             return {
                                 isArchive: false,
                                 blockCount: height,
-                                reason: 'Failed old block tests'
+                                reason: 'Cannot retrieve half-height blocks'
                             };
                         }
                         
-                        // Determine type based on confirmed depth
-                        const isFullArchive = confirmedDepth >= Math.floor(height / 2);
+                        // Archive confirmed - calculate coverage
+                        const coverageDays = (height - halfHeight) / this.blocksPerDay;
                         
                         return {
                             isArchive: true,
                             blockCount: height,
-                            type: isFullArchive ? 'full' : 'partial',
-                            coverage: isFullArchive ? 'Full' : `${confirmedDays.toFixed(1)}d+`,
-                            confirmedDepth: confirmedDepth
+                            type: 'archive',
+                            coverage: `${coverageDays.toFixed(1)}d+`,
+                            confirmedDepth: height - halfHeight
                         };
                     }
                     
@@ -2793,6 +2796,35 @@
                 
                 this.connections.clear();
                 this.log('Archive Node Manager stopped', 'info');
+            }
+            
+            loadThreshold() {
+                const saved = localStorage.getItem(`archiveThreshold_${this.networkId}`);
+                if (saved) {
+                    return parseFloat(saved) * 1000000; // Convert from M to blocks
+                }
+                // Default thresholds
+                return this.networkId === 'mainnet' ? 50000000 : 5000000; // 50M for mainnet, 5M for testnet
+            }
+            
+            saveThreshold(thresholdM) {
+                localStorage.setItem(`archiveThreshold_${this.networkId}`, thresholdM.toString());
+                this.archiveThreshold = thresholdM * 1000000;
+                this.log(`Threshold updated to ${thresholdM}M blocks`, 'info');
+            }
+            
+            updateNetwork(networkId) {
+                if (this.networkId === networkId) return;
+                
+                this.networkId = networkId;
+                this.archiveThreshold = this.loadThreshold();
+                this.log(`Network switched to ${networkId}`, 'info');
+                
+                // Clear current connections as they're for wrong network
+                if (this.connections.size > 0) {
+                    this.log('Clearing connections for network switch', 'info');
+                    this.stop();
+                }
             }
         }
         
@@ -8126,6 +8158,16 @@
             document.getElementById('archiveAvgResponse').textContent = 
                 stats.avgResponseTime > 0 ? `${stats.avgResponseTime.toFixed(0)}ms` : '-';
             
+            // Update UI threshold if different
+            const thresholdInput = document.getElementById('archiveThresholdInput');
+            if (thresholdInput) {
+                const currentValue = parseFloat(thresholdInput.value);
+                const managerValue = manager.archiveThreshold / 1000000;
+                if (Math.abs(currentValue - managerValue) > 0.01) {
+                    thresholdInput.value = managerValue;
+                }
+            }
+            
             // Compact node details
             const detailsDiv = document.getElementById('archiveNodeDetails');
             if (stats.nodes.length === 0) {
@@ -8205,6 +8247,38 @@
             log('テスト完了', 'info');
         }
         
+        // UI functions for archive settings
+        window.updateArchiveNetwork = function() {
+            const select = document.getElementById('archiveNetworkSelect');
+            const manager = NetworkState.archiveManager;
+            if (!manager) return;
+            
+            const newNetwork = select.value;
+            manager.updateNetwork(newNetwork);
+            
+            // Update threshold input with saved value for new network
+            const thresholdM = manager.archiveThreshold / 1000000;
+            document.getElementById('archiveThresholdInput').value = thresholdM;
+            
+            updateArchiveNodeStatus();
+        }
+        
+        window.updateArchiveThreshold = function() {
+            const input = document.getElementById('archiveThresholdInput');
+            const manager = NetworkState.archiveManager;
+            if (!manager) return;
+            
+            const thresholdM = parseFloat(input.value);
+            if (isNaN(thresholdM) || thresholdM <= 0) {
+                alert('無効な閾値です');
+                input.value = manager.archiveThreshold / 1000000;
+                return;
+            }
+            
+            manager.saveThreshold(thresholdM);
+            updateArchiveNodeStatus();
+        }
+        
         // Initialize Archive Manager when system initializes
         async function initializeArchiveManager() {
             if (!NetworkState.kaspa) {
@@ -8213,8 +8287,22 @@
             }
             
             log('Archive Node Managerを初期化中...', 'info');
-            NetworkState.archiveManager = new ArchiveNodeManager();
+            
+            // Get initial network from UI or default
+            const networkSelect = document.getElementById('archiveNetworkSelect');
+            const networkId = networkSelect ? networkSelect.value : 'mainnet';
+            
+            NetworkState.archiveManager = new ArchiveNodeManager({ networkId });
             await NetworkState.archiveManager.initialize();
+            
+            // Set UI values from manager
+            if (networkSelect) {
+                networkSelect.value = NetworkState.archiveManager.networkId;
+            }
+            const thresholdInput = document.getElementById('archiveThresholdInput');
+            if (thresholdInput) {
+                thresholdInput.value = NetworkState.archiveManager.archiveThreshold / 1000000;
+            }
             
             // Start periodic status updates
             setInterval(updateArchiveNodeStatus, 2000);

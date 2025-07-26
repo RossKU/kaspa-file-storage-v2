@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.1 - アーカイブノード統合版（デバッグ版）</title>
+    <title>Kaspa P2P File Storage v5.11.2 - アーカイブノード統合版（段階的テスト）</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -2671,41 +2671,71 @@
                         };
                     }
                     
-                    // If testOldBlocks is enabled, test half-height block retrieval
+                    // If testOldBlocks is enabled, test multiple depths
                     if (this.testOldBlocks) {
-                        const halfHeight = Math.floor(height / 2);
+                        // Test depths: 1 day, 1 week, 1 month, half height
+                        const testDepths = [
+                            { blocks: 864000, label: '1 day' },        // 1 day = 0.864M blocks
+                            { blocks: 6048000, label: '1 week' },      // 7 days = 6.048M blocks
+                            { blocks: 25920000, label: '1 month' },    // 30 days = 25.92M blocks
+                            { blocks: Math.floor(height / 2), label: 'half height' }
+                        ];
                         
-                        // Test if can retrieve block at half the chain height
-                        const canRetrieveHalf = await this.testBlockRetrieval(client, halfHeight);
+                        let maxSuccessfulDepth = 0;
+                        let maxSuccessfulLabel = 'none';
                         
-                        if (!canRetrieveHalf) {
+                        this.log(`Testing block retrieval at multiple depths for ${(height/1000000).toFixed(1)}M node:`, 'info');
+                        
+                        for (const depth of testDepths) {
+                            if (depth.blocks >= height) {
+                                this.log(`  - ${depth.label}: Skipped (depth > height)`, 'debug');
+                                continue;
+                            }
+                            
+                            const testHeight = height - depth.blocks;
+                            const canRetrieve = await this.testBlockRetrieval(client, testHeight);
+                            
+                            if (canRetrieve) {
+                                this.log(`  ✓ ${depth.label} (${(depth.blocks/1000000).toFixed(1)}M blocks): SUCCESS`, 'success');
+                                maxSuccessfulDepth = depth.blocks;
+                                maxSuccessfulLabel = depth.label;
+                            } else {
+                                this.log(`  ✗ ${depth.label} (${(depth.blocks/1000000).toFixed(1)}M blocks): FAILED`, 'error');
+                                // If we can't even get 1 day old blocks, stop testing
+                                if (depth.label === '1 day') {
+                                    return {
+                                        isArchive: false,
+                                        blockCount: height,
+                                        reason: 'Cannot retrieve even 1-day old blocks'
+                                    };
+                                }
+                                break; // Stop testing deeper if current depth failed
+                            }
+                        }
+                        
+                        if (maxSuccessfulDepth > 0) {
+                            const coverageDays = maxSuccessfulDepth / this.blocksPerDay;
+                            return {
+                                isArchive: true,
+                                blockCount: height,
+                                type: 'archive',
+                                coverage: `${coverageDays.toFixed(1)}d+`,
+                                confirmedDepth: maxSuccessfulDepth,
+                                maxDepthLabel: maxSuccessfulLabel
+                            };
+                        } else {
                             return {
                                 isArchive: false,
                                 blockCount: height,
-                                reason: 'Cannot retrieve half-height blocks'
+                                reason: 'No historical blocks retrievable'
                             };
                         }
-                        
-                        // Archive confirmed - calculate coverage
-                        const coverageDays = (height - halfHeight) / this.blocksPerDay;
-                        
-                        return {
-                            isArchive: true,
-                            blockCount: height,
-                            estimatedBlockCount: estimatedHeight,
-                            estimated: blockEstimate.estimated,
-                            type: 'archive',
-                            coverage: `${coverageDays.toFixed(1)}d+`,
-                            confirmedDepth: height - halfHeight
-                        };
                     }
                     
                     // If testOldBlocks is disabled, just use height threshold
                     return {
                         isArchive: true,
                         blockCount: height,
-                        estimatedBlockCount: estimatedHeight,
-                        estimated: blockEstimate.estimated,
                         type: 'height-based',
                         coverage: 'Not tested'
                     };

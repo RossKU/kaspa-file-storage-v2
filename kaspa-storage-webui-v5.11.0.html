@@ -1976,6 +1976,7 @@
                 <div style="font-size: 12px; line-height: 1.4; margin-bottom: 8px; font-family: monospace;">
                     <div id="archiveStats">探索: - | 発見: -/- | 速度: -</div>
                     <div>接続: <span id="archiveHealthBar">[-----]</span> <span id="archiveConnectedNodes">0/5</span> | Avg: <span id="archiveAvgResponse">-</span></div>
+                    <div id="archiveCheckingStatus" style="color: #888;">チェック中: <span id="archiveCheckingNode">待機中</span></div>
                 </div>
                 
                 <!-- Compact Node List -->
@@ -2464,6 +2465,14 @@
                 // Network info
                 this.networkId = 'mainnet';
                 this.resolver = 'kaspa.stream';
+                
+                // Current checking status
+                this.currentChecking = {
+                    nodeId: null,
+                    blockCount: null,
+                    version: null,
+                    status: 'idle' // idle, connecting, checking, complete
+                };
             }
             
             calculateRequiredBlocks() {
@@ -2512,6 +2521,9 @@
                 this.stats.totalAttempts++;
                 
                 try {
+                    // Update checking status
+                    this.currentChecking = { status: 'connecting', nodeId: null, blockCount: null, version: null };
+                    
                     // Create new RPC client to random node
                     const client = new NetworkState.kaspa.RpcClient({
                         resolver: new NetworkState.kaspa.Resolver(),
@@ -2519,11 +2531,29 @@
                     });
                     
                     await client.connect();
+                    
+                    // Get node info first
+                    const nodeInfo = await client.getServerInfo();
+                    const dagInfo = await client.getBlockDagInfo();
+                    const blockCount = Number(dagInfo.blockCount || 0);
+                    const blockCountM = (blockCount / 1000000).toFixed(1);
+                    
+                    // Update checking status with block count
+                    this.currentChecking = {
+                        status: 'checking',
+                        blockCount: blockCount,
+                        version: nodeInfo.serverVersion,
+                        blockCountM: blockCountM + 'M'
+                    };
+                    
+                    this.addEvent(`Checking: ${blockCountM}M blocks`, '🔍');
+                    
+                    // Validate if it's an archive node
                     const validation = await this.validateArchiveNode(client);
+                    validation.blockCount = blockCount; // Ensure blockCount is in validation
                     
                     // Add to unique nodes
-                    const nodeInfo = await client.getServerInfo();
-                    const nodeIdentifier = `${nodeInfo.serverVersion}_${validation.blockCount}`;
+                    const nodeIdentifier = `${nodeInfo.serverVersion}_${blockCount}`;
                     this.stats.uniqueNodes.add(nodeIdentifier);
                     
                     if (validation.isArchive) {
@@ -2539,7 +2569,7 @@
                         });
                         
                         this.log(`Archive node found! Total: ${this.connections.size}/5`, 'success');
-                        this.addEvent(`Archive #${this.connections.size} found!`, '🎉');
+                        this.addEvent(`Archive #${this.connections.size} found! (${blockCountM}M)`, '🎉');
                         updateArchiveNodeStatus();
                         
                         if (this.connections.size >= 5) {
@@ -2549,9 +2579,11 @@
                         }
                     } else {
                         await client.disconnect();
+                        this.addEvent(`Not archive (${blockCountM}M)`, '❌');
                     }
                 } catch (error) {
                     this.log(`Discovery error: ${error.message}`, 'error');
+                    this.currentChecking = { status: 'idle', nodeId: null, blockCount: null, version: null };
                 } finally {
                     this.activeWorkers--;
                     
@@ -2565,25 +2597,56 @@
             async validateArchiveNode(client) {
                 try {
                     const dagInfo = await client.getBlockDagInfo();
-                    const blockCount = Number(dagInfo.blockCount || 0);
+                    const currentHeight = Number(dagInfo.blockCount || 0);
                     
-                    // Check if meets required blocks threshold
-                    const isArchive = blockCount >= this.requiredBlocks;
+                    // Calculate target height (30 hours ago)
+                    const targetHeight = currentHeight - this.requiredBlocks;
                     
-                    if (isArchive) {
-                        // Test actual data retrieval
-                        const targetHeight = blockCount - Math.floor(this.requiredBlocks * 0.9);
-                        const hasData = await this.testBlockRetrieval(client, targetHeight);
-                        
-                        return {
-                            isArchive: hasData,
-                            blockCount,
-                            type: blockCount >= this.fullArchiveThreshold ? 'full' : 'partial',
-                            coverage: Math.floor(blockCount / this.blocksPerSecond / 3600) + ' hours'
+                    // Test if node can retrieve blocks from 30 hours ago
+                    let canRetrieve30h = false;
+                    try {
+                        const block = await client.getBlock({ 
+                            height: targetHeight, 
+                            includeTransactions: false 
+                        });
+                        canRetrieve30h = !!block;
+                    } catch (error) {
+                        if (error.message && error.message.includes('pruned')) {
+                            this.log(`Node pruned at 30h mark`, 'info');
+                            canRetrieve30h = false;
+                        }
+                    }
+                    
+                    if (!canRetrieve30h) {
+                        return { 
+                            isArchive: false, 
+                            blockCount: currentHeight,
+                            reason: 'Cannot retrieve 30h old blocks'
                         };
                     }
                     
-                    return { isArchive: false, blockCount };
+                    // Test for full archive (can retrieve very old blocks)
+                    let isFullArchive = false;
+                    const veryOldHeight = Math.floor(currentHeight / 2);
+                    try {
+                        const oldBlock = await client.getBlock({ 
+                            height: veryOldHeight, 
+                            includeTransactions: false 
+                        });
+                        isFullArchive = !!oldBlock;
+                    } catch {
+                        isFullArchive = false;
+                    }
+                    
+                    const coverageHours = Math.floor((currentHeight - targetHeight) / this.blocksPerSecond / 3600);
+                    
+                    return {
+                        isArchive: true,
+                        blockCount: currentHeight,
+                        type: isFullArchive ? 'full' : 'partial',
+                        coverage: isFullArchive ? 'Full' : `${coverageHours}+ hours`,
+                        pruningPoint: isFullArchive ? 0 : targetHeight
+                    };
                 } catch (error) {
                     return { isArchive: false, error: error.message };
                 }
@@ -8079,6 +8142,21 @@
                     html += `<div>[${event.time}] ${event.icon} ${event.message}</div>`;
                 });
                 eventLogDiv.innerHTML = html;
+            }
+            
+            // Update checking status
+            const checkingSpan = document.getElementById('archiveCheckingNode');
+            if (manager.currentChecking && manager.currentChecking.status !== 'idle') {
+                if (manager.currentChecking.status === 'connecting') {
+                    checkingSpan.textContent = '接続中...';
+                    checkingSpan.style.color = '#ff9800';
+                } else if (manager.currentChecking.status === 'checking') {
+                    checkingSpan.textContent = `${manager.currentChecking.blockCountM || '-'} (判定中...)`;
+                    checkingSpan.style.color = '#2196F3';
+                }
+            } else {
+                checkingSpan.textContent = '待機中';
+                checkingSpan.style.color = '#888';
             }
             
             // Enable/disable test button

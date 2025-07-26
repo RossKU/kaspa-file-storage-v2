@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.2 - アーカイブノード統合版（段階的テスト）</title>
+    <title>Kaspa P2P File Storage v5.11.3 - アーカイブノード統合版（閾値判定＋手動テスト）</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -1969,6 +1969,7 @@
                     <div>
                         <button onclick="NetworkState.archiveManager?.startDiscovery()" id="archiveStartBtn" style="padding: 4px 8px; font-size: 12px;">探索</button>
                         <button onclick="NetworkState.archiveManager?.stop()" id="archiveStopBtn" style="padding: 4px 8px; font-size: 12px;">停止</button>
+                        <button onclick="NetworkState.archiveManager?.testBlocks()" id="testBlockBtn" style="padding: 4px 8px; font-size: 12px;">テスト実行</button>
                     </div>
                 </div>
                 
@@ -1984,6 +1985,11 @@
                         <span>M blocks</span>
                     </div>
                     <span style="color: #888; font-size: 10px;">(0.864M = 1日分)</span>
+                </div>
+                
+                <!-- Test Block Hash Input -->
+                <div style="font-size: 11px; margin-bottom: 8px;">
+                    <input type="text" id="testBlockHash" placeholder="テスト用ブロックハッシュ (任意)" style="width: 100%; padding: 4px; font-size: 11px;">
                 </div>
                 
                 <!-- Compact Statistics -->
@@ -2654,14 +2660,10 @@
             async validateArchiveNode(client) {
                 try {
                     const dagInfo = await client.getBlockDagInfo();
-                    const serverInfo = await client.getServerInfo();
                     const height = Number(dagInfo.blockCount || 0);
                     
-                    // Use actual block count instead of estimate for now
-                    // TODO: Fix estimate logic for better pruned node detection
-                    
-                    // First check: height > archiveThreshold
-                    let isArchive = height > this.archiveThreshold;
+                    // Simple threshold check only
+                    const isArchive = height > this.archiveThreshold;
                     
                     if (!isArchive) {
                         return { 
@@ -2671,73 +2673,12 @@
                         };
                     }
                     
-                    // If testOldBlocks is enabled, test multiple depths
-                    if (this.testOldBlocks) {
-                        // Test depths: 1 day, 1 week, 1 month, half height
-                        const testDepths = [
-                            { blocks: 864000, label: '1 day' },        // 1 day = 0.864M blocks
-                            { blocks: 6048000, label: '1 week' },      // 7 days = 6.048M blocks
-                            { blocks: 25920000, label: '1 month' },    // 30 days = 25.92M blocks
-                            { blocks: Math.floor(height / 2), label: 'half height' }
-                        ];
-                        
-                        let maxSuccessfulDepth = 0;
-                        let maxSuccessfulLabel = 'none';
-                        
-                        this.log(`Testing block retrieval at multiple depths for ${(height/1000000).toFixed(1)}M node:`, 'info');
-                        
-                        for (const depth of testDepths) {
-                            if (depth.blocks >= height) {
-                                this.log(`  - ${depth.label}: Skipped (depth > height)`, 'debug');
-                                continue;
-                            }
-                            
-                            const testHeight = height - depth.blocks;
-                            const canRetrieve = await this.testBlockRetrieval(client, testHeight);
-                            
-                            if (canRetrieve) {
-                                this.log(`  ✓ ${depth.label} (${(depth.blocks/1000000).toFixed(1)}M blocks): SUCCESS`, 'success');
-                                maxSuccessfulDepth = depth.blocks;
-                                maxSuccessfulLabel = depth.label;
-                            } else {
-                                this.log(`  ✗ ${depth.label} (${(depth.blocks/1000000).toFixed(1)}M blocks): FAILED`, 'error');
-                                // If we can't even get 1 day old blocks, stop testing
-                                if (depth.label === '1 day') {
-                                    return {
-                                        isArchive: false,
-                                        blockCount: height,
-                                        reason: 'Cannot retrieve even 1-day old blocks'
-                                    };
-                                }
-                                break; // Stop testing deeper if current depth failed
-                            }
-                        }
-                        
-                        if (maxSuccessfulDepth > 0) {
-                            const coverageDays = maxSuccessfulDepth / this.blocksPerDay;
-                            return {
-                                isArchive: true,
-                                blockCount: height,
-                                type: 'archive',
-                                coverage: `${coverageDays.toFixed(1)}d+`,
-                                confirmedDepth: maxSuccessfulDepth,
-                                maxDepthLabel: maxSuccessfulLabel
-                            };
-                        } else {
-                            return {
-                                isArchive: false,
-                                blockCount: height,
-                                reason: 'No historical blocks retrievable'
-                            };
-                        }
-                    }
-                    
-                    // If testOldBlocks is disabled, just use height threshold
+                    // Archive node based on threshold
                     return {
                         isArchive: true,
                         blockCount: height,
-                        type: 'height-based',
-                        coverage: 'Not tested'
+                        type: 'threshold-based',
+                        coverage: 'Use Test Block button to verify'
                     };
                 } catch (error) {
                     this.log(`Validation error: ${error.message}`, 'error');
@@ -2745,30 +2686,8 @@
                 }
             }
             
-            async testBlockRetrieval(client, height) {
-                try {
-                    // Test block retrieval with detailed logging
-                    // Testing block retrieval
-                    
-                    let block;
-                    if (client.getBlockByHeight) {
-                        block = await client.getBlockByHeight(height);
-                        if (!block) {
-                            this.log(`getBlockByHeight(${height}): FAILED - block not found`, 'error');
-                        }
-                    } else {
-                        block = await client.getBlock({ height, includeTransactions: false });
-                        if (!block) {
-                            this.log(`getBlock(${height}): FAILED - block not found`, 'error');
-                        }
-                    }
-                    
-                    return !!block;
-                } catch (error) {
-                    this.log(`Block retrieval failed at ${height}: ${error.message}`, 'error');
-                    return false;
-                }
-            }
+            // Removed testBlockRetrieval - now using threshold-based detection only
+            // Users can verify with testBlocks() method using custom hash
             
             async getOptimalClient() {
                 if (this.connections.size === 0) return null;
@@ -2894,6 +2813,93 @@
                 
                 this.connections.clear();
                 // Archive Node Manager stopped
+            }
+            
+            async testBlocks() {
+                if (this.connections.size === 0) {
+                    this.log('No active archive node connections', 'error');
+                    this.addEvent('No connections to test', '❌');
+                    return;
+                }
+                
+                const hash = document.getElementById('testBlockHash')?.value?.trim();
+                this.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info');
+                this.log(`Testing ${this.connections.size} archive nodes...`, 'info');
+                
+                if (hash && hash.length === 64) {
+                    this.log(`Using custom block hash: ${hash}`, 'info');
+                } else {
+                    this.log('No custom hash provided, using tip blocks', 'info');
+                }
+                
+                let successCount = 0;
+                
+                for (const [nodeId, node] of this.connections) {
+                    const stats = node.stats;
+                    this.log(`\nTesting node: ${stats.blockCount ? (stats.blockCount/1000000).toFixed(1) + 'M blocks' : 'Unknown'}`, 'info');
+                    
+                    try {
+                        // Get DAG info for tip hashes
+                        const dag = await node.client.getBlockDagInfo();
+                        
+                        let testResult = false;
+                        
+                        // Test with custom hash if provided
+                        if (hash && hash.length === 64) {
+                            try {
+                                const blockResponse = await node.client.getBlock({ 
+                                    hash: hash,
+                                    includeTransactions: true 
+                                });
+                                
+                                if (blockResponse) {
+                                    const block = blockResponse.block || blockResponse;
+                                    this.log(`✓ Custom block retrieved successfully`, 'success');
+                                    this.log(`  Transactions: ${block.transactions?.length || 0}`, 'info');
+                                    testResult = true;
+                                    successCount++;
+                                }
+                            } catch (error) {
+                                this.log(`✗ Failed to retrieve custom block: ${error.message}`, 'error');
+                            }
+                        } else if (dag.tipHashes && dag.tipHashes.length > 0) {
+                            // Test with tip hash
+                            const tipHash = dag.tipHashes[0];
+                            this.log(`Testing with tip hash: ${tipHash.substring(0, 16)}...`, 'info');
+                            
+                            try {
+                                const tipBlock = await node.client.getBlock({
+                                    hash: tipHash,
+                                    includeTransactions: true
+                                });
+                                
+                                if (tipBlock) {
+                                    const block = tipBlock.block || tipBlock;
+                                    this.log(`✓ Tip block retrieved successfully`, 'success');
+                                    this.log(`  Transactions: ${block.transactions?.length || 0}`, 'info');
+                                    testResult = true;
+                                    successCount++;
+                                }
+                            } catch (error) {
+                                this.log(`✗ Failed to retrieve tip block: ${error.message}`, 'error');
+                            }
+                        }
+                        
+                        if (testResult) {
+                            this.addEvent(`Node test passed ✓`, '✅');
+                        } else {
+                            this.addEvent(`Node test failed ✗`, '❌');
+                        }
+                        
+                    } catch (error) {
+                        this.log(`Test error: ${error.message}`, 'error');
+                        this.addEvent(`Test error: ${error.message}`, '❌');
+                    }
+                }
+                
+                this.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info');
+                this.log(`Test complete: ${successCount}/${this.connections.size} nodes passed`, successCount > 0 ? 'success' : 'error');
+                this.addEvent(`Test: ${successCount}/${this.connections.size} passed`, successCount > 0 ? '✅' : '❌');
             }
             
             loadThreshold() {

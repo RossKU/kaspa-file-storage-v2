@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.3 - アーカイブノード統合版（閾値判定＋手動テスト）</title>
+    <title>Kaspa P2P File Storage v5.11.4 - アーカイブノード統合版（テキストログエクスポート）</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -2026,6 +2026,7 @@
             <div style="margin-top: 12px; display: flex; gap: 8px;">
                 <button onclick="copyLog()">ログをコピー</button>
                 <button onclick="exportLogs()">ログをJSON形式でエクスポート</button>
+                <button onclick="exportLogsAsText()">ログをテキスト形式でエクスポート</button>
                 <button onclick="clearLog()">ログをクリア</button>
             </div>
         </div>
@@ -13533,6 +13534,32 @@
             URL.revokeObjectURL(url);
             
             log('ログをエクスポートしました', 'success');
+        };
+
+        window.exportLogsAsText = function() {
+            const logs = AppState.history.systemLogs;
+            const textLines = logs.map(log => {
+                // ISO形式から時刻部分を抽出（ミリ秒付き）
+                const date = new Date(log.timestamp);
+                const time = date.toLocaleTimeString('ja-JP', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    fractionalSecondDigits: 3  // ミリ秒3桁
+                });
+                const typeStr = log.type.toUpperCase().padEnd(7); // 幅を揃える
+                return `[${time}] [${typeStr}] ${log.message}`;
+            });
+            
+            const blob = new Blob([textLines.join('\n')], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `kaspa-p2p-logs-${Date.now()}.txt`;
+            a.click();
+            URL.revokeObjectURL(url);
+            
+            log('ログをテキスト形式でエクスポートしました', 'success');
         };
 
         window.clearLogs = function() {

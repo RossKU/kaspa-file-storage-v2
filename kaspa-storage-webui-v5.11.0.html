@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.0 - アーカイブノード統合版</title>
+    <title>Kaspa P2P File Storage v5.11.1 - アーカイブノード統合版（推定値対応）</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -2546,17 +2546,22 @@
                     const nodeInfo = await client.getServerInfo();
                     const dagInfo = await client.getBlockDagInfo();
                     const blockCount = Number(dagInfo.blockCount || 0);
-                    const blockCountM = (blockCount / 1000000).toFixed(1);
+                    
+                    // Use estimate_block_count logic
+                    const blockEstimate = this.estimateBlockCount(dagInfo, nodeInfo);
+                    const estimatedBlockCount = blockEstimate.value;
+                    const blockCountM = blockEstimate.displayValue;
                     
                     // Update checking status with block count
                     this.currentChecking = {
                         status: 'checking',
                         blockCount: blockCount,
+                        estimatedBlockCount: estimatedBlockCount,
                         version: nodeInfo.serverVersion,
-                        blockCountM: blockCountM + 'M'
+                        blockCountM: blockCountM
                     };
                     
-                    this.addEvent(`Checking: ${blockCountM}M blocks`, '🔍');
+                    this.addEvent(`Checking: ${blockCountM} blocks${blockEstimate.estimated ? ' (est)' : ''}`, '🔍');
                     
                     // Validate if it's an archive node
                     const validation = await this.validateArchiveNode(client);
@@ -2604,19 +2609,77 @@
                 }
             }
             
+            // Estimate block count based on Kaspa's estimate_block_count logic
+            estimateBlockCount(dagInfo, serverInfo) {
+                // Get total block count
+                const totalBlockCount = Number(dagInfo.blockCount || 0);
+                
+                // Check if number is safe for JavaScript operations
+                if (totalBlockCount > Number.MAX_SAFE_INTEGER) {
+                    this.log(`Warning: Block count ${totalBlockCount} exceeds MAX_SAFE_INTEGER`, 'warning');
+                    // Use BigInt for calculations if needed
+                    const bigBlockCount = BigInt(dagInfo.blockCount || 0);
+                    return {
+                        estimated: true,
+                        value: totalBlockCount,
+                        bigValue: bigBlockCount,
+                        displayValue: (Number(bigBlockCount / 1000000n)).toFixed(1) + 'M'
+                    };
+                }
+                
+                // For pruned nodes, we need to estimate based on retention period
+                // Since we don't have direct access to pruning point or DAA scores,
+                // we'll use the server version to make educated guesses
+                const isPrunedNode = serverInfo && serverInfo.isSynced && !serverInfo.hasUtxoIndex;
+                
+                if (isPrunedNode) {
+                    // Pruned nodes typically keep ~3 days of data (2.592M blocks)
+                    // This is a rough estimate based on typical Kaspa node configurations
+                    const estimatedRetention = 2592000; // ~3 days at 10 blocks/sec
+                    const estimatedBlocks = Math.min(totalBlockCount, estimatedRetention);
+                    
+                    return {
+                        estimated: true,
+                        value: estimatedBlocks,
+                        totalBlocks: totalBlockCount,
+                        displayValue: (estimatedBlocks / 1000000).toFixed(1) + 'M',
+                        note: 'Pruned node - estimated retention'
+                    };
+                }
+                
+                // For archive nodes or nodes with UTXO index, use full block count
+                return {
+                    estimated: false,
+                    value: totalBlockCount,
+                    displayValue: (totalBlockCount / 1000000).toFixed(1) + 'M'
+                };
+            }
+            
             async validateArchiveNode(client) {
                 try {
                     const dagInfo = await client.getBlockDagInfo();
+                    const serverInfo = await client.getServerInfo();
                     const height = Number(dagInfo.blockCount || 0);
                     
-                    // First check: height > archiveThreshold (exactly like v29)
-                    let isArchive = height > this.archiveThreshold;
+                    // Use estimate_block_count logic
+                    const blockEstimate = this.estimateBlockCount(dagInfo, serverInfo);
+                    const estimatedHeight = blockEstimate.value;
+                    
+                    this.log(`Block count: ${height} (estimated: ${blockEstimate.displayValue})`, 'info');
+                    if (blockEstimate.estimated) {
+                        this.log(`Note: ${blockEstimate.note || 'Using estimated value'}`, 'debug');
+                    }
+                    
+                    // First check: estimated height > archiveThreshold
+                    let isArchive = estimatedHeight > this.archiveThreshold;
                     
                     if (!isArchive) {
                         return { 
                             isArchive: false, 
                             blockCount: height,
-                            reason: `Height ${(height/1000000).toFixed(1)}M < threshold ${(this.archiveThreshold/1000000).toFixed(0)}M`
+                            estimatedBlockCount: estimatedHeight,
+                            estimated: blockEstimate.estimated,
+                            reason: `Height ${(estimatedHeight/1000000).toFixed(1)}M < threshold ${(this.archiveThreshold/1000000).toFixed(0)}M`
                         };
                     }
                     
@@ -2631,6 +2694,8 @@
                             return {
                                 isArchive: false,
                                 blockCount: height,
+                                estimatedBlockCount: estimatedHeight,
+                                estimated: blockEstimate.estimated,
                                 reason: 'Cannot retrieve half-height blocks'
                             };
                         }
@@ -2641,6 +2706,8 @@
                         return {
                             isArchive: true,
                             blockCount: height,
+                            estimatedBlockCount: estimatedHeight,
+                            estimated: blockEstimate.estimated,
                             type: 'archive',
                             coverage: `${coverageDays.toFixed(1)}d+`,
                             confirmedDepth: height - halfHeight
@@ -2651,6 +2718,8 @@
                     return {
                         isArchive: true,
                         blockCount: height,
+                        estimatedBlockCount: estimatedHeight,
+                        estimated: blockEstimate.estimated,
                         type: 'height-based',
                         coverage: 'Not tested'
                     };

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.6 - アーカイブノード統合版（手動探査モード）</title>
+    <title>Kaspa P2P File Storage v5.11.7 - アーカイブノード統合版（REST APIテストモード追加）</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -1884,6 +1884,16 @@
                     </div>
                     <label class="toggle-switch">
                         <input type="checkbox" id="parallelDownloadToggle" onchange="toggleParallelDownload()">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <div class="setting-row">
+                    <div class="setting-label">
+                        REST APIテストモード<br>
+                        <small style="color: #999;">RPCをスキップしてREST API経由でダウンロード</small>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="restApiTestToggle" onchange="toggleRestApiTest()">
                         <span class="toggle-slider"></span>
                     </label>
                 </div>
@@ -7459,8 +7469,8 @@
                     
                     for (let retry = 0; retry <= this.maxRetries; retry++) {
                         try {
-                            // Try RPC first if we have blockId
-                            if (blockId && rpcClient) {
+                            // Try RPC first if we have blockId (unless REST API test mode)
+                            if (blockId && rpcClient && (!window.downloadManager || !window.downloadManager.forceRestApi)) {
                                 const response = await NetworkState.rpcClient.getBlock({
                                     hash: blockId,
                                     includeTransactions: true
@@ -7556,6 +7566,7 @@
             constructor() {
                 this.isDownloading = false;
                 this.metadata = null; // v4.7.14: Store metadata internally
+                this.forceRestApi = false; // v5.11.7: Test mode to force REST API
             }
             
             // Simple method to check if ready
@@ -7569,13 +7580,23 @@
                 log('[DownloadManager] メタデータをクリアしました', 'debug');
             }
             
+            // v5.11.7: Toggle REST API test mode
+            toggleRestApiMode(enabled) {
+                this.forceRestApi = enabled;
+                if (enabled) {
+                    log('[DownloadManager] REST APIテストモード有効 - RPCをスキップします', 'warning');
+                } else {
+                    log('[DownloadManager] REST APIテストモード無効 - 通常モード', 'info');
+                }
+            }
+            
             // Fetch metadata from blockchain
             async fetchMetadata(metaTxId, blockId, password) {
                 try {
                     let payload = null;
                     
-                    // If we have BlockID, use RPC directly
-                    if (blockId && rpcClient) {
+                    // If we have BlockID, use RPC directly (unless REST API test mode)
+                    if (blockId && rpcClient && !this.forceRestApi) {
                         log(`[DownloadManager] BlockID経由でメタデータ取得: ${blockId.substring(0, 16)}...`, 'info');
                         
                         const blockResponse = await NetworkState.rpcClient.getBlock({
@@ -7650,6 +7671,12 @@
                 try {
                     log(`[DownloadManager] ペイロード ${index + 1} ダウンロード開始: ${txId.substring(0, 16)}...`, 'info');
                     
+                    // Skip RPC if REST API test mode
+                    if (this.forceRestApi) {
+                        log(`[DownloadManager] REST APIテストモード - RPCをスキップ`, 'debug');
+                        throw new Error('REST API test mode - skip RPC');
+                    }
+                    
                     // Get block data
                     const blockResponse = await NetworkState.rpcClient.getBlock({
                         hash: blockId,
@@ -7680,9 +7707,32 @@
                     
                     return payload;
                     
-                } catch (error) {
-                    log(`[DownloadManager] ペイロードダウンロードエラー: ${error.message}`, 'error');
-                    throw error;
+                } catch (rpcError) {
+                    log(`[DownloadManager] RPC失敗、REST APIにフォールバック: ${rpcError.message}`, 'warning');
+                    
+                    // Fallback to REST API
+                    try {
+                        const networkApiUrl = config.network === 'testnet-10' ? 
+                            'https://api-tn10.kaspa.org' : 'https://api.kaspa.org';
+                        const url = `${networkApiUrl}/transactions/${txId}`;
+                        const response = await fetchWithTimeout(url, {}, 10000, 2);
+                        
+                        if (!response.ok) {
+                            throw new Error(`REST API error: ${response.status}`);
+                        }
+                        
+                        const data = await response.json();
+                        if (data.payload) {
+                            const payload = safeHexDecode(data.payload, 'payload from REST API');
+                            log(`[DownloadManager] REST API経由でペイロード取得成功: ${payload.length} bytes`, 'success');
+                            return payload;
+                        } else {
+                            throw new Error('No payload in REST API response');
+                        }
+                    } catch (apiError) {
+                        log(`[DownloadManager] REST APIエラー: ${apiError.message}`, 'error');
+                        throw apiError;
+                    }
                 }
             }
             
@@ -7690,6 +7740,12 @@
             async downloadChunk(txId, blockId, key, index, metadata) {
                 try {
                     log(`[DownloadManager] チャンク ${index + 1} ダウンロード開始: ${txId.substring(0, 16)}...`, 'info');
+                    
+                    // Skip RPC if REST API test mode
+                    if (this.forceRestApi) {
+                        log(`[DownloadManager] REST APIテストモード - RPCをスキップ`, 'debug');
+                        throw new Error('REST API test mode - skip RPC');
+                    }
                     
                     // Get block data
                     const blockResponse = await NetworkState.rpcClient.getBlock({
@@ -7739,9 +7795,44 @@
                     log(`[DownloadManager] チャンク ${index + 1} 処理完了: ${decompressed.length} bytes`, 'success');
                     return decompressed;
                     
-                } catch (error) {
-                    log(`[DownloadManager] チャンクダウンロードエラー: ${error.message}`, 'error');
-                    throw error;
+                } catch (rpcError) {
+                    log(`[DownloadManager] RPC失敗、REST APIにフォールバック: ${rpcError.message}`, 'warning');
+                    
+                    // Fallback to REST API
+                    try {
+                        const networkApiUrl = config.network === 'testnet-10' ? 
+                            'https://api-tn10.kaspa.org' : 'https://api.kaspa.org';
+                        const url = `${networkApiUrl}/transactions/${txId}`;
+                        const response = await fetchWithTimeout(url, {}, 10000, 2);
+                        
+                        if (!response.ok) {
+                            throw new Error(`REST API error: ${response.status}`);
+                        }
+                        
+                        const data = await response.json();
+                        if (data.payload) {
+                            const payload = safeHexDecode(data.payload, 'chunk payload from REST API');
+                            log(`[DownloadManager] REST API経由でチャンク取得成功: ${payload.length} bytes`, 'success');
+                            
+                            // Process chunk data same as above
+                            const segmentBoundaries = metadata.metadata?.segmentBoundaries || metadata.metadata?.chunkBoundaries;
+                            if (metadata.file?.compression?.enabled && segmentBoundaries) {
+                                return payload; // Return encrypted data as-is
+                            }
+                            
+                            const decrypted = await decryptChunk(payload, key, index);
+                            const decompressed = metadata.file?.compression?.enabled ? 
+                                lzDecompress(decrypted) : decrypted;
+                            
+                            log(`[DownloadManager] チャンク ${index + 1} 処理完了 (REST API): ${decompressed.length} bytes`, 'success');
+                            return decompressed;
+                        } else {
+                            throw new Error('No payload in REST API response');
+                        }
+                    } catch (apiError) {
+                        log(`[DownloadManager] REST APIエラー: ${apiError.message}`, 'error');
+                        throw apiError;
+                    }
                 }
             }
             
@@ -13545,6 +13636,20 @@
                 log('並列ダウンロードを有効にしました（実験的機能）', 'warning');
             } else {
                 log('並列ダウンロードを無効にしました（安定モード）', 'success');
+            }
+        };
+        
+        // Toggle REST API test mode
+        window.toggleRestApiTest = function() {
+            const enabled = document.getElementById('restApiTestToggle').checked;
+            if (window.downloadManager) {
+                window.downloadManager.toggleRestApiMode(enabled);
+            }
+            
+            if (enabled) {
+                log('⚠️ REST APIテストモードを有効にしました - RPCは使用されません', 'warning');
+            } else {
+                log('✅ REST APIテストモードを無効にしました - 通常モード', 'success');
             }
         };
         

@@ -12705,7 +12705,7 @@
                 let payload = null;
                 
                 // If we have BlockID, use RPC directly (no REST API needed)
-                if (blockId) {
+                if (blockId && (!window.downloadManager || !window.downloadManager.forceRestApi)) {
                     log(`BlockIDを使用してRPC経由で取得中...`, 'info');
                     try {
                         const blockResponse = await NetworkState.rpcClient.getBlock({
@@ -12782,8 +12782,12 @@
                         }
                     }
                 } else {
-                    // Fall back to REST API if no BlockID provided
-                    log(`メタTxID ${metaTxId.substring(0, 16)}... からREST API経由で復元を開始`, 'info');
+                    // Fall back to REST API if no BlockID provided or REST API test mode
+                    if (window.downloadManager && window.downloadManager.forceRestApi) {
+                        log(`REST APIテストモード - RPCをスキップしてREST API経由で復元`, 'warning');
+                    } else {
+                        log(`メタTxID ${metaTxId.substring(0, 16)}... からREST API経由で復元を開始`, 'info');
+                    }
                     
                     try {
                     // First try to get via Explorer API (more reliable)

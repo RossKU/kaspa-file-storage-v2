@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.11 - アーカイブノード統合版（REST API修正）</title>
+    <title>Kaspa P2P File Storage v5.11.12 - アーカイブノード統合版（Dev Wallet切替）</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -1375,7 +1375,7 @@
                     <label>秘密鍵:</label>
                     <input type="password" id="walletPrivateKey" placeholder="秘密鍵を入力" style="width: 100%; margin-top: 8px;">
                 </div>
-                <button onclick="connectWallet()" style="width: 100%; margin-bottom: 12px;">接続</button>
+                <button id="walletConnectBtn" onclick="connectWallet()" style="width: 100%; margin-bottom: 12px;">接続</button>
                 
                 <div class="status-row">
                     <strong>アドレス:</strong>
@@ -1983,6 +1983,23 @@
         <!-- System Initialization -->
         <div class="container">
             <h2>🔧 システム初期化</h2>
+            
+            <!-- Dev Wallet Toggle -->
+            <div style="margin-bottom: 15px; padding: 10px; background: rgba(255,255,0,0.1); border: 1px solid rgba(255,255,0,0.3); border-radius: 5px;">
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                    <div>
+                        <strong>🔑 Dev Wallet</strong>
+                        <small style="display: block; color: #999; margin-top: 2px;">
+                            開発用ウォレット (b7e15162...)
+                        </small>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="devWalletToggle" checked onchange="toggleDevWallet()">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+            
             <div class="grid-2">
                 <button onclick="initializeSystem()" id="initBtn">システムを初期化</button>
                 <button onclick="setupWorkspace()" id="workspaceBtn">作業フォルダ設定</button>
@@ -2421,7 +2438,8 @@
         // Grouped application state for better organization
         const AppState = {
             settings: {
-                parallelDownloadEnabled: false  // Default OFF for v3.5.0 compatibility
+                parallelDownloadEnabled: false,  // Default OFF for v3.5.0 compatibility
+                devWalletEnabled: true          // Dev wallet enabled by default
             },
             monitoring: {
                 wsMonitorTimeout: null  // WebSocket monitoring timeout
@@ -8737,18 +8755,22 @@
                 }
                 log('すべての必要な関数を確認しました', 'success');
                 
-                // Initialize wallet
-                log('[DEBUG] UserState before initialization:', 'debug', UserState);
-                UserState.privateKey = new NetworkState.kaspa.PrivateKey(config.testPrivateKey);
-                log('[DEBUG] UserState.privateKey set', 'debug');
-                
-                const publicKey = UserState.privateKey.toPublicKey();
-                log('[DEBUG] Public key generated', 'debug');
-                
-                UserState.address = publicKey.toAddress(config.network);
-                log('[DEBUG] UserState.address set:', 'debug', UserState.address);
-                
-                log(`ウォレットアドレス: ${UserState.address.toString()}`, 'success');
+                // Initialize wallet (only if Dev Wallet is enabled)
+                if (AppState.settings.devWalletEnabled) {
+                    log('[DEBUG] Dev Wallet enabled, initializing with test key', 'debug');
+                    UserState.privateKey = new NetworkState.kaspa.PrivateKey(config.testPrivateKey);
+                    log('[DEBUG] UserState.privateKey set', 'debug');
+                    
+                    const publicKey = UserState.privateKey.toPublicKey();
+                    log('[DEBUG] Public key generated', 'debug');
+                    
+                    UserState.address = publicKey.toAddress(config.network);
+                    log('[DEBUG] UserState.address set:', 'debug', UserState.address);
+                    
+                    log(`Dev Walletアドレス: ${UserState.address.toString()}`, 'success');
+                } else {
+                    log('Dev Wallet無効 - 手動でウォレットを接続してください', 'warning');
+                }
                 
                 // Create RPC client
                 NetworkState.rpcClient = new NetworkState.kaspa.RpcClient({
@@ -8769,21 +8791,35 @@
                 // Check REST API health
                 checkRestApiHealth();
                 
-                // Get balance
-                const { entries } = await NetworkState.rpcClient.getUtxosByAddresses([UserState.address.toString()]);
-                const balance = entries.reduce((sum, utxo) => sum + Number(utxo.amount), 0) / 1e8;
-                log(`残高: ${balance} KAS`, 'info');
+                // Get balance (only if wallet is connected)
+                let balance = 0;
+                if (UserState.address) {
+                    const { entries } = await NetworkState.rpcClient.getUtxosByAddresses([UserState.address.toString()]);
+                    balance = entries.reduce((sum, utxo) => sum + Number(utxo.amount), 0) / 1e8;
+                    log(`残高: ${balance} KAS`, 'info');
+                }
                 
                 // Update UI
                 window.kaspa = NetworkState.kaspa;
                 document.getElementById('initStatus').style.display = 'block';
-                document.getElementById('initStatus').innerHTML = `
-                    <p class="success">✅ システム初期化完了</p>
-                    <p>アドレス: ${UserState.address.toString()}</p>
-                    <p>残高: ${balance} KAS</p>
-                `;
+                
+                if (UserState.address) {
+                    document.getElementById('initStatus').innerHTML = `
+                        <p class="success">✅ システム初期化完了</p>
+                        <p>アドレス: ${UserState.address.toString()}</p>
+                        <p>残高: ${balance} KAS</p>
+                        ${AppState.settings.devWalletEnabled ? '<p style="color: #ffcc66;">⚠️ Dev Wallet使用中</p>' : ''}
+                    `;
+                } else {
+                    document.getElementById('initStatus').innerHTML = `
+                        <p class="success">✅ システム初期化完了</p>
+                        <p style="color: #ffcc66;">⚠️ ウォレット未接続</p>
+                        <p>ステータスタブからウォレットを接続してください</p>
+                    `;
+                }
+                
                 document.getElementById('testBtn').disabled = false;
-                document.getElementById('uploadBtn').disabled = false;
+                document.getElementById('uploadBtn').disabled = !UserState.address; // Only enable if wallet connected
                 
                 // Initialize history manager
                 if (WorkspaceState.historyManager) {
@@ -14774,6 +14810,7 @@
             
             log('ページ読み込み完了 - システムを自動初期化します', 'info');
             window.loadParallelSetting(); // Load parallel download setting
+            window.loadDevWalletSetting(); // Load dev wallet setting
             
             // v5.6.6: Initialize ConnectionManager after log function is available
             ConnectionManager.init();
@@ -15346,42 +15383,109 @@
         };
         
         // ===== v5.9.0: Status Tab Functions =====
+        // Toggle Dev Wallet
+        window.toggleDevWallet = function() {
+            const enabled = document.getElementById('devWalletToggle').checked;
+            AppState.settings.devWalletEnabled = enabled;
+            localStorage.setItem('kaspaDevWalletEnabled', enabled.toString());
+            
+            if (enabled) {
+                log('Dev Wallet有効化', 'info');
+            } else {
+                log('Dev Wallet無効化 - 手動接続が必要です', 'warning');
+                // If wallet is currently using dev wallet, disconnect it
+                if (UserState.privateKey && UserState.privateKey.toString() === config.testPrivateKey) {
+                    disconnectWallet();
+                }
+            }
+        };
+        
+        // Load Dev Wallet setting on startup
+        window.loadDevWalletSetting = function() {
+            const saved = localStorage.getItem('kaspaDevWalletEnabled');
+            if (saved !== null) {
+                AppState.settings.devWalletEnabled = saved === 'true';
+                document.getElementById('devWalletToggle').checked = AppState.settings.devWalletEnabled;
+            }
+        };
+        
+        // Disconnect wallet
+        window.disconnectWallet = function() {
+            UserState.privateKey = null;
+            UserState.address = null;
+            
+            // Update UI
+            document.getElementById('walletAddress').textContent = '-';
+            document.getElementById('walletBalance').textContent = '-';
+            document.getElementById('walletConnectBtn').textContent = '接続';
+            
+            // Update init status if visible
+            const initStatus = document.getElementById('initStatus');
+            if (initStatus && initStatus.style.display !== 'none') {
+                initStatus.innerHTML = `<p class="error">❌ ウォレット切断</p>`;
+            }
+            
+            // Disable upload button
+            document.getElementById('uploadBtn').disabled = true;
+            
+            log('ウォレット切断', 'info');
+        };
+        
         // Wallet connection handler
         window.connectWallet = async function() {
-            const privateKey = document.getElementById('walletPrivateKey').value;
+            const privateKeyInput = document.getElementById('walletPrivateKey');
+            const privateKey = privateKeyInput.value.trim();
+            
             if (!privateKey) {
                 alert('秘密鍵を入力してください');
                 return;
             }
             
+            // Check if already connected
+            if (UserState.privateKey) {
+                // If connected, disconnect first
+                disconnectWallet();
+                privateKeyInput.value = '';
+                return;
+            }
+            
             try {
-                // Set the private key
-                UserState.privateKey = privateKey;
-                
                 // Initialize wallet with SDK
                 if (!NetworkState.kaspa) {
-                    throw new Error('Kaspa SDK not initialized');
+                    throw new Error('Kaspa SDK not initialized - システムを初期化してください');
                 }
                 
-                // Create wallet from private key
-                const publicKey = await NetworkState.kaspa.derivePublicKey(privateKey);
-                const address = await NetworkState.kaspa.publicKeyToAddress(publicKey, config.network);
-                UserState.address = address;
+                // Create wallet from private key (correct API usage)
+                UserState.privateKey = new NetworkState.kaspa.PrivateKey(privateKey);
+                const publicKey = UserState.privateKey.toPublicKey();
+                UserState.address = publicKey.toAddress(config.network);
+                
+                log(`ウォレット接続: ${UserState.address.toString()}`, 'success');
                 
                 // Update UI
-                document.getElementById('walletAddress').textContent = address;
+                document.getElementById('walletAddress').textContent = UserState.address.toString();
                 
                 // Get balance
-                if (NetworkState.rpcClient) {
-                    const balanceResponse = await NetworkState.rpcClient.getBalanceByAddress(address);
-                    const balance = balanceResponse.balance / 100000000; // Convert from sompi to KAS
+                if (NetworkState.rpcClient && NetworkState.rpcClient.isConnected) {
+                    const { entries } = await NetworkState.rpcClient.getUtxosByAddresses([UserState.address.toString()]);
+                    const balance = entries.reduce((sum, utxo) => sum + Number(utxo.amount), 0) / 1e8;
                     document.getElementById('walletBalance').textContent = `${balance.toFixed(8)} KAS`;
+                    
+                    // Update upload button state
+                    document.getElementById('uploadBtn').disabled = false;
+                } else {
+                    document.getElementById('walletBalance').textContent = 'RPC未接続';
                 }
                 
-                log(`[Wallet] Connected: ${address}`, 'success');
+                // Clear password input
+                privateKeyInput.value = '';
+                
+                // Update connection button text
+                document.getElementById('walletConnectBtn').textContent = '切断';
+                
             } catch (error) {
-                log(`[Wallet] Connection error: ${error.message}`, 'error');
-                alert(`Wallet接続エラー: ${error.message}`);
+                log(`ウォレット接続エラー: ${error.message}`, 'error');
+                alert(`エラー: ${error.message}`);
             }
         };
         

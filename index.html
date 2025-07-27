@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.4 - アーカイブノード統合版（テキストログエクスポート）</title>
+    <title>Kaspa P2P File Storage v5.11.5 - アーカイブノード統合版（手動探査モード）</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -1969,6 +1969,7 @@
                     <div>
                         <button onclick="NetworkState.archiveManager?.startDiscovery()" id="archiveStartBtn" style="padding: 4px 8px; font-size: 12px;">探索</button>
                         <button onclick="NetworkState.archiveManager?.stop()" id="archiveStopBtn" style="padding: 4px 8px; font-size: 12px;">停止</button>
+                        <button onclick="NetworkState.archiveManager?.reset()" id="archiveResetBtn" style="padding: 4px 8px; font-size: 12px;">リセット</button>
                         <button onclick="NetworkState.archiveManager?.testBlocks()" id="testBlockBtn" style="padding: 4px 8px; font-size: 12px;">テスト実行</button>
                     </div>
                 </div>
@@ -1994,7 +1995,7 @@
                 
                 <!-- Compact Statistics -->
                 <div style="font-size: 12px; line-height: 1.4; margin-bottom: 8px; font-family: monospace;">
-                    <div id="archiveStats">探索: - | 発見: -/- | 速度: -</div>
+                    <div id="archiveStats">探索: 未開始 (デバッグタブから開始してください)</div>
                     <div>接続: <span id="archiveHealthBar">[-----]</span> <span id="archiveConnectedNodes">0/5</span> | Avg: <span id="archiveAvgResponse">-</span></div>
                     <div id="archiveCheckingStatus" style="color: #888;">チェック中: <span id="archiveCheckingNode">待機中</span></div>
                 </div>
@@ -2007,7 +2008,7 @@
                 <!-- Minimal Event Log -->
                 <div style="border-top: 1px solid var(--border-color); padding-top: 6px; margin-top: 6px;">
                     <div style="font-size: 11px; color: #888; margin-bottom: 4px;">最近のイベント:</div>
-                    <div id="archiveEventLog" style="font-size: 11px; font-family: monospace; line-height: 1.3; max-height: 40px; overflow-y: auto;">
+                    <div id="archiveEventLog" style="font-size: 11px; font-family: monospace; line-height: 1.3; max-height: 80px; overflow-y: auto;">
                         <div style="color: #666;">イベントなし</div>
                     </div>
                 </div>
@@ -2504,7 +2505,8 @@
                 
                 this.isInitialized = true;
                 this.stats.startTime = Date.now();
-                this.startDiscovery();
+                // Auto-start disabled - manual start only from debug tab
+                // this.startDiscovery();
             }
             
             async startDiscovery() {
@@ -2512,7 +2514,10 @@
                 
                 this.isDiscovering = true;
                 this.maintainConnections = true;
-                // Starting discovery silently
+                this.log('Archive node discovery started manually', 'info');
+                
+                // Reset stats for fresh start
+                this.stats.startTime = Date.now();
                 
                 // Start discovery workers
                 this.spawnWorkers();
@@ -2551,6 +2556,7 @@
                     // Get node info first
                     const nodeInfo = await client.getServerInfo();
                     const dagInfo = await client.getBlockDagInfo();
+                    this.log('Called getBlockDagInfo() to retrieve block count', 'debug');
                     const blockCount = Number(dagInfo.blockCount || 0);
                     
                     // Use actual block count
@@ -2564,7 +2570,7 @@
                         blockCountM: blockCountM
                     };
                     
-                    this.addEvent(`Checking: ${blockCountM}M blocks`, '🔍');
+                    this.addEvent(`Checking BlockDAG: ${blockCountM}M blocks`, '🔍');
                     
                     // Validate if it's an archive node
                     const validation = await this.validateArchiveNode(client);
@@ -2661,6 +2667,7 @@
             async validateArchiveNode(client) {
                 try {
                     const dagInfo = await client.getBlockDagInfo();
+                    this.log('Validating with getBlockDagInfo() - checking total block count', 'debug');
                     const height = Number(dagInfo.blockCount || 0);
                     
                     // Simple threshold check only
@@ -2814,6 +2821,44 @@
                 
                 this.connections.clear();
                 // Archive Node Manager stopped
+            }
+            
+            async reset() {
+                this.log('Resetting archive node discovery...', 'info');
+                
+                // Stop current discovery
+                await this.stop();
+                
+                // Reset all statistics
+                this.stats = {
+                    totalAttempts: 0,
+                    uniqueNodes: new Set(),
+                    archiveNodes: new Set(),
+                    startTime: Date.now(),
+                    lastDiscoveryTime: null
+                };
+                
+                // Clear events
+                this.events = [];
+                
+                // Reset checking status
+                this.currentChecking = null;
+                
+                // Update UI to initial state
+                document.getElementById('archiveStats').textContent = '探索: 未開始 (デバッグタブから開始してください)';
+                document.getElementById('archiveHealthBar').textContent = '[-----]';
+                document.getElementById('archiveConnectedNodes').textContent = '0/5';
+                document.getElementById('archiveAvgResponse').textContent = '-';
+                document.getElementById('archiveCheckingNode').textContent = '待機中';
+                document.getElementById('archiveEventLog').innerHTML = '<div class="archive-event-item">リセット完了 - 探索ボタンで再開始できます</div>';
+                
+                // Clear archive list
+                const archiveList = document.getElementById('archiveList');
+                if (archiveList) {
+                    archiveList.innerHTML = '<div>まだアーカイブノードが見つかっていません</div>';
+                }
+                
+                this.log('Archive discovery reset complete', 'success');
             }
             
             async testBlocks() {

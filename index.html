@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.5 - アーカイブノード統合版（手動探査モード）</title>
+    <title>Kaspa P2P File Storage v5.11.6 - アーカイブノード統合版（手動探査モード）</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -2514,7 +2514,7 @@
                 
                 this.isDiscovering = true;
                 this.maintainConnections = true;
-                this.log('Archive node discovery started manually', 'info');
+                this.addEvent('Archive discovery started', '🚀');
                 
                 // Reset stats for fresh start
                 this.stats.startTime = Date.now();
@@ -2526,7 +2526,7 @@
             async spawnWorkers() {
                 const needed = Math.max(0, 5 - this.connections.size);
                 if (needed === 0) {
-                    this.log('Already have 5 archive nodes', 'success');
+                    this.addEvent('Already have 5 archive nodes', '✅');
                     return;
                 }
                 
@@ -2555,8 +2555,9 @@
                     
                     // Get node info first
                     const nodeInfo = await client.getServerInfo();
+                    this.addEvent(`Connected to ${nodeInfo.serverVersion}`, '🔗');
+                    
                     const dagInfo = await client.getBlockDagInfo();
-                    this.log('Called getBlockDagInfo() to retrieve block count', 'debug');
                     const blockCount = Number(dagInfo.blockCount || 0);
                     
                     // Use actual block count
@@ -2570,7 +2571,7 @@
                         blockCountM: blockCountM
                     };
                     
-                    this.addEvent(`Checking BlockDAG: ${blockCountM}M blocks`, '🔍');
+                    this.addEvent(`BlockDAG info: ${blockCountM}M blocks`, '📊');
                     
                     // Validate if it's an archive node
                     const validation = await this.validateArchiveNode(client);
@@ -2592,21 +2593,19 @@
                             }
                         });
                         
-                        this.log(`Archive node found! Total: ${this.connections.size}/5`, 'success');
                         this.addEvent(`Archive #${this.connections.size} found! (${blockCountM}M)`, '🎉');
                         updateArchiveNodeStatus();
                         
                         if (this.connections.size >= 5) {
                             this.isDiscovering = false;
-                            this.log('Target of 5 archive nodes reached', 'success');
-                            this.addEvent('5 nodes connected!', '🎯');
+                            this.addEvent('Target of 5 nodes reached!', '🎯');
                         }
                     } else {
                         await client.disconnect();
                         this.addEvent(`Not archive (${blockCountM}M)`, '❌');
                     }
                 } catch (error) {
-                    this.log(`Discovery error: ${error.message}`, 'error');
+                    this.addEvent(`Discovery error: ${error.message}`, '⚠️');
                     this.currentChecking = { status: 'idle', nodeId: null, blockCount: null, version: null };
                 } finally {
                     this.activeWorkers--;
@@ -2625,7 +2624,6 @@
                 
                 // Check if number is safe for JavaScript operations
                 if (totalBlockCount > Number.MAX_SAFE_INTEGER) {
-                    this.log(`Warning: Block count ${totalBlockCount} exceeds MAX_SAFE_INTEGER`, 'warning');
                     // Use BigInt for calculations if needed
                     const bigBlockCount = BigInt(dagInfo.blockCount || 0);
                     return {
@@ -2667,13 +2665,14 @@
             async validateArchiveNode(client) {
                 try {
                     const dagInfo = await client.getBlockDagInfo();
-                    this.log('Validating with getBlockDagInfo() - checking total block count', 'debug');
                     const height = Number(dagInfo.blockCount || 0);
                     
                     // Simple threshold check only
                     const isArchive = height > this.archiveThreshold;
+                    const thresholdM = (this.archiveThreshold / 1000000).toFixed(1);
                     
                     if (!isArchive) {
+                        this.addEvent(`✗ Below threshold (${(height/1000000).toFixed(1)}M < ${thresholdM}M)`, '❌');
                         return { 
                             isArchive: false, 
                             blockCount: height,
@@ -2682,6 +2681,7 @@
                     }
                     
                     // Archive node based on threshold
+                    this.addEvent(`✓ Archive node found (${(height/1000000).toFixed(1)}M > ${thresholdM}M)`, '✅');
                     return {
                         isArchive: true,
                         blockCount: height,
@@ -2689,7 +2689,7 @@
                         coverage: 'Use Test Block button to verify'
                     };
                 } catch (error) {
-                    this.log(`Validation error: ${error.message}`, 'error');
+                    this.addEvent(`Validation error: ${error.message}`, '⚠️');
                     return { isArchive: false, error: error.message };
                 }
             }
@@ -2751,7 +2751,6 @@
                 const node = this.connections.get(nodeId);
                 if (node) {
                     node.stats.isHealthy = false;
-                    this.log(`Node ${nodeId} marked as unhealthy`, 'warning');
                     this.addEvent('Node marked unhealthy', '⚠️');
                 }
             }
@@ -2824,7 +2823,7 @@
             }
             
             async reset() {
-                this.log('Resetting archive node discovery...', 'info');
+                this.addEvent('Resetting discovery...', '🔄');
                 
                 // Stop current discovery
                 await this.stop();
@@ -2858,31 +2857,28 @@
                     archiveList.innerHTML = '<div>まだアーカイブノードが見つかっていません</div>';
                 }
                 
-                this.log('Archive discovery reset complete', 'success');
+                this.addEvent('Reset complete', '✅');
             }
             
             async testBlocks() {
                 if (this.connections.size === 0) {
-                    this.log('No active archive node connections', 'error');
                     this.addEvent('No connections to test', '❌');
                     return;
                 }
                 
                 const hash = document.getElementById('testBlockHash')?.value?.trim();
-                this.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info');
-                this.log(`Testing ${this.connections.size} archive nodes...`, 'info');
+                this.addEvent(`Testing ${this.connections.size} nodes...`, '🧪');
                 
                 if (hash && hash.length === 64) {
-                    this.log(`Using custom block hash: ${hash}`, 'info');
+                    this.addEvent(`Custom hash: ${hash.substring(0, 16)}...`, '🔍');
                 } else {
-                    this.log('No custom hash provided, using tip blocks', 'info');
+                    this.addEvent('Using tip blocks for test', '📊');
                 }
                 
                 let successCount = 0;
                 
                 for (const [nodeId, node] of this.connections) {
                     const stats = node.stats;
-                    this.log(`\nTesting node: ${stats.blockCount ? (stats.blockCount/1000000).toFixed(1) + 'M blocks' : 'Unknown'}`, 'info');
                     
                     try {
                         // Get DAG info for tip hashes
@@ -2900,19 +2896,15 @@
                                 
                                 if (blockResponse) {
                                     const block = blockResponse.block || blockResponse;
-                                    this.log(`✓ Custom block retrieved successfully`, 'success');
-                                    this.log(`  Transactions: ${block.transactions?.length || 0}`, 'info');
                                     testResult = true;
                                     successCount++;
                                 }
                             } catch (error) {
-                                this.log(`✗ Failed to retrieve custom block: ${error.message}`, 'error');
+                                // Error will be reported in summary
                             }
                         } else if (dag.tipHashes && dag.tipHashes.length > 0) {
                             // Test with tip hash
                             const tipHash = dag.tipHashes[0];
-                            this.log(`Testing with tip hash: ${tipHash.substring(0, 16)}...`, 'info');
-                            
                             try {
                                 const tipBlock = await node.client.getBlock({
                                     hash: tipHash,
@@ -2921,13 +2913,11 @@
                                 
                                 if (tipBlock) {
                                     const block = tipBlock.block || tipBlock;
-                                    this.log(`✓ Tip block retrieved successfully`, 'success');
-                                    this.log(`  Transactions: ${block.transactions?.length || 0}`, 'info');
                                     testResult = true;
                                     successCount++;
                                 }
                             } catch (error) {
-                                this.log(`✗ Failed to retrieve tip block: ${error.message}`, 'error');
+                                // Error will be reported in summary
                             }
                         }
                         
@@ -2938,14 +2928,11 @@
                         }
                         
                     } catch (error) {
-                        this.log(`Test error: ${error.message}`, 'error');
                         this.addEvent(`Test error: ${error.message}`, '❌');
                     }
                 }
                 
-                this.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info');
-                this.log(`Test complete: ${successCount}/${this.connections.size} nodes passed`, successCount > 0 ? 'success' : 'error');
-                this.addEvent(`Test: ${successCount}/${this.connections.size} passed`, successCount > 0 ? '✅' : '❌');
+                this.addEvent(`Test complete: ${successCount}/${this.connections.size} passed`, successCount > 0 ? '✅' : '❌');
             }
             
             loadThreshold() {

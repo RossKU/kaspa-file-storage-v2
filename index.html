@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.10 - アーカイブノード統合版（REST API状態表示）</title>
+    <title>Kaspa P2P File Storage v5.11.11 - アーカイブノード統合版（REST API修正）</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -1334,14 +1334,13 @@
                         <div>Blocks: <span id="archiveBlocks">-</span></div>
                     </div>
                 </div>
-            </div>
-            
-            <!-- REST API Status -->
-            <div class="status-box">
-                <h3>🌐 REST API (Fallback)</h3>
+                
+                <div style="margin: 16px 0; border-top: 1px solid var(--border-color);"></div>
+                
+                <!-- REST API Status (Fallback) -->
                 <div class="status-row">
                     <div>
-                        <strong>REST API:</strong>
+                        <strong>REST API (Fallback):</strong>
                         <span class="status-indicator-large status-disconnected" id="restApiIndicator"></span>
                         <span id="restApiStatus">Not Checked</span>
                     </div>
@@ -6901,24 +6900,29 @@
                 const apiUrl = config.network === 'testnet-10' ? 
                     'https://api-tn10.kaspa.org' : 
                     'https://api.kaspa.org';
-                const healthEndpoint = `${apiUrl}/info/health`;
                 
                 // Update endpoint display
                 restApiEndpoint.textContent = `Endpoint: ${apiUrl}`;
                 
-                // Make health check request
+                // Use a dummy transaction ID to test the API
+                // 404 response means the API is working (transaction not found)
+                const testTxId = '0000000000000000000000000000000000000000000000000000000000000000';
+                const testEndpoint = `${apiUrl}/transactions/${testTxId}`;
+                
+                // Make test request
                 const startTime = Date.now();
-                const response = await fetchWithTimeout(healthEndpoint, {}, 5000, 1);
+                const response = await fetchWithTimeout(testEndpoint, {}, 5000, 1);
                 const responseTime = Date.now() - startTime;
                 
-                if (response.ok) {
-                    // Success
+                // 404 is expected and means API is working
+                if (response.ok || response.status === 404) {
+                    // Success (including 404 which is expected)
                     restApiStatus.textContent = 'Ready';
                     restApiIndicator.className = 'status-indicator-large status-connected';
                     restApiResponse.textContent = `Response: ${responseTime}ms`;
                     log(`[REST API] ヘルスチェック成功: ${responseTime}ms`, 'success');
                 } else {
-                    // HTTP error
+                    // Other HTTP errors
                     restApiStatus.textContent = 'Error';
                     restApiIndicator.className = 'status-indicator-large status-disconnected';
                     restApiResponse.textContent = `Response: HTTP ${response.status}`;

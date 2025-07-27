@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.7 - アーカイブノード統合版（REST APIテストモード追加）</title>
+    <title>Kaspa P2P File Storage v5.11.8 - アーカイブノード統合版（グローバル変数削除）</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -7470,7 +7470,7 @@
                     for (let retry = 0; retry <= this.maxRetries; retry++) {
                         try {
                             // Try RPC first if we have blockId (unless REST API test mode)
-                            if (blockId && rpcClient && (!window.downloadManager || !window.downloadManager.forceRestApi)) {
+                            if (blockId && rpcClient && (!NetworkState.downloadManager || !NetworkState.downloadManager.forceRestApi)) {
                                 const response = await NetworkState.rpcClient.getBlock({
                                     hash: blockId,
                                     includeTransactions: true
@@ -12407,11 +12407,11 @@
                             `ダウンロード中: ${entry.name} (${completedFiles + skippedFiles + 1}/${totalFiles})`;
                         
                         // Use DownloadManager
-                        if (!window.downloadManager) {
-                            window.downloadManager = new DownloadManager();
+                        if (!NetworkState.downloadManager) {
+                            NetworkState.downloadManager = new DownloadManager();
                         }
                         
-                        const metadata = await window.downloadManager.fetchMetadata(entry.metaTxId, entry.blockId, password);
+                        const metadata = await NetworkState.downloadManager.fetchMetadata(entry.metaTxId, entry.blockId, password);
                         
                         const folderStructureOption = {
                             enabled: true,
@@ -12420,7 +12420,7 @@
                             // v4.7.12: Remove targetHandle to force folder picker each time
                         };
                         
-                        await window.downloadManager.executeDownload(metadata, password, {
+                        await NetworkState.downloadManager.executeDownload(metadata, password, {
                             onProgress: (progress) => {
                                 const percent = ((completedFiles + progress.current/progress.total) / totalFiles * 100).toFixed(0);
                                 document.getElementById('downloadProgressBar').style.width = percent + '%';
@@ -12471,12 +12471,12 @@
                 }
                 
                 // DownloadManagerを使用
-                if (!window.downloadManager) {
+                if (!NetworkState.downloadManager) {
                     log('[DownloadManager] 初期化されていません', 'error');
                     return;
                 }
                 
-                if (!window.downloadManager.isReady()) {
+                if (!NetworkState.downloadManager.isReady()) {
                     log('[DownloadManager] 現在ダウンロード中です', 'warning');
                     return;
                 }
@@ -12486,7 +12486,7 @@
                 document.getElementById('downloadStatus').textContent = 'メタデータを取得中...';
                 
                 // メタデータ取得
-                const metadata = await window.downloadManager.fetchMetadata(metaTxId, blockId, password);
+                const metadata = await NetworkState.downloadManager.fetchMetadata(metaTxId, blockId, password);
                 
                 // v4.7.8: フォルダ構造オプションを追加
                 const folderStructureOption = (filePath && window.currentDirectoryMetadata) ? {
@@ -12496,7 +12496,7 @@
                 } : null;
                 
                 // ダウンロード実行
-                await window.downloadManager.executeDownload(metadata, password, {
+                await NetworkState.downloadManager.executeDownload(metadata, password, {
                     onProgress: (progress) => {
                         document.getElementById('downloadProgressBar').style.width = progress.percent + '%';
                         document.getElementById('downloadProgressBar').textContent = progress.percent + '%';
@@ -12527,8 +12527,8 @@
             
             // v4.7.14: Clear previous metadata
             FileState.kaspaMetadata = null;
-            if (window.downloadManager) {
-                window.downloadManager.clearMetadata();
+            if (NetworkState.downloadManager) {
+                NetworkState.downloadManager.clearMetadata();
             }
             
             const file = event?.target?.files?.[0];
@@ -12636,8 +12636,8 @@
             log(`統一入力から復元開始: ${txIdInput.substring(0, 20)}...`, 'info');
             
             // v4.7.14: Clear previous metadata in DownloadManager
-            if (window.downloadManager) {
-                window.downloadManager.clearMetadata();
+            if (NetworkState.downloadManager) {
+                NetworkState.downloadManager.clearMetadata();
             }
             
             // Use existing loadFromMetaTxId logic
@@ -12705,7 +12705,7 @@
                 let payload = null;
                 
                 // If we have BlockID, use RPC directly (no REST API needed)
-                if (blockId && (!window.downloadManager || !window.downloadManager.forceRestApi)) {
+                if (blockId && (!NetworkState.downloadManager || !NetworkState.downloadManager.forceRestApi)) {
                     log(`BlockIDを使用してRPC経由で取得中...`, 'info');
                     try {
                         const blockResponse = await NetworkState.rpcClient.getBlock({
@@ -12783,7 +12783,7 @@
                     }
                 } else {
                     // Fall back to REST API if no BlockID provided or REST API test mode
-                    if (window.downloadManager && window.downloadManager.forceRestApi) {
+                    if (NetworkState.downloadManager && NetworkState.downloadManager.forceRestApi) {
                         log(`REST APIテストモード - RPCをスキップしてREST API経由で復元`, 'warning');
                     } else {
                         log(`メタTxID ${metaTxId.substring(0, 16)}... からREST API経由で復元を開始`, 'info');
@@ -13278,7 +13278,7 @@
                     }
                 };
                 
-                await window.downloadManager.executeDownload(
+                await NetworkState.downloadManager.executeDownload(
                     kaspaMetadata,
                     password,
                     {
@@ -13646,8 +13646,8 @@
         // Toggle REST API test mode
         window.toggleRestApiTest = function() {
             const enabled = document.getElementById('restApiTestToggle').checked;
-            if (window.downloadManager) {
-                window.downloadManager.toggleRestApiMode(enabled);
+            if (NetworkState.downloadManager) {
+                NetworkState.downloadManager.toggleRestApiMode(enabled);
             }
             
             if (enabled) {
@@ -14525,7 +14525,7 @@
         // Initialize history manager on load
         WorkspaceState.historyManager = new UploadHistoryManager();
         window.directoryManager = new DirectoryManager();
-        window.downloadManager = new DownloadManager();
+        NetworkState.downloadManager = new DownloadManager();
         
         // Debug information collection
         function collectDebugInfo() {

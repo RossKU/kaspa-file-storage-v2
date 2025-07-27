@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.12 - アーカイブノード統合版（Dev Wallet切替）</title>
+    <title>Kaspa P2P File Storage v5.11.14 - アーカイブノード統合版（手動Wallet接続改善）</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -1994,7 +1994,7 @@
                         </small>
                     </div>
                     <label class="toggle-switch">
-                        <input type="checkbox" id="devWalletToggle" checked onchange="toggleDevWallet()">
+                        <input type="checkbox" id="devWalletToggle" checked onchange="AppState.toggleDevWallet()">
                         <span class="toggle-slider"></span>
                     </label>
                 </div>
@@ -2453,6 +2453,9 @@
                 simpleWalletManager: null    // Simple wallet manager instance (v5.5.39)
             }
         };
+        
+        // Expose AppState to window for global access
+        window.AppState = AppState;
         
         // ===== Phase 2: User State Refactoring (v5.4.30) =====
         const UserState = {
@@ -8731,6 +8734,62 @@
             }
         }
         
+        // ===== Dev Wallet Functions (AppState Methods) =====
+        AppState.toggleDevWallet = function() {
+            const enabled = document.getElementById('devWalletToggle').checked;
+            AppState.settings.devWalletEnabled = enabled;
+            localStorage.setItem('kaspaDevWalletEnabled', enabled.toString());
+            
+            if (enabled) {
+                log('Dev Wallet有効化', 'info');
+            } else {
+                log('Dev Wallet無効化 - 手動接続が必要です', 'warning');
+                // If wallet is currently using dev wallet, disconnect it
+                if (UserState.privateKey && UserState.privateKey.toString() === config.testPrivateKey) {
+                    AppState.disconnectWallet();
+                }
+            }
+        };
+        
+        AppState.loadDevWalletSetting = function() {
+            const saved = localStorage.getItem('kaspaDevWalletEnabled');
+            if (saved !== null) {
+                AppState.settings.devWalletEnabled = saved === 'true';
+                document.getElementById('devWalletToggle').checked = AppState.settings.devWalletEnabled;
+            }
+        };
+        
+        AppState.disconnectWallet = function() {
+            UserState.privateKey = null;
+            UserState.address = null;
+            
+            // Update UI
+            document.getElementById('walletAddress').textContent = '-';
+            document.getElementById('walletBalance').textContent = '-';
+            document.getElementById('walletConnectBtn').textContent = '接続';
+            
+            // Update init status if visible
+            const initStatus = document.getElementById('initStatus');
+            if (initStatus && initStatus.style.display !== 'none') {
+                initStatus.innerHTML = `<p class="error">❌ ウォレット切断</p>`;
+            }
+            
+            // Disable upload button
+            document.getElementById('uploadBtn').disabled = true;
+            
+            log('ウォレット切断', 'info');
+        };
+        
+        // Disable Dev Wallet and update UI
+        AppState.disableDevWallet = function() {
+            if (AppState.settings.devWalletEnabled) {
+                AppState.settings.devWalletEnabled = false;
+                localStorage.setItem('kaspaDevWalletEnabled', 'false');
+                document.getElementById('devWalletToggle').checked = false;
+                log('Dev Wallet自動無効化 - 手動Wallet接続のため', 'info');
+            }
+        };
+        
         window.initializeSystem = async function() {
             try {
                 log('システム初期化を開始...');
@@ -14810,7 +14869,7 @@
             
             log('ページ読み込み完了 - システムを自動初期化します', 'info');
             window.loadParallelSetting(); // Load parallel download setting
-            window.loadDevWalletSetting(); // Load dev wallet setting
+            AppState.loadDevWalletSetting(); // Load dev wallet setting
             
             // v5.6.6: Initialize ConnectionManager after log function is available
             ConnectionManager.init();
@@ -15383,54 +15442,6 @@
         };
         
         // ===== v5.9.0: Status Tab Functions =====
-        // Toggle Dev Wallet
-        window.toggleDevWallet = function() {
-            const enabled = document.getElementById('devWalletToggle').checked;
-            AppState.settings.devWalletEnabled = enabled;
-            localStorage.setItem('kaspaDevWalletEnabled', enabled.toString());
-            
-            if (enabled) {
-                log('Dev Wallet有効化', 'info');
-            } else {
-                log('Dev Wallet無効化 - 手動接続が必要です', 'warning');
-                // If wallet is currently using dev wallet, disconnect it
-                if (UserState.privateKey && UserState.privateKey.toString() === config.testPrivateKey) {
-                    disconnectWallet();
-                }
-            }
-        };
-        
-        // Load Dev Wallet setting on startup
-        window.loadDevWalletSetting = function() {
-            const saved = localStorage.getItem('kaspaDevWalletEnabled');
-            if (saved !== null) {
-                AppState.settings.devWalletEnabled = saved === 'true';
-                document.getElementById('devWalletToggle').checked = AppState.settings.devWalletEnabled;
-            }
-        };
-        
-        // Disconnect wallet
-        window.disconnectWallet = function() {
-            UserState.privateKey = null;
-            UserState.address = null;
-            
-            // Update UI
-            document.getElementById('walletAddress').textContent = '-';
-            document.getElementById('walletBalance').textContent = '-';
-            document.getElementById('walletConnectBtn').textContent = '接続';
-            
-            // Update init status if visible
-            const initStatus = document.getElementById('initStatus');
-            if (initStatus && initStatus.style.display !== 'none') {
-                initStatus.innerHTML = `<p class="error">❌ ウォレット切断</p>`;
-            }
-            
-            // Disable upload button
-            document.getElementById('uploadBtn').disabled = true;
-            
-            log('ウォレット切断', 'info');
-        };
-        
         // Wallet connection handler
         window.connectWallet = async function() {
             const privateKeyInput = document.getElementById('walletPrivateKey');
@@ -15443,10 +15454,16 @@
             
             // Check if already connected
             if (UserState.privateKey) {
-                // If connected, disconnect first
-                disconnectWallet();
-                privateKeyInput.value = '';
-                return;
+                // If connected with Dev Wallet, proceed to replace with manual connection
+                const isDevWallet = UserState.privateKey.toString() === config.testPrivateKey;
+                if (!isDevWallet) {
+                    // If not Dev Wallet, just disconnect and return
+                    AppState.disconnectWallet();
+                    privateKeyInput.value = '';
+                    return;
+                }
+                // If Dev Wallet, disconnect it and continue with manual connection
+                AppState.disconnectWallet();
             }
             
             try {
@@ -15461,6 +15478,9 @@
                 UserState.address = publicKey.toAddress(config.network);
                 
                 log(`ウォレット接続: ${UserState.address.toString()}`, 'success');
+                
+                // Disable Dev Wallet when manually connecting
+                AppState.disableDevWallet();
                 
                 // Update UI
                 document.getElementById('walletAddress').textContent = UserState.address.toString();

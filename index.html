@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.8 - アーカイブノード統合版（グローバル変数削除）</title>
+    <title>Kaspa P2P File Storage v5.11.9 - アーカイブノード統合版（RPC接続情報表示）</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -5724,6 +5724,7 @@
                     this.isConnected = false;
                     this.lastError = error;
                     updateNetworkStatus('offline', 'ネットワークエラー');
+                    updateRpcNodeInfo(); // Reset display
                     
                     // Save progress if needed
                     if (FileState.progressManager?.progress) {
@@ -5800,6 +5801,9 @@
                     // Test connection
                     const info = await NetworkState.rpcClient.getServerInfo();
                     log(`[ConnectionManager] RPC接続成功: ${info.serverVersion}`, 'success');
+                    
+                    // Update RPC node info display
+                    updateRpcNodeInfo(info, config.network, config.nodeType, config.currentEndpoint);
                     
                     await this.handleReconnected();
                     
@@ -6811,6 +6815,53 @@
                     break;
             }
             statusText.textContent = text;
+        }
+
+        // Update RPC node information display
+        function updateRpcNodeInfo(info = null, network = null, nodeType = null, endpoint = null) {
+            const rpcStatus = document.getElementById('rpcStatus');
+            const rpcNode = document.getElementById('rpcNode');
+            const statusIndicator = document.querySelector('#rpcStatus').previousElementSibling;
+            
+            if (!info) {
+                // Disconnected state
+                rpcStatus.textContent = 'Not Connected';
+                rpcNode.textContent = 'Node: -';
+                statusIndicator.className = 'status-indicator-large status-disconnected';
+                return;
+            }
+            
+            // Connected state
+            rpcStatus.textContent = 'Connected';
+            statusIndicator.className = 'status-indicator-large status-connected';
+            
+            // Format network name
+            const networkDisplay = network === 'testnet-10' ? 'Testnet-10' : 'Mainnet';
+            
+            // Format node type and endpoint
+            let nodeTypeDisplay = '';
+            if (nodeType === 'archive') {
+                nodeTypeDisplay = ' • Archive Node';
+                if (endpoint) {
+                    nodeTypeDisplay += ` (${endpoint})`;
+                }
+            } else if (nodeType === 'custom' && endpoint) {
+                nodeTypeDisplay = ' • Custom Node';
+                nodeTypeDisplay += ` (${endpoint})`;
+            } else {
+                // Auto or standard mode
+                nodeTypeDisplay = ' • Standard (Auto)';
+            }
+            
+            // Format sync status
+            const syncStatus = info.isSynced ? ' • Synced' : ' • Syncing';
+            
+            // Check if pruned node
+            const prunedStatus = info.hasUtxoIndex === false ? ' • Pruned' : '';
+            
+            // Combine all information
+            const nodeInfo = `Node: ${networkDisplay} • ${info.serverVersion}${syncStatus}${prunedStatus}${nodeTypeDisplay}`;
+            rpcNode.textContent = nodeInfo;
         }
 
         // Generate file CID based on content (v3.3 specification)
@@ -8638,6 +8689,9 @@
                 const info = await NetworkState.rpcClient.getServerInfo();
                 log(`接続成功! サーバー: ${info.serverVersion}`, 'success');
                 
+                // Update RPC node info display
+                updateRpcNodeInfo(info, config.network, config.nodeType, config.currentEndpoint);
+                
                 // Get balance
                 const { entries } = await NetworkState.rpcClient.getUtxosByAddresses([UserState.address.toString()]);
                 const balance = entries.reduce((sum, utxo) => sum + Number(utxo.amount), 0) / 1e8;
@@ -8668,6 +8722,7 @@
             } catch (error) {
                 log(`初期化エラー: ${error.message}`, 'error');
                 updateNetworkStatus('offline', 'エラー');
+                updateRpcNodeInfo(); // Reset display
             }
         };
         
@@ -8679,13 +8734,16 @@
             if (config.nodeType === 'archive') {
                 // Use archive node endpoint
                 endpoint = config.archiveEndpoints[config.network];
+                config.currentEndpoint = endpoint;
                 log(`[RPC] アーカイブノードを使用: ${endpoint}`, 'info');
             } else if (config.nodeType === 'custom' && config.customEndpoint) {
                 // Use custom endpoint
                 endpoint = config.customEndpoint;
+                config.currentEndpoint = endpoint;
                 log(`[RPC] カスタムエンドポイントを使用: ${endpoint}`, 'info');
             } else {
                 // Use standard resolver (auto or standard mode)
+                config.currentEndpoint = null;
                 log(`[RPC] 標準Resolverを使用 (${config.nodeType} mode)`, 'info');
             }
             
@@ -8731,12 +8789,16 @@
                 const info = await NetworkState.rpcClient.getServerInfo();
                 log(`RPC再接続成功! サーバー: ${info.serverVersion}`, 'success');
                 
+                // Update RPC node info display
+                updateRpcNodeInfo(info, config.network, config.nodeType, config.currentEndpoint);
+                
                 updateNetworkStatus('online', 'オンライン');
                 return true;
                 
             } catch (error) {
                 log(`RPC初期化エラー: ${error.message}`, 'error');
                 updateNetworkStatus('offline', 'エラー');
+                updateRpcNodeInfo(); // Reset display
                 return false;
             }
         }
@@ -13992,6 +14054,7 @@
                         ConnectionManager.isConnected = false;
                         ConnectionManager.lastError = new Error('WebSocket disconnected via event');
                         updateNetworkStatus('offline', 'WebSocket切断');
+                        updateRpcNodeInfo(); // Reset display
                         
                         // v5.7.5: Ensure RPC client is cleaned up on WebSocket disconnect
                         if (NetworkState.rpcClient) {

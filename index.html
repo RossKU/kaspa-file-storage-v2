@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.14 - アーカイブノード統合版（手動Wallet接続改善）</title>
+    <title>Kaspa P2P File Storage v5.11.15 - アーカイブノード統合版（セグメント処理リファクタリング）</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -2432,7 +2432,7 @@
         // Constants
         const CHUNKS_PER_META = 160; // Maximum chunks per MetaTxID
         const MAX_CHUNKS_SUPPORTED = 25600; // Maximum chunks supported via Super (160 × 160)
-        const PROCESS_CHUNK_SIZE = 1024 * 1024; // 1MB processing chunks
+        const PROCESS_SEGMENT_SIZE = 1024 * 1024; // 1MB processing segments
         
         // ===== Phase 1: Global State Refactoring (v5.4.19) =====
         // Grouped application state for better organization
@@ -10190,7 +10190,7 @@
             log('[INFO] アップロードセッションを開始', 'info');
             
             try {
-                const PROCESS_CHUNK_SIZE = 1024 * 1024; // 1MB processing chunks
+                const PROCESS_SEGMENT_SIZE = 1024 * 1024; // 1MB processing segments
                 const PAYLOAD_SIZE = 22 * 1024; // 22KB payloads
             
             // Generate proper salt using file hash
@@ -10226,9 +10226,9 @@
             let encryptedBuffer = new Uint8Array(0);
             let totalEncryptedBytes = 0;
             
-            // Process file in chunks
+            // Process file in segments
             while (processedBytes < file.size) {
-                const end = Math.min(processedBytes + PROCESS_CHUNK_SIZE, file.size);
+                const end = Math.min(processedBytes + PROCESS_SEGMENT_SIZE, file.size);
                 const blob = file.slice(processedBytes, end);
                 const chunk = new Uint8Array(await blob.arrayBuffer());
                 
@@ -10237,13 +10237,13 @@
                     lzCompress(chunk) : chunk;
                 
                 // Encrypt (continuous stream)
-                const chunkIndex = Math.floor(processedBytes / PROCESS_CHUNK_SIZE);
-                const payloadStartIndex = payloads.length; // Current payload index for this chunk
-                const encrypted = await encryptChunk(compressed, key, chunkIndex, payloadStartIndex);
+                const segmentIndex = Math.floor(processedBytes / PROCESS_SEGMENT_SIZE);
+                const payloadStartIndex = payloads.length; // Current payload index for this segment
+                const encrypted = await encryptChunk(compressed, key, segmentIndex, payloadStartIndex);
                 
                 // Record segment boundary
                 segmentBoundaries.push({
-                    index: chunkIndex,
+                    index: segmentIndex,
                     offset: totalEncryptedBytes,
                     size: encrypted.length,
                     originalSize: chunk.length,

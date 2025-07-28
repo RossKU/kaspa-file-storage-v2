@@ -16,7 +16,11 @@ KENVファイルシステムは、Kaspa P2P File Storageの作業環境を管理
    - isTemporary削除（使用場面なし）
    - addedDate削除（uploadDateで十分）
 2. **必須項目の最小化**
+   - MetaTxIDをオプション化（.kaspaファイルのみモード対応）
 3. **パスワード保管の推奨**
+4. **2つの保存モード対応**
+   - オンチェーンモード：MetaTxID必須
+   - .kaspaファイルのみモード：MetaTxID不要
 
 ## ファイル構成
 
@@ -126,8 +130,8 @@ id,type,version,created,network,name,path,metaTxId,metaTxBlockId,firstChunkTxId,
 |----|---------|-----|------|-------------------|------|
 | 5 | name | string | ✓ | file.name / directory.name | 表示名 |
 | 6 | path | string | | entries[].path | ディレクトリ内パス |
-| 7 | metaTxId | string | ✓ | metadata.metaTxId | メタデータTxID |
-| 8 | metaTxBlockId | string | ✓ | metadata.metaTxBlockId | メタデータBlockID |
+| 7 | metaTxId | string | | metadata.metaTxId | メタデータTxID（オンチェーン時必須） |
+| 8 | metaTxBlockId | string | | metadata.metaTxBlockId | メタデータBlockID（オンチェーン時必須） |
 
 #### トランザクション情報（9-12）
 | 列 | カラム名 | 型 | 必須 | .kaspa対応フィールド | 備考 |
@@ -235,9 +239,14 @@ type,name,path,size,metaTxId,blockId,password,cid[,fileCount,totalSize]
 
 ### データ例
 
-#### 最小構成（マニュアル追加）
+#### 最小構成1（オンチェーンモード・マニュアル追加）
 ```csv
 file_001,kaspa-file,,,mainnet,重要書類.pdf,,abc123xxx,def456yyy,,,,,manual,pending,,,,,,,,,,,,,,,,,,,,,,,,,,,,,mypass123,,,重要ファイル,
+```
+
+#### 最小構成2（.kaspaファイルのみモード）
+```csv
+file_002,kaspa-file,,,mainnet,document.kaspa,,,,,,,,,manual,pending,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,file_002_document.kaspa,kaspa-only,ローカル保存ファイル,
 ```
 
 #### 検証済みファイル（全情報）
@@ -264,10 +273,12 @@ function parseCSVLine(line) {
         id: columns[0],
         type: columns[1] || 'kaspa-file',
         name: columns[5],
-        metaTxId: columns[7],
-        metaTxBlockId: columns[8],
         source: columns[13],
         status: columns[14],
+        
+        // 条件付き必須（モード依存）
+        metaTxId: columns[7] || null,
+        metaTxBlockId: columns[8] || null,
         
         // オプション項目（自動補完可能）
         version: columns[2] || '3.4.2',
@@ -314,21 +325,38 @@ async function verifyAndComplete(entry) {
     entry.status = 'verifying';
     
     try {
-        // 1. MetaTxIDから.kaspaファイル取得
-        const kaspaData = await fetchKaspaMetadata(
-            entry.metaTxId, 
-            entry.metaTxBlockId,
-            entry.password
-        );
-        
-        // 2. 自動情報補完
-        Object.assign(entry, {
-            fileSize: kaspaData.file.size,
-            sha256: kaspaData.file.sha256,
-            encrypted: kaspaData.file.encrypted,
-            // ... その他の情報
-            status: 'verified'
-        });
+        if (entry.metaTxId) {
+            // オンチェーンモード
+            // 1. MetaTxIDから.kaspaファイル取得
+            const kaspaData = await fetchKaspaMetadata(
+                entry.metaTxId, 
+                entry.metaTxBlockId,
+                entry.password
+            );
+            
+            // 2. 自動情報補完
+            Object.assign(entry, {
+                fileSize: kaspaData.file.size,
+                sha256: kaspaData.file.sha256,
+                encrypted: kaspaData.file.encrypted,
+                // ... その他の情報
+                status: 'verified'
+            });
+        } else if (entry.externalRef) {
+            // .kaspaファイルのみモード
+            // 1. ローカル.kaspaファイル読み込み
+            const kaspaData = await loadLocalKaspaFile(entry.externalRef);
+            
+            // 2. 情報補完（MetaTxID以外）
+            Object.assign(entry, {
+                fileSize: kaspaData.file.size,
+                sha256: kaspaData.file.sha256,
+                encrypted: kaspaData.file.encrypted,
+                chunks: kaspaData.chunks,
+                // ... その他の情報
+                status: 'verified'
+            });
+        }
         
     } catch (error) {
         entry.status = 'failed';
@@ -340,20 +368,26 @@ async function verifyAndComplete(entry) {
 ### 最適化のポイント
 
 1. **最小構成での動作**
-   - 必須7項目だけで登録可能
+   - 必須5項目だけで登録可能（id, type, name, source, status）
+   - MetaTxIDはモード依存でオプション
    - 後からバックグラウンドで情報補完
 
-2. **パスワード管理**
+2. **2つの保存モード対応**
+   - **オンチェーンモード**: MetaTxID必須、ブロックチェーンから復元可能
+   - **.kaspaファイルのみモード**: MetaTxID不要、ローカルファイルで完結
+
+3. **パスワード管理**
    - .kenv暗号化による二重保護
    - 復元時の利便性向上
 
-3. **効率的なCSV処理**
+4. **効率的なCSV処理**
    - 45カラムに削減（v3.1.1の49から4カラム削減）
    - ストリーミング処理対応
 
-4. **柔軟な検証**
+5. **柔軟な検証**
    - 未検証でも登録可能
    - オフライン対応
+   - モードに応じた検証処理
 
 ## 移行ガイド
 
@@ -377,8 +411,9 @@ function migrateFromV311(oldEntry) {
 
 v3.1.2では、実用性を重視した最適化を行いました：
 - 不要カラムの削除により45カラムに削減
-- 最小7項目での登録を可能に
+- 最小5項目での登録を可能に（MetaTxIDオプション化）
+- 2つの保存モード対応（オンチェーン/.kaspaファイルのみ）
 - パスワード保管を推奨し利便性向上
 - 段階的検証による柔軟な運用
 
-これにより、高速なCSV処理と使いやすさを両立しています。
+これにより、高速なCSV処理と多様な使用シナリオへの対応を実現しています。

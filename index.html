@@ -11594,12 +11594,15 @@
                     const actualCost = await FileState.costTracking.calculateActualCost();
                     
                     // Update the most recent history entry with actual cost
-                    if (WorkspaceState.historyManager && WorkspaceState.historyManager.history.length > 0) {
-                        const lastEntry = WorkspaceState.historyManager.history[WorkspaceState.historyManager.history.length - 1];
-                        if (lastEntry.fileName === currentFile.name) {
-                            lastEntry.totalCost = actualCost;
-                            await WorkspaceState.historyManager.saveHistory();
-                            log(`履歴の実際のコストを更新: ${actualCost.toFixed(8)} KAS`, 'info');
+                    if (WorkspaceState.historyManager) {
+                        const history = WorkspaceState.historyManager.getHistory();
+                        if (history.length > 0) {
+                            const lastEntry = history[history.length - 1];
+                            if (lastEntry.fileName === currentFile.name) {
+                                lastEntry.totalCost = actualCost;
+                                await WorkspaceState.historyManager.saveToFile();
+                                log(`履歴の実際のコストを更新: ${actualCost.toFixed(8)} KAS`, 'info');
+                            }
                         }
                     }
                 } else {

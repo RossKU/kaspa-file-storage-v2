@@ -3036,7 +3036,86 @@
             currentFileCIDFull: null,  // Current file's full CID (v5.5.39)
             // v5.9.0: File list management
             fileList: [],             // List of files displayed in File tab
-            selectedFiles: new Set()  // Set of selected file IDs
+            selectedFiles: new Set(),  // Set of selected file IDs
+            
+            // v5.11.16: Cost tracking system
+            costTracking: {
+                initialBalance: 0,      // Balance before upload starts
+                finalBalance: 0,        // Balance after upload completes
+                estimatedCost: 0,       // Calculated estimated cost
+                actualCost: 0,          // Actual cost (initial - final)
+                lastUpdate: null,       // Last balance check timestamp
+                transactions: [],       // Array of transaction costs
+                
+                // Methods
+                reset() {
+                    this.initialBalance = 0;
+                    this.finalBalance = 0;
+                    this.estimatedCost = 0;
+                    this.actualCost = 0;
+                    this.lastUpdate = null;
+                    this.transactions = [];
+                },
+                
+                // Get current wallet balance
+                async getCurrentBalance() {
+                    if (!NetworkState.rpcClient || !UserState.address) {
+                        throw new Error('Wallet not connected or RPC not initialized');
+                    }
+                    
+                    try {
+                        const { entries } = await NetworkState.rpcClient.getUtxosByAddresses([UserState.address.toString()]);
+                        const balance = entries.reduce((sum, utxo) => sum + Number(utxo.amount), 0) / 1e8;
+                        this.lastUpdate = new Date();
+                        return balance;
+                    } catch (error) {
+                        log(`残高取得エラー: ${error.message}`, 'error');
+                        throw error;
+                    }
+                },
+                
+                // Record initial balance
+                async recordInitialBalance() {
+                    try {
+                        this.initialBalance = await this.getCurrentBalance();
+                        log(`アップロード開始前残高: ${this.initialBalance.toFixed(8)} KAS`, 'info');
+                        return this.initialBalance;
+                    } catch (error) {
+                        log(`初期残高記録エラー: ${error.message}`, 'warning');
+                        return 0;
+                    }
+                },
+                
+                // Calculate actual cost from final balance
+                async calculateActualCost() {
+                    try {
+                        this.finalBalance = await this.getCurrentBalance();
+                        this.actualCost = this.initialBalance - this.finalBalance;
+                        
+                        // Log comparison
+                        log(`実際のコスト: ${this.actualCost.toFixed(8)} KAS（推定: ${this.estimatedCost.toFixed(8)} KAS）`, 'info');
+                        if (Math.abs(this.actualCost - this.estimatedCost) > 0.00001) {
+                            const diff = this.actualCost - this.estimatedCost;
+                            log(`コスト差異: ${diff > 0 ? '+' : ''}${diff.toFixed(8)} KAS`, 'warning');
+                        }
+                        
+                        return this.actualCost;
+                    } catch (error) {
+                        log(`最終コスト計算エラー: ${error.message}`, 'warning');
+                        return this.estimatedCost; // Fallback to estimated
+                    }
+                },
+                
+                // Add transaction cost
+                addTransaction(txId, cost, type = 'chunk') {
+                    this.transactions.push({
+                        txId,
+                        cost,
+                        type,
+                        timestamp: new Date()
+                    });
+                }
+            }
         };
         
         // Expose FileState to window for global access
@@ -9246,7 +9325,13 @@
             document.getElementById('uploadBtn').disabled = true;
             document.getElementById('uploadProgress').style.display = 'block';
             
+            // v5.11.16: Reset and record initial balance for directory upload
+            FileState.costTracking.reset();
+            
             try {
+                // v5.11.16: Record initial balance
+                await FileState.costTracking.recordInitialBalance();
+                
                 const files = window.selectedDirectory.files;
                 const dirName = window.selectedDirectory.name;
                 
@@ -9371,6 +9456,20 @@
                     failedFiles: failedFiles,
                     network: config.network
                 };
+                
+                // v5.11.16: Calculate actual cost for directory upload
+                try {
+                    const actualCost = await FileState.costTracking.calculateActualCost();
+                    if (actualCost > 0) {
+                        totalCost = actualCost; // Use actual cost for display and history
+                        dirMetadata.recovery.uploadCost = actualCost; // Update metadata with actual cost
+                        uploadData.totalCost = actualCost; // Update uploadData with actual cost
+                        log(`ディレクトリアップロードの実際のコスト: ${actualCost.toFixed(8)} KAS`, 'info');
+                    }
+                } catch (error) {
+                    log(`実際のコスト計算エラー: ${error.message}`, 'warning');
+                    // Continue with estimated cost
+                }
                 
                 await WorkspaceState.historyManager.addUpload(uploadData);
                 
@@ -10443,6 +10542,9 @@
             // v5.5.24: window.progressManager -> FileState.progressManager (2/11)
             // v5.5.26: Remove local variable to fix File System Access API state cache error
             
+            // v5.11.16: Reset cost tracking for new upload
+            FileState.costTracking.reset();
+            
             // Initialize processedChunks with existing chunks from progress
             // v5.5.22: window.processedChunks -> FileState.processedChunks (1/18)
             FileState.processedChunks = [];
@@ -10485,6 +10587,9 @@
                 // v5.3.7: Also set uploadSessionActive
                 FileState.uploadSessionActive = true; // v5.5.35: Using FileState
                 log('[INFO] アップロードセッションを開始 (メイン)', 'info');
+                
+                // v5.11.16: Record initial balance
+                await FileState.costTracking.recordInitialBalance();
                 
                 log(`処理開始: ${currentFile.name}`);
                 log(`ファイルサイズ: ${(currentFile.size / 1024 / 1024).toFixed(2)} MB`);
@@ -11312,10 +11417,13 @@
                 }
                 } // End of old approach
                 
-                // Calculate cost
+                // Calculate estimated cost
                 // v5.5.22: window.processedChunks -> FileState.processedChunks (6/18)
                 const totalPayloadKB = FileState.processedChunks.reduce((sum, c) => sum + c.payloadSize, 0) / 1024;
                 const totalCost = totalChunks * 0.00005 + totalPayloadKB * 0.00001;
+                
+                // v5.11.16: Store estimated cost
+                FileState.costTracking.estimatedCost = totalCost;
                 
                 // Final progress save
                 await FileState.progressManager.saveProgress();
@@ -11391,6 +11499,13 @@
                 });
                 
                 log(`アップロード完了! 総コスト: ${totalCost.toFixed(5)} KAS`, 'success');
+                
+                // v5.11.16: Calculate actual cost before meta-tx (if any)
+                if (!document.getElementById('useMetaTx').checked) {
+                    // If no meta-tx, calculate actual cost now
+                    const actualCost = await FileState.costTracking.calculateActualCost();
+                    totalCost = actualCost; // Use actual cost for history
+                }
                 
                 // Phase 0-L: Clear network error flag on successful completion
                 FileState.networkErrorOccurred = false;
@@ -11474,6 +11589,19 @@
                 if (useMetaTx) {
                     log('[DEBUG] メタTx作成を開始します', 'debug');
                     await createAndUploadMetaTx();
+                    
+                    // v5.11.16: Calculate actual cost after meta-tx
+                    const actualCost = await FileState.costTracking.calculateActualCost();
+                    
+                    // Update the most recent history entry with actual cost
+                    if (WorkspaceState.historyManager && WorkspaceState.historyManager.history.length > 0) {
+                        const lastEntry = WorkspaceState.historyManager.history[WorkspaceState.historyManager.history.length - 1];
+                        if (lastEntry.fileName === currentFile.name) {
+                            lastEntry.totalCost = actualCost;
+                            await WorkspaceState.historyManager.saveHistory();
+                            log(`履歴の実際のコストを更新: ${actualCost.toFixed(8)} KAS`, 'info');
+                        }
+                    }
                 } else {
                     log('[DEBUG] メタTxは作成しません（チェックボックスがOFF）', 'debug');
                     // Auto-stop monitoring for non-meta-tx uploads

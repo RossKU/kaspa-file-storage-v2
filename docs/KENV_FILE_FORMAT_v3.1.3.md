@@ -1,15 +1,30 @@
-# KENV File Format Specification v3.1.3 - 拡張子統一と.kindex最適化
+# KENV File Format Specification v3.1.3 - 統合最適化版
 
 ## 概要
-KENVファイルシステムは、Kaspa P2P File Storageの作業環境を管理する軽量ストレージシステムです。v3.1.3では専用拡張子の採用と、.kindexの大幅な最適化を行いました。
+KENVファイルシステムは、Kaspa P2P File Storageの作業環境を管理する軽量ストレージシステムです。v3.1.3では、v3.1.2の機能改善に加え、専用拡張子の採用と.kindexの大幅な最適化を実現しました。
 
 ## フォーマットバージョン
-- **現行バージョン**: 3.1.3
-- **前バージョン**: 3.1.2
+- **現行バージョン**: 3.1.3（統合版）
+- **前バージョン**: 3.1.1
 - **基準実装**: v5.12.0（予定）
 - **.kaspa互換**: v3.4.2準拠
 
-## 主要な変更点（v3.1.2→v3.1.3）
+## 主要な変更点（v3.1.1→v3.1.3）
+
+### v3.1.2での変更
+1. **重複・不要カラムの削除**（49→45カラム）
+   - hasPassword削除（passwordIncludedと重複）
+   - downloadable削除（statusから判断可能）
+   - isTemporary削除（使用場面なし）
+   - addedDate削除（uploadDateで十分）
+2. **必須項目の最小化**
+   - MetaTxIDをオプション化（.kaspaファイルのみモード対応）
+   - 最小5項目で登録可能（id, type, name, source, status）
+3. **2つの保存モード対応**
+   - オンチェーンモード：MetaTxID必須
+   - .kaspaファイルのみモード：MetaTxID不要
+
+### v3.1.3での追加変更
 1. **専用拡張子の採用**
    - `.kenv` - 設定ファイル（JSON形式）
    - `.kindex` - インデックスファイル（JSON形式）
@@ -18,6 +33,9 @@ KENVファイルシステムは、Kaspa P2P File Storageの作業環境を管理
    - UIカラムに基づいた効率的インデックス
    - 10万件でも数MBに収まる設計
    - ソート・検索・フィルタの高速化
+3. **設定拡張**
+   - マジックナンバーの外部化（settings.technical）
+   - UIカスタマイズ設定追加
 
 ## ファイル構成
 
@@ -223,12 +241,130 @@ function updateIndex(newEntry, lineNumber) {
 
 ## 3. .kentry（エントリーファイル）
 
-### フォーマット（v3.1.2から変更なし、拡張子のみ変更）
+### CSVヘッダー（45カラム固定）
 ```csv
 id,type,version,created,network,name,path,metaTxId,metaTxBlockId,firstChunkTxId,uploadDate,blockTime,uploadedBy,source,status,fileSize,originalSize,compressedSize,mimeType,sha256,encrypted,compressionAlgorithm,compressionEnabled,variableChunk,payloadSplit,cid,totalChunks,chunkCount,chunkSize,segmentCount,totalFiles,fileCount,directoryCount,entryCount,checksum,uploadCost,uploadDuration,chunkStructureType,chunkLevel,totalGroups,passwordIncluded,password,externalRef,tags,notes,authWarning
 ```
 
-## 4. 性能特性
+### カラム定義（主要項目）
+| カラム名 | 必須 | 説明 |
+|---------|------|------|
+| id | ✓ | ローカル一意識別子 |
+| type | ✓ | kaspa-file/kaspa-directory |
+| name | ✓ | ファイル/ディレクトリ名 |
+| metaTxId | | オンチェーンモード時必須 |
+| metaTxBlockId | | オンチェーンモード時必須 |
+| source | ✓ | upload/manual/download |
+| status | ✓ | pending/verifying/verified/failed |
+| password | | 暗号化パスワード（推奨保管） |
+| externalRef | | 大容量ファイル外部参照 |
+
+### データ例
+
+#### 最小構成1（オンチェーンモード）
+```csv
+file_001,kaspa-file,,,mainnet,重要書類.pdf,,abc123xxx,def456yyy,,,,,manual,pending,,,,,,,,,,,,,,,,,,,,,,,,,,,,,mypass123,,,重要ファイル,
+```
+
+#### 最小構成2（.kaspaファイルのみモード）
+```csv
+file_002,kaspa-file,,,mainnet,document.kaspa,,,,,,,,,manual,pending,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,file_002_document.kaspa,kaspa-only,ローカル保存ファイル,
+```
+
+#### 検証済みファイル（全情報）
+```csv
+file_003,kaspa-file,3.4.2,2025-01-28T10:00:00Z,mainnet,document.pdf,,abc123xxx,def456yyy,chunk1aaa,2025-01-28T10:00:00Z,2025-01-28T10:01:00Z,kaspa:qq...,upload,verified,1048576,1048576,1000000,application/pdf,a1b2c3d4...,true,lz77,true,true,true,bafybeif...,100,100,12288,3,0,0,0,0,sha256sum,0.01,60000,flat,0,0,true,mypass123,,work,業務資料,,tx1,blk1,tx2,blk2,...,seg,0,0,12288,10000,8000,0
+```
+
+### 可変カラム（46列目以降）
+- チャンクペア: `tx1,blk1,tx2,blk2,...`
+- セグメントバウンダリー: `seg,index,offset,size,originalSize,compressedSize,payloadIndex`
+
+### パース実装
+```javascript
+const FIXED_COLUMN_COUNT = 46;  // v3.1.3で45カラム固定
+
+function parseCSVLine(line) {
+    const columns = parseCSVColumns(line);
+    
+    const entry = {
+        // 必須項目（最小5項目）
+        id: columns[0],
+        type: columns[1] || 'kaspa-file',
+        name: columns[5],
+        source: columns[13],
+        status: columns[14],
+        
+        // 条件付き必須（モード依存）
+        metaTxId: columns[7] || null,
+        metaTxBlockId: columns[8] || null,
+        
+        // パスワード（推奨保管）
+        password: columns[41] || null,
+        externalRef: columns[42] || null
+    };
+    
+    // 可変部分の処理...
+    return entry;
+}
+```
+
+## 4. エントリー検証とモード管理
+
+### ステータス管理
+```javascript
+const EntryStatus = {
+    PENDING: 'pending',         // 未検証（最小情報のみ）
+    VERIFYING: 'verifying',     // 検証中
+    VERIFIED: 'verified',       // 検証済み（全情報補完）
+    FAILED: 'failed',          // 検証失敗
+    INCOMPLETE: 'incomplete'    // 部分的失敗
+};
+```
+
+### 段階的情報補完
+```javascript
+async function verifyAndComplete(entry) {
+    if (entry.status !== 'pending') return;
+    
+    entry.status = 'verifying';
+    
+    try {
+        if (entry.metaTxId) {
+            // オンチェーンモード
+            const kaspaData = await fetchKaspaMetadata(
+                entry.metaTxId, 
+                entry.metaTxBlockId,
+                entry.password
+            );
+            
+            Object.assign(entry, {
+                fileSize: kaspaData.file.size,
+                sha256: kaspaData.file.sha256,
+                encrypted: kaspaData.file.encrypted,
+                status: 'verified'
+            });
+            
+        } else if (entry.externalRef) {
+            // .kaspaファイルのみモード
+            const kaspaData = await loadLocalKaspaFile(entry.externalRef);
+            
+            Object.assign(entry, {
+                fileSize: kaspaData.file.size,
+                sha256: kaspaData.file.sha256,
+                encrypted: kaspaData.file.encrypted,
+                chunks: kaspaData.chunks,
+                status: 'verified'
+            });
+        }
+    } catch (error) {
+        entry.status = 'failed';
+        entry.authWarning = error.message;
+    }
+}
+```
+
+## 5. 性能特性
 
 ### メモリ使用量（10万エントリー時）
 | コンポーネント | サイズ | 備考 |
@@ -293,10 +429,24 @@ node rebuild-index.js workspace.kentry > workspace.kindex
 
 ## まとめ
 
-v3.1.3では、専用拡張子の採用とインデックスの大幅な最適化により：
-- **明確な役割分離** - 拡張子で用途が一目瞭然
-- **高速アクセス** - UIカラムに最適化されたインデックス
-- **省メモリ** - 10万件でも数MBで動作
-- **拡張性** - 新しいソート条件の追加が容易
+v3.1.3（統合版）では、以下の最適化を実現しました：
 
-これにより、大規模ファイルリストでも快適な操作性を実現します。
+### 機能面
+- **2つの保存モード対応** - オンチェーン/.kaspaファイルのみ
+- **最小構成での動作** - 5項目のみで登録可能
+- **MetaTxIDオプション化** - 柔軟な運用が可能
+- **段階的検証** - バックグラウンドで情報補完
+
+### 技術面
+- **専用拡張子の採用** - .kenv/.kindex/.kentry
+- **.kindex最適化** - 10万件で約3MB（従来比85%削減）
+- **45カラムCSV** - 不要カラム削除で高速化
+- **マジックナンバー外部化** - 設定による調整可能
+
+### 性能面
+- **高速アクセス** - O(1)ソート、O(log n)検索
+- **省メモリ** - 効率的なインデックス設計
+- **ストリーミング対応** - 大規模CSV処理
+- **オフライン対応** - ローカル完結モード
+
+これにより、大規模ファイルリストでも快適な操作性と、多様な利用シナリオへの対応を両立しています。

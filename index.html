@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.17 - Priority Fee最適化版</title>
+    <title>Kaspa P2P File Storage v5.11.18 - コスト見積もり承認機能実装版</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -3115,7 +3115,10 @@
                         timestamp: new Date()
                     });
                 }
-            }
+            },
+            
+            // v5.11.18: Prepared payloads for cost estimation
+            preparedPayloads: null  // Store payloads after processFileWithPayloadSplit
         };
         
         // Expose FileState to window for global access
@@ -10737,7 +10740,9 @@
                 // Initial UTXO fetch
                 let currentUtxos = null;
                 
-                // Start WebSocket monitoring for transaction confirmations
+                // v5.11.18: WebSocket monitoring is now started after cost confirmation
+                // Moved to after user confirmation
+                /*
                 if (!NetworkState.ws.monitorActive) {
                     log('WebSocket監視を開始します...', 'info');
                     await startMonitoring();
@@ -10745,6 +10750,7 @@
                     log('WebSocket監視は既に動作中です', 'info');
                     // log(`現在監視中のトランザクション数: ${NetworkState.ws.monitoredTransactions.size}`, 'info');
                 }
+                */
                 
                 
                 // NEW: Process file with payload split approach
@@ -10772,6 +10778,94 @@
                             password, 
                             useCompression
                         );
+                    
+                    // v5.11.18: Cost estimation and confirmation
+                    const payloadCount = payloads.length;
+                    const useMetaTx = document.getElementById('useMetaTx').checked;
+                    const CHUNKS_PER_META = 160;
+                    
+                    // Calculate total transactions needed
+                    let totalTxCount = payloadCount; // Base payload transactions
+                    let metaTxCount = 0;
+                    let superMetaTxCount = 0;
+                    
+                    if (useMetaTx) {
+                        if (payloadCount <= CHUNKS_PER_META) {
+                            metaTxCount = 1;
+                        } else {
+                            metaTxCount = Math.ceil(payloadCount / CHUNKS_PER_META);
+                            superMetaTxCount = 1;
+                        }
+                        totalTxCount += metaTxCount + superMetaTxCount;
+                    }
+                    
+                    // Calculate estimated cost and time
+                    const costPerTx = 0.00024; // 24,000 sompi per tx (Priority Fee削除済み)
+                    const timePerTx = 2.4; // 2.4 seconds per tx (実測値)
+                    const estimatedCost = totalTxCount * costPerTx;
+                    const estimatedTime = totalTxCount * timePerTx;
+                    
+                    // Build confirmation message
+                    let confirmMessage = `📊 アップロード見積もり\n\n`;
+                    confirmMessage += `ファイル名: ${currentFile.name}\n`;
+                    confirmMessage += `ファイルサイズ: ${(currentFile.size / 1024 / 1024).toFixed(2)} MB\n\n`;
+                    confirmMessage += `ペイロード数: ${payloadCount}チャンク\n`;
+                    
+                    if (useMetaTx) {
+                        if (metaTxCount > 0 && superMetaTxCount === 0) {
+                            confirmMessage += `メタトランザクション: ${metaTxCount}\n`;
+                        } else if (metaTxCount > 0 && superMetaTxCount > 0) {
+                            confirmMessage += `メタトランザクション: ${metaTxCount}\n`;
+                            confirmMessage += `スーパーメタトランザクション: ${superMetaTxCount}\n`;
+                        }
+                    }
+                    
+                    confirmMessage += `\n合計トランザクション数: ${totalTxCount}\n`;
+                    confirmMessage += `推定コスト: ${estimatedCost.toFixed(6)} KAS\n`;
+                    confirmMessage += `推定時間: ${Math.ceil(estimatedTime)}秒 (${(estimatedTime / 60).toFixed(1)}分)\n\n`;
+                    confirmMessage += `続行しますか？`;
+                    
+                    // Show confirmation dialog
+                    const confirmed = confirm(confirmMessage);
+                    
+                    if (!confirmed) {
+                        // User cancelled - cleanup
+                        log('アップロードがキャンセルされました', 'info');
+                        
+                        // Store payloads for potential future use
+                        FileState.preparedPayloads = {
+                            payloads,
+                            key: encKey,
+                            salt: encSalt,
+                            segmentBoundaries,
+                            timestamp: Date.now()
+                        };
+                        
+                        // Reset UI state
+                        document.getElementById('uploadBtn').disabled = false;
+                        document.getElementById('uploadProgress').style.display = 'none';
+                        
+                        // Keep progress manager for resume capability
+                        // Do not reset FileState.progressManager
+                        
+                        // Reset upload flags
+                        FileState.isUploadingFile = false;
+                        FileState.uploadSessionActive = false;
+                        
+                        return;
+                    }
+                    
+                    // User confirmed - clear any previously prepared payloads
+                    FileState.preparedPayloads = null;
+                    
+                    // Log estimation
+                    log(`📊 見積もり承認済み: ${totalTxCount}トランザクション, ${estimatedCost.toFixed(6)} KAS`, 'info');
+                    
+                    // Start WebSocket monitoring after confirmation
+                    if (!NetworkState.ws.monitorActive) {
+                        log('WebSocket監視を開始します...', 'info');
+                        await startMonitoring();
+                    }
                     
                     // Upload each payload
                     for (let i = 0; i < payloads.length; i++) {

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.18 - コスト見積もり承認機能実装版</title>
+    <title>Kaspa P2P File Storage v5.11.18-fix - ファイル名サニタイズ対応版</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -6087,7 +6087,12 @@
                 this.cid = cid;
                 this.type = type; // 'upload' or 'download'
                 // Use .kprogress extension with CID
-                const baseName = file.name || 'file';
+                // v5.11.18-fix: Sanitize filename to avoid File System Access API issues
+                const originalName = file.name || 'file';
+                const baseName = originalName
+                    .replace(/[()\[\]{}]/g, '') // Remove parentheses and brackets
+                    .replace(/\s+/g, '_')       // Replace spaces with underscores
+                    .replace(/[^a-zA-Z0-9._-]/g, ''); // Keep only safe characters
                 this.progressFileName = cid ? `${baseName}.${cid}.kprogress` : `${baseName}.kprogress`;
                 this.progress = null;
                 this.saveHandle = null;

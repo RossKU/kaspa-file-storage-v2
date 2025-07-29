@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.25 - サイドバーactive状態修正</title>
+    <title>Kaspa P2P File Storage v5.11.26 - 不要なコメント削除でコード整理</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -2326,32 +2326,6 @@
             // Ignore errors in debug logging
         }
         // Global state
-        // kaspa moved to NetworkState.kaspa
-        // rpcClient moved to NetworkState.rpcClient
-        // currentFile moved to FileState.currentFile in v5.5.5
-        // currentPassword moved to FileState.currentPassword in v5.5.3
-        // processedChunks moved to FileState.processedChunks in v5.5.4
-        // kaspaMetadata moved to FileState.kaspaMetadata in v5.5.6
-        // directoryMetadata moved to FileState.directoryMetadata in v5.5.1
-        // v5.4.52: wsMonitorActive moved to NetworkState.ws.monitorActive
-        // v5.4.52: monitoredTransactions moved to NetworkState.ws.monitoredTransactions
-        // uploadHistory moved to AppState.history.uploadHistory
-        // systemLogs moved to AppState.history.systemLogs
-        // privateKey moved to UserState.privateKey
-        // address moved to UserState.address
-        // progressManager moved to FileState.progressManager in v5.5.0
-        // wsConnection moved to NetworkState.ws.connection
-        // wsConnected moved to NetworkState.ws.connected
-        // wsReconnectInterval moved to NetworkState.ws.reconnectInterval
-        // workspaceHandle moved to WorkspaceState.handle in v5.5.30
-        // let progressFileMap = new Map(); // Map of filename -> {cid, fileHandle} - Moved to WorkspaceState.progressFileMap
-        // let historyManager = null; // Upload history manager - Moved to WorkspaceState.historyManager
-        // wsMonitorTimeout moved to AppState.monitoring.wsMonitorTimeout
-        // let uploadingChunksCount = 0; // Number of chunks being uploaded - v5.5.36: Moved to FileState.uploadingChunksCount
-        // let uploadingMetaTx = false; // Whether meta-tx is being uploaded - v5.5.37: Moved to FileState.uploadingMetaTx
-        // let uploadingDirMeta = false; // Whether directory meta is being uploaded - v5.5.38-phase2: Moved to FileState with proxy
-        // let isUploadingFile = false; // Overall file upload status (v3.6.3 fix) - v5.5.34: Moved to FileState.isUploadingFile
-        // let uploadSessionActive = false; // Upload session active flag (v5.3.6) - v5.5.35: Moved to FileState.uploadSessionActive
         
         // Constants
         const CHUNKS_PER_META = 160; // Maximum chunks per MetaTxID
@@ -3937,7 +3911,6 @@
         
         // Backward compatibility proxies (to be removed in future versions)
         let parallelDownloadEnabled = AppState.settings.parallelDownloadEnabled;
-        // window.parallelDownloadEnabled = AppState.settings.parallelDownloadEnabled; // v5.5.29: Removed - using Object.defineProperty instead
         
         // Define getter/setter for parallelDownloadEnabled
         Object.defineProperty(window, 'parallelDownloadEnabled', {
@@ -4324,14 +4297,12 @@
             if (saved !== null) {
                 AppState.settings.parallelDownloadEnabled = saved === 'true';
                 parallelDownloadEnabled = AppState.settings.parallelDownloadEnabled;
-                // window.parallelDownloadEnabled = AppState.settings.parallelDownloadEnabled; // v5.5.29: Removed - using Object.defineProperty
                 const toggle = document.getElementById('parallelDownloadToggle');
                 if (toggle) {
                     toggle.checked = AppState.settings.parallelDownloadEnabled;
                 }
             } else {
                 // Ensure all references are synchronized
-                // window.parallelDownloadEnabled = AppState.settings.parallelDownloadEnabled; // v5.5.29: Removed - using Object.defineProperty
                 parallelDownloadEnabled = AppState.settings.parallelDownloadEnabled;
             }
         }
@@ -6101,9 +6072,6 @@
             return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
         }
         
-        // Moved to UI CONTROL & EVENT HANDLERS section
-        // window.copyToClipboard - Clipboard operations handler
-        
         // Progress Manager Class
         class ProgressManager {
             constructor(file, chunkSize, cid = null, type = 'upload') {
@@ -7174,12 +7142,6 @@
                 }
             }
         }
-
-        // Moved to UI CONTROL & EVENT HANDLERS section
-        // window.switchTab - Tab navigation handler
-        
-        // Moved to UI CONTROL & EVENT HANDLERS section
-        // window.createDirectory - Directory creation handler
 
         // Filter out trash and system files
         function shouldSkipFile(fileName, filePath = '') {
@@ -9148,9 +9110,6 @@
             }
         }
 
-        // Moved to UI CONTROL & EVENT HANDLERS section
-        // window.testConnection - Connection test handler
-
         // ===== File Operation Helper Functions =====
         
         // Check file size and show warning if needed
@@ -9240,8 +9199,6 @@
             // Upload dir tab has been removed in v5.11.22
         }
 
-        // Moved to UI CONTROL & EVENT HANDLERS section
-        // window.handleFileSelect - File selection handler
         
         // Directory handling
         window.handleDirectorySelect = async function(event) {
@@ -14790,8 +14747,6 @@
     <!-- Multi-Wallet Phase 1 Integration -->
     <script>
         // グローバル変数として定義
-        // let multiWalletTestMode = false; // v5.5.39: Moved to AppState.experimental.multiWalletTestMode
-        // let simpleWalletManager = null; // v5.5.39: Moved to AppState.experimental.simpleWalletManager
 
         // 安全なインライン実装
         class SimpleWalletManager {

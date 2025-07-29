@@ -1793,8 +1793,8 @@
                 <!-- Password and Export Section -->
                 <div style="margin-bottom: 15px; padding: 15px; background: var(--bg-secondary); border-radius: 8px;">
                     <div style="margin-bottom: 15px;">
-                        <label for="dirbuilder-password">パスワード保護 (オプション):</label>
-                        <input type="password" id="dirbuilder-password" placeholder="8文字以上のパスワード（空欄 = 保護なし）" style="width: 100%; padding: 8px; margin-top: 5px;">
+                        <label for="dirbuilder-password">パスワード保護 (必須):</label>
+                        <input type="password" id="dirbuilder-password" placeholder="8文字以上のパスワード（必須）" style="width: 100%; padding: 8px; margin-top: 5px;" required>
                     </div>
                     
                     <!-- Action Buttons -->
@@ -3842,7 +3842,12 @@
                 
                 try {
                     const password = document.getElementById('dirbuilder-password').value;
-                    if (password && password.length < 8) {
+                    // v5.11.18-fix11: Make password mandatory
+                    if (!password) {
+                        this.showStatus('パスワードを入力してください', 'error');
+                        return;
+                    }
+                    if (password.length < 8) {
                         this.showStatus('パスワードは8文字以上で入力してください', 'error');
                         return;
                     }
@@ -3877,7 +3882,12 @@
                 
                 try {
                     const password = document.getElementById('dirbuilder-password').value;
-                    if (password && password.length < 8) {
+                    // v5.11.18-fix11: Make password mandatory
+                    if (!password) {
+                        this.showStatus('パスワードを入力してください', 'error');
+                        return;
+                    }
+                    if (password.length < 8) {
                         this.showStatus('パスワードは8文字以上で入力してください', 'error');
                         return;
                     }

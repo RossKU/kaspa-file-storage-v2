@@ -3776,11 +3776,29 @@
                     return false;
                 }
                 
-                // Check for duplicates
-                const names = this.entries.map(e => e.name);
-                const duplicates = names.filter((name, index) => names.indexOf(name) !== index);
-                if (duplicates.length > 0) {
-                    this.showStatus(`重複するエントリー名があります: ${duplicates.join(', ')}`, 'error');
+                // Check for duplicates in same directory
+                const pathMap = new Map();
+                const duplicateInfo = [];
+                
+                for (const entry of this.entries) {
+                    const path = entry.path || '/';
+                    const key = `${path}/${entry.name}`;
+                    
+                    if (!pathMap.has(path)) {
+                        pathMap.set(path, new Set());
+                    }
+                    
+                    const namesInPath = pathMap.get(path);
+                    if (namesInPath.has(entry.name)) {
+                        const displayPath = path === '/' ? 'ルート' : path;
+                        duplicateInfo.push(`「${entry.name}」(${displayPath}ディレクトリ内)`);
+                    } else {
+                        namesInPath.add(entry.name);
+                    }
+                }
+                
+                if (duplicateInfo.length > 0) {
+                    this.showStatus(`同じ階層に重複するファイル名があります: ${duplicateInfo.join(', ')}`, 'error');
                     return false;
                 }
                 

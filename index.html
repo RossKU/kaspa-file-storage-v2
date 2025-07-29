@@ -1730,7 +1730,7 @@
                 <!-- Directory Name -->
                 <div style="margin-bottom: 15px;">
                     <label>ディレクトリ名:</label>
-                    <input type="text" id="dirbuilder-name" placeholder="ディレクトリ名を入力" style="width: 100%; padding: 8px;" oninput="DirectoryBuilderState.updatePreview()">
+                    <input type="text" id="dirbuilder-name" placeholder="ディレクトリ名を入力" style="width: 100%; padding: 8px;" oninput="DirectoryBuilderState.updatePreview(); DirectoryBuilderState.updateButtonStates()">
                 </div>
 
                 <!-- TxID Input -->
@@ -1794,7 +1794,7 @@
                 <div style="margin-bottom: 15px; padding: 15px; background: var(--bg-secondary); border-radius: 8px;">
                     <div style="margin-bottom: 15px;">
                         <label for="dirbuilder-password">パスワード保護 (必須):</label>
-                        <input type="password" id="dirbuilder-password" placeholder="8文字以上のパスワード（必須）" style="width: 100%; padding: 8px; margin-top: 5px;" required>
+                        <input type="password" id="dirbuilder-password" placeholder="8文字以上のパスワード（必須）" style="width: 100%; padding: 8px; margin-top: 5px;" required oninput="DirectoryBuilderState.updateButtonStates()">
                     </div>
                     
                     <!-- Action Buttons -->
@@ -1805,10 +1805,10 @@
                         <button onclick="DirectoryBuilderState.validate()" class="button">
                             <span class="icon">✓</span> 検証
                         </button>
-                        <button onclick="DirectoryBuilderState.generateOnly()" class="button">
+                        <button id="dirbuilder-generate-btn" onclick="DirectoryBuilderState.generateOnly()" class="button" disabled>
                             <span class="icon">🔧</span> 生成のみ
                         </button>
-                        <button onclick="DirectoryBuilderState.generateAndUpload()" class="button button-primary">
+                        <button id="dirbuilder-upload-btn" onclick="DirectoryBuilderState.generateAndUpload()" class="button button-primary" disabled>
                             <span class="icon">📤</span> 生成してアップロード
                         </button>
                     </div>
@@ -3160,6 +3160,29 @@
                 this.selectedNode = null;
             },
             
+            // v5.11.18-fix12: Update button states based on form validation
+            updateButtonStates() {
+                const nameField = document.getElementById('dirbuilder-name');
+                const passwordField = document.getElementById('dirbuilder-password');
+                const generateBtn = document.getElementById('dirbuilder-generate-btn');
+                const uploadBtn = document.getElementById('dirbuilder-upload-btn');
+                
+                if (!generateBtn || !uploadBtn) return; // Not in edit mode
+                
+                const name = nameField ? nameField.value.trim() : '';
+                const password = passwordField ? passwordField.value : '';
+                
+                // Check all conditions
+                const hasName = name.length > 0;
+                const hasEntries = this.entries.length > 0;
+                const hasPassword = password.length >= 8;
+                
+                // Enable/disable buttons based on conditions
+                const isReady = hasName && hasEntries && hasPassword;
+                generateBtn.disabled = !isReady;
+                uploadBtn.disabled = !isReady;
+            },
+            
             startNew() {
                 this.reset();
                 this.showEditSection();
@@ -3245,6 +3268,9 @@
                 // Initialize tree with root selected
                 this.currentPath = '';
                 this.renderTree();
+                
+                // v5.11.18-fix12: Update button states when showing edit section
+                this.updateButtonStates();
             },
             
             addFileEntry() {
@@ -3319,12 +3345,16 @@
                 
                 this.entries.push(newEntry);
                 this.updatePreview();
+                // v5.11.18-fix12: Update button states after adding entry
+                this.updateButtonStates();
             },
             
             removeEntry(index) {
                 if (confirm('このエントリーを削除しますか？')) {
                     this.entries.splice(index, 1);
                     this.updatePreview();
+                    // v5.11.18-fix12: Update button states after removing entry
+                    this.updateButtonStates();
                 }
             },
             
@@ -3367,6 +3397,8 @@
                         };
                         this.entries.push(newEntry);
                         this.showStatus(`ファイル「${newEntry.name}」を追加しました`, 'success');
+                        // v5.11.18-fix12: Update button states after adding entry
+                        this.updateButtonStates();
                         
                     } else if (result.type === 'kaspa-directory') {
                         // Directory metadata
@@ -3385,6 +3417,8 @@
                         };
                         this.entries.push(newEntry);
                         this.showStatus(`ディレクトリ「${newEntry.name}」を追加しました`, 'success');
+                        // v5.11.18-fix12: Update button states after adding entry
+                        this.updateButtonStates();
                         
                         // Optionally expand directory contents
                         if (result.entries && confirm(`ディレクトリ「${newEntry.name}」の中身も展開しますか？`)) {
@@ -3401,6 +3435,8 @@
                     // Clear input and update view
                     document.getElementById('dirbuilder-txid-input').value = '';
                     this.updatePreview();
+                    // v5.11.18-fix12: Update button states after batch adding entries
+                    this.updateButtonStates();
                     
                 } catch (error) {
                     this.showStatus(`エラー: ${error.message}`, 'error');
@@ -3624,6 +3660,8 @@
                 
                 this.entries.push(newFolder);
                 this.updatePreview();
+                // v5.11.18-fix12: Update button states after adding folder
+                this.updateButtonStates();
                 this.showStatus(`フォルダ「${folderName}」を作成しました`, 'success');
                 
                 // Auto-select the new folder
@@ -3762,6 +3800,9 @@
                     document.getElementById('dirbuilder-import-section').style.display = 'block';
                     document.getElementById('dirbuilder-edit-section').style.display = 'none';
                     document.getElementById('dirbuilder-password').value = '';
+                    document.getElementById('dirbuilder-name').value = '';
+                    // v5.11.18-fix12: Clear button states when resetting
+                    this.updateButtonStates();
                 }
             },
             

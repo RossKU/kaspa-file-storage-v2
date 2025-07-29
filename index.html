@@ -3888,6 +3888,12 @@
                     // First generate
                     const metadata = await createDirectoryMetadata(this.name, optimizedEntries, password);
                     
+                    // v5.11.18-fix9: Start WebSocket monitoring before upload
+                    if (!NetworkState.ws.monitorActive) {
+                        this.showStatus('WebSocket監視を開始中...', 'info');
+                        await window.startMonitoring();
+                    }
+                    
                     this.showStatus('ディレクトリメタデータをブロックチェーンにアップロード中...', 'info');
                     
                     // Upload to blockchain

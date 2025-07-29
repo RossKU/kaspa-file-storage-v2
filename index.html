@@ -14993,6 +14993,41 @@
         window.directoryManager = new DirectoryManager();
         NetworkState.downloadManager = new DownloadManager();
         
+        // v5.11.18-fix6: downloadFromTxId helper function for DirectoryBuilderState
+        async function downloadFromTxId(txId, blockId, password = '') {
+            try {
+                if (!NetworkState.downloadManager) {
+                    NetworkState.downloadManager = new DownloadManager();
+                }
+                
+                // Fetch metadata using DownloadManager
+                const metadata = await NetworkState.downloadManager.fetchMetadata(txId, blockId, password);
+                
+                // Add type information for consistency
+                if (metadata) {
+                    // Detect type based on metadata structure
+                    if (metadata.type === 'kaspa-directory') {
+                        metadata.type = 'directory';
+                    } else if (metadata.type === 'kaspa-file' || metadata.file) {
+                        metadata.type = 'kaspa-file';
+                        metadata.name = metadata.file?.name || metadata.name || 'unknown';
+                        metadata.size = metadata.file?.size || metadata.size || 0;
+                        metadata.cid = metadata.cid || null;
+                    }
+                    
+                    // Check if it's a SuperMeta
+                    if (metadata.superMeta) {
+                        metadata.isSuperMeta = true;
+                    }
+                }
+                
+                return metadata;
+            } catch (error) {
+                log(`[downloadFromTxId] エラー: ${error.message}`, 'error');
+                throw error;
+            }
+        }
+        
         // Debug information collection
         function collectDebugInfo() {
             const info = {

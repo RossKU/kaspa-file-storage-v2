@@ -12696,7 +12696,8 @@
                             buttonsContainer = document.createElement('span');
                             const txId = entry.metaTxId || '';
                             const blkId = entry.blockId || '';
-                            const pwd = dirMetadata.auth?.password || '';
+                            // v5.11.18-fix13: Use individual entry password first, then directory password
+                            const pwd = entry.password || dirMetadata.auth?.password || '';
                             const fileName = entry.name || '';
                             
                             // コピーボタン
@@ -12982,7 +12983,9 @@
                             NetworkState.downloadManager = new DownloadManager();
                         }
                         
-                        const metadata = await NetworkState.downloadManager.fetchMetadata(entry.metaTxId, entry.blockId, password);
+                        // v5.11.18-fix13: Use individual entry password first, then directory password
+                        const entryPassword = entry.password || password || '';
+                        const metadata = await NetworkState.downloadManager.fetchMetadata(entry.metaTxId, entry.blockId, entryPassword);
                         
                         const folderStructureOption = {
                             enabled: true,

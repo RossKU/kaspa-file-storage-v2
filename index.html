@@ -3133,6 +3133,23 @@
             currentPath: '', // Currently selected path in tree
             selectedNode: null, // Currently selected node
             
+            // v5.11.18-fix3: showStatus helper for DirectoryBuilderState
+            this.showStatus(message, type = 'info') {
+                // Console log with appropriate level
+                if (type === 'error') {
+                    console.error(`[DirectoryBuilder] ${message}`);
+                } else if (type === 'warning') {
+                    console.warn(`[DirectoryBuilder] ${message}`);
+                } else {
+                    console.log(`[DirectoryBuilder] ${message}`);
+                }
+                
+                // Use global log function if available
+                if (typeof log === 'function') {
+                    log(message, type);
+                }
+            },
+            
             // Methods
             reset() {
                 this.entries = [];
@@ -3161,7 +3178,7 @@
                 const [txId, blockId, password] = parts;
                 
                 try {
-                    showStatus('TxIDからディレクトリメタデータを読み込み中...', 'info');
+                    this.showStatus('TxIDからディレクトリメタデータを読み込み中...', 'info');
                     
                     // Use existing download functionality
                     const result = await downloadFromTxId(txId, blockId, password || '');
@@ -3173,12 +3190,12 @@
                         this.mode = 'edit';
                         this.showEditSection();
                         this.updatePreview();
-                        showStatus('ディレクトリメタデータを読み込みました', 'success');
+                        this.showStatus('ディレクトリメタデータを読み込みました', 'success');
                     } else {
-                        showStatus('指定されたTxIDはディレクトリメタデータではありません', 'error');
+                        this.showStatus('指定されたTxIDはディレクトリメタデータではありません', 'error');
                     }
                 } catch (error) {
-                    showStatus(`読み込みエラー: ${error.message}`, 'error');
+                    this.showStatus(`読み込みエラー: ${error.message}`, 'error');
                 }
             },
             
@@ -3196,7 +3213,7 @@
                         const metadata = JSON.parse(text);
                         
                         if (metadata.type !== 'kaspa-directory') {
-                            showStatus('.kaspaファイルがディレクトリメタデータではありません', 'error');
+                            this.showStatus('.kaspaファイルがディレクトリメタデータではありません', 'error');
                             return;
                         }
                         
@@ -3206,9 +3223,9 @@
                         
                         self.showEditSection();
                         self.updatePreview();
-                        showStatus('.kaspaファイルを読み込みました', 'success');
+                        this.showStatus('.kaspaファイルを読み込みました', 'success');
                     } catch (error) {
-                        showStatus(`ファイル読み込みエラー: ${error.message}`, 'error');
+                        this.showStatus(`ファイル読み込みエラー: ${error.message}`, 'error');
                     }
                 };
                 input.click();
@@ -3317,20 +3334,20 @@
                 
                 const parts = input.split(':');
                 if (parts.length < 2) {
-                    showStatus('形式が正しくありません。TxID:BlockID:Password形式で入力してください。', 'error');
+                    this.showStatus('形式が正しくありません。TxID:BlockID:Password形式で入力してください。', 'error');
                     return;
                 }
                 
                 const [txId, blockId, password] = parts;
                 
                 try {
-                    showStatus('メタデータを取得中...', 'info');
+                    this.showStatus('メタデータを取得中...', 'info');
                     
                     // Try to get metadata using download functionality
                     const result = await downloadFromTxId(txId, blockId, password || '');
                     
                     if (!result) {
-                        showStatus('メタデータの取得に失敗しました', 'error');
+                        this.showStatus('メタデータの取得に失敗しました', 'error');
                         return;
                     }
                     
@@ -3349,7 +3366,7 @@
                             verified: true  // メタデータが取得できたので検証済み
                         };
                         this.entries.push(newEntry);
-                        showStatus(`ファイル「${newEntry.name}」を追加しました`, 'success');
+                        this.showStatus(`ファイル「${newEntry.name}」を追加しました`, 'success');
                         
                     } else if (result.type === 'kaspa-directory') {
                         // Directory metadata
@@ -3367,7 +3384,7 @@
                             verified: true  // メタデータが取得できたので検証済み
                         };
                         this.entries.push(newEntry);
-                        showStatus(`ディレクトリ「${newEntry.name}」を追加しました`, 'success');
+                        this.showStatus(`ディレクトリ「${newEntry.name}」を追加しました`, 'success');
                         
                         // Optionally expand directory contents
                         if (result.entries && confirm(`ディレクトリ「${newEntry.name}」の中身も展開しますか？`)) {
@@ -3386,7 +3403,7 @@
                     this.updatePreview();
                     
                 } catch (error) {
-                    showStatus(`エラー: ${error.message}`, 'error');
+                    this.showStatus(`エラー: ${error.message}`, 'error');
                     console.error('addFromTxId error:', error);
                 }
             },
@@ -3572,7 +3589,7 @@
                 
                 // Show current path
                 const pathDisplay = path || 'ルート';
-                showStatus(`選択中: ${pathDisplay}`, 'info');
+                this.showStatus(`選択中: ${pathDisplay}`, 'info');
             },
             
             createEmptyFolder() {
@@ -3587,7 +3604,7 @@
                 });
                 
                 if (exists) {
-                    showStatus('同名のフォルダが既に存在します', 'error');
+                    this.showStatus('同名のフォルダが既に存在します', 'error');
                     return;
                 }
                 
@@ -3607,7 +3624,7 @@
                 
                 this.entries.push(newFolder);
                 this.updatePreview();
-                showStatus(`フォルダ「${folderName}」を作成しました`, 'success');
+                this.showStatus(`フォルダ「${folderName}」を作成しました`, 'success');
                 
                 // Auto-select the new folder
                 this.selectNode(fullPath, 'directory');
@@ -3750,12 +3767,12 @@
             
             async validate() {
                 if (!this.name) {
-                    showStatus('ディレクトリ名を入力してください', 'error');
+                    this.showStatus('ディレクトリ名を入力してください', 'error');
                     return false;
                 }
                 
                 if (this.entries.length === 0) {
-                    showStatus('少なくとも1つのエントリーを追加してください', 'error');
+                    this.showStatus('少なくとも1つのエントリーを追加してください', 'error');
                     return false;
                 }
                 
@@ -3763,11 +3780,11 @@
                 const names = this.entries.map(e => e.name);
                 const duplicates = names.filter((name, index) => names.indexOf(name) !== index);
                 if (duplicates.length > 0) {
-                    showStatus(`重複するエントリー名があります: ${duplicates.join(', ')}`, 'error');
+                    this.showStatus(`重複するエントリー名があります: ${duplicates.join(', ')}`, 'error');
                     return false;
                 }
                 
-                showStatus('検証に成功しました', 'success');
+                this.showStatus('検証に成功しました', 'success');
                 return true;
             },
             
@@ -3786,7 +3803,7 @@
                 a.click();
                 URL.revokeObjectURL(url);
                 
-                showStatus('.kaspaファイルを生成しました', 'success');
+                this.showStatus('.kaspaファイルを生成しました', 'success');
             },
             
             async generateOnly() {
@@ -3799,7 +3816,7 @@
                 try {
                     const password = document.getElementById('dirbuilder-password').value;
                     if (password && password.length < 8) {
-                        showStatus('パスワードは8文字以上で入力してください', 'error');
+                        this.showStatus('パスワードは8文字以上で入力してください', 'error');
                         return;
                     }
                     
@@ -3815,12 +3832,12 @@
                         password: password
                     };
                     
-                    showStatus('ディレクトリメタデータを生成しました', 'success');
+                    this.showStatus('ディレクトリメタデータを生成しました', 'success');
                     
                     // Enable additional actions
                     this.exportAsKaspa();
                 } catch (error) {
-                    showStatus(`生成エラー: ${error.message}`, 'error');
+                    this.showStatus(`生成エラー: ${error.message}`, 'error');
                 }
             },
             
@@ -3834,7 +3851,7 @@
                 try {
                     const password = document.getElementById('dirbuilder-password').value;
                     if (password && password.length < 8) {
-                        showStatus('パスワードは8文字以上で入力してください', 'error');
+                        this.showStatus('パスワードは8文字以上で入力してください', 'error');
                         return;
                     }
                     
@@ -3844,7 +3861,7 @@
                     // First generate
                     const metadata = await createDirectoryMetadata(this.name, optimizedEntries, password);
                     
-                    showStatus('ディレクトリメタデータをブロックチェーンにアップロード中...', 'info');
+                    this.showStatus('ディレクトリメタデータをブロックチェーンにアップロード中...', 'info');
                     
                     // Upload to blockchain
                     const result = await uploadDirectoryMetadata(metadata, password);
@@ -3861,16 +3878,16 @@
                             password: password
                         };
                         
-                        showStatus(`アップロード完了: TxID ${result.txid}`, 'success');
+                        this.showStatus(`アップロード完了: TxID ${result.txid}`, 'success');
                         
                         // Show copy button for TxID
                         const txInfo = `${result.txid}:${result.blockId}${password ? ':' + password : ''}`;
-                        showStatus(`📋 ダウンロード情報: ${txInfo}`, 'info');
+                        this.showStatus(`📋 ダウンロード情報: ${txInfo}`, 'info');
                     } else {
-                        showStatus(`アップロードエラー: ${result.error}`, 'error');
+                        this.showStatus(`アップロードエラー: ${result.error}`, 'error');
                     }
                 } catch (error) {
-                    showStatus(`エラー: ${error.message}`, 'error');
+                    this.showStatus(`エラー: ${error.message}`, 'error');
                 }
             },
             
@@ -3900,7 +3917,7 @@
                     updateFileListUI();
                 }
                 
-                showStatus('Fileタブに登録しました', 'success');
+                this.showStatus('Fileタブに登録しました', 'success');
                 
                 // Reset builder
                 this.resetBuilder();

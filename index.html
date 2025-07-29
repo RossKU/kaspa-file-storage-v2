@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.28 - ログ関数のカプセル化</title>
+    <title>Kaspa P2P File Storage v5.11.29 - UI制御関数のカプセル化</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -4115,6 +4115,41 @@
         // Expose UtilityHandlers to window for debugging (can be removed later)
         window.UtilityHandlers = UtilityHandlers;
         
+        // ===== UI Handlers Object (v5.11.29) =====
+        // Encapsulate UI control functions
+        const UIHandlers = {
+            // Theme management
+            changeTheme: function(theme) {
+                document.body.setAttribute('data-theme', theme);
+                localStorage.setItem('theme', theme);
+            },
+            
+            // Sidebar toggle for mobile
+            toggleSidebar: function() {
+                const sidebar = document.getElementById('sidebar');
+                sidebar.classList.toggle('open');
+            },
+            
+            // Sidebar collapse toggle for desktop
+            toggleSidebarCollapse: function() {
+                const sidebar = document.getElementById('sidebar');
+                const body = document.body;
+                const toggleBtn = document.getElementById('sidebarToggle');
+                
+                sidebar.classList.toggle('collapsed');
+                body.classList.toggle('sidebar-collapsed');
+                
+                // Update toggle button icon
+                toggleBtn.textContent = sidebar.classList.contains('collapsed') ? '▶' : '◀';
+                
+                // Save state to localStorage
+                localStorage.setItem('sidebarCollapsed', sidebar.classList.contains('collapsed'));
+            }
+        };
+        
+        // Expose UIHandlers to window for debugging (can be removed later)
+        window.UIHandlers = UIHandlers;
+        
         // ===== Backward Compatibility Proxies for Utility Functions =====
         // Define proxies for log-related functions
         Object.defineProperty(window, 'exportLogs', {
@@ -4139,6 +4174,23 @@
         
         Object.defineProperty(window, 'copyLog', {
             get() { return UtilityHandlers.copyLog; },
+            configurable: true
+        });
+        
+        // ===== Backward Compatibility Proxies for UI Functions =====
+        // Define proxies for UI control functions
+        Object.defineProperty(window, 'changeTheme', {
+            get() { return UIHandlers.changeTheme; },
+            configurable: true
+        });
+        
+        Object.defineProperty(window, 'toggleSidebar', {
+            get() { return UIHandlers.toggleSidebar; },
+            configurable: true
+        });
+        
+        Object.defineProperty(window, 'toggleSidebarCollapse', {
+            get() { return UIHandlers.toggleSidebarCollapse; },
             configurable: true
         });
         
@@ -14850,33 +14902,6 @@
             }
         };
 
-        // Theme change function
-        window.changeTheme = function(theme) {
-            document.body.setAttribute('data-theme', theme);
-            localStorage.setItem('theme', theme);
-        };
-
-        // Sidebar toggle for mobile
-        window.toggleSidebar = function() {
-            const sidebar = document.getElementById('sidebar');
-            sidebar.classList.toggle('open');
-        };
-
-        // Sidebar collapse toggle for desktop
-        window.toggleSidebarCollapse = function() {
-            const sidebar = document.getElementById('sidebar');
-            const body = document.body;
-            const toggleBtn = document.getElementById('sidebarToggle');
-            
-            sidebar.classList.toggle('collapsed');
-            body.classList.toggle('sidebar-collapsed');
-            
-            // Update toggle button icon
-            toggleBtn.textContent = sidebar.classList.contains('collapsed') ? '▶' : '◀';
-            
-            // Save state to localStorage
-            localStorage.setItem('sidebarCollapsed', sidebar.classList.contains('collapsed'));
-        };
 
 
         // Initialize theme on load

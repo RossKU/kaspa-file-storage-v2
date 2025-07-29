@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.29 - UI制御関数のカプセル化</title>
+    <title>Kaspa P2P File Storage v5.11.30 - ユーティリティ関数の完全カプセル化</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -4109,6 +4109,55 @@
                 navigator.clipboard.writeText(logText).then(() => {
                     alert('ログをクリップボードにコピーしました');
                 });
+            },
+            
+            // General clipboard copy function
+            copyToClipboard: async function(text) {
+                const preview = text && text.length > 20 ? text.substring(0, 20) + '...' : text;
+                // Use window.log to ensure it's accessible
+                if (typeof log !== 'undefined') {
+                    log(`[DEBUG] copyToClipboard が呼び出されました: ${preview}`, 'debug');
+                }
+                try {
+                    await navigator.clipboard.writeText(text);
+                    if (typeof log !== 'undefined') {
+                        log('クリップボードにコピーしました', 'success');
+                    }
+                    return true;
+                } catch (error) {
+                    if (typeof log !== 'undefined') {
+                        log(`クリップボードへのコピーに失敗しました: ${error.message}`, 'error');
+                    }
+                    return false;
+                }
+            },
+            
+            // Settings management
+            toggleParallelDownload: function() {
+                AppState.settings.parallelDownloadEnabled = document.getElementById('parallelDownloadToggle').checked;
+                parallelDownloadEnabled = AppState.settings.parallelDownloadEnabled;
+                localStorage.setItem('kaspaParallelDownload', AppState.settings.parallelDownloadEnabled.toString());
+                
+                if (AppState.settings.parallelDownloadEnabled) {
+                    log('並列ダウンロードを有効にしました（実験的機能）', 'warning');
+                } else {
+                    log('並列ダウンロードを無効にしました（安定モード）', 'success');
+                }
+            },
+            
+            loadParallelSetting: function() {
+                const saved = localStorage.getItem('kaspaParallelDownload');
+                if (saved !== null) {
+                    AppState.settings.parallelDownloadEnabled = saved === 'true';
+                    parallelDownloadEnabled = AppState.settings.parallelDownloadEnabled;
+                    const toggle = document.getElementById('parallelDownloadToggle');
+                    if (toggle) {
+                        toggle.checked = AppState.settings.parallelDownloadEnabled;
+                    }
+                } else {
+                    // Ensure all references are synchronized
+                    parallelDownloadEnabled = AppState.settings.parallelDownloadEnabled;
+                }
             }
         };
         
@@ -4144,6 +4193,90 @@
                 
                 // Save state to localStorage
                 localStorage.setItem('sidebarCollapsed', sidebar.classList.contains('collapsed'));
+            },
+            
+            // Drag and drop handlers
+            handleDragOver: function(e) {
+                e.preventDefault();
+                e.currentTarget.classList.add('dragover');
+            },
+            
+            handleDragLeave: function(e) {
+                e.preventDefault();
+                e.currentTarget.classList.remove('dragover');
+            },
+            
+            handleKaspaDrop: function(e) {
+                e.preventDefault();
+                e.currentTarget.classList.remove('dragover');
+                
+                log('=== handleKaspaDrop 開始 ===', 'info');
+                log(`e.dataTransfer.files: ${e.dataTransfer.files}`, 'info');
+                log(`files.length: ${e.dataTransfer.files.length}`, 'info');
+                
+                const file = e.dataTransfer.files[0];
+                log(`file: ${file}`, 'info');
+                
+                if (file) {
+                    log(`file.name: ${file.name}`, 'info');
+                    log(`file.type: ${file.type}`, 'info');
+                    log(`file.size: ${file.size} bytes`, 'info');
+                    log(`endsWith('.kaspa'): ${file.name.endsWith('.kaspa')}`, 'info');
+                    
+                    if (file.name.endsWith('.kaspa')) {
+                        log('.kaspa ファイルが検出されました', 'info');
+                        
+                        const reader = new FileReader();
+                        reader.onload = async function(event) {
+                            log('FileReader.onload が呼び出されました', 'info');
+                            try {
+                                const kaspaContent = event.target.result;
+                                const kaspaData = JSON.parse(kaspaContent);
+                                
+                                log(`Loaded Kaspa data:`, 'info');
+                                log(`Type: ${kaspaData.metadata?.dataType || 'Unknown'}`, 'info');
+                                
+                                if (kaspaData.metadata && kaspaData.metadata.dataType === 'KASPA_FILE_V2') {
+                                    log('KASPA_FILE_V2 フォーマットが検出されました', 'info');
+                                    
+                                    window.kaspaMetadata = kaspaData;
+                                    document.getElementById('metaTxId').value = kaspaData.metadata.metaTxId || '';
+                                    document.getElementById('downloadPassword').value = '';
+                                    document.getElementById('downloadPassword').placeholder = kaspaData.auth?.passwordIncluded ? 
+                                        'パスワードは.kaspaファイルに含まれています' : 'パスワードを入力';
+                                    
+                                    // Call appropriate function based on context
+                                    if (typeof downloadFile === 'function') {
+                                        await downloadFile();
+                                    } else if (typeof loadKaspaFile === 'function') {
+                                        document.getElementById('kaspaFileInput').files = e.dataTransfer.files;
+                                        loadKaspaFile({ target: { files: [file] } });
+                                    }
+                                } else if (kaspaData.version === 'v3.4.0' && kaspaData.type === 'directory') {
+                                    // v4.6.18: Handle v3.4.0 directory format
+                                    log('v3.4.0 ディレクトリフォーマットが検出されました', 'info');
+                                    
+                                    if (typeof displayDirectoryContents === 'function') {
+                                        displayDirectoryContents(kaspaData);
+                                    } else {
+                                        alert('ディレクトリ表示機能が利用できません');
+                                    }
+                                } else {
+                                    alert('未対応のKaspaファイル形式です');
+                                }
+                            } catch (error) {
+                                log(`Kaspaファイル読み込みエラー: ${error.message}`, 'error');
+                                alert('Kaspaファイルの読み込みに失敗しました');
+                            }
+                        };
+                        reader.readAsText(file);
+                    } else {
+                        log('.kaspa ファイルではありません', 'warning');
+                        alert('.kaspaファイルをドロップしてください');
+                    }
+                } else {
+                    log('ドロップされたファイルは.kaspaファイルではありません', 'error');
+                }
             }
         };
         
@@ -4194,21 +4327,37 @@
             configurable: true
         });
         
-        // Load parallel download setting from localStorage
-        window.loadParallelSetting = function() {
-            const saved = localStorage.getItem('kaspaParallelDownload');
-            if (saved !== null) {
-                AppState.settings.parallelDownloadEnabled = saved === 'true';
-                parallelDownloadEnabled = AppState.settings.parallelDownloadEnabled;
-                const toggle = document.getElementById('parallelDownloadToggle');
-                if (toggle) {
-                    toggle.checked = AppState.settings.parallelDownloadEnabled;
-                }
-            } else {
-                // Ensure all references are synchronized
-                parallelDownloadEnabled = AppState.settings.parallelDownloadEnabled;
-            }
-        }
+        // Define proxies for drag and drop functions
+        Object.defineProperty(window, 'handleDragOver', {
+            get() { return UIHandlers.handleDragOver; },
+            configurable: true
+        });
+        
+        Object.defineProperty(window, 'handleDragLeave', {
+            get() { return UIHandlers.handleDragLeave; },
+            configurable: true
+        });
+        
+        Object.defineProperty(window, 'handleKaspaDrop', {
+            get() { return UIHandlers.handleKaspaDrop; },
+            configurable: true
+        });
+        
+        // ===== Backward Compatibility Proxies for Other Utility Functions =====
+        Object.defineProperty(window, 'copyToClipboard', {
+            get() { return UtilityHandlers.copyToClipboard; },
+            configurable: true
+        });
+        
+        Object.defineProperty(window, 'toggleParallelDownload', {
+            get() { return UtilityHandlers.toggleParallelDownload; },
+            configurable: true
+        });
+        
+        Object.defineProperty(window, 'loadParallelSetting', {
+            get() { return UtilityHandlers.loadParallelSetting; },
+            configurable: true
+        });
         
         // Upload History Manager Class
         class UploadHistoryManager {
@@ -13979,19 +14128,6 @@
             }
         };
 
-        // Toggle parallel download
-        window.toggleParallelDownload = function() {
-            AppState.settings.parallelDownloadEnabled = document.getElementById('parallelDownloadToggle').checked;
-            parallelDownloadEnabled = AppState.settings.parallelDownloadEnabled;
-            // window.parallelDownloadEnabled = AppState.settings.parallelDownloadEnabled; // v5.5.29: Removed - using Object.defineProperty
-            localStorage.setItem('kaspaParallelDownload', AppState.settings.parallelDownloadEnabled.toString());
-            
-            if (AppState.settings.parallelDownloadEnabled) {
-                log('並列ダウンロードを有効にしました（実験的機能）', 'warning');
-            } else {
-                log('並列ダウンロードを無効にしました（安定モード）', 'success');
-            }
-        };
         
         // Toggle REST API test mode
         window.toggleRestApiTest = function() {
@@ -14007,42 +14143,6 @@
             }
         };
 
-        // Drag and drop
-        window.handleDragOver = function(e) {
-            e.preventDefault();
-            e.currentTarget.classList.add('dragover');
-        };
-
-        window.handleDragLeave = function(e) {
-            e.preventDefault();
-            e.currentTarget.classList.remove('dragover');
-        };
-
-        window.handleKaspaDrop = function(e) {
-            e.preventDefault();
-            e.currentTarget.classList.remove('dragover');
-            
-            log('=== handleKaspaDrop 開始 ===', 'info');
-            log(`e.dataTransfer.files: ${e.dataTransfer.files}`, 'info');
-            log(`files.length: ${e.dataTransfer.files.length}`, 'info');
-            
-            const file = e.dataTransfer.files[0];
-            log(`file: ${file}`, 'info');
-            
-            if (file) {
-                log(`file.name: ${file.name}`, 'info');
-                log(`file.type: ${file.type}`, 'info');
-                log(`file.size: ${file.size} bytes`, 'info');
-                log(`endsWith('.kaspa'): ${file.name.endsWith('.kaspa')}`, 'info');
-            }
-            
-            if (file && file.name.endsWith('.kaspa')) {
-                document.getElementById('kaspaFileInput').files = e.dataTransfer.files;
-                loadKaspaFile({ target: { files: [file] } });
-            } else {
-                log('ドロップされたファイルは.kaspaファイルではありません', 'error');
-            }
-        };
 
         // File upload drag and drop
         document.addEventListener('DOMContentLoaded', () => {
@@ -14051,8 +14151,8 @@
             
             const fileLabel = document.querySelector('.file-input-label');
             
-            fileLabel.addEventListener('dragover', handleDragOver);
-            fileLabel.addEventListener('dragleave', handleDragLeave);
+            fileLabel.addEventListener('dragover', UIHandlers.handleDragOver);
+            fileLabel.addEventListener('dragleave', UIHandlers.handleDragLeave);
             fileLabel.addEventListener('drop', (e) => {
                 e.preventDefault();
                 e.currentTarget.classList.remove('dragover');
@@ -14834,26 +14934,6 @@
         // ============= UI CONTROL & EVENT HANDLERS =============
         // User interface controls and event handling functions
         
-        // Clipboard copy function (moved from UTILITY FUNCTIONS)
-        window.copyToClipboard = async function(text) {
-            const preview = text && text.length > 20 ? text.substring(0, 20) + '...' : text;
-            // Use window.log to ensure it's accessible
-            if (typeof log !== 'undefined') {
-                log(`[DEBUG] copyToClipboard が呼び出されました: ${preview}`, 'debug');
-            }
-            try {
-                await navigator.clipboard.writeText(text);
-                if (typeof log !== 'undefined') {
-                    log('クリップボードにコピーしました', 'success');
-                }
-            } catch (err) {
-                if (typeof log !== 'undefined') {
-                    log(`コピーエラー: ${err.message}`, 'error');
-                } else {
-                    console.error(`コピーエラー: ${err.message}`);
-                }
-            }
-        }
         
         // Tab switching function (moved from FILE OPERATIONS)
         window.switchTab = function(tab) {

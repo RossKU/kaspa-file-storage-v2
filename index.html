@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.33 - システム初期化・接続関数のカプセル化</title>
+    <title>Kaspa P2P File Storage v5.11.34 - プログレスファイル関数のカプセル化</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -1491,17 +1491,17 @@
             <!-- Resume Section -->
             <div class="section-divider" style="margin: 20px 0;">
                 <p style="text-align: center; color: #999;">または</p>
-                <button onclick="loadProgressFile()">
+                <button onclick="WorkspaceHandlers.loadProgressFile()">
                     📂 進捗ファイル (.kprogress) から再開
                 </button>
-                <input type="file" id="progressFileInput" accept=".kprogress" style="display: none;" onchange="handleProgressFileSelect(event)">
+                <input type="file" id="progressFileInput" accept=".kprogress" style="display: none;" onchange="WorkspaceHandlers.handleProgressFileSelect(event)">
             </div>
             
             <!-- Resume Info -->
             <div id="resumeInfo" style="display: none;" class="metric-box">
                 <h4 class="success">✅ レジューム準備完了</h4>
                 <div id="resumeDetails"></div>
-                <button onclick="cancelResume()" style="background: #666; margin-top: 10px;">キャンセル</button>
+                <button onclick="WorkspaceHandlers.cancelResume()" style="background: #666; margin-top: 10px;">キャンセル</button>
             </div>
             
             <div class="grid-2">
@@ -2114,6 +2114,146 @@
         
         // Expose WorkspaceState to window for onclick handlers
         window.WorkspaceState = WorkspaceState;
+        
+        // Progress file handling functions (Section 6: STORAGE MANAGEMENT)
+        const WorkspaceHandlers = {
+            loadProgressFile: async function() {
+                // Check workspace first
+                if (WorkspaceState.handle) {
+                    try {
+                        const fileHandle = await WorkspaceState.handle.getFileHandle('kaspa-upload-progress.json');
+                        const file = await fileHandle.getFile();
+                        const content = await file.text();
+                        const progress = JSON.parse(content);
+                        
+                        if (progress && progress.version === '2.0') {
+                            handleProgressLoad(progress);
+                            return;
+                        }
+                    } catch (err) {
+                        // File doesn't exist in workspace
+                    }
+                }
+                
+                // Try localStorage
+                const progress = loadProgressFromLocalStorage();
+                if (progress) {
+                    const metadata = localStorage.getItem('kaspa-upload-metadata');
+                    let metaInfo = {};
+                    try {
+                        metaInfo = JSON.parse(metadata) || {};
+                    } catch (err) {}
+                    
+                    const useLocal = confirm(
+                        '保存された進捗が見つかりました。\n\n' +
+                        `ファイル: ${metaInfo.fileName || '不明'}\n` +
+                        `進捗: ${metaInfo.completedChunks || '?'}/${metaInfo.totalChunks || '?'} チャンク\n` +
+                        `最終更新: ${metaInfo.lastUpdate ? new Date(metaInfo.lastUpdate).toLocaleString() : '不明'}\n\n` +
+                        'これを使用しますか？\n\n' +
+                        '「キャンセル」を選択するとファイルから読み込みます。'
+                    );
+                    
+                    if (useLocal) {
+                        handleProgressLoad(progress);
+                        return;
+                    }
+                }
+                
+                // Load from file as last resort
+                document.getElementById('progressFileInput').click();
+            },
+            
+            handleProgressFileSelect: async function(event) {
+                const file = event.target.files[0];
+                if (!file || !file.name.endsWith('.kprogress')) {
+                    log('有効な進捗ファイル（.kprogress）を選択してください', 'error');
+                    return;
+                }
+                
+                try {
+                    const content = await file.text();
+                    const progress = JSON.parse(content);
+                    
+                    // Extract CID from filename if available
+                    const match = file.name.match(/\.([a-z0-9]{8})\.kprogress$/);
+                    if (match && match[1]) {
+                        window.currentFileCID = match[1];
+                        log(`進捗ファイルからCIDを取得: ${match[1]}`, 'info');
+                    }
+                    
+                    handleProgressLoad(progress);
+                } catch (error) {
+                    log(`進捗ファイル読み込みエラー: ${error.message}`, 'error');
+                }
+            },
+            
+            cancelResume: function() {
+                window.pendingProgress = null;
+                document.getElementById('resumeInfo').style.display = 'none';
+                log('レジュームをキャンセルしました', 'info');
+            },
+            
+            checkAutoResumeProgress: async function(file) {
+                if (!window.pendingProgress && WorkspaceState.progressFileMap.has(file.name)) {
+                    const progressInfo = WorkspaceState.progressFileMap.get(file.name);
+                    log(`進捗ファイルを自動検出: ${progressInfo.progressFilename}`, 'info');
+                    
+                    try {
+                        // Load the progress file
+                        const progressFile = await progressInfo.fileHandle.getFile();
+                        const content = await progressFile.text();
+                        const progress = JSON.parse(content);
+                        
+                        // Verify CID matches (calculate from first chunk)
+                        const chunkSize = parseInt(document.getElementById('chunkSize').value) * 1024;
+                        const actualChunkSize = calculateSafePayloadSize(chunkSize);
+                        const firstChunkEnd = Math.min(actualChunkSize, file.size);
+                        const firstChunkBlob = file.slice(0, firstChunkEnd);
+                        const firstChunkArrayBuffer = await firstChunkBlob.arrayBuffer();
+                        const firstChunkData = new Uint8Array(firstChunkArrayBuffer);
+                        const firstChunkHash = await sha256(firstChunkData);
+                        const calculatedCID = firstChunkHash.substring(0, 8);
+                        
+                        if (calculatedCID === progressInfo.cid) {
+                            log(`CID検証成功: ${calculatedCID}`, 'success');
+                            
+                            // Check if already completed
+                            if (progress.metadata.completedChunks >= progress.metadata.totalChunks) {
+                                log(`完了済みファイルを検出: ${file.name}`, 'info');
+                                return { completed: true };
+                            }
+                            
+                            // Enable auto-resume
+                            window.pendingProgress = progress;
+                            return { autoResume: true, progress };
+                        } else {
+                            log(`CID不一致: ${calculatedCID} != ${progressInfo.cid}`, 'warning');
+                        }
+                    } catch (err) {
+                        log(`進捗ファイル読み込みエラー: ${err.message}`, 'error');
+                    }
+                }
+                return { autoResume: false };
+            }
+        };
+        
+        // Backward compatibility for progress functions
+        Object.defineProperty(window, 'loadProgressFile', {
+            get() { return WorkspaceHandlers.loadProgressFile; },
+            configurable: true
+        });
+        Object.defineProperty(window, 'handleProgressFileSelect', {
+            get() { return WorkspaceHandlers.handleProgressFileSelect; },
+            configurable: true
+        });
+        Object.defineProperty(window, 'cancelResume', {
+            get() { return WorkspaceHandlers.cancelResume; },
+            configurable: true
+        });
+        Object.defineProperty(window, 'checkAutoResumeProgress', {
+            get() { return WorkspaceHandlers.checkAutoResumeProgress; },
+            configurable: true
+        });
         
         // ===== Phase 4: Network State Refactoring (v5.4.39) =====
         // v5.4.52: Complete NetworkState consolidation - moving monitoredTransactions here
@@ -7703,7 +7843,8 @@
             return null;
         }
         
-        // Progress file handling
+        // Progress file handling moved to WorkspaceHandlers
+        /*
         window.loadProgressFile = async function() {
             // Check workspace first
             if (WorkspaceState.handle) {
@@ -7749,6 +7890,7 @@
             // Load from file as last resort
             document.getElementById('progressFileInput').click();
         };
+        */
 
         // v2.1 から v3.3 形式への変換関数
         function convertV21ToV33Progress(v21Progress) {
@@ -7836,6 +7978,7 @@
             return v33Progress;
         }
         
+        /*
         window.handleProgressFileSelect = async function(event) {
             const file = event.target.files[0];
             if (!file || !file.name.endsWith('.kprogress')) {
@@ -7859,6 +8002,7 @@
                 log(`進捗ファイル読み込みエラー: ${error.message}`, 'error');
             }
         };
+        */
         
         // Handle loaded progress
         function handleProgressLoad(progress) {
@@ -7923,11 +8067,13 @@
             }
         }
 
+        /*
         window.cancelResume = function() {
             window.pendingProgress = null;
             document.getElementById('resumeInfo').style.display = 'none';
             log('レジュームをキャンセルしました', 'info');
         };
+        */
 
         // Add new methods to ParallelDownloader prototype
         ParallelDownloader.prototype.downloadChunksRaw = async function(txIds, blockIds, progressCallback) {
@@ -9414,7 +9560,8 @@
             return false;
         }
         
-        // Check for auto-resume from progress file
+        // Check for auto-resume from progress file moved to WorkspaceHandlers
+        /*
         window.checkAutoResumeProgress = async function checkAutoResumeProgress(file) {
             if (!window.pendingProgress && WorkspaceState.progressFileMap.has(file.name)) {
                 const progressInfo = WorkspaceState.progressFileMap.get(file.name);
@@ -9470,6 +9617,7 @@
             }
             return { resume: false };
         }
+        */
         
         // Update file selection UI
         window.updateFileSelectionUI = function updateFileSelectionUI(file, isResume = false, resumeStats = null) {
@@ -15263,7 +15411,7 @@
             checkFileSizeWarning(file);
             
             // Check for auto-resume
-            const resumeResult = await checkAutoResumeProgress(file);
+            const resumeResult = await WorkspaceHandlers.checkAutoResumeProgress(file);
             if (resumeResult.completed) {
                 return; // File already completed
             }

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.41 - KENV Phase 1-B修正 プロパティ名統一</title>
+    <title>Kaspa P2P File Storage v5.11.42 - リファクタリング関数名修正</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -1514,17 +1514,17 @@
             <!-- Resume Section -->
             <div class="section-divider" style="margin: 20px 0;">
                 <p style="text-align: center; color: #999;">または</p>
-                <button onclick="WorkspaceHandlers.loadProgressFile()">
+                <button onclick="loadProgressFile()">
                     📂 進捗ファイル (.kprogress) から再開
                 </button>
-                <input type="file" id="progressFileInput" accept=".kprogress" style="display: none;" onchange="WorkspaceHandlers.handleProgressFileSelect(event)">
+                <input type="file" id="progressFileInput" accept=".kprogress" style="display: none;" onchange="handleProgressFileSelect(event)">
             </div>
             
             <!-- Resume Info -->
             <div id="resumeInfo" style="display: none;" class="metric-box">
                 <h4 class="success">✅ レジューム準備完了</h4>
                 <div id="resumeDetails"></div>
-                <button onclick="WorkspaceHandlers.cancelResume()" style="background: #666; margin-top: 10px;">キャンセル</button>
+                <button onclick="cancelResume()" style="background: #666; margin-top: 10px;">キャンセル</button>
             </div>
             
             <div class="grid-2">
@@ -16424,7 +16424,7 @@
             checkFileSizeWarning(file);
             
             // Check for auto-resume
-            const resumeResult = await WorkspaceHandlers.checkAutoResumeProgress(file);
+            const resumeResult = await checkAutoResumeProgress(file);
             if (resumeResult.completed) {
                 return; // File already completed
             }
@@ -16904,7 +16904,7 @@
                               '⏸️';
             
             // Format values
-            const size = entry.fileSize ? formatFileSize(entry.fileSize) : '-';
+            const size = entry.fileSize ? formatSize(entry.fileSize) : '-';
             const cid = entry.cid ? entry.cid.substring(0, 8) + '...' : '-';
             const metaTxId = entry.metaTxId ? entry.metaTxId.substring(0, 8) + '...' : '-';
             const uploader = entry.uploadedBy ? shortenAddress(entry.uploadedBy) : '-';

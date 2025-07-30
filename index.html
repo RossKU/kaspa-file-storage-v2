@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.44 - グローバルスコープ関数修正</title>
+    <title>Kaspa P2P File Storage v5.11.45 - window関数非依存化</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -16439,8 +16439,56 @@
             // Check file size warning
             checkFileSizeWarning(file);
             
-            // Check for auto-resume
-            const resumeResult = await checkAutoResumeProgress(file);
+            // Check for auto-resume (inline implementation)
+            let resumeResult = { completed: false };
+            if (!window.pendingProgress && WorkspaceState.progressFileMap.has(file.name)) {
+                const progressInfo = WorkspaceState.progressFileMap.get(file.name);
+                log(`進捗ファイルを自動検出: ${progressInfo.progressFilename}`, 'info');
+                
+                try {
+                    // Load the progress file
+                    const progressFile = await progressInfo.fileHandle.getFile();
+                    const content = await progressFile.text();
+                    const progress = JSON.parse(content);
+                    
+                    // Verify CID matches (calculate from first chunk)
+                    const chunkSize = parseInt(document.getElementById('chunkSize').value) * 1024;
+                    const actualChunkSize = calculateSafePayloadSize(chunkSize);
+                    const firstChunkEnd = Math.min(actualChunkSize, file.size);
+                    const firstChunkBlob = file.slice(0, firstChunkEnd);
+                    const firstChunkArrayBuffer = await firstChunkBlob.arrayBuffer();
+                    const firstChunkData = new Uint8Array(firstChunkArrayBuffer);
+                    const firstChunkHash = await sha256(firstChunkData);
+                    const calculatedCID = firstChunkHash.substring(0, 8);
+                    
+                    if (progress.cid === calculatedCID || progress.cid === window.currentFileCID) {
+                        if (progress._progress.completedChunks === progress.recovery.totalChunks) {
+                            log(`✅ このファイルは既にアップロード完了しています`, 'success');
+                            log(`📋 CID: ${progress.cid}`, 'info');
+                            log(`📦 完了チャンク: ${progress._progress.completedChunks}/${progress.recovery.totalChunks}`, 'info');
+                            UIHandlers.updateFileSelectionUI(file, true, {
+                                completed: progress._progress.completedChunks,
+                                total: progress.recovery.totalChunks
+                            });
+                            resumeResult.completed = true;
+                        } else {
+                            window.pendingProgress = progress;
+                            const resumeDetails = document.getElementById('resumeDetails');
+                            resumeDetails.innerHTML = `
+                                <p><strong>ファイル:</strong> ${file.name}</p>
+                                <p><strong>CID:</strong> ${progress.cid}</p>
+                                <p><strong>進捗:</strong> ${progress._progress.completedChunks}/${progress.recovery.totalChunks} チャンク</p>
+                                <p><strong>完了率:</strong> ${((progress._progress.completedChunks / progress.recovery.totalChunks) * 100).toFixed(1)}%</p>
+                            `;
+                            document.getElementById('resumeInfo').style.display = 'block';
+                            log(`📂 レジューム可能な進捗を検出: ${progress._progress.completedChunks}/${progress.recovery.totalChunks} チャンク完了`, 'info');
+                        }
+                    }
+                } catch (error) {
+                    log(`進捗ファイルの読み込みエラー: ${error.message}`, 'error');
+                }
+            }
+            
             if (resumeResult.completed) {
                 return; // File already completed
             }

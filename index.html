@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.38 - File TabへのKENV統合</title>
+    <title>Kaspa P2P File Storage v5.11.39 - KENV Phase 1-A ファイル名分離</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -3228,6 +3228,11 @@
             schemaVersion: 3,
             kaspaCompatVersion: "3.4.2",
             
+            // ファイル名定義（v5.11.39: Phase 1-A）
+            kenvFile: 'workspace.kenv',      // 設定ファイル
+            kindexFile: 'workspace.kindex',  // インデックスファイル
+            kentryFile: 'workspace.kentry',  // エントリーデータファイル
+            
             // エントリー配列（.kentryの内容）
             entries: [],
             
@@ -3433,6 +3438,397 @@
                 // タイプ分布
                 const fileType = entry.mimeType ? entry.mimeType.split('/')[1] : 'unknown';
                 stats.typeDistribution[fileType] = (stats.typeDistribution[fileType] || 0) + 1;
+            },
+            
+            // ===== ファイル保存・読み込み関数 (v5.11.39: Phase 1-A) =====
+            
+            // .kenvファイルの保存
+            async saveKenvFile() {
+                if (!WorkspaceState.handle) {
+                    log('[KENV] ワークスペースが設定されていません', 'warning');
+                    return false;
+                }
+                
+                try {
+                    const kenvData = {
+                        version: this.version,
+                        schemaVersion: this.schemaVersion,
+                        kaspaCompatVersion: this.kaspaCompatVersion,
+                        createdAt: new Date().toISOString(),
+                        updatedAt: new Date().toISOString(),
+                        wallet: UserState.address || '',
+                        encryption: {
+                            enabled: true,
+                            algorithm: "AES-256-GCM",
+                            iterations: 100000,
+                            passwordStorage: "encrypted"
+                        },
+                        settings: {
+                            network: {
+                                parallelDownloadEnabled: AppState.settings.parallelDownloadEnabled,
+                                devWalletEnabled: AppState.settings.devWalletEnabled,
+                                customRpcEndpoint: "",
+                                archiveNodeThreshold: 50
+                            },
+                            ui: {
+                                theme: document.body.getAttribute('data-theme') || 'dark',
+                                accentColor: "#2A6F65",
+                                language: "ja",
+                                defaultSort: "uploadDate",
+                                itemsPerPage: 100
+                            },
+                            storage: {
+                                autoSaveInterval: 300,
+                                csvEncryption: false,
+                                streamingChunkSize: 65536,
+                                externalFileThreshold: 10000,
+                                minimalMode: true,
+                                indexUpdateInterval: 60
+                            },
+                            technical: {
+                                kaspaMaxPayload: 24000,
+                                maxEncryptedSize: 22984,
+                                processSegmentSize: 1048576,
+                                chunksPerMeta: 160,
+                                maxChunksSupported: 25600,
+                                defaultChunkSize: 12288
+                            }
+                        },
+                        workspace: {
+                            folderName: WorkspaceState.handle.name,
+                            totalEntries: this.entries.length,
+                            totalSize: this.kindex.stats.totalSize || 0,
+                            lastActivity: new Date().toISOString(),
+                            indexVersion: "2.0"
+                        }
+                    };
+                    
+                    const fileHandle = await WorkspaceState.handle.getFileHandle(this.kenvFile, { create: true });
+                    const writable = await fileHandle.createWritable();
+                    await writable.write(JSON.stringify(kenvData, null, 2));
+                    await writable.close();
+                    
+                    log(`[KENV] ${this.kenvFile}を保存しました`, 'success');
+                    return true;
+                } catch (error) {
+                    log(`[KENV] ${this.kenvFile}保存エラー: ${error.message}`, 'error');
+                    return false;
+                }
+            },
+            
+            // .kindexファイルの保存
+            async saveKindexFile() {
+                if (!WorkspaceState.handle) {
+                    log('[KENV] ワークスペースが設定されていません', 'warning');
+                    return false;
+                }
+                
+                try {
+                    const fileHandle = await WorkspaceState.handle.getFileHandle(this.kindexFile, { create: true });
+                    const writable = await fileHandle.createWritable();
+                    await writable.write(JSON.stringify(this.kindex, null, 2));
+                    await writable.close();
+                    
+                    log(`[KENV] ${this.kindexFile}を保存しました`, 'success');
+                    return true;
+                } catch (error) {
+                    log(`[KENV] ${this.kindexFile}保存エラー: ${error.message}`, 'error');
+                    return false;
+                }
+            },
+            
+            // .kentryファイルの保存
+            async saveKentryFile() {
+                if (!WorkspaceState.handle) {
+                    log('[KENV] ワークスペースが設定されていません', 'warning');
+                    return false;
+                }
+                
+                try {
+                    // CSVヘッダー（45カラム）
+                    const headers = 'id,type,version,created,network,name,path,metaTxId,metaTxBlockId,firstChunkTxId,uploadDate,blockTime,uploadedBy,source,status,fileSize,originalSize,compressedSize,mimeType,sha256,encrypted,compressionAlgorithm,compressionEnabled,variableChunk,payloadSplit,cid,totalChunks,chunkCount,chunkSize,segmentCount,totalFiles,fileCount,directoryCount,entryCount,checksum,uploadCost,uploadDuration,chunkStructureType,chunkLevel,totalGroups,passwordIncluded,password,externalRef,tags,notes,authWarning';
+                    
+                    let csvContent = headers + '\n';
+                    
+                    // エントリーをCSV形式に変換
+                    this.entries.forEach(entry => {
+                        const row = [
+                            entry.id || '',
+                            entry.type || '',
+                            entry.version || '',
+                            entry.created || '',
+                            entry.network || '',
+                            entry.name || '',
+                            entry.path || '',
+                            entry.metaTxId || '',
+                            entry.metaTxBlockId || '',
+                            entry.firstChunkTxId || '',
+                            entry.uploadDate || '',
+                            entry.blockTime || '',
+                            entry.uploadedBy || '',
+                            entry.source || '',
+                            entry.status || '',
+                            entry.fileSize || '',
+                            entry.originalSize || '',
+                            entry.compressedSize || '',
+                            entry.mimeType || '',
+                            entry.sha256 || '',
+                            entry.encrypted || '',
+                            entry.compressionAlgorithm || '',
+                            entry.compressionEnabled || '',
+                            entry.variableChunk || '',
+                            entry.payloadSplit || '',
+                            entry.cid || '',
+                            entry.totalChunks || '',
+                            entry.chunkCount || '',
+                            entry.chunkSize || '',
+                            entry.segmentCount || '',
+                            entry.totalFiles || '',
+                            entry.fileCount || '',
+                            entry.directoryCount || '',
+                            entry.entryCount || '',
+                            entry.checksum || '',
+                            entry.uploadCost || '',
+                            entry.uploadDuration || '',
+                            entry.chunkStructureType || '',
+                            entry.chunkLevel || '',
+                            entry.totalGroups || '',
+                            entry.passwordIncluded || '',
+                            entry.password || '',
+                            entry.externalRef || '',
+                            entry.tags || '',
+                            entry.notes || '',
+                            entry.authWarning || ''
+                        ].map(val => {
+                            // CSV用にエスケープ
+                            const str = String(val);
+                            if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+                                return `"${str.replace(/"/g, '""')}"`;
+                            }
+                            return str;
+                        });
+                        
+                        csvContent += row.join(',') + '\n';
+                    });
+                    
+                    const fileHandle = await WorkspaceState.handle.getFileHandle(this.kentryFile, { create: true });
+                    const writable = await fileHandle.createWritable();
+                    await writable.write(csvContent);
+                    await writable.close();
+                    
+                    log(`[KENV] ${this.kentryFile}を保存しました (${this.entries.length}件)`, 'success');
+                    return true;
+                } catch (error) {
+                    log(`[KENV] ${this.kentryFile}保存エラー: ${error.message}`, 'error');
+                    return false;
+                }
+            },
+            
+            // すべてのKENVファイルを保存
+            async saveAll() {
+                log('[KENV] すべてのファイルを保存開始', 'info');
+                const results = await Promise.all([
+                    this.saveKenvFile(),
+                    this.saveKindexFile(),
+                    this.saveKentryFile()
+                ]);
+                
+                if (results.every(r => r)) {
+                    log('[KENV] すべてのファイルを保存しました', 'success');
+                    return true;
+                } else {
+                    log('[KENV] 一部のファイル保存に失敗しました', 'warning');
+                    return false;
+                }
+            },
+            
+            // .kenvファイルの読み込み
+            async loadKenvFile() {
+                if (!WorkspaceState.handle) {
+                    log('[KENV] ワークスペースが設定されていません', 'warning');
+                    return false;
+                }
+                
+                try {
+                    const fileHandle = await WorkspaceState.handle.getFileHandle(this.kenvFile);
+                    const file = await fileHandle.getFile();
+                    const content = await file.text();
+                    const kenvData = JSON.parse(content);
+                    
+                    // バージョンチェック
+                    if (kenvData.version !== this.version) {
+                        log(`[KENV] バージョン不一致: ${kenvData.version} (期待値: ${this.version})`, 'warning');
+                    }
+                    
+                    log(`[KENV] ${this.kenvFile}を読み込みました`, 'success');
+                    return kenvData;
+                } catch (error) {
+                    if (error.name === 'NotFoundError') {
+                        log(`[KENV] ${this.kenvFile}が見つかりません`, 'info');
+                    } else {
+                        log(`[KENV] ${this.kenvFile}読み込みエラー: ${error.message}`, 'error');
+                    }
+                    return null;
+                }
+            },
+            
+            // .kindexファイルの読み込み
+            async loadKindexFile() {
+                if (!WorkspaceState.handle) {
+                    log('[KENV] ワークスペースが設定されていません', 'warning');
+                    return false;
+                }
+                
+                try {
+                    const fileHandle = await WorkspaceState.handle.getFileHandle(this.kindexFile);
+                    const file = await fileHandle.getFile();
+                    const content = await file.text();
+                    const kindexData = JSON.parse(content);
+                    
+                    // 既存のkindexを更新
+                    Object.assign(this.kindex, kindexData);
+                    
+                    log(`[KENV] ${this.kindexFile}を読み込みました`, 'success');
+                    return true;
+                } catch (error) {
+                    if (error.name === 'NotFoundError') {
+                        log(`[KENV] ${this.kindexFile}が見つかりません`, 'info');
+                    } else {
+                        log(`[KENV] ${this.kindexFile}読み込みエラー: ${error.message}`, 'error');
+                    }
+                    return false;
+                }
+            },
+            
+            // .kentryファイルの読み込み
+            async loadKentryFile() {
+                if (!WorkspaceState.handle) {
+                    log('[KENV] ワークスペースが設定されていません', 'warning');
+                    return false;
+                }
+                
+                try {
+                    const fileHandle = await WorkspaceState.handle.getFileHandle(this.kentryFile);
+                    const file = await fileHandle.getFile();
+                    const content = await file.text();
+                    
+                    // CSVパース
+                    const lines = content.trim().split('\n');
+                    if (lines.length < 2) {
+                        log('[KENV] エントリーファイルが空です', 'info');
+                        return true;
+                    }
+                    
+                    const headers = lines[0].split(',');
+                    this.entries = [];
+                    
+                    for (let i = 1; i < lines.length; i++) {
+                        const values = this.parseCSVLine(lines[i]);
+                        const entry = {};
+                        
+                        // 必須フィールドのマッピング
+                        entry.id = values[0];
+                        entry.type = values[1] || 'kaspa-file';
+                        entry.name = values[5];
+                        entry.source = values[13];
+                        entry.status = values[14];
+                        
+                        // オプショナルフィールド
+                        if (values[7]) entry.metaTxId = values[7];
+                        if (values[8]) entry.metaTxBlockId = values[8];
+                        if (values[15]) entry.fileSize = parseInt(values[15]) || null;
+                        if (values[10]) entry.uploadDate = values[10];
+                        if (values[12]) entry.uploadedBy = values[12];
+                        if (values[41]) entry.password = values[41];
+                        if (values[42]) entry.externalRef = values[42];
+                        if (values[45]) entry.authWarning = values[45];
+                        
+                        this.entries.push(entry);
+                    }
+                    
+                    log(`[KENV] ${this.kentryFile}を読み込みました (${this.entries.length}件)`, 'success');
+                    return true;
+                } catch (error) {
+                    if (error.name === 'NotFoundError') {
+                        log(`[KENV] ${this.kentryFile}が見つかりません`, 'info');
+                    } else {
+                        log(`[KENV] ${this.kentryFile}読み込みエラー: ${error.message}`, 'error');
+                    }
+                    return false;
+                }
+            },
+            
+            // CSVライン解析ヘルパー
+            parseCSVLine(line) {
+                const values = [];
+                let current = '';
+                let inQuotes = false;
+                
+                for (let i = 0; i < line.length; i++) {
+                    const char = line[i];
+                    const nextChar = line[i + 1];
+                    
+                    if (char === '"') {
+                        if (inQuotes && nextChar === '"') {
+                            current += '"';
+                            i++; // Skip next quote
+                        } else {
+                            inQuotes = !inQuotes;
+                        }
+                    } else if (char === ',' && !inQuotes) {
+                        values.push(current);
+                        current = '';
+                    } else {
+                        current += char;
+                    }
+                }
+                
+                values.push(current); // Last value
+                return values;
+            },
+            
+            // すべてのKENVファイルを読み込み
+            async loadAll() {
+                log('[KENV] すべてのファイルを読み込み開始', 'info');
+                
+                // 設定ファイルを読み込み
+                const kenvData = await this.loadKenvFile();
+                
+                // エントリーとインデックスを読み込み
+                const kentryLoaded = await this.loadKentryFile();
+                const kindexLoaded = await this.loadKindexFile();
+                
+                if (kentryLoaded && kindexLoaded) {
+                    log('[KENV] すべてのファイルを読み込みました', 'success');
+                    return true;
+                } else if (kentryLoaded || kindexLoaded) {
+                    log('[KENV] 一部のファイルを読み込みました', 'warning');
+                    return true;
+                } else {
+                    log('[KENV] KENVファイルが見つかりません', 'info');
+                    return false;
+                }
+            },
+            
+            // 初期化処理
+            async initialize() {
+                if (!WorkspaceState.handle) {
+                    log('[KENV] ワークスペースが設定されていません', 'warning');
+                    return false;
+                }
+                
+                log('[KENV] 初期化開始', 'info');
+                
+                // ファイルの読み込みを試行
+                const loaded = await this.loadAll();
+                
+                if (!loaded) {
+                    // 新規作成
+                    log('[KENV] 新規ワークスペースとして初期化', 'info');
+                    await this.saveAll();
+                }
+                
+                return true;
             },
             
             // エントリーの検証と補完
@@ -5145,7 +5541,15 @@
                 
                 // Update file tab when switching to it (KENV v3.1.3)
                 if (tab === 'file') {
-                    window.updateFileListFromKENV();
+                    // v5.11.39: Phase 1-A - Initialize KENV before updating file list
+                    if (WorkspaceState.handle && !FileState.kenvManager._initialized) {
+                        FileState.kenvManager.initialize().then(() => {
+                            FileState.kenvManager._initialized = true;
+                            window.updateFileListFromKENV();
+                        });
+                    } else {
+                        window.updateFileListFromKENV();
+                    }
                 }
                 
                 // Update theme dropdown when switching to settings
@@ -8282,6 +8686,10 @@
                 
                 // Load history if available
                 await loadWorkspaceHistory();
+                
+                // v5.11.39: Phase 1-A - Initialize KENV after workspace setup
+                await FileState.kenvManager.initialize();
+                FileState.kenvManager._initialized = true;
                 
                 // Update UI to show workspace status
                 showWorkspaceStatus();

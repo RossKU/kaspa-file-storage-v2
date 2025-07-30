@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.37 - KENV v3.1.3マネージャー追加</title>
+    <title>Kaspa P2P File Storage v5.11.38 - File TabへのKENV統合</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -1390,7 +1390,30 @@
         <div class="container">
             <h2>📂 ファイル管理</h2>
             
-            <div style="margin-bottom: 16px;">
+            <!-- KENV Search and Sort Controls -->
+            <div style="margin-bottom: 16px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+                <div style="flex: 1; min-width: 200px;">
+                    <input type="text" id="kenvSearchInput" placeholder="🔍 ファイル名で検索..." 
+                           style="width: 100%; padding: 8px; border-radius: 4px;"
+                           onkeyup="searchKENVFiles(this.value)">
+                </div>
+                
+                <select id="kenvSortSelect" onchange="sortKENVFiles(this.value)" 
+                        style="padding: 8px; border-radius: 4px;">
+                    <option value="name">📝 名前順</option>
+                    <option value="size">📈 サイズ順</option>
+                    <option value="date">📅 日付順</option>
+                </select>
+                
+                <select id="kenvFilterSelect" onchange="filterKENVFiles(this.value)" 
+                        style="padding: 8px; border-radius: 4px;">
+                    <option value="all">📄 すべて</option>
+                    <option value="file">📄 ファイルのみ</option>
+                    <option value="directory">📁 ディレクトリのみ</option>
+                    <option value="verified">✅ 検証済み</option>
+                    <option value="pending">⏸️ 未検証</option>
+                </select>
+                
                 <button onclick="addFile()" style="padding: 10px 20px;">
                     ➕ Add File
                 </button>
@@ -5118,6 +5141,11 @@
                 if (tab === 'directory' && window.directoryManager) {
                     window.directoryManager.updateFileSelector();
                     window.directoryManager.updateUI();
+                }
+                
+                // Update file tab when switching to it (KENV v3.1.3)
+                if (tab === 'file') {
+                    window.updateFileListFromKENV();
                 }
                 
                 // Update theme dropdown when switching to settings
@@ -16089,51 +16117,83 @@
             
             if (type === 'file') {
                 const info = document.getElementById('addEntryInfo').value;
-                addFileToList(info);
+                
+                if (!info) {
+                    log('[KENV] ダウンロード情報を入力してください', 'error');
+                    return;
+                }
+                
+                // KENVにエントリーを追加
+                if (info.includes(':')) {
+                    // オンチェーンモード（TxID:BlockID:Pass形式）
+                    const parts = info.split(':');
+                    const [metaTxId, blockId, password] = parts;
+                    
+                    const entry = FileState.kenvManager.addMinimalEntry('Loading...', 'kaspa-file', 'manual');
+                    entry.metaTxId = metaTxId;
+                    entry.metaTxBlockId = blockId;
+                    entry.password = password || null;
+                    
+                    log(`[KENV] オンチェーンエントリー追加: ${metaTxId}`, 'info');
+                    
+                    // バックグラウンドで検証
+                    setTimeout(() => {
+                        FileState.kenvManager.verifyAndCompleteEntry(entry);
+                        updateFileListFromKENV();
+                    }, 100);
+                    
+                } else if (info.endsWith('.kaspa')) {
+                    // .kaspaファイルのみモード
+                    const filename = info.split('/').pop();
+                    const entry = FileState.kenvManager.addMinimalEntry(filename, 'kaspa-file', 'manual');
+                    entry.externalRef = info;
+                    
+                    log(`[KENV] .kaspaファイルエントリー追加: ${filename}`, 'info');
+                    
+                    // バックグラウンドで検証
+                    setTimeout(() => {
+                        FileState.kenvManager.verifyAndCompleteEntry(entry);
+                        updateFileListFromKENV();
+                    }, 100);
+                    
+                } else {
+                    log('[KENV] 無効な形式です。TxID:BlockID:Pass または .kaspa URLを入力してください', 'error');
+                    return;
+                }
+                
+                // UIを更新
+                updateFileListFromKENV();
+                
             } else {
-                // Add directory entry
+                // ディレクトリエントリー
                 const dirName = document.getElementById('addDirName').value;
                 const dirMeta = document.getElementById('addDirMeta').value;
                 
                 if (!dirName) {
-                    log('[File] ディレクトリ名を入力してください', 'error');
+                    log('[KENV] ディレクトリ名を入力してください', 'error');
                     return;
                 }
                 
-                const dirEntry = {
-                    id: `dir_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-                    type: 'directory',
-                    name: dirName,
-                    path: '',
-                    fileCount: 0,
-                    directoryCount: 0,
-                    totalSize: 0,
-                    cid: '-',
-                    metaTxId: '-',
-                    blockId: '-',
-                    password: null,
-                    uploadDate: '-',
-                    addedDate: new Date().toLocaleDateString('ja-JP')
-                };
+                // KENVにディレクトリを追加
+                const entry = FileState.kenvManager.addMinimalEntry(dirName, 'kaspa-directory', 'manual');
                 
-                // Parse directory metadata if provided
-                if (dirMeta) {
+                if (dirMeta && dirMeta.includes(':')) {
                     const parts = dirMeta.split(':');
-                    if (parts.length >= 2) {
-                        dirEntry.metaTxId = parts[0];
-                        dirEntry.blockId = parts[1] || '-';
-                        if (parts[2]) {
-                            dirEntry.password = parts[2];
-                        }
-                        // Mark as downloadable
-                        dirEntry.downloadable = true;
-                    }
+                    entry.metaTxId = parts[0];
+                    entry.metaTxBlockId = parts[1];
+                    entry.password = parts[2] || null;
+                    
+                    // バックグラウンドで検証
+                    setTimeout(() => {
+                        FileState.kenvManager.verifyAndCompleteEntry(entry);
+                        updateFileListFromKENV();
+                    }, 100);
                 }
                 
-                // Add to FileState
-                FileState.fileList.push(dirEntry);
-                updateFileListUI();
-                log(`[File] Added directory to list: ${dirName}`, 'info');
+                log(`[KENV] ディレクトリエントリー追加: ${dirName}`, 'info');
+                
+                // UIを更新
+                updateFileListFromKENV();
             }
         };
         
@@ -16295,6 +16355,250 @@
             
             // TODO: Implement share menu dropdown
             log('[File] Share menu not yet implemented', 'warning');
+        };
+        
+        // ===== KENV File Tab Integration (v5.11.38) =====
+        
+        // Update file list from KENV data
+        window.updateFileListFromKENV = function() {
+            const tbody = document.getElementById('fileListBody');
+            if (!tbody) return;
+            
+            tbody.innerHTML = ''; // Clear existing content
+            
+            // Get sorted entries from KENV index
+            const sortedEntries = FileState.kenvManager.kindex.sortIndexes.name;
+            
+            if (sortedEntries.length === 0) {
+                // Show empty state
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="9" style="text-align: center; padding: 40px; color: #888;">
+                            <div style="font-size: 48px; margin-bottom: 10px;">📂</div>
+                            <div>ファイルがありません</div>
+                            <div style="margin-top: 10px;">
+                                <button onclick="addFile()" style="padding: 5px 15px;">+ ファイルを追加</button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            // Create rows for each entry
+            sortedEntries.forEach(([name, lineNum, type]) => {
+                const entry = FileState.kenvManager.entries[lineNum];
+                const row = createKENVTableRow(entry);
+                tbody.appendChild(row);
+            });
+            
+            // Update file actions bar
+            updateFileActions();
+        };
+        
+        // Create table row from KENV entry
+        window.createKENVTableRow = function(entry) {
+            const tr = document.createElement('tr');
+            
+            // Determine icon and status
+            const icon = entry.type === 'kaspa-directory' ? '📁' : 
+                        getFileIcon(entry.name);
+            const statusIcon = entry.status === 'verified' ? '✅' : 
+                              entry.status === 'verifying' ? '⏳' : 
+                              entry.status === 'failed' ? '❌' : 
+                              '⏸️';
+            
+            // Format values
+            const size = entry.fileSize ? formatFileSize(entry.fileSize) : '-';
+            const cid = entry.cid ? entry.cid.substring(0, 8) + '...' : '-';
+            const metaTxId = entry.metaTxId ? entry.metaTxId.substring(0, 8) + '...' : '-';
+            const uploader = entry.uploadedBy ? shortenAddress(entry.uploadedBy) : '-';
+            const uploadDate = entry.uploadDate ? formatDate(entry.uploadDate) : '-';
+            const addedDate = entry.created ? formatDate(entry.created) : '-';
+            
+            tr.innerHTML = `
+                <td><input type="checkbox" class="file-checkbox" data-id="${entry.id}" onchange="updateFileActions()"></td>
+                <td><span class="file-icon">${icon}</span></td>
+                <td>
+                    <span>${entry.name}</span>
+                    <span style="margin-left: 5px; font-size: 0.8em;">${statusIcon}</span>
+                </td>
+                <td>${size}</td>
+                <td class="hide-mobile">${cid}</td>
+                <td class="hide-mobile">${metaTxId}</td>
+                <td class="hide-mobile">${uploader}</td>
+                <td>${uploadDate}</td>
+                <td class="hide-mobile">${addedDate}</td>
+            `;
+            
+            // Add click handler for row (excluding checkbox)
+            tr.addEventListener('click', (e) => {
+                if (e.target.type !== 'checkbox') {
+                    showEntryDetails(entry);
+                }
+            });
+            
+            return tr;
+        };
+        
+        // Get file icon based on extension
+        window.getFileIcon = function(filename) {
+            const ext = filename.split('.').pop().toLowerCase();
+            const iconMap = {
+                'pdf': '📄',
+                'doc': '📝', 'docx': '📝',
+                'xls': '📊', 'xlsx': '📊',
+                'ppt': '📊', 'pptx': '📊',
+                'txt': '📃',
+                'jpg': '🖼️', 'jpeg': '🖼️', 'png': '🖼️', 'gif': '🖼️',
+                'mp4': '🎬', 'avi': '🎬', 'mov': '🎬',
+                'mp3': '🎵', 'wav': '🎵',
+                'zip': '📦', 'rar': '📦', '7z': '📦',
+                'kaspa': '💎'
+            };
+            return iconMap[ext] || '📄';
+        };
+        
+        // Format date for display
+        window.formatDate = function(dateString) {
+            const date = new Date(dateString);
+            const now = new Date();
+            const diffDays = Math.floor((now - date) / (1000 * 60 * 60 * 24));
+            
+            if (diffDays === 0) return '今日';
+            if (diffDays === 1) return '昨日';
+            if (diffDays < 7) return `${diffDays}日前`;
+            
+            return `${date.getMonth() + 1}/${date.getDate()}`;
+        };
+        
+        // Shorten Kaspa address for display
+        window.shortenAddress = function(address) {
+            if (!address) return '-';
+            if (address.length < 20) return address;
+            return address.substring(0, 10) + '...' + address.substring(address.length - 6);
+        };
+        
+        // Show entry details (placeholder)
+        window.showEntryDetails = function(entry) {
+            log(`[KENV] エントリー詳細: ${entry.name}`, 'info');
+            // TODO: Implement detail view modal
+        };
+        
+        // Search KENV files by name
+        window.searchKENVFiles = function(query) {
+            if (!query || query.length < 1) {
+                // 空の場合はすべて表示
+                updateFileListFromKENV();
+                return;
+            }
+            
+            const tbody = document.getElementById('fileListBody');
+            tbody.innerHTML = '';
+            
+            // 検索実行
+            const results = [];
+            FileState.kenvManager.entries.forEach((entry, index) => {
+                if (entry.name.toLowerCase().includes(query.toLowerCase())) {
+                    results.push({ entry, index });
+                }
+            });
+            
+            // 結果を表示
+            if (results.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="9" style="text-align: center; padding: 40px; color: #888;">
+                            🔍 "${query}" に一致するファイルが見つかりません
+                        </td>
+                    </tr>
+                `;
+            } else {
+                results.forEach(({ entry }) => {
+                    const row = createKENVTableRow(entry);
+                    tbody.appendChild(row);
+                });
+            }
+        };
+        
+        // Sort KENV files
+        window.sortKENVFiles = function(sortBy) {
+            const tbody = document.getElementById('fileListBody');
+            tbody.innerHTML = '';
+            
+            let sortedEntries = [];
+            
+            switch (sortBy) {
+                case 'name':
+                    sortedEntries = [...FileState.kenvManager.kindex.sortIndexes.name];
+                    break;
+                case 'size':
+                    sortedEntries = [...FileState.kenvManager.kindex.sortIndexes.size]
+                        .reverse() // 大きい順
+                        .map(([size, lineNum]) => {
+                            const entry = FileState.kenvManager.entries[lineNum];
+                            return [entry.name, lineNum, entry.type[0]];
+                        });
+                    break;
+                case 'date':
+                    sortedEntries = [...FileState.kenvManager.kindex.sortIndexes.uploadDate]
+                        .reverse() // 新しい順
+                        .map(([timestamp, lineNum]) => {
+                            const entry = FileState.kenvManager.entries[lineNum];
+                            return [entry.name, lineNum, entry.type[0]];
+                        });
+                    break;
+            }
+            
+            // 表示
+            sortedEntries.forEach(([name, lineNum, type]) => {
+                const entry = FileState.kenvManager.entries[lineNum];
+                const row = createKENVTableRow(entry);
+                tbody.appendChild(row);
+            });
+        };
+        
+        // Filter KENV files
+        window.filterKENVFiles = function(filterType) {
+            const tbody = document.getElementById('fileListBody');
+            tbody.innerHTML = '';
+            
+            let filteredLineNumbers = [];
+            
+            switch (filterType) {
+                case 'all':
+                    updateFileListFromKENV();
+                    return;
+                case 'file':
+                    filteredLineNumbers = FileState.kenvManager.kindex.filterIndexes.type.file || [];
+                    break;
+                case 'directory':
+                    filteredLineNumbers = FileState.kenvManager.kindex.filterIndexes.type.directory || [];
+                    break;
+                case 'verified':
+                    filteredLineNumbers = FileState.kenvManager.kindex.filterIndexes.status.verified || [];
+                    break;
+                case 'pending':
+                    filteredLineNumbers = FileState.kenvManager.kindex.filterIndexes.status.pending || [];
+                    break;
+            }
+            
+            // 表示
+            if (filteredLineNumbers.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="9" style="text-align: center; padding: 40px; color: #888;">
+                            🔍 該当するファイルがありません
+                        </td>
+                    </tr>
+                `;
+            } else {
+                filteredLineNumbers.forEach(lineNum => {
+                    const entry = FileState.kenvManager.entries[lineNum];
+                    const row = createKENVTableRow(entry);
+                    tbody.appendChild(row);
+                });
+            }
         };
         
         // Toggle share menu

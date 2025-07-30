@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kaspa File Storage - 色パレット分析</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            margin-bottom: 30px;
+            color: #333;
+        }
+        
+        .theme-section {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .theme-section h2 {
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #eee;
+        }
+        
+        .color-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        
+        .color-item {
+            display: flex;
+            align-items: center;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            background: #fafafa;
+        }
+        
+        .color-swatch {
+            width: 60px;
+            height: 60px;
+            border-radius: 4px;
+            margin-right: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .color-info {
+            flex: 1;
+        }
+        
+        .color-name {
+            font-weight: 600;
+            margin-bottom: 4px;
+            font-family: monospace;
+        }
+        
+        .color-value {
+            color: #666;
+            font-size: 14px;
+            font-family: monospace;
+        }
+        
+        .color-usage {
+            font-size: 12px;
+            color: #888;
+            margin-top: 4px;
+        }
+        
+        .analysis-section {
+            background: #fff9c4;
+            border: 1px solid #f9a825;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .analysis-section h3 {
+            color: #f57f17;
+            margin-bottom: 15px;
+        }
+        
+        .duplicate-colors {
+            background: #ffebee;
+            border: 1px solid #ef5350;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .duplicate-colors h3 {
+            color: #c62828;
+            margin-bottom: 15px;
+        }
+        
+        .recommendation {
+            background: #e8f5e9;
+            border: 1px solid #66bb6a;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .recommendation h3 {
+            color: #2e7d32;
+            margin-bottom: 15px;
+        }
+        
+        ul {
+            margin-left: 20px;
+        }
+        
+        li {
+            margin-bottom: 8px;
+        }
+        
+        .hardcoded-section {
+            background: #fff3e0;
+            border: 1px solid #ff9800;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .hardcoded-section h3 {
+            color: #e65100;
+            margin-bottom: 15px;
+        }
+        
+        code {
+            background: #f5f5f5;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Kaspa File Storage v5.11.50 - 色パレット分析</h1>
+        
+        <!-- 現在の色数サマリー -->
+        <div class="analysis-section">
+            <h3>📊 現在の色使用状況</h3>
+            <ul>
+                <li><strong>CSS変数として定義</strong>: 18種類 × 2テーマ = 36色</li>
+                <li><strong>ハードコード色</strong>: white, transparent, rgba()系など約10箇所</li>
+                <li><strong>総色数</strong>: 実質約20種類（重複除く）</li>
+            </ul>
+        </div>
+        
+        <!-- ライトテーマ -->
+        <div class="theme-section">
+            <h2>🌞 ライトテーマ</h2>
+            <div class="color-grid">
+                <!-- 背景色 -->
+                <div class="color-item">
+                    <div class="color-swatch" style="background: #ffffff;"></div>
+                    <div class="color-info">
+                        <div class="color-name">--bg-primary</div>
+                        <div class="color-value">#ffffff</div>
+                        <div class="color-usage">メイン背景色</div>
+                    </div>
+                </div>
+                
+                <div class="color-item">
+                    <div class="color-swatch" style="background: #f7f7f7;"></div>
+                    <div class="color-info">
+                        <div class="color-name">--bg-secondary</div>
+                        <div class="color-value">#f7f7f7</div>
+                        <div class="color-usage">セカンダリ背景（パネル等）</div>
+                    </div>
+                </div>
+                
+                <div class="color-item">
+                    <div class="color-swatch" style="background: #ffffff; border: 2px dashed red;"></div>
+                    <div class="color-info">
+                        <div class="color-name">--bg-tertiary ⚠️重複</div>
+                        <div class="color-value">#ffffff</div>
+                        <div class="color-usage">--bg-primaryと同じ</div>
+                    </div>
+                </div>
+                
+                <!-- テキスト色 -->
+                <div class="color-item">
+                    <div class="color-swatch" style="background: #000000;"></div>
+                    <div class="color-info">
+                        <div class="color-name">--text-primary</div>
+                        <div class="color-value">#000000</div>
+                        <div class="color-usage">メインテキスト</div>
+                    </div>
+                </div>
+                
+                <div class="color-item">
+                    <div class="color-swatch" style="background: #666666;"></div>
+                    <div class="color-info">
+                        <div class="color-name">--text-secondary</div>
+                        <div class="color-value">#666666</div>
+                        <div class="color-usage">サブテキスト、グレー系統一</div>
+                    </div>
+                </div>
+                
+                <!-- UI要素 -->
+                <div class="color-item">
+                    <div class="color-swatch" style="background: #e0e0e0;"></div>
+                    <div class="color-info">
+                        <div class="color-name">--border-color</div>
+                        <div class="color-value">#e0e0e0</div>
+                        <div class="color-usage">ボーダー、区切り線</div>
+                    </div>
+                </div>
+                
+                <!-- アクセント色 -->
+                <div class="color-item">
+                    <div class="color-swatch" style="background: #70C7BA;"></div>
+                    <div class="color-info">
+                        <div class="color-name">--accent-color</div>
+                        <div class="color-value">#70C7BA</div>
+                        <div class="color-usage">サイドバー、ボタン</div>
+                    </div>
+                </div>
+                
+                <div class="color-item">
+                    <div class="color-swatch" style="background: #5fb0a9;"></div>
+                    <div class="color-info">
+                        <div class="color-name">--accent-hover</div>
+                        <div class="color-value">#5fb0a9</div>
+                        <div class="color-usage">ホバー状態</div>
+                    </div>
+                </div>
+                
+                <div class="color-item">
+                    <div class="color-swatch" style="background: rgba(112, 199, 186, 0.1);"></div>
+                    <div class="color-info">
+                        <div class="color-name">--accent-light</div>
+                        <div class="color-value">rgba(112, 199, 186, 0.1)</div>
+                        <div class="color-usage">薄いアクセント背景</div>
+                    </div>
+                </div>
+                
+                <!-- ステータス色 -->
+                <div class="color-item">
+                    <div class="color-swatch" style="background: #28a745;"></div>
+                    <div class="color-info">
+                        <div class="color-name">--success-color</div>
+                        <div class="color-value">#28a745</div>
+                        <div class="color-usage">成功メッセージ</div>
+                    </div>
+                </div>
+                
+                <div class="color-item">
+                    <div class="color-swatch" style="background: #dc3545;"></div>
+                    <div class="color-info">
+                        <div class="color-name">--error-color</div>
+                        <div class="color-value">#dc3545</div>
+                        <div class="color-usage">エラーメッセージ</div>
+                    </div>
+                </div>
+                
+                <div class="color-item">
+                    <div class="color-swatch" style="background: #ffc107;"></div>
+                    <div class="color-info">
+                        <div class="color-name">--warning-color</div>
+                        <div class="color-value">#ffc107</div>
+                        <div class="color-usage">警告メッセージ</div>
+                    </div>
+                </div>
+                
+                <div class="color-item">
+                    <div class="color-swatch" style="background: #17a2b8;"></div>
+                    <div class="color-info">
+                        <div class="color-name">--info-color</div>
+                        <div class="color-value">#17a2b8</div>
+                        <div class="color-usage">情報メッセージ</div>
+                    </div>
+                </div>
+                
+                <!-- 接続ステータス -->
+                <div class="color-item">
+                    <div class="color-swatch" style="background: #49EACB;"></div>
+                    <div class="color-info">
+                        <div class="color-name">--status-connected</div>
+                        <div class="color-value">#49EACB → #2A6F65に変更予定</div>
+                        <div class="color-usage">接続状態、ボーダー</div>
+                    </div>
+                </div>
+                
+                <div class="color-item">
+                    <div class="color-swatch" style="background: #ffcc66;"></div>
+                    <div class="color-info">
+                        <div class="color-name">--status-warning</div>
+                        <div class="color-value">#ffcc66</div>
+                        <div class="color-usage">警告状態</div>
+                    </div>
+                </div>
+                
+                <div class="color-item">
+                    <div class="color-swatch" style="background: #e94560;"></div>
+                    <div class="color-info">
+                        <div class="color-name">--status-disconnected</div>
+                        <div class="color-value">#e94560</div>
+                        <div class="color-usage">切断状態、エラー</div>
+                    </div>
+                </div>
+                
+                <!-- その他 -->
+                <div class="color-item">
+                    <div class="color-swatch" style="background: #333333;"></div>
+                    <div class="color-info">
+                        <div class="color-name">--input-text</div>
+                        <div class="color-value">#333333</div>
+                        <div class="color-usage">入力フィールドテキスト</div>
+                    </div>
+                </div>
+                
+                <div class="color-item">
+                    <div class="color-swatch" style="background: #f5f5f5;"></div>
+                    <div class="color-info">
+                        <div class="color-name">--code-bg</div>
+                        <div class="color-value">#f5f5f5</div>
+                        <div class="color-usage">コード背景</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- ダークテーマ -->
+        <div class="theme-section" style="background: #1a1a1a; color: white;">
+            <h2>🌙 ダークテーマ</h2>
+            <div class="color-grid">
+                <!-- 背景色 -->
+                <div class="color-item" style="background: #2a2a2a; border-color: #444;">
+                    <div class="color-swatch" style="background: #0d0d0d;"></div>
+                    <div class="color-info">
+                        <div class="color-name" style="color: #fff;">--bg-primary</div>
+                        <div class="color-value" style="color: #ccc;">#0d0d0d</div>
+                        <div class="color-usage" style="color: #999;">メイン背景色</div>
+                    </div>
+                </div>
+                
+                <div class="color-item" style="background: #2a2a2a; border-color: #444;">
+                    <div class="color-swatch" style="background: #1a1a1a;"></div>
+                    <div class="color-info">
+                        <div class="color-name" style="color: #fff;">--bg-secondary</div>
+                        <div class="color-value" style="color: #ccc;">#1a1a1a</div>
+                        <div class="color-usage" style="color: #999;">セカンダリ背景</div>
+                    </div>
+                </div>
+                
+                <div class="color-item" style="background: #2a2a2a; border-color: #444;">
+                    <div class="color-swatch" style="background: #141414;"></div>
+                    <div class="color-info">
+                        <div class="color-name" style="color: #fff;">--bg-tertiary</div>
+                        <div class="color-value" style="color: #ccc;">#141414</div>
+                        <div class="color-usage" style="color: #999;">第3背景色</div>
+                    </div>
+                </div>
+                
+                <!-- 以下省略... 同様の構造でダークテーマの色を表示 -->
+            </div>
+        </div>
+        
+        <!-- 重複している色 -->
+        <div class="duplicate-colors">
+            <h3>⚠️ 重複・類似している色</h3>
+            <ul>
+                <li><code>--bg-tertiary: #ffffff</code> は <code>--bg-primary: #ffffff</code> と同じ（ライトテーマ）</li>
+                <li><code>--warning-color: #ffc107</code> と <code>--status-warning: #ffcc66</code> は両方警告色で役割が重複</li>
+                <li><code>--status-connected: #49EACB</code> はCLAUDE.mdで <code>#2A6F65</code> への変更が指定されている</li>
+            </ul>
+        </div>
+        
+        <!-- ハードコードされている色 -->
+        <div class="hardcoded-section">
+            <h3>🔧 まだハードコードされている色</h3>
+            <ul>
+                <li><code>white</code> - サイドバー内のテキスト（約10箇所）</li>
+                <li><code>transparent</code> - 背景リセット用</li>
+                <li><code>rgba(255, 255, 255, 0.2)</code> - サイドバーのボーダー</li>
+                <li><code>rgba(255, 255, 255, 0.3)</code> - サイドバーのボーダー（強調）</li>
+                <li><code>rgba(0, 0, 0, 0.9)</code> - ツールチップ背景</li>
+                <li><code>#16213e</code> - ボタンテキスト（1箇所）</li>
+                <li><code>#c13651</code> - 削除ボタン背景（1箇所）</li>
+                <li><code>#ff9800</code> - JavaScriptでのステータス色</li>
+                <li><code>#2196F3</code> - JavaScriptでのステータス色</li>
+            </ul>
+        </div>
+        
+        <!-- 推奨事項 -->
+        <div class="recommendation">
+            <h3>✅ 色を絞るための推奨事項</h3>
+            <ol>
+                <li><strong>重複を削除</strong>
+                    <ul>
+                        <li><code>--bg-tertiary</code> を削除（--bg-primaryで代用）</li>
+                        <li><code>--status-warning</code> を <code>--warning-color</code> に統一</li>
+                    </ul>
+                </li>
+                
+                <li><strong>ハードコード色をCSS変数化</strong>
+                    <ul>
+                        <li><code>white</code> → <code>--sidebar-text</code> として定義</li>
+                        <li>rgba系 → <code>--sidebar-border-light</code>, <code>--sidebar-border</code> として定義</li>
+                        <li>特殊用途の色（#16213e, #c13651）→ 既存の色で代用を検討</li>
+                    </ul>
+                </li>
+                
+                <li><strong>色数を削減</strong>
+                    <ul>
+                        <li>現在: 実質20種類 → 目標: 15種類以下</li>
+                        <li>ステータス色を4種類（success, error, warning, info）に統一</li>
+                        <li>グレースケールは3段階（primary, secondary, border）で十分</li>
+                    </ul>
+                </li>
+                
+                <li><strong>CLAUDE.md対応</strong>
+                    <ul>
+                        <li><code>--status-connected: #49EACB</code> → <code>#2A6F65</code> に変更</li>
+                    </ul>
+                </li>
+            </ol>
+        </div>
+        
+        <!-- 最終的な色構成案 -->
+        <div class="analysis-section">
+            <h3>🎯 推奨される最終的な色構成（15色以下）</h3>
+            <h4>基本色（6色）</h4>
+            <ul>
+                <li>背景: primary, secondary</li>
+                <li>テキスト: primary, secondary</li>
+                <li>ボーダー: 1色</li>
+                <li>コード背景: 1色</li>
+            </ul>
+            
+            <h4>アクセント色（3色）</h4>
+            <ul>
+                <li>メイン、ホバー、ライト</li>
+            </ul>
+            
+            <h4>ステータス色（4色）</h4>
+            <ul>
+                <li>成功、エラー、警告、情報</li>
+            </ul>
+            
+            <h4>その他（2色）</h4>
+            <ul>
+                <li>入力テキスト、サイドバーテキスト</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>

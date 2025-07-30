@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.32 - NetworkStateへのアーカイブ機能統合</title>
+    <title>Kaspa P2P File Storage v5.11.33 - システム初期化・接続関数のカプセル化</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -1371,7 +1371,7 @@
                     <label>秘密鍵:</label>
                     <input type="password" id="walletPrivateKey" placeholder="秘密鍵を入力" style="width: 100%; margin-top: 8px;">
                 </div>
-                <button id="walletConnectBtn" onclick="connectWallet()" style="width: 100%; margin-bottom: 12px;">接続</button>
+                <button id="walletConnectBtn" onclick="SystemHandlers.connectWallet()" style="width: 100%; margin-bottom: 12px;">接続</button>
                 
                 <div class="status-row">
                     <strong>アドレス:</strong>
@@ -1925,9 +1925,9 @@
             </div>
             
             <div class="grid-2">
-                <button onclick="initializeSystem()" id="initBtn">システムを初期化</button>
+                <button onclick="SystemHandlers.initializeSystem()" id="initBtn">システムを初期化</button>
                 <button onclick="setupWorkspace()" id="workspaceBtn">作業フォルダ設定</button>
-                <button onclick="testConnection()" id="testBtn" disabled>接続テスト</button>
+                <button onclick="SystemHandlers.testConnection()" id="testBtn" disabled>接続テスト</button>
             </div>
             <div id="initStatus" class="metric-box" style="display: none;"></div>
         </div>
@@ -2211,6 +2211,220 @@
         
         // Expose NetworkState to window for global access
         window.NetworkState = NetworkState;
+        
+        // System initialization functions (Section 4: GLOBAL STATE & INITIALIZATION)
+        const SystemHandlers = {
+            initializeSystem: async function() {
+                try {
+                    log('システム初期化を開始...');
+                    updateNetworkStatus('connecting', '初期化中...');
+                    
+                    // Import WASM SDK
+                    NetworkState.kaspa = await import('./kaspa-core.js');
+                    log('kaspa-core.jsをインポートしました');
+                    
+                    // Initialize WASM binary
+                    // v5.7.13: Use new initialization format to avoid deprecated parameters warning
+                    await NetworkState.kaspa.default({ module_or_path: './kaspa-core_bg.wasm' });
+                    log('WASMバイナリを初期化しました');
+                    
+                    // Verify functions
+                    const requiredFunctions = ['RpcClient', 'Resolver', 'createTransactions', 
+                        'PrivateKey', 'addressFromScriptPublicKey', 'Address'];
+                    for (const func of requiredFunctions) {
+                        if (typeof NetworkState.kaspa[func] !== 'function') {
+                            throw new Error(`必要な関数が見つかりません: ${func}`);
+                        }
+                    }
+                    log('すべての必要な関数を確認しました', 'success');
+                    
+                    // Initialize wallet (only if Dev Wallet is enabled)
+                    if (AppState.settings.devWalletEnabled) {
+                        log('[DEBUG] Dev Wallet enabled, initializing with test key', 'debug');
+                        UserState.privateKey = new NetworkState.kaspa.PrivateKey(config.testPrivateKey);
+                        log('[DEBUG] UserState.privateKey set', 'debug');
+                        
+                        const publicKey = UserState.privateKey.toPublicKey();
+                        log('[DEBUG] Public key generated', 'debug');
+                        
+                        UserState.address = publicKey.toAddress(config.network);
+                        log('[DEBUG] UserState.address set:', 'debug', UserState.address);
+                        
+                        log(`Dev Walletアドレス: ${UserState.address.toString()}`, 'success');
+                    } else {
+                        log('Dev Wallet無効 - 手動でウォレットを接続してください', 'warning');
+                    }
+                    
+                    // Create RPC client
+                    NetworkState.rpcClient = new NetworkState.kaspa.RpcClient({
+                        resolver: new NetworkState.kaspa.Resolver(),
+                        networkId: config.network
+                    });
+                    
+                    log('RPC接続を試行中...');
+                    await NetworkState.rpcClient.connect();
+                    
+                    // Test connection
+                    const info = await NetworkState.rpcClient.getServerInfo();
+                    log(`接続成功! サーバー: ${info.serverVersion}`, 'success');
+                    
+                    // Update RPC node info display
+                    updateRpcNodeInfo(info, config.network, config.nodeType, config.currentEndpoint);
+                    
+                    // Check REST API health
+                    checkRestApiHealth();
+                    
+                    // Get balance (only if wallet is connected)
+                    let balance = 0;
+                    if (UserState.address) {
+                        const { entries } = await NetworkState.rpcClient.getUtxosByAddresses([UserState.address.toString()]);
+                        balance = entries.reduce((sum, utxo) => sum + Number(utxo.amount), 0) / 1e8;
+                        log(`残高: ${balance} KAS`, 'info');
+                    }
+                    
+                    // Update UI
+                    window.kaspa = NetworkState.kaspa;
+                    document.getElementById('initStatus').style.display = 'block';
+                    
+                    if (UserState.address) {
+                        document.getElementById('initStatus').innerHTML = `
+                            <p class="success">✅ システム初期化完了</p>
+                            <p>アドレス: ${UserState.address.toString()}</p>
+                            <p>残高: ${balance} KAS</p>
+                            ${AppState.settings.devWalletEnabled ? '<p style="color: #ffcc66;">⚠️ Dev Wallet使用中</p>' : ''}
+                        `;
+                    } else {
+                        document.getElementById('initStatus').innerHTML = `
+                            <p class="success">✅ システム初期化完了</p>
+                            <p style="color: #ffcc66;">⚠️ ウォレット未接続</p>
+                            <p>ステータスタブからウォレットを接続してください</p>
+                        `;
+                    }
+                    
+                    document.getElementById('testBtn').disabled = false;
+                    document.getElementById('uploadBtn').disabled = !UserState.address; // Only enable if wallet connected
+                    
+                    // Initialize history manager
+                    if (WorkspaceState.historyManager) {
+                        await WorkspaceState.historyManager.initialize(config.testPrivateKey);
+                        WorkspaceState.historyManager.updateHistoryUI();
+                    }
+                    
+                    updateNetworkStatus('online', 'オンライン');
+                    
+                    // Initialize Archive Manager
+                    await initializeArchiveManager();
+                    
+                } catch (error) {
+                    log(`初期化エラー: ${error.message}`, 'error');
+                    updateNetworkStatus('offline', 'エラー');
+                    updateRpcNodeInfo(); // Reset display
+                }
+            },
+            
+            testConnection: async function() {
+                try {
+                    log('接続テストを実行中...');
+                    const startTime = Date.now();
+                    
+                    // Test RPC
+                    const info = await NetworkState.rpcClient.getServerInfo();
+                    const rpcTime = Date.now() - startTime;
+                    log(`RPC応答時間: ${rpcTime}ms`, 'success');
+                    
+                    // Test Explorer API
+                    const apiStart = Date.now();
+                    const response = await fetchWithTimeout('https://api-tn10.kaspa.org/info/health', {}, 5000, 1);
+                    const apiTime = Date.now() - apiStart;
+                    log(`Explorer API応答時間: ${apiTime}ms`, 'success');
+                    
+                    alert(`接続テスト成功!\nRPC: ${rpcTime}ms\nAPI: ${apiTime}ms`);
+                } catch (error) {
+                    log(`接続テストエラー: ${error.message}`, 'error');
+                    alert(`接続テスト失敗: ${error.message}`);
+                }
+            },
+            
+            connectWallet: async function() {
+                const privateKeyInput = document.getElementById('walletPrivateKey');
+                const privateKey = privateKeyInput.value.trim();
+                
+                if (!privateKey) {
+                    alert('秘密鍵を入力してください');
+                    return;
+                }
+                
+                // Check if already connected
+                if (UserState.privateKey) {
+                    // If connected with Dev Wallet, proceed to replace with manual connection
+                    const isDevWallet = UserState.privateKey.toString() === config.testPrivateKey;
+                    if (!isDevWallet) {
+                        // If not Dev Wallet, just disconnect and return
+                        AppState.disconnectWallet();
+                        privateKeyInput.value = '';
+                        return;
+                    }
+                    // If Dev Wallet, disconnect it and continue with manual connection
+                    AppState.disconnectWallet();
+                }
+                
+                try {
+                    // Initialize wallet with SDK
+                    if (!NetworkState.kaspa) {
+                        throw new Error('Kaspa SDK not initialized - システムを初期化してください');
+                    }
+                    
+                    // Create wallet from private key (correct API usage)
+                    UserState.privateKey = new NetworkState.kaspa.PrivateKey(privateKey);
+                    const publicKey = UserState.privateKey.toPublicKey();
+                    UserState.address = publicKey.toAddress(config.network);
+                    
+                    log(`ウォレット接続: ${UserState.address.toString()}`, 'success');
+                    
+                    // Disable Dev Wallet when manually connecting
+                    AppState.disableDevWallet();
+                    
+                    // Update UI
+                    document.getElementById('walletAddress').textContent = UserState.address.toString();
+                    
+                    // Get balance
+                    if (NetworkState.rpcClient && NetworkState.rpcClient.isConnected) {
+                        const { entries } = await NetworkState.rpcClient.getUtxosByAddresses([UserState.address.toString()]);
+                        const balance = entries.reduce((sum, utxo) => sum + Number(utxo.amount), 0) / 1e8;
+                        document.getElementById('walletBalance').textContent = `${balance.toFixed(8)} KAS`;
+                        
+                        // Update upload button state
+                        document.getElementById('uploadBtn').disabled = false;
+                    } else {
+                        document.getElementById('walletBalance').textContent = 'RPC未接続';
+                    }
+                    
+                    // Clear password input
+                    privateKeyInput.value = '';
+                    
+                    // Update connection button text
+                    document.getElementById('walletConnectBtn').textContent = '切断';
+                    
+                } catch (error) {
+                    log(`ウォレット接続エラー: ${error.message}`, 'error');
+                    alert(`エラー: ${error.message}`);
+                }
+            }
+        };
+        
+        // Backward compatibility
+        Object.defineProperty(window, 'initializeSystem', {
+            get() { return SystemHandlers.initializeSystem; },
+            configurable: true
+        });
+        Object.defineProperty(window, 'testConnection', {
+            get() { return SystemHandlers.testConnection; },
+            configurable: true
+        });
+        Object.defineProperty(window, 'connectWallet', {
+            get() { return SystemHandlers.connectWallet; },
+            configurable: true
+        });
         
         // ===== Archive Node Manager (v5.10.21) =====
         class ArchiveNodeManager {
@@ -8939,8 +9153,10 @@
                 document.getElementById('devWalletToggle').checked = false;
                 log('Dev Wallet自動無効化 - 手動Wallet接続のため', 'info');
             }
-        };
+};
         
+        // Moved to SystemHandlers
+        /*
         window.initializeSystem = async function() {
             try {
                 log('システム初期化を開始...');
@@ -9048,6 +9264,7 @@
                 updateRpcNodeInfo(); // Reset display
             }
         };
+        */
         
         // Create RPC client based on node type configuration (v5.6.0)
         async function createRpcClient() {
@@ -15028,29 +15245,7 @@
             }
         });
         
-        // Connection test function (moved from NETWORK & RPC FUNCTIONS)
-        window.testConnection = async function() {
-            try {
-                log('接続テストを実行中...');
-                const startTime = Date.now();
-                
-                // Test RPC
-                const info = await NetworkState.rpcClient.getServerInfo();
-                const rpcTime = Date.now() - startTime;
-                log(`RPC応答時間: ${rpcTime}ms`, 'success');
-                
-                // Test Explorer API
-                const apiStart = Date.now();
-                const response = await fetchWithTimeout('https://api-tn10.kaspa.org/info/health', {}, 5000, 1);
-                const apiTime = Date.now() - apiStart;
-                log(`Explorer API応答時間: ${apiTime}ms`, 'success');
-                
-                alert(`接続テスト成功!\nRPC: ${rpcTime}ms\nAPI: ${apiTime}ms`);
-            } catch (error) {
-                log(`接続テストエラー: ${error.message}`, 'error');
-                alert(`接続テスト失敗: ${error.message}`);
-            }
-        };
+        // Connection test function moved to SystemHandlers
         
         // File selection handler (moved from FILE OPERATIONS)
         window.handleFileSelect = async function(event) {
@@ -15129,7 +15324,8 @@
         };
         
         // ===== v5.9.0: Status Tab Functions =====
-        // Wallet connection handler
+        // Wallet connection handler moved to SystemHandlers
+        /*
         window.connectWallet = async function() {
             const privateKeyInput = document.getElementById('walletPrivateKey');
             const privateKey = privateKeyInput.value.trim();
@@ -15195,6 +15391,7 @@
                 alert(`エラー: ${error.message}`);
             }
         };
+        */
         
         // ===== v5.9.0: File Tab Functions =====
         // Add file dialog handler

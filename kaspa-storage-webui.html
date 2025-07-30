@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.48 - KENVワークスペースなし初期化対応</title>
+    <title>Kaspa P2P File Storage v5.11.49 - SafeStorage実装とLocalStorage保存対応</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -3637,17 +3637,87 @@
             // すべてのKENVファイルを保存
             async saveAll() {
                 log('[KENV] すべてのファイルを保存開始', 'info');
-                const results = await Promise.all([
-                    this.saveKenvFile(),
-                    this.saveKindexFile(),
-                    this.saveKentryFile()
-                ]);
                 
-                if (results.every(r => r)) {
-                    log('[KENV] すべてのファイルを保存しました', 'success');
-                    return true;
+                // ワークスペースがある場合
+                if (WorkspaceState.handle) {
+                    const results = await Promise.all([
+                        this.saveKenvFile(),
+                        this.saveKindexFile(),
+                        this.saveKentryFile()
+                    ]);
+                    
+                    if (results.every(r => r)) {
+                        log('[KENV] すべてのファイルを保存しました', 'success');
+                        return true;
+                    } else {
+                        log('[KENV] 一部のファイル保存に失敗しました', 'warning');
+                        return false;
+                    }
                 } else {
-                    log('[KENV] 一部のファイル保存に失敗しました', 'warning');
+                    // ワークスペースがない場合はLocalStorageに保存
+                    return await this.saveToLocalStorage();
+                }
+            },
+            
+            // LocalStorageへの保存
+            async saveToLocalStorage() {
+                const KENV_LOCALSTORAGE_LIMIT = 5 * 1024 * 1024; // 5MB
+                const MAX_ENTRIES_IN_LOCALSTORAGE = 500; // 最大500件
+                
+                try {
+                    // Step 1: エントリー数チェック
+                    let entriesToSave = this.entries;
+                    let truncated = false;
+                    
+                    if (entriesToSave.length > MAX_ENTRIES_IN_LOCALSTORAGE) {
+                        entriesToSave = this.entries.slice(-MAX_ENTRIES_IN_LOCALSTORAGE);
+                        truncated = true;
+                        log(`[KENV] エントリー数制限: ${this.entries.length}件中${MAX_ENTRIES_IN_LOCALSTORAGE}件のみ保存`, 'warning');
+                    }
+                    
+                    // Step 2: データ準備
+                    const data = {
+                        entries: entriesToSave,
+                        kindex: this.kindex,
+                        version: '3.1.3',
+                        timestamp: new Date().toISOString(),
+                        truncated: truncated,
+                        originalCount: truncated ? this.entries.length : undefined,
+                        savedCount: entriesToSave.length
+                    };
+                    
+                    // Step 3: サイズチェック
+                    const dataStr = JSON.stringify(data);
+                    if (dataStr.length > KENV_LOCALSTORAGE_LIMIT) {
+                        // さらに削減
+                        const reductionRatio = KENV_LOCALSTORAGE_LIMIT / dataStr.length;
+                        const targetCount = Math.floor(entriesToSave.length * reductionRatio * 0.8);
+                        entriesToSave = entriesToSave.slice(-targetCount);
+                        
+                        // 再度データ準備
+                        data.entries = entriesToSave;
+                        data.truncated = true;
+                        data.originalCount = this.entries.length;
+                        data.savedCount = entriesToSave.length;
+                        
+                        log(`[KENV] 容量制限: ${(dataStr.length/1024/1024).toFixed(1)}MB → 5MBに削減`, 'warning');
+                    }
+                    
+                    // Step 4: 保存
+                    const result = SafeStorage.setItem('kenv_temp_data', JSON.stringify(data));
+                    if (result.success) {
+                        log(`[KENV] LocalStorageに保存しました (${entriesToSave.length}件)`, 'success');
+                        return true;
+                    } else {
+                        if (result.error === 'quota_exceeded') {
+                            log('[KENV] LocalStorage容量不足 - ワークスペース設定を推奨', 'error');
+                        } else {
+                            log(`[KENV] LocalStorage保存エラー: ${result.error}`, 'error');
+                        }
+                        return false;
+                    }
+                } catch (error) {
+                    log(`[KENV] 保存処理エラー: ${error.message}`, 'error');
                     return false;
                 }
             },
@@ -3903,21 +3973,15 @@
             
             // LocalStorageからの読み込み
             loadFromLocalStorage() {
-                try {
-                    const data = localStorage.getItem('kenv_temp_data');
-                    if (!data) return null;
-                    
-                    const parsed = JSON.parse(data);
-                    if (this.validateKENVData(parsed)) {
-                        return parsed;
-                    }
-                    
-                    log('[KENV] LocalStorageデータ検証失敗', 'error');
-                    return null;
-                } catch (error) {
-                    log(`[KENV] LocalStorage読み込みエラー: ${error.message}`, 'error');
-                    return null;
+                const data = SafeStorage.getItem('kenv_temp_data');
+                if (!data) return null;
+                
+                if (this.validateKENVData(data)) {
+                    return data;
                 }
+                
+                log('[KENV] LocalStorageデータ検証失敗', 'error');
+                return null;
             },
             
             // データ検証
@@ -3988,11 +4052,11 @@
             
             // LocalStorageクリア
             clearLocalStorage() {
-                try {
-                    localStorage.removeItem('kenv_temp_data');
+                const result = SafeStorage.removeItem('kenv_temp_data');
+                if (result.success) {
                     log('[KENV] LocalStorageをクリアしました', 'debug');
-                } catch (error) {
-                    log(`[KENV] LocalStorageクリアエラー: ${error.message}`, 'error');
+                } else {
+                    log(`[KENV] LocalStorageクリアエラー: ${result.error}`, 'error');
                 }
             }
         };
@@ -5813,6 +5877,94 @@
             get() { return UtilityHandlers.loadParallelSetting; },
             configurable: true
         });
+        
+        // SafeStorage Class - v5.11.48
+        // 堅牢なLocalStorage操作を提供
+        class SafeStorage {
+            static setItem(key, value) {
+                try {
+                    localStorage.setItem(key, value);
+                    return { success: true };
+                } catch (e) {
+                    if (e.name === 'QuotaExceededError') {
+                        // 容量超過時の処理
+                        this.handleQuotaExceeded(key);
+                        
+                        // リトライ
+                        try {
+                            localStorage.setItem(key, value);
+                            return { success: true };
+                        } catch (e2) {
+                            return { success: false, error: 'quota_exceeded' };
+                        }
+                    }
+                    return { success: false, error: e.message };
+                }
+            }
+            
+            static getItem(key) {
+                try {
+                    const value = localStorage.getItem(key);
+                    if (!value) return null;
+                    
+                    // JSON形式の場合は自動パース
+                    if (value.startsWith('{') || value.startsWith('[')) {
+                        try {
+                            return JSON.parse(value);
+                        } catch (e) {
+                            console.error(`Invalid JSON in ${key}:`, e);
+                            // 破損データを削除
+                            localStorage.removeItem(key);
+                            return null;
+                        }
+                    }
+                    return value;
+                } catch (e) {
+                    console.error(`Storage access error for ${key}:`, e);
+                    return null;
+                }
+            }
+            
+            static removeItem(key) {
+                try {
+                    localStorage.removeItem(key);
+                    return { success: true };
+                } catch (e) {
+                    return { success: false, error: e.message };
+                }
+            }
+            
+            static handleQuotaExceeded(newKey) {
+                // 優先度の低いデータから削除
+                const priorityOrder = [
+                    'kaspa-upload-progress',     // 一時的
+                    'kaspa-upload-metadata',     // 一時的
+                    'kaspaDirectories',          // 再構築可能
+                    'kaspaDAG',                  // 再構築可能
+                    'kenv_temp_data'            // 重要（最後に削除）
+                ];
+                
+                for (const key of priorityOrder) {
+                    if (key !== newKey && localStorage.getItem(key)) {
+                        localStorage.removeItem(key);
+                        log(`[Storage] 容量確保のため${key}を削除`, 'warning');
+                        break;
+                    }
+                }
+            }
+            
+            static checkAvailability() {
+                try {
+                    const test = '__storage_test__';
+                    localStorage.setItem(test, '1');
+                    localStorage.removeItem(test);
+                    return true;
+                } catch (e) {
+                    log('[Storage] LocalStorage使用不可', 'warning');
+                    return false;
+                }
+            }
+        }
         
         // Upload History Manager Class
         class UploadHistoryManager {

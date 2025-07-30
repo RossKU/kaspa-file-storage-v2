@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.43 - イベントリスナー適正化</title>
+    <title>Kaspa P2P File Storage v5.11.44 - グローバルスコープ関数修正</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -16440,7 +16440,7 @@
             checkFileSizeWarning(file);
             
             // Check for auto-resume
-            const resumeResult = await WorkspaceHandlers.checkAutoResumeProgress(file);
+            const resumeResult = await checkAutoResumeProgress(file);
             if (resumeResult.completed) {
                 return; // File already completed
             }
@@ -16920,7 +16920,14 @@
                               '⏸️';
             
             // Format values
-            const size = entry.fileSize ? formatSize(entry.fileSize) : '-';
+            const size = entry.fileSize ? (() => {
+                const bytes = entry.fileSize;
+                if (bytes === 0) return '0 B';
+                const k = 1024;
+                const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            })() : '-';
             const cid = entry.cid ? entry.cid.substring(0, 8) + '...' : '-';
             const metaTxId = entry.metaTxId ? entry.metaTxId.substring(0, 8) + '...' : '-';
             const uploader = entry.uploadedBy ? shortenAddress(entry.uploadedBy) : '-';

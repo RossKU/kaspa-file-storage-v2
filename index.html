@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.34 - プログレスファイル関数のカプセル化</title>
+    <title>Kaspa P2P File Storage v5.11.35 - UI関連関数のカプセル化</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -1230,35 +1230,35 @@
             </div>
             
             <nav class="sidebar-nav">
-                <div class="nav-item active" onclick="switchTab('status')" data-tooltip="Status">
+                <div class="nav-item active" onclick="UIHandlers.switchTab('status')" data-tooltip="Status">
                     <span class="nav-item-icon">📊</span>
                     <span class="nav-item-text">Status</span>
                 </div>
-                <div class="nav-item" onclick="switchTab('file')" data-tooltip="File">
+                <div class="nav-item" onclick="UIHandlers.switchTab('file')" data-tooltip="File">
                     <span class="nav-item-icon">📂</span>
                     <span class="nav-item-text">File</span>
                 </div>
-                <div class="nav-item" onclick="switchTab('download')" data-tooltip="Download">
+                <div class="nav-item" onclick="UIHandlers.switchTab('download')" data-tooltip="Download">
                     <span class="nav-item-icon">📥</span>
                     <span class="nav-item-text">Download</span>
                 </div>
-                <div class="nav-item" onclick="switchTab('upload')" data-tooltip="Upload File">
+                <div class="nav-item" onclick="UIHandlers.switchTab('upload')" data-tooltip="Upload File">
                     <span class="nav-item-icon">📤</span>
                     <span class="nav-item-text">Upload File</span>
                 </div>
-                <div class="nav-item" onclick="switchTab('dirbuilder')" data-tooltip="Dir Builder">
+                <div class="nav-item" onclick="UIHandlers.switchTab('dirbuilder')" data-tooltip="Dir Builder">
                     <span class="nav-item-icon">🛠️</span>
                     <span class="nav-item-text">Dir Builder</span>
                 </div>
-                <div class="nav-item" onclick="switchTab('history')" data-tooltip="History">
+                <div class="nav-item" onclick="UIHandlers.switchTab('history')" data-tooltip="History">
                     <span class="nav-item-icon">📜</span>
                     <span class="nav-item-text">History</span>
                 </div>
-                <div class="nav-item" onclick="switchTab('debug')" data-tooltip="Debug">
+                <div class="nav-item" onclick="UIHandlers.switchTab('debug')" data-tooltip="Debug">
                     <span class="nav-item-icon">🐛</span>
                     <span class="nav-item-text">Debug</span>
                 </div>
-                <div class="nav-item" onclick="switchTab('settings')" data-tooltip="Settings">
+                <div class="nav-item" onclick="UIHandlers.switchTab('settings')" data-tooltip="Settings">
                     <span class="nav-item-icon">⚙️</span>
                     <span class="nav-item-text">Settings</span>
                 </div>
@@ -4699,6 +4699,99 @@
                 } else {
                     log('ドロップされたファイルは.kaspaファイルではありません', 'error');
                 }
+            },
+            
+            // File size warning checker
+            checkFileSizeWarning: function(file) {
+                const MAX_SIZE_WITH_META = 550 * 1024 * 1024; // 550MB
+                if (file.size > MAX_SIZE_WITH_META) {
+                    log(`⚠️ 警告: このファイルサイズ(${(file.size/1024/1024).toFixed(1)}MB)では、ブロックチェーン上のメタデータトランザクションが生成されない可能性があります`, 'warning');
+                    log('.kaspaファイルは生成されますが、メタデータの共有が制限されます', 'warning');
+                    return true;
+                }
+                return false;
+            },
+            
+            // Update file selection UI
+            updateFileSelectionUI: function(file, isResume = false, resumeStats = null) {
+                const label = document.querySelector('.file-input-label');
+                if (isResume && resumeStats) {
+                    label.innerHTML = `
+                        <div class="file-info">
+                            <span class="filename">${file.name}</span>
+                            <span class="filesize">${(file.size / 1024 / 1024).toFixed(2)} MB</span>
+                        </div>
+                        <div class="resume-info">
+                            <span class="resume-status">レジューム: ${resumeStats.completed}/${resumeStats.total} チャンク (${resumeStats.percentage}%)</span>
+                            <span class="resume-cid">CID: ${resumeStats.cid}</span>
+                        </div>
+                    `;
+                    label.classList.add('file-selected', 'resume-mode');
+                } else {
+                    label.innerHTML = `
+                        <div class="file-info">
+                            <span class="filename">${file.name}</span>
+                            <span class="filesize">${(file.size / 1024 / 1024).toFixed(2)} MB</span>
+                        </div>
+                    `;
+                    label.classList.add('file-selected');
+                    label.classList.remove('resume-mode');
+                }
+            },
+            
+            // Tab switching
+            switchTab: function(tab) {
+                // Update nav items
+                document.querySelectorAll('.nav-item').forEach(btn => btn.classList.remove('active'));
+                document.querySelector(`[onclick="UIHandlers.switchTab('${tab}')"]`)?.classList.add('active');
+                
+                // Update tab contents
+                document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+                document.getElementById(tab + '-tab')?.classList.add('active');
+                
+                // Close sidebar on mobile after selection
+                if (window.innerWidth <= 768) {
+                    document.getElementById('sidebar').classList.remove('open');
+                }
+                
+                // Update history tab when switching to it
+                if (tab === 'history' && WorkspaceState.historyManager) {
+                    WorkspaceState.historyManager.updateHistoryUI();
+                }
+                
+                // Update directory tab when switching to it
+                if (tab === 'directory' && window.directoryManager) {
+                    window.directoryManager.updateFileSelector();
+                    window.directoryManager.updateUI();
+                }
+                
+                // Update theme dropdown when switching to settings
+                if (tab === 'settings') {
+                    const currentTheme = document.body.getAttribute('data-theme') || 'dark';
+                    const themeSelect = document.getElementById('themeSelect');
+                    if (themeSelect) {
+                        themeSelect.value = currentTheme;
+                    }
+                }
+            },
+            
+            // Get upload status for debugging
+            getUploadStatus: function() {
+                // v5.5.38-phase2: Check proxy functionality
+                const proxyValue = uploadingDirMeta; // This goes through the proxy
+                
+                return {
+                    file: window.uploadingFile,
+                    metaTxId: window.metaTxId,
+                    chunks: window.processedChunks,
+                    pendingTasks: window.uploadQueue ? window.uploadQueue.length : 0,
+                    completedTasks: window.completedCount || 0,
+                    erroredTasks: window.erroredChunks ? window.erroredChunks.size : 0,
+                    dirMeta: window.dirMetadata || null,
+                    uploadingDirMeta: uploadingDirMeta,
+                    dirMetaProxyWorks: uploadingDirMeta === FileState.uploadingDirMeta,
+                    monitoredTx: NetworkState.ws.monitoredTransactions.size
+                };
             }
         };
         
@@ -4762,6 +4855,27 @@
         
         Object.defineProperty(window, 'handleKaspaDrop', {
             get() { return UIHandlers.handleKaspaDrop; },
+            configurable: true
+        });
+        
+        // Backward compatibility for new UI functions (v5.11.34)
+        Object.defineProperty(window, 'checkFileSizeWarning', {
+            get() { return UIHandlers.checkFileSizeWarning; },
+            configurable: true
+        });
+        
+        Object.defineProperty(window, 'updateFileSelectionUI', {
+            get() { return UIHandlers.updateFileSelectionUI; },
+            configurable: true
+        });
+        
+        Object.defineProperty(window, 'switchTab', {
+            get() { return UIHandlers.switchTab; },
+            configurable: true
+        });
+        
+        Object.defineProperty(window, 'getUploadStatus', {
+            get() { return UIHandlers.getUploadStatus; },
             configurable: true
         });
         
@@ -9549,7 +9663,8 @@
 
         // ===== File Operation Helper Functions =====
         
-        // Check file size and show warning if needed
+        // Check file size and show warning if needed - moved to UIHandlers
+        /*
         window.checkFileSizeWarning = function checkFileSizeWarning(file) {
             const MAX_SIZE_WITH_META = 550 * 1024 * 1024; // 550MB
             if (file.size > MAX_SIZE_WITH_META) {
@@ -9559,6 +9674,7 @@
             }
             return false;
         }
+        */
         
         // Check for auto-resume from progress file moved to WorkspaceHandlers
         /*
@@ -9619,7 +9735,8 @@
         }
         */
         
-        // Update file selection UI
+        // Update file selection UI - moved to UIHandlers
+        /*
         window.updateFileSelectionUI = function updateFileSelectionUI(file, isResume = false, resumeStats = null) {
             const label = document.querySelector('.file-input-label');
             if (isResume && resumeStats) {
@@ -9637,6 +9754,7 @@
             
             // Upload dir tab has been removed in v5.11.22
         }
+        */
 
         
         // Directory handling
@@ -15322,7 +15440,8 @@
         // User interface controls and event handling functions
         
         
-        // Tab switching function (moved from FILE OPERATIONS)
+        // Tab switching function (moved from FILE OPERATIONS) - moved to UIHandlers
+        /*
         window.switchTab = function(tab) {
             // Update nav items
             document.querySelectorAll('.nav-item').forEach(btn => btn.classList.remove('active'));
@@ -15368,6 +15487,7 @@
                 }
             }
         };
+        */
 
 
 
@@ -15441,15 +15561,16 @@
                     log('進捗ファイルが選択されたファイルと一致しません', 'error');
                     // v5.5.24: window.progressManager -> FileState.progressManager (9/11)
                     FileState.progressManager = null;
-                    updateFileSelectionUI(file, false);
+                    UIHandlers.updateFileSelectionUI(file, false);
                 }
             } else {
                 // Update UI for new upload
-                updateFileSelectionUI(file, false);
+                UIHandlers.updateFileSelectionUI(file, false);
             }
         };
         
-        // v5.3.6: Debug helper for upload status
+        // v5.3.6: Debug helper for upload status - moved to UIHandlers
+        /*
         window.getUploadStatus = function() {
             // v5.5.38-phase2: Check proxy functionality
             const proxyValue = uploadingDirMeta; // This goes through the proxy
@@ -15470,6 +15591,7 @@
                 monitoredTx: NetworkState.ws.monitoredTransactions.size
             };
         };
+        */
         
         // ===== v5.9.0: Status Tab Functions =====
         // Wallet connection handler moved to SystemHandlers

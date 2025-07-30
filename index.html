@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.35 - UI関連関数のカプセル化</title>
+    <title>Kaspa P2P File Storage v5.11.36 - ファイル操作系関数のカプセル化</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -3182,11 +3182,24 @@
             },
             
             // v5.11.18: Prepared payloads for cost estimation
-            preparedPayloads: null  // Store payloads after processFileWithPayloadSplit
+            preparedPayloads: null,  // Store payloads after processFileWithPayloadSplit
+            
+            // v5.11.36: File operation handlers (Section 9: FILE OPERATIONS)
+            fileOperationHandlers: {
+                // File upload/download operations
+                processAndUpload: null,  // Will be defined later
+                downloadFile: null,      // Will be defined later
+                downloadAllFilesFromDirectory: null,  // Will be defined later
+                downloadFileFromDirectory: null       // Will be defined later
+            }
         };
         
         // Expose FileState to window for global access
         window.FileState = FileState;
+        
+        // ===== Define File Operation Handlers (v5.11.36) =====
+        // These handlers will be defined later in the file and assigned to FileState.fileOperationHandlers
+        // This is done to avoid forward reference issues
         
         // ===== Directory Builder State (v5.10.11) =====
         const DirectoryBuilderState = {
@@ -11045,8 +11058,11 @@
             return true;
         }
         
+        // ===== Populate FileState.fileOperationHandlers (v5.11.36) =====
+        // Section 9: FILE OPERATIONS - Centralized file operation functions
+        
         // Process and upload file
-        window.processAndUpload = async function() {
+        FileState.fileOperationHandlers.processAndUpload = async function() {
             // Debug log
             log(`[DEBUG] processAndUpload called`, 'debug');
             log(`[DEBUG] FileState.currentFile: ${FileState.currentFile ? FileState.currentFile.name : 'null'}`, 'debug');
@@ -12339,6 +12355,9 @@
                 }
             }
         };
+        
+        // Backward compatibility for processAndUpload
+        window.processAndUpload = FileState.fileOperationHandlers.processAndUpload;
 
         // Generate .kaspa file - DEPRECATED: Now handled in History tab
         // Keeping for backward compatibility if needed
@@ -13320,7 +13339,7 @@
         }
 
         // v4.7.9: Download all files from directory
-        window.downloadAllFilesFromDirectory = async function(dirMetadata) {
+        FileState.fileOperationHandlers.downloadAllFilesFromDirectory = async function(dirMetadata) {
             log('[一括ダウンロード] ディレクトリ内の全ファイルをダウンロード開始', 'info');
             
             // Check workspace handle
@@ -13455,9 +13474,12 @@
                 document.getElementById('downloadProgress').style.display = 'none';
             }
         };
+        
+        // Backward compatibility for downloadAllFilesFromDirectory
+        window.downloadAllFilesFromDirectory = FileState.fileOperationHandlers.downloadAllFilesFromDirectory;
 
         // Download individual file from directory
-        window.downloadFileFromDirectory = async function(metaTxId, blockId, fileName, password, filePath) {
+        FileState.fileOperationHandlers.downloadFileFromDirectory = async function(metaTxId, blockId, fileName, password, filePath) {
             // v4.7.8: DownloadManagerを使用したフォルダ構造対応実装
             log(`[DownloadManager] ディレクトリ内ファイルのダウンロード開始: ${fileName}`, 'info');
             if (filePath) {
@@ -13520,6 +13542,9 @@
                 document.getElementById('downloadProgress').style.display = 'none';
             }
         };
+        
+        // Backward compatibility for downloadFileFromDirectory
+        window.downloadFileFromDirectory = FileState.fileOperationHandlers.downloadFileFromDirectory;
 
         // Load .kaspa file
         window.loadKaspaFile = async function(event) {
@@ -14212,7 +14237,7 @@
         };
 
         // Download file
-        window.downloadFile = async function() {
+        FileState.fileOperationHandlers.downloadFile = async function() {
             let password = document.getElementById('downloadPassword').value;
             log(`パスワードフィールドの値: ${password ? '入力あり' : '空'}`, 'debug');
             
@@ -14578,6 +14603,9 @@
                 log(`ダウンロードエラー: ${error.message}`, 'error');
             }
         };
+        
+        // Backward compatibility for downloadFile
+        window.downloadFile = FileState.fileOperationHandlers.downloadFile;
 
         // Check if monitoring should stop
         async function checkMonitoringStop() {

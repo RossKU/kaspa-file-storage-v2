@@ -3366,6 +3366,9 @@
                     return;
                 }
                 
+                // v5.11.49: 既存のインデックスエントリーを削除してから追加（重複防止）
+                this.removeFromAllIndexes(lineNumber);
+                
                 // 名前順インデックス
                 const nameEntry = [entry.name, lineNumber, entry.type === 'kaspa-directory' ? 'd' : 'f'];
                 const nameInsertPos = this.findInsertPosition(this.kindex.sortIndexes.name, entry.name, 0);
@@ -3404,6 +3407,41 @@
                 
                 // 更新時刻
                 this.kindex.updated = new Date().toISOString();
+            },
+            
+            // すべてのインデックスから指定されたlineNumberのエントリーを削除
+            removeFromAllIndexes(lineNumber) {
+                // sortIndexesから削除
+                this.kindex.sortIndexes.name = this.kindex.sortIndexes.name.filter(
+                    ([name, lineNum, type]) => lineNum !== lineNumber
+                );
+                this.kindex.sortIndexes.size = this.kindex.sortIndexes.size.filter(
+                    ([size, lineNum]) => lineNum !== lineNumber
+                );
+                this.kindex.sortIndexes.uploadDate = this.kindex.sortIndexes.uploadDate.filter(
+                    ([timestamp, lineNum]) => lineNum !== lineNumber
+                );
+                
+                // searchIndexesから削除
+                Object.keys(this.kindex.searchIndexes.name).forEach(prefix => {
+                    this.kindex.searchIndexes.name[prefix] = this.kindex.searchIndexes.name[prefix].filter(
+                        lineNum => lineNum !== lineNumber
+                    );
+                    // 空の配列は削除
+                    if (this.kindex.searchIndexes.name[prefix].length === 0) {
+                        delete this.kindex.searchIndexes.name[prefix];
+                    }
+                });
+                
+                // filterIndexesから削除
+                ['type', 'status'].forEach(category => {
+                    Object.keys(this.kindex.filterIndexes[category]).forEach(key => {
+                        this.kindex.filterIndexes[category][key] = 
+                            this.kindex.filterIndexes[category][key].filter(
+                                lineNum => lineNum !== lineNumber
+                            );
+                    });
+                });
             },
             
             // バイナリサーチで挿入位置を見つける
@@ -4151,6 +4189,42 @@
                 
                 console.log('[KENV Test] テストデータ追加完了');
                 this.showEntries();
+            },
+            
+            // 重複テスト - v5.11.49
+            testDuplication() {
+                console.log('[KENV Test] 重複テスト開始...');
+                
+                // Step 1: エントリーを追加
+                const entry = this.addTestEntry('duplicate-test.pdf');
+                const lineNumber = FileState.kenvManager.entries.indexOf(entry);
+                
+                console.log(`[KENV Test] エントリー追加完了 - LineNumber: ${lineNumber}`);
+                console.log('[KENV Test] 初回インデックス状態:');
+                console.log('- 名前順インデックス:', FileState.kenvManager.kindex.sortIndexes.name);
+                
+                // Step 2: 同じエントリーのupdateIndexを複数回実行
+                console.log('[KENV Test] updateIndexを3回実行...');
+                for (let i = 0; i < 3; i++) {
+                    FileState.kenvManager.updateIndex(entry, lineNumber);
+                }
+                
+                // Step 3: 結果を確認
+                console.log('[KENV Test] 更新後のインデックス状態:');
+                const nameIndex = FileState.kenvManager.kindex.sortIndexes.name;
+                console.log('- 名前順インデックス:', nameIndex);
+                
+                // 重複をチェック
+                const duplicates = nameIndex.filter(([name, ln]) => ln === lineNumber);
+                console.log(`[KENV Test] LineNumber ${lineNumber} のエントリー数: ${duplicates.length}`);
+                
+                if (duplicates.length === 1) {
+                    console.log('✅ [KENV Test] 重複なし - 修正成功！');
+                } else {
+                    console.error('❌ [KENV Test] 重複検出 - 修正失敗');
+                }
+                
+                return duplicates.length === 1;
             }
         };
         

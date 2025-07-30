@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.36 - ファイル操作系関数のカプセル化</title>
+    <title>Kaspa P2P File Storage v5.11.37 - KENV v3.1.3マネージャー追加</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -3196,6 +3196,348 @@
         
         // Expose FileState to window for global access
         window.FileState = FileState;
+        
+        // ===== KENV Manager (v3.1.3) =====
+        // KENV v3.1.3 統合最適化版のデータ管理システム
+        FileState.kenvManager = {
+            // バージョン情報
+            version: "3.1.3",
+            schemaVersion: 3,
+            kaspaCompatVersion: "3.4.2",
+            
+            // エントリー配列（.kentryの内容）
+            entries: [],
+            
+            // 高速アクセス用インデックス（.kindexの内容）
+            kindex: {
+                version: "2.0",
+                updated: new Date().toISOString(),
+                format: "optimized",
+                
+                // ソート用インデックス
+                sortIndexes: {
+                    name: [],      // [[name, lineNum, type], ...]
+                    size: [],      // [[size, lineNum], ...]
+                    uploadDate: [] // [[timestamp, lineNum], ...]
+                },
+                
+                // 検索用インデックス（プレフィックス）
+                searchIndexes: {
+                    name: {},      // {"doc": [0,1,2], "ima": [3,4], ...}
+                    metaTxId: {},  // {"a1b2c3de": [0], ...}
+                    cid: {},       // {"Qm1234ab": [1], ...}
+                    uploader: {}   // {"qq": [0,1], "qr": [2], ...}
+                },
+                
+                // フィルタ用インデックス
+                filterIndexes: {
+                    type: {
+                        file: [],      // ファイルの行番号リスト
+                        directory: []  // ディレクトリの行番号リスト
+                    },
+                    status: {
+                        pending: [],    // 未検証
+                        verifying: [],  // 検証中
+                        verified: [],   // 検証済み
+                        failed: []      // 失敗
+                    },
+                    encrypted: {
+                        true: [],
+                        false: []
+                    },
+                    hasPassword: {
+                        true: [],
+                        false: []
+                    }
+                },
+                
+                // 統計情報
+                stats: {
+                    totalEntries: 0,
+                    totalSize: 0,
+                    oldestDate: null,
+                    newestDate: null,
+                    largestFile: 0,
+                    smallestFile: Number.MAX_SAFE_INTEGER,
+                    typeDistribution: {}
+                }
+            },
+            
+            // 最小エントリー追加（5項目のみ）
+            addMinimalEntry(name, type = 'kaspa-file', source = 'manual') {
+                const entry = {
+                    // 必須5項目
+                    id: `${type}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                    type: type,
+                    version: null,
+                    created: new Date().toISOString(),
+                    network: config.network || 'mainnet',
+                    name: name,
+                    path: null,
+                    metaTxId: null,
+                    metaTxBlockId: null,
+                    firstChunkTxId: null,
+                    uploadDate: new Date().toISOString(),
+                    blockTime: null,
+                    uploadedBy: null,
+                    source: source,
+                    status: 'pending',
+                    // ファイル情報（後で補完）
+                    fileSize: null,
+                    originalSize: null,
+                    compressedSize: null,
+                    mimeType: null,
+                    sha256: null,
+                    encrypted: null,
+                    compressionAlgorithm: null,
+                    compressionEnabled: null,
+                    variableChunk: null,
+                    payloadSplit: null,
+                    cid: null,
+                    totalChunks: null,
+                    chunkCount: null,
+                    chunkSize: null,
+                    segmentCount: null,
+                    totalFiles: null,
+                    fileCount: null,
+                    directoryCount: null,
+                    entryCount: null,
+                    checksum: null,
+                    uploadCost: null,
+                    uploadDuration: null,
+                    chunkStructureType: null,
+                    chunkLevel: null,
+                    totalGroups: null,
+                    passwordIncluded: null,
+                    password: null,
+                    externalRef: null,
+                    tags: null,
+                    notes: null,
+                    authWarning: null
+                };
+                
+                // エントリーを追加
+                const lineNumber = this.entries.length;
+                this.entries.push(entry);
+                
+                // インデックスを更新
+                this.updateIndex(entry, lineNumber);
+                
+                // 統計を更新
+                this.updateStats(entry);
+                
+                log(`[KENV] エントリー追加: ${entry.id} - ${entry.name}`, 'debug');
+                return entry;
+            },
+            
+            // インデックス更新（差分更新）
+            updateIndex(entry, lineNumber) {
+                // 名前順インデックス
+                const nameEntry = [entry.name, lineNumber, entry.type === 'kaspa-directory' ? 'd' : 'f'];
+                const nameInsertPos = this.findInsertPosition(this.kindex.sortIndexes.name, entry.name, 0);
+                this.kindex.sortIndexes.name.splice(nameInsertPos, 0, nameEntry);
+                
+                // サイズ順インデックス（サイズがある場合）
+                if (entry.fileSize !== null) {
+                    const sizeEntry = [entry.fileSize, lineNumber];
+                    const sizeInsertPos = this.findInsertPosition(this.kindex.sortIndexes.size, entry.fileSize, 0);
+                    this.kindex.sortIndexes.size.splice(sizeInsertPos, 0, sizeEntry);
+                }
+                
+                // 日付順インデックス
+                const timestamp = new Date(entry.uploadDate).getTime();
+                const dateEntry = [timestamp, lineNumber];
+                const dateInsertPos = this.findInsertPosition(this.kindex.sortIndexes.uploadDate, timestamp, 0);
+                this.kindex.sortIndexes.uploadDate.splice(dateInsertPos, 0, dateEntry);
+                
+                // 検索インデックス（名前）
+                const namePrefix = entry.name.substring(0, 3).toLowerCase();
+                if (!this.kindex.searchIndexes.name[namePrefix]) {
+                    this.kindex.searchIndexes.name[namePrefix] = [];
+                }
+                this.kindex.searchIndexes.name[namePrefix].push(lineNumber);
+                
+                // フィルタインデックス（タイプ）
+                const typeKey = entry.type === 'kaspa-directory' ? 'directory' : 'file';
+                this.kindex.filterIndexes.type[typeKey].push(lineNumber);
+                
+                // フィルタインデックス（ステータス）
+                this.kindex.filterIndexes.status[entry.status].push(lineNumber);
+                
+                // 更新時刻
+                this.kindex.updated = new Date().toISOString();
+            },
+            
+            // バイナリサーチで挿入位置を見つける
+            findInsertPosition(array, value, keyIndex) {
+                let left = 0;
+                let right = array.length;
+                
+                while (left < right) {
+                    const mid = Math.floor((left + right) / 2);
+                    const midValue = array[mid][keyIndex];
+                    
+                    if (midValue < value) {
+                        left = mid + 1;
+                    } else {
+                        right = mid;
+                    }
+                }
+                
+                return left;
+            },
+            
+            // 統計情報の更新
+            updateStats(entry) {
+                const stats = this.kindex.stats;
+                stats.totalEntries++;
+                
+                if (entry.fileSize) {
+                    stats.totalSize += entry.fileSize;
+                    stats.largestFile = Math.max(stats.largestFile, entry.fileSize);
+                    stats.smallestFile = Math.min(stats.smallestFile, entry.fileSize);
+                }
+                
+                // 日付の更新
+                const date = entry.uploadDate;
+                if (!stats.oldestDate || date < stats.oldestDate) {
+                    stats.oldestDate = date;
+                }
+                if (!stats.newestDate || date > stats.newestDate) {
+                    stats.newestDate = date;
+                }
+                
+                // タイプ分布
+                const fileType = entry.mimeType ? entry.mimeType.split('/')[1] : 'unknown';
+                stats.typeDistribution[fileType] = (stats.typeDistribution[fileType] || 0) + 1;
+            },
+            
+            // エントリーの検証と補完
+            async verifyAndCompleteEntry(entry) {
+                if (entry.status !== 'pending') return;
+                
+                entry.status = 'verifying';
+                log(`[KENV] 検証開始: ${entry.id}`, 'debug');
+                
+                try {
+                    if (entry.metaTxId && entry.metaTxBlockId) {
+                        // オンチェーンモード
+                        log(`[KENV] オンチェーンモードで検証: ${entry.metaTxId}`, 'debug');
+                        // TODO: fetchKaspaMetadata実装後に有効化
+                        // const kaspaData = await fetchKaspaMetadata(entry.metaTxId, entry.metaTxBlockId, entry.password);
+                        // Object.assign(entry, kaspaData);
+                        entry.status = 'verified';
+                    } else if (entry.externalRef) {
+                        // .kaspaファイルのみモード
+                        log(`[KENV] .kaspaファイルモードで検証: ${entry.externalRef}`, 'debug');
+                        // TODO: loadLocalKaspaFile実装後に有効化
+                        // const kaspaData = await loadLocalKaspaFile(entry.externalRef);
+                        // Object.assign(entry, kaspaData);
+                        entry.status = 'verified';
+                    } else {
+                        entry.status = 'failed';
+                        entry.authWarning = 'MetaTxIDまたは外部参照が必要です';
+                    }
+                } catch (error) {
+                    entry.status = 'failed';
+                    entry.authWarning = error.message;
+                    log(`[KENV] 検証失敗: ${entry.id} - ${error.message}`, 'error');
+                }
+            }
+        };
+        
+        // KENVテスト用関数（コンソールから実行可能）
+        window.testKENV = {
+            // テストエントリーを追加
+            addTestEntry(name = 'test.pdf', type = 'kaspa-file') {
+                const entry = FileState.kenvManager.addMinimalEntry(name, type, 'manual');
+                console.log('[KENV Test] エントリー追加:', entry);
+                return entry;
+            },
+            
+            // 現在のエントリーを表示
+            showEntries() {
+                console.log('[KENV Test] 現在のエントリー数:', FileState.kenvManager.entries.length);
+                console.table(FileState.kenvManager.entries.map(e => ({
+                    id: e.id,
+                    name: e.name,
+                    type: e.type,
+                    status: e.status,
+                    metaTxId: e.metaTxId || '-',
+                    size: e.fileSize || '-'
+                })));
+            },
+            
+            // インデックスを表示
+            showIndex() {
+                const kindex = FileState.kenvManager.kindex;
+                console.log('[KENV Test] ソートインデックス:');
+                console.log('- 名前順:', kindex.sortIndexes.name);
+                console.log('- サイズ順:', kindex.sortIndexes.size);
+                console.log('- 日付順:', kindex.sortIndexes.uploadDate);
+                console.log('[KENV Test] 検索インデックス:', kindex.searchIndexes);
+                console.log('[KENV Test] フィルタインデックス:', kindex.filterIndexes);
+                console.log('[KENV Test] 統計:', kindex.stats);
+            },
+            
+            // 名前で検索
+            searchByName(query) {
+                const prefix = query.substring(0, 3).toLowerCase();
+                const candidates = FileState.kenvManager.kindex.searchIndexes.name[prefix] || [];
+                console.log(`[KENV Test] "${query}"の検索結果:`);
+                
+                const results = candidates.filter(lineNum => {
+                    const entry = FileState.kenvManager.entries[lineNum];
+                    return entry.name.toLowerCase().includes(query.toLowerCase());
+                });
+                
+                results.forEach(lineNum => {
+                    const entry = FileState.kenvManager.entries[lineNum];
+                    console.log(`- ${entry.name} (${entry.type}) [${entry.status}]`);
+                });
+                
+                return results;
+            },
+            
+            // ステータスでフィルタ
+            filterByStatus(status) {
+                const lineNumbers = FileState.kenvManager.kindex.filterIndexes.status[status] || [];
+                console.log(`[KENV Test] ステータス "${status}" のエントリー:`);
+                
+                lineNumbers.forEach(lineNum => {
+                    const entry = FileState.kenvManager.entries[lineNum];
+                    console.log(`- ${entry.name} (${entry.type})`);
+                });
+                
+                return lineNumbers;
+            },
+            
+            // テストデータを一括追加
+            addBulkTestData() {
+                const testFiles = [
+                    { name: 'document.pdf', type: 'kaspa-file' },
+                    { name: 'image.jpg', type: 'kaspa-file' },
+                    { name: 'video.mp4', type: 'kaspa-file' },
+                    { name: 'archive.zip', type: 'kaspa-file' },
+                    { name: 'project', type: 'kaspa-directory' },
+                    { name: 'documents', type: 'kaspa-directory' }
+                ];
+                
+                testFiles.forEach(file => {
+                    const entry = FileState.kenvManager.addMinimalEntry(file.name, file.type);
+                    // ランダムにステータスを設定
+                    if (Math.random() > 0.5) {
+                        entry.status = 'verified';
+                        entry.fileSize = Math.floor(Math.random() * 10000000);
+                        entry.metaTxId = 'abc' + Math.random().toString(36).substr(2, 5);
+                        FileState.kenvManager.updateIndex(entry, FileState.kenvManager.entries.length - 1);
+                    }
+                });
+                
+                console.log('[KENV Test] テストデータ追加完了');
+                this.showEntries();
+            }
+        };
         
         // ===== Define File Operation Handlers (v5.11.36) =====
         // These handlers will be defined later in the file and assigned to FileState.fileOperationHandlers

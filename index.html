@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.31 - アーカイブノード関数のカプセル化</title>
+    <title>Kaspa P2P File Storage v5.11.32 - NetworkStateへのアーカイブ機能統合</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -1948,13 +1948,13 @@
                 
                 <!-- Network and Threshold Settings -->
                 <div style="font-size: 11px; margin-bottom: 8px; display: flex; align-items: center; gap: 10px;">
-                    <select id="archiveNetworkSelect" onchange="ArchiveHandlers.updateArchiveNetwork()" style="padding: 2px 4px; font-size: 11px;">
+                    <select id="archiveNetworkSelect" onchange="NetworkState.archiveHandlers.updateArchiveNetwork()" style="padding: 2px 4px; font-size: 11px;">
                         <option value="mainnet">Mainnet</option>
                         <option value="testnet-10">Testnet</option>
                     </select>
                     <div style="display: flex; align-items: center; gap: 4px;">
                         <label>閾値:</label>
-                        <input type="number" id="archiveThresholdInput" value="50" step="0.1" style="width: 50px; padding: 2px; font-size: 11px;" onchange="ArchiveHandlers.updateArchiveThreshold()">
+                        <input type="number" id="archiveThresholdInput" value="50" step="0.1" style="width: 50px; padding: 2px; font-size: 11px;" onchange="NetworkState.archiveHandlers.updateArchiveThreshold()">
                         <span>M blocks</span>
                     </div>
                     <span style="color: #888; font-size: 10px;">(0.864M = 1日分)</span>
@@ -1986,8 +1986,8 @@
                 </div>
                 
                 <div style="margin-top: 8px; text-align: center;">
-                    <button onclick="ArchiveHandlers.testArchiveNodes()" disabled id="archiveTestBtn" style="padding: 4px 12px; font-size: 12px;">テスト実行</button>
-                    <button onclick="ArchiveHandlers.refreshArchiveStatus()" style="padding: 4px 12px; font-size: 12px;">更新</button>
+                    <button onclick="NetworkState.archiveHandlers.testArchiveNodes()" disabled id="archiveTestBtn" style="padding: 4px 12px; font-size: 12px;">テスト実行</button>
+                    <button onclick="NetworkState.archiveHandlers.refreshArchiveStatus()" style="padding: 4px 12px; font-size: 12px;">更新</button>
                 </div>
             </div>
         </div>
@@ -2140,6 +2140,74 @@
         
         // Initialize Archive Manager
         NetworkState.archiveManager = null;
+        
+        // Archive-related handler functions (Section 8: NETWORK & RPC FUNCTIONS)
+        NetworkState.archiveHandlers = {
+            refreshArchiveStatus: function() {
+                updateArchiveNodeStatus();
+                log('[UI] アーカイブノードステータスを更新しました', 'info');
+            },
+            
+            testArchiveNodes: async function() {
+                const manager = NetworkState.archiveManager;
+                if (!manager || manager.connections.size === 0) {
+                    log('テスト可能なアーカイブノードがありません', 'warning');
+                    return;
+                }
+                
+                log('アーカイブノード応答時間テストを開始...', 'info');
+                
+                for (const [nodeId, node] of manager.connections) {
+                    if (!node.stats.isHealthy) continue;
+                    
+                    try {
+                        const startTime = Date.now();
+                        const info = await node.client.getServerInfo();
+                        const duration = Date.now() - startTime;
+                        
+                        manager.recordResponseTime(nodeId, duration);
+                        log(`Node ${nodeId}: ${duration}ms (${info.serverVersion})`, 'success');
+                    } catch (error) {
+                        manager.markUnhealthy(nodeId);
+                        log(`Node ${nodeId}: エラー - ${error.message}`, 'error');
+                    }
+                }
+                
+                updateArchiveNodeStatus();
+                log('テスト完了', 'info');
+            },
+            
+            updateArchiveNetwork: function() {
+                const select = document.getElementById('archiveNetworkSelect');
+                const manager = NetworkState.archiveManager;
+                if (!manager) return;
+                
+                const newNetwork = select.value;
+                manager.updateNetwork(newNetwork);
+                
+                // Update threshold input with saved value for new network
+                const thresholdM = manager.archiveThreshold / 1000000;
+                document.getElementById('archiveThresholdInput').value = thresholdM;
+                
+                updateArchiveNodeStatus();
+            },
+            
+            updateArchiveThreshold: function() {
+                const input = document.getElementById('archiveThresholdInput');
+                const manager = NetworkState.archiveManager;
+                if (!manager) return;
+                
+                const thresholdM = parseFloat(input.value);
+                if (isNaN(thresholdM) || thresholdM <= 0) {
+                    alert('無効な閾値です');
+                    input.value = manager.archiveThreshold / 1000000;
+                    return;
+                }
+                
+                manager.saveThreshold(thresholdM);
+                updateArchiveNodeStatus();
+            }
+        };
         
         // Expose NetworkState to window for global access
         window.NetworkState = NetworkState;
@@ -8716,89 +8784,22 @@
             document.getElementById('archiveTestBtn').disabled = activeCount === 0;
         }
         
-        // Archive-related handler functions
-        const ArchiveHandlers = {
-            refreshArchiveStatus: function() {
-                updateArchiveNodeStatus();
-                log('[UI] アーカイブノードステータスを更新しました', 'info');
-            },
-            
-            testArchiveNodes: async function() {
-                const manager = NetworkState.archiveManager;
-                if (!manager || manager.connections.size === 0) {
-                    log('テスト可能なアーカイブノードがありません', 'warning');
-                    return;
-                }
-                
-                log('アーカイブノード応答時間テストを開始...', 'info');
-                
-                for (const [nodeId, node] of manager.connections) {
-                    if (!node.stats.isHealthy) continue;
-                    
-                    try {
-                        const startTime = Date.now();
-                        const info = await node.client.getServerInfo();
-                        const duration = Date.now() - startTime;
-                        
-                        manager.recordResponseTime(nodeId, duration);
-                        log(`Node ${nodeId}: ${duration}ms (${info.serverVersion})`, 'success');
-                    } catch (error) {
-                        manager.markUnhealthy(nodeId);
-                        log(`Node ${nodeId}: エラー - ${error.message}`, 'error');
-                    }
-                }
-                
-                updateArchiveNodeStatus();
-                log('テスト完了', 'info');
-            },
-            
-            updateArchiveNetwork: function() {
-                const select = document.getElementById('archiveNetworkSelect');
-                const manager = NetworkState.archiveManager;
-                if (!manager) return;
-                
-                const newNetwork = select.value;
-                manager.updateNetwork(newNetwork);
-                
-                // Update threshold input with saved value for new network
-                const thresholdM = manager.archiveThreshold / 1000000;
-                document.getElementById('archiveThresholdInput').value = thresholdM;
-                
-                updateArchiveNodeStatus();
-            },
-            
-            updateArchiveThreshold: function() {
-                const input = document.getElementById('archiveThresholdInput');
-                const manager = NetworkState.archiveManager;
-                if (!manager) return;
-                
-                const thresholdM = parseFloat(input.value);
-                if (isNaN(thresholdM) || thresholdM <= 0) {
-                    alert('無効な閾値です');
-                    input.value = manager.archiveThreshold / 1000000;
-                    return;
-                }
-                
-                manager.saveThreshold(thresholdM);
-                updateArchiveNodeStatus();
-            }
-        };
         
         // Backward compatibility for archive functions
         Object.defineProperty(window, 'refreshArchiveStatus', {
-            get() { return ArchiveHandlers.refreshArchiveStatus; },
+            get() { return NetworkState.archiveHandlers.refreshArchiveStatus; },
             configurable: true
         });
         Object.defineProperty(window, 'testArchiveNodes', {
-            get() { return ArchiveHandlers.testArchiveNodes; },
+            get() { return NetworkState.archiveHandlers.testArchiveNodes; },
             configurable: true
         });
         Object.defineProperty(window, 'updateArchiveNetwork', {
-            get() { return ArchiveHandlers.updateArchiveNetwork; },
+            get() { return NetworkState.archiveHandlers.updateArchiveNetwork; },
             configurable: true
         });
         Object.defineProperty(window, 'updateArchiveThreshold', {
-            get() { return ArchiveHandlers.updateArchiveThreshold; },
+            get() { return NetworkState.archiveHandlers.updateArchiveThreshold; },
             configurable: true
         });
         

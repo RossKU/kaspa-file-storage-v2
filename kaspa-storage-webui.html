@@ -24,6 +24,12 @@
             --error-color: #dc3545;
             --warning-color: #ffc107;
             --info-color: #17a2b8;
+            
+            /* Additional status and UI colors */
+            --status-connected: #49EACB;
+            --status-warning: #ffcc66;
+            --status-disconnected: #e94560;
+            --input-text: #333333;
         }
 
         /* Dark Theme Colors */
@@ -44,6 +50,12 @@
             --error-color: #ff5252;
             --warning-color: #ffc107;
             --info-color: #2196F3;
+            
+            /* Additional status and UI colors */
+            --status-connected: #49EACB;
+            --status-warning: #ffcc66;
+            --status-disconnected: #e94560;
+            --input-text: #eeeeee;
         }
 
         /* Base Styles */
@@ -1024,8 +1036,8 @@
             border-radius: 50%;
             margin-right: 8px;
         }
-        .status-connected { background: #49EACB; }
-        .status-disconnected { background: #e94560; }
+        .status-connected { background: var(--status-connected); }
+        .status-disconnected { background: var(--status-disconnected); }
         
         /* File Tab Styles */
         .file-table-wrapper {
@@ -1495,7 +1507,7 @@
     <div id="upload-tab" class="tab-content">
         <!-- Workspace Status (Always Visible) -->
         <div class="container" style="padding: 16px; margin-bottom: 20px; border-radius: 8px;">
-            <div id="workspaceStatusDisplay" style="color: #ffcc66; font-size: 14px;">
+            <div id="workspaceStatusDisplay" style="color: var(--status-warning); font-size: 14px;">
                 作業フォルダ: 未設定 (ブラウザ内保存のみ)
                 <button onclick="setupWorkspace()" style="margin-left: 10px; padding: 5px 10px; font-size: 12px;">設定</button>
             </div>
@@ -1513,7 +1525,7 @@
             
             <!-- Resume Section -->
             <div class="section-divider" style="margin: 20px 0;">
-                <p style="text-align: center; color: #999;">または</p>
+                <p style="text-align: center; color: var(--text-secondary);">または</p>
                 <button id="loadProgressFileBtn">
                     📂 進捗ファイル (.kprogress) から再開
                 </button>
@@ -1524,7 +1536,7 @@
             <div id="resumeInfo" style="display: none;" class="metric-box">
                 <h4 class="success">✅ レジューム準備完了</h4>
                 <div id="resumeDetails"></div>
-                <button id="cancelResumeBtn" style="background: #666; margin-top: 10px;">キャンセル</button>
+                <button id="cancelResumeBtn" style="background: var(--text-secondary); margin-top: 10px;">キャンセル</button>
             </div>
             
             <div class="grid-2">
@@ -1586,7 +1598,7 @@
                         🔍 自動判別して復元
                     </button>
                 </div>
-                <div class="info" style="font-size: 12px; color: #999;">
+                <div class="info" style="font-size: 12px; color: var(--text-secondary);">
                     <p>✨ すべてのタイプを自動判別:</p>
                     <ul style="margin: 5px 0; padding-left: 20px;">
                         <li>📄 通常ファイルのMetaTxID</li>
@@ -1597,7 +1609,7 @@
                 </div>
             </div>
             
-            <div style="text-align: center; margin: 20px 0; color: #666;">
+            <div style="text-align: center; margin: 20px 0; color: var(--text-secondary);">
                 ─── または ───
             </div>
             
@@ -1829,7 +1841,7 @@
                 
                 <div id="customEndpointSection" style="display: none; margin-top: 10px;">
                     <label>カスタムRPCエンドポイント</label>
-                    <input type="text" id="customRpcEndpoint" placeholder="wss://your-node.example.com:17210" style="width: 100%; padding: 8px; color: #eee; border: 1px solid #49EACB; border-radius: 5px;">
+                    <input type="text" id="customRpcEndpoint" placeholder="wss://your-node.example.com:17210" style="width: 100%; padding: 8px; color: var(--input-text); border: 1px solid var(--status-connected); border-radius: 5px;">
                 </div>
                 
                 <div id="nodeConnectionStatus" style="margin-top: 10px; padding: 10px; border-radius: 5px; display: none;">
@@ -1848,7 +1860,7 @@
                 <div class="setting-row">
                     <div class="setting-label">
                         並列ダウンロード (実験的機能)<br>
-                        <small style="color: #999;">10チャンク以上のファイルで8並列接続を使用</small>
+                        <small style="color: var(--text-secondary);">10チャンク以上のファイルで8並列接続を使用</small>
                     </div>
                     <label class="toggle-switch">
                         <input type="checkbox" id="parallelDownloadToggle" onchange="toggleParallelDownload()">
@@ -1858,7 +1870,7 @@
                 <div class="setting-row">
                     <div class="setting-label">
                         REST APIテストモード<br>
-                        <small style="color: #999;">RPCをスキップしてREST API経由でダウンロード</small>
+                        <small style="color: var(--text-secondary);">RPCをスキップしてREST API経由でダウンロード</small>
                     </div>
                     <label class="toggle-switch">
                         <input type="checkbox" id="restApiTestToggle" onchange="toggleRestApiTest()">
@@ -1870,14 +1882,14 @@
             <!-- Multi-Wallet Phase 1 Test -->
             <div class="metric-box" style="margin-top: 30px;">
                 <h3>🧪 Multi-Wallet Phase 1 Test</h3>
-                <p style="color: #999; font-size: 14px; margin-bottom: 15px;">
+                <p style="color: var(--text-secondary); font-size: 14px; margin-bottom: 15px;">
                     実験的機能: マルチウォレットによる並列アップロード高速化のテスト
                 </p>
                 
                 <div style="margin: 15px 0;">
                     <button onclick="runPhase1Test()" style="
                         padding: 10px 20px;
-                        background: #49EACB;
+                        background: var(--status-connected);
                         color: #16213e;
                         border: none;
                         border-radius: 5px;
@@ -1918,7 +1930,7 @@
                     white-space: pre-wrap;
                     display: none;
                     font-size: 14px;
-                    color: #49EACB;
+                    color: var(--status-connected);
                     border: 1px solid rgba(73, 234, 203, 0.3);
                 "></div>
             </div>
@@ -1936,7 +1948,7 @@
                 <div style="display: flex; align-items: center; justify-content: space-between;">
                     <div>
                         <strong>🔑 Dev Wallet</strong>
-                        <small style="display: block; color: #999; margin-top: 2px;">
+                        <small style="display: block; color: var(--text-secondary); margin-top: 2px;">
                             開発用ウォレット (b7e15162...)
                         </small>
                     </div>
@@ -1980,7 +1992,7 @@
                         <input type="number" id="archiveThresholdInput" value="50" step="0.1" style="width: 50px; padding: 2px; font-size: 11px;" onchange="NetworkState.archiveHandlers.updateArchiveThreshold()">
                         <span>M blocks</span>
                     </div>
-                    <span style="color: #888; font-size: 10px;">(0.864M = 1日分)</span>
+                    <span style="color: var(--text-secondary); font-size: 10px;">(0.864M = 1日分)</span>
                 </div>
                 
                 <!-- Test Block Hash Input -->
@@ -1992,19 +2004,19 @@
                 <div style="font-size: 12px; line-height: 1.4; margin-bottom: 8px; font-family: monospace;">
                     <div id="archiveStats">探索: 未開始 (デバッグタブから開始してください)</div>
                     <div>接続: <span id="archiveHealthBar">[-----]</span> <span id="archiveConnectedNodes">0/5</span> | Avg: <span id="archiveAvgResponse">-</span></div>
-                    <div id="archiveCheckingStatus" style="color: #888;">チェック中: <span id="archiveCheckingNode">待機中</span></div>
+                    <div id="archiveCheckingStatus" style="color: var(--text-secondary);">チェック中: <span id="archiveCheckingNode">待機中</span></div>
                 </div>
                 
                 <!-- Compact Node List -->
                 <div id="archiveNodeDetails" style="font-size: 11px; font-family: monospace; line-height: 1.3; margin-bottom: 8px; max-height: 80px; overflow-y: auto;">
-                    <div style="color: #666;">接続待機中...</div>
+                    <div style="color: var(--text-secondary);">接続待機中...</div>
                 </div>
                 
                 <!-- Minimal Event Log -->
                 <div style="border-top: 1px solid var(--border-color); padding-top: 6px; margin-top: 6px;">
-                    <div style="font-size: 11px; color: #888; margin-bottom: 4px;">最近のイベント:</div>
+                    <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 4px;">最近のイベント:</div>
                     <div id="archiveEventLog" style="font-size: 11px; font-family: monospace; line-height: 1.3; max-height: 80px; overflow-y: auto;">
-                        <div style="color: #666;">イベントなし</div>
+                        <div style="color: var(--text-secondary);">イベントなし</div>
                     </div>
                 </div>
                 
@@ -2454,12 +2466,12 @@
                             <p class="success">✅ システム初期化完了</p>
                             <p>アドレス: ${UserState.address.toString()}</p>
                             <p>残高: ${balance} KAS</p>
-                            ${AppState.settings.devWalletEnabled ? '<p style="color: #ffcc66;">⚠️ Dev Wallet使用中</p>' : ''}
+                            ${AppState.settings.devWalletEnabled ? '<p style="color: var(--status-warning);">⚠️ Dev Wallet使用中</p>' : ''}
                         `;
                     } else {
                         document.getElementById('initStatus').innerHTML = `
                             <p class="success">✅ システム初期化完了</p>
-                            <p style="color: #ffcc66;">⚠️ ウォレット未接続</p>
+                            <p style="color: var(--status-warning);">⚠️ ウォレット未接続</p>
                             <p>ステータスタブからウォレットを接続してください</p>
                         `;
                     }
@@ -6299,7 +6311,7 @@
                 
                 const history = this.getHistory();
                 historyList.innerHTML = history.length === 0 ? 
-                    '<p style="text-align: center; color: #666;">アップロード履歴がありません</p>' :
+                    '<p style="text-align: center; color: var(--text-secondary);">アップロード履歴がありません</p>' :
                     history.map(item => this.createHistoryItem(item)).join('');
                 log(`[UploadHistoryManager] 履歴リストを更新しました (${history.length}件)`, 'debug');
                 
@@ -6412,17 +6424,17 @@
                         <div class="history-item-header">
                             <div>
                                 <strong>${icon} ${displayName}</strong>
-                                <span style="color: #666; font-size: 12px; margin-left: 10px;">${displaySize}</span>
+                                <span style="color: var(--text-secondary); font-size: 12px; margin-left: 10px;">${displaySize}</span>
                             </div>
                             <div class="history-item-actions">
                                 ${buttons.join('\n                                ')}
                             </div>
                         </div>
-                        <div style="font-size: 12px; color: #999;">
+                        <div style="font-size: 12px; color: var(--text-secondary);">
                             <div>日時: ${date}</div>
                             <div>${isDirectory ? `ファイル数: ${item.fileCount}` : `チャンク: ${item.chunks}`} | コスト: ${item.totalCost?.toFixed(5) || 0} KAS</div>
                             ${item.metaTxId ? `<div>MetaTxID: ${item.metaTxId.substring(0, 16)}...</div>` : ''}
-                            ${isDirectory && item.failedCount > 0 ? `<div style="color: #e94560;">エラー: ${item.failedCount} ファイル</div>` : ''}
+                            ${isDirectory && item.failedCount > 0 ? `<div style="color: var(--status-disconnected);">エラー: ${item.failedCount} ファイル</div>` : ''}
                         </div>
                     </div>
                 `;
@@ -7347,7 +7359,7 @@
                 if (!directoryList) return;
                 
                 if (this.directories.length === 0) {
-                    directoryList.innerHTML = '<p style="color: #999; text-align: center;">ディレクトリがありません</p>';
+                    directoryList.innerHTML = '<p style="color: var(--text-secondary); text-align: center;">ディレクトリがありません</p>';
                     return;
                 }
                 
@@ -7360,7 +7372,7 @@
                         <div style="display: flex; justify-content: space-between; align-items: center;">
                             <div>
                                 <strong>${indent > 0 ? '└ ' : ''}📁 ${dir.name}</strong>
-                                <div style="font-size: 12px; color: #999; margin-top: 5px;">
+                                <div style="font-size: 12px; color: var(--text-secondary); margin-top: 5px;">
                                     ${dir.files.length}ファイル | ${formatSize(dir.totalSize)} | 
                                     作成: ${new Date(dir.created).toLocaleString()}
                                     ${dir.cid ? `<br>CID: ${dir.cid.substring(0, 12)}...` : ''}
@@ -7379,7 +7391,7 @@
                             </div>
                         </div>
                         <details style="margin-top: 10px;">
-                            <summary style="cursor: pointer; color: #49EACB;">ファイル一覧を表示</summary>
+                            <summary style="cursor: pointer; color: var(--status-connected);">ファイル一覧を表示</summary>
                             <div style="margin-top: 10px; padding-left: 20px;">
                                 ${dir.files.map(f => `
                                     <div style="margin-bottom: 5px;">
@@ -7428,7 +7440,7 @@
                 const existingDirs = this.directories;
                 
                 if (history.length === 0 && existingDirs.length === 0) {
-                    fileList.innerHTML = '<p style="color: #999; text-align: center;">アップロード済みファイルがありません</p>';
+                    fileList.innerHTML = '<p style="color: var(--text-secondary); text-align: center;">アップロード済みファイルがありません</p>';
                     return;
                 }
                 
@@ -7441,7 +7453,7 @@
                         <label style="display: block; margin-bottom: 10px; cursor: pointer;">
                             <input type="checkbox" value="file:${item.id}" name="directoryFiles" style="margin-right: 10px;">
                             📄 ${item.fileName} (${formatSize(item.fileSize)})
-                            <span style="font-size: 12px; color: #999; margin-left: 10px;">
+                            <span style="font-size: 12px; color: var(--text-secondary); margin-left: 10px;">
                                 ${new Date(item.uploadTime).toLocaleDateString()}
                             </span>
                         </label>
@@ -9072,14 +9084,14 @@
                         <button onclick="setupWorkspace()" style="margin-left: 10px; padding: 5px 10px; font-size: 12px;">変更</button>
                         <span onclick="alert('Kaspa P2P File Storage - 作業フォルダについて\\n\\n作業フォルダを設定すると：\\n✓ 進捗がファイルに自動保存されます\\n✓ ダウンロードファイルが整理されます\\n✓ ブラウザを閉じても進捗が残ります\\n\\n設定しない場合：\\n✓ ブラウザ内に進捗が保存されます\\n✓ ファイルの自動ダウンロードはありません\\n\\n※「作業フォルダ設定」ボタンで後から設定できます')" style="cursor: pointer; margin-left: 5px; color: var(--accent-color);">❓</span>
                     `;
-                    status.style.color = '#49EACB';
+                    status.style.color = 'var(--status-connected)';
                 } else {
                     status.innerHTML = `
                         作業フォルダ: 未設定 (ブラウザ内保存のみ)
                         <button onclick="setupWorkspace()" style="margin-left: 10px; padding: 5px 10px; font-size: 12px;">設定</button>
                         <span onclick="alert('Kaspa P2P File Storage - 作業フォルダについて\\n\\n作業フォルダを設定すると：\\n✓ 進捗がファイルに自動保存されます\\n✓ ダウンロードファイルが整理されます\\n✓ ブラウザを閉じても進捗が残ります\\n\\n設定しない場合：\\n✓ ブラウザ内に進捗が保存されます\\n✓ ファイルの自動ダウンロードはありません\\n\\n※「作業フォルダ設定」ボタンで後から設定できます')" style="cursor: pointer; margin-left: 5px; color: var(--accent-color);">❓</span>
                     `;
-                    status.style.color = '#ffcc66';
+                    status.style.color = 'var(--status-warning)';
                 }
             }
             
@@ -10365,7 +10377,7 @@
             // Compact node details
             const detailsDiv = document.getElementById('archiveNodeDetails');
             if (stats.nodes.length === 0) {
-                detailsDiv.innerHTML = '<div style="color: #666;">接続待機中...</div>';
+                detailsDiv.innerHTML = '<div style="color: var(--text-secondary);">接続待機中...</div>';
             } else {
                 let html = '';
                 stats.nodes.forEach((node, idx) => {
@@ -10400,7 +10412,7 @@
                 }
             } else {
                 checkingSpan.textContent = '待機中';
-                checkingSpan.style.color = '#888';
+                checkingSpan.style.color = 'var(--text-secondary)';
             }
             
             // Enable/disable test button
@@ -14393,7 +14405,7 @@
                         fileListHtml += '<span>' + icon + ' ' + (entry.path || entry.name) + '</span>';
                         // v4.6.29: rightSpanをプレースホルダーIDで一時的に置き換え
                         const placeholderId = `buttons_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-                        const rightSpan = `<span style="font-size: 12px; color: #999;">${sizeDisplay} | MetaTx: ${hasMetaTx} <span id="${placeholderId}"></span></span>`;
+                        const rightSpan = `<span style="font-size: 12px; color: var(--text-secondary);">${sizeDisplay} | MetaTx: ${hasMetaTx} <span id="${placeholderId}"></span></span>`;
                         fileListHtml += rightSpan;
                         
                         // ボタンコンテナを後で挿入するために保存（buttonsContainerが存在する場合のみ）
@@ -14405,7 +14417,7 @@
                     });
                     
                     fileListHtml += '</div>';
-                    fileListHtml += `<br><div style="font-size: 12px; color: #999;">📥 ボタンをクリックして個別ファイルをダウンロード</div>`;
+                    fileListHtml += `<br><div style="font-size: 12px; color: var(--text-secondary);">📥 ボタンをクリックして個別ファイルをダウンロード</div>`;
                     
                     log(`[DEBUG] 最終的なfileListHtml長さ: ${fileListHtml.length}文字`, 'debug');
                     log(`[DEBUG] fileListHtmlの一部: ${fileListHtml.substring(0, 200)}...`, 'debug');
@@ -17280,7 +17292,7 @@
                 // Show empty state
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="9" style="text-align: center; padding: 40px; color: #888;">
+                        <td colspan="9" style="text-align: center; padding: 40px; color: var(--text-secondary);">
                             <div style="font-size: 48px; margin-bottom: 10px;">📂</div>
                             <div>ファイルがありません</div>
                             <div style="margin-top: 10px;">
@@ -17422,7 +17434,7 @@
             if (results.length === 0) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="9" style="text-align: center; padding: 40px; color: #888;">
+                        <td colspan="9" style="text-align: center; padding: 40px; color: var(--text-secondary);">
                             🔍 "${query}" に一致するファイルが見つかりません
                         </td>
                     </tr>
@@ -17501,7 +17513,7 @@
             if (filteredLineNumbers.length === 0) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="9" style="text-align: center; padding: 40px; color: #888;">
+                        <td colspan="9" style="text-align: center; padding: 40px; color: var(--text-secondary);">
                             🔍 該当するファイルがありません
                         </td>
                     </tr>

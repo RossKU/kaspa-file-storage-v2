@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.45 - window関数非依存化</title>
+    <title>Kaspa P2P File Storage v5.11.48 - KENVワークスペースなし初期化対応</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -5673,8 +5673,8 @@
                 
                 // Update file tab when switching to it (KENV v3.1.3)
                 if (tab === 'file') {
-                    // v5.11.39: Phase 1-A - Initialize KENV before updating file list
-                    if (WorkspaceState.handle && !FileState.kenvManager._initialized) {
+                    // v5.11.48: Initialize KENV regardless of workspace
+                    if (!FileState.kenvManager._initialized) {
                         FileState.kenvManager.initialize().then(() => {
                             FileState.kenvManager._initialized = true;
                             window.updateFileListFromKENV();
@@ -17509,6 +17509,14 @@
             log(`[システム] アーカイブノード接続機能が利用可能です`, 'info');
             // config is not accessible here, use default value
             log(`[システム] ノードタイプ: auto (デフォルト)`, 'debug');
+            
+            // v5.11.48: Initialize KENV on page load
+            FileState.kenvManager.initialize().then(() => {
+                FileState.kenvManager._initialized = true;
+                log('[KENV] 初期化完了', 'success');
+            }).catch(error => {
+                log(`[KENV] 初期化エラー: ${error.message}`, 'error');
+            });
         });
     </script>
 </body>

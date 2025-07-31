@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.63-fix - 履歴マネージャー初期化無効化（修正版）</title>
+    <title>Kaspa P2P File Storage v5.11.64 - .kaspaファイル生成機能追加</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -17661,8 +17661,8 @@
                         
                     case 'kaspa-password':
                     case 'kaspa-no-password':
-                        // TODO: .kaspaファイル生成機能は別途実装が必要
-                        log(`${action}機能は未実装です`, 'info');
+                        // .kaspaファイル生成
+                        await generateKaspaFromKENV(selectedId, action === 'kaspa-password');
                         break;
                         
                     default:
@@ -17744,6 +17744,85 @@
                 nodeInfo.style.display = 'none';
             }
         };
+        
+        // Generate .kaspa file from KENV entry
+        async function generateKaspaFromKENV(entryId, includePassword) {
+            try {
+                const kenvEntry = FileState.kenvManager.entries.find(e => e.id === entryId);
+                if (!kenvEntry) {
+                    log('選択されたファイルの情報が見つかりません', 'error');
+                    return;
+                }
+                
+                // メタトランザクションIDが必要
+                if (!kenvEntry.metaTxId || !kenvEntry.metaTxBlockId) {
+                    log('メタトランザクション情報がありません', 'error');
+                    return;
+                }
+                
+                // .kaspaファイルのメタデータ構造を作成
+                const kaspaMetadata = {
+                    type: "kaspa-file",
+                    version: "3.4.2",
+                    metadata: {
+                        dataType: "KASPA_FILE_V2",
+                        metaTxId: kenvEntry.metaTxId,
+                        metaTxBlockId: kenvEntry.metaTxBlockId,
+                        reference: `${kenvEntry.metaTxId}:${kenvEntry.metaTxBlockId}`,
+                        source: "blockchain",
+                        network: config.network || "testnet-10"
+                    },
+                    auth: {
+                        encrypted: kenvEntry.encrypted === 'true' || kenvEntry.encrypted === true,
+                        passwordIncluded: includePassword && !!kenvEntry.password,
+                        password: includePassword ? kenvEntry.password : undefined
+                    },
+                    file: {
+                        name: kenvEntry.name,
+                        size: parseInt(kenvEntry.fileSize) || 0,
+                        mimeType: kenvEntry.mimeType || 'application/octet-stream',
+                        sha256: kenvEntry.sha256 || '',
+                        cid: kenvEntry.cid || ''
+                    },
+                    upload: {
+                        uploadDate: kenvEntry.uploadDate || new Date().toISOString(),
+                        uploadedBy: kenvEntry.uploadedBy || '',
+                        uploadCost: parseFloat(kenvEntry.uploadCost) || 0,
+                        totalChunks: parseInt(kenvEntry.totalChunks) || parseInt(kenvEntry.chunkCount) || 0
+                    }
+                };
+                
+                // パスワードを含まない場合はauthセクションからpasswordを削除
+                if (!includePassword) {
+                    delete kaspaMetadata.auth.password;
+                }
+                
+                // JSON文字列に変換
+                const jsonString = JSON.stringify(kaspaMetadata, null, 2);
+                
+                // ファイル名を生成（CIDを使用）
+                const cid = kenvEntry.cid || 'unknown';
+                const filename = `${kenvEntry.name}.${cid}.kaspa`;
+                
+                // Blobを作成してダウンロード
+                const blob = new Blob([jsonString], { type: 'application/octet-stream' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                log(includePassword ? 
+                    'パスワード付き.kaspaファイルを生成しました' : 
+                    'パスワードなし.kaspaファイルを生成しました', 'success');
+                    
+            } catch (error) {
+                log(`.kaspaファイル生成エラー: ${error.message}`, 'error');
+            }
+        }
         
         // Show password dialog for adding file
         window.showAddFilePasswordDialog = function(fileInfo, originalInfo) {

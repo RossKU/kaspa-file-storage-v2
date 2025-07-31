@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.57 - Historyタブ削除 Step 5</title>
+    <title>Kaspa P2P File Storage v5.11.57 - Historyタブ削除 Step 2</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -11100,7 +11100,8 @@
                     }
                 }
                 
-                // Add to history
+                // Add to history - Step 2: 履歴追加を無効化
+                /*
                 const uploadData = {
                     id: `dir_${Date.now()}`,
                     type: 'directory',
@@ -11118,14 +11119,15 @@
                     failedFiles: failedFiles,
                     network: config.network
                 };
+                */
                 
                 // v5.11.16: Calculate actual cost for directory upload
                 try {
                     const actualCost = await FileState.costTracking.calculateActualCost();
                     if (actualCost > 0) {
-                        totalCost = actualCost; // Use actual cost for display and history
+                        totalCost = actualCost; // Use actual cost for display
                         dirMetadata.recovery.uploadCost = actualCost; // Update metadata with actual cost
-                        uploadData.totalCost = actualCost; // Update uploadData with actual cost
+                        // uploadData.totalCost = actualCost; // Step 2: uploadData削除のためコメントアウト
                         log(`ディレクトリアップロードの実際のコスト: ${actualCost.toFixed(8)} KAS`, 'info');
                     }
                 } catch (error) {
@@ -11133,7 +11135,7 @@
                     // Continue with estimated cost
                 }
                 
-                await WorkspaceState.historyManager.addUpload(uploadData);
+                // await WorkspaceState.historyManager.addUpload(uploadData); // Step 2: 履歴追加を無効化
                 
                 // Show completion summary
                 log(`\n🎉 ディレクトリアップロード完了!`, 'success');
@@ -13273,7 +13275,8 @@
                     log(`[DEBUG] kaspaMetadata.encryption: ${FileState.kaspaMetadata.encryption ? 'exists' : 'null'}`, 'debug');
                 }
                 
-                // Add to history
+                // Add to history - Step 2: 履歴追加を無効化
+                /*
                 if (WorkspaceState.historyManager) {
                     // Get block time from last chunk or meta-tx
                     // Get block time from the last chunk
@@ -13324,6 +13327,8 @@
                     };
                     log(`[DEBUG] 履歴データ生成完了 - ID: ${uploadData.id}`, 'debug');
                     await WorkspaceState.historyManager.addUpload(uploadData);
+                }
+                */
                     
                     // v5.11.41: Phase 1-B修正 - 正しいプロパティ名を使用
                     if (FileState.kenvManager._initialized) {
@@ -13647,7 +13652,8 @@
                         singleMetaTxs: singleMetaTxs
                     };
                     
-                    // Update history
+                    // Update history - Step 2: 履歴更新を無効化
+                    /*
                     if (WorkspaceState.historyManager && window.currentFileCID) {
                         const history = WorkspaceState.historyManager.getHistory();
                         const latestUpload = history.find(h => h.cid === window.currentFileCID);
@@ -13659,6 +13665,7 @@
                             await WorkspaceState.historyManager.saveToFile();
                         }
                     }
+                    */
                     
                     log(`[SuperMeta] 🎉 スーパーメタデータ作成完了！`, 'success');
                     
@@ -13840,7 +13847,8 @@
                     createdAt: Date.now()
                 };
                 
-                // Update history with metaTxId
+                // Update history with metaTxId - Step 2: 履歴更新を無効化
+                /*
                 if (WorkspaceState.historyManager && window.currentFileCID) {
                     log(`[DEBUG] 履歴更新開始 - CID: ${window.currentFileCID}`, 'debug');
                     const history = WorkspaceState.historyManager.getHistory();
@@ -13857,6 +13865,7 @@
                         localStorage.setItem(WorkspaceState.historyManager.dbName, JSON.stringify(history));
                         await WorkspaceState.historyManager.saveToFile();
                         log('[UploadHistoryManager] メタTxIDとBlockIDを履歴に追加しました', 'debug');
+                        */
                         
                         // v5.11.40: Phase 1-B - Update KENV entry with meta-tx info
                         if (FileState.kenvManager._initialized && window.currentFileCID) {
@@ -13889,12 +13898,14 @@
                                 log(`[KENV] CID ${window.currentFileCID} のエントリーが見つかりません`, 'warning');
                             }
                         }
+                    /*
                     } else {
                         log(`[DEBUG] CID ${window.currentFileCID} の履歴エントリーが見つかりません`, 'error');
                     }
                 } else {
                     log(`[DEBUG] 履歴更新スキップ - historyManager: ${!!WorkspaceState.historyManager}, CID: ${window.currentFileCID || 'なし'}`, 'warning');
                 }
+                */
                 
                 // Auto-stop WebSocket monitoring after meta-tx creation
                 if (NetworkState.ws.monitorActive) {
@@ -16345,8 +16356,7 @@
                 NetworkState.ws.connection.close();
             }
             
-            // Save any pending data - Step 5: 履歴保存を無効化
-            /*
+            // Save any pending data
             if (WorkspaceState.historyManager) {
                 try {
                     WorkspaceState.historyManager.saveHistory();
@@ -16354,7 +16364,6 @@
                     console.error('Failed to save history on unload:', e);
                 }
             }
-            */
             
             // Log final debug info
             const finalDebugInfo = collectDebugInfo();

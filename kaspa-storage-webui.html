@@ -8497,6 +8497,13 @@
             return match ? match[1] : '4.3.0';
         }
         
+        // Get version description from title
+        function getVersionDescription() {
+            const title = document.title;
+            const parts = title.split(' - ');
+            return parts.length > 1 ? parts[1] : 'Kaspa P2P File Storage';
+        }
+        
         // Configuration
         const config = {
             network: 'testnet-10',
@@ -15903,7 +15910,7 @@
             }
             
             log(`🚀 Kaspa P2P v${getAppVersion()} 準備完了！`, 'info');
-            log(`📋 v${getAppVersion()}: セグメントバウンダリ移行版`, 'info');
+            log(`📋 v${getAppVersion()}: ${getVersionDescription()}`, 'info');
             log('✨ 並列ダウンロード: ' + (AppState.settings.parallelDownloadEnabled ? '有効' : '無効'), 'info');
             log('システムを初期化してください', 'info');
             

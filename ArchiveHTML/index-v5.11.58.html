@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.59 - ファイル削除機能修正</title>
+    <title>Kaspa P2P File Storage v5.11.58 - Historyタブ削除 Step 3</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -2431,11 +2431,13 @@
                     document.getElementById('testBtn').disabled = false;
                     document.getElementById('uploadBtn').disabled = !UserState.address; // Only enable if wallet connected
                     
-                    // Initialize history manager
+                    // Initialize history manager - Step 3: 初期化処理を無効化
+                    /*
                     if (WorkspaceState.historyManager) {
                         await WorkspaceState.historyManager.initialize(config.testPrivateKey);
                         // WorkspaceState.historyManager.updateHistoryUI(); // Step 1: UI更新を無効化
                     }
+                    */
                     
                     updateNetworkStatus('online', 'オンライン');
                     
@@ -8985,7 +8987,8 @@
             return false;
         }
         
-        // Load history if available
+        // Load history if available - Step 3: 履歴ロードを無効化
+        /*
         async function loadWorkspaceHistory() {
             if (WorkspaceState.historyManager && WorkspaceState.historyManager.encryptionKey) {
                 try {
@@ -8995,6 +8998,7 @@
                 }
             }
         }
+        */
         
         // Refactored setupWorkspace using helper functions
         async function setupWorkspace() {
@@ -9013,8 +9017,8 @@
                 // Check for legacy progress file
                 await checkLegacyProgress(dirHandle);
                 
-                // Load history if available
-                await loadWorkspaceHistory();
+                // Load history if available - Step 3: 履歴ロード呼び出しを無効化
+                // await loadWorkspaceHistory();
                 
                 // v5.11.39: Phase 1-A - Initialize KENV after workspace setup
                 await FileState.kenvManager.initialize();
@@ -16224,8 +16228,8 @@
             }
         }
         
-        // Initialize history manager on load
-        WorkspaceState.historyManager = new UploadHistoryManager();
+        // Initialize history manager on load - Step 3: インスタンス作成を無効化
+        // WorkspaceState.historyManager = new UploadHistoryManager();
         window.directoryManager = new DirectoryManager();
         NetworkState.downloadManager = new DownloadManager();
         
@@ -17215,59 +17219,16 @@
         };
         
         // Delete selected files from list
-        window.deleteSelected = async function() {
+        window.deleteSelected = function() {
             const selectedIds = Array.from(FileState.selectedFiles);
             if (selectedIds.length === 0) return;
             
             if (confirm(`${selectedIds.length}個のファイルをリストから削除しますか？`)) {
-                // KENVエントリーから削除（後ろから削除して、インデックスのずれを防ぐ）
-                const entriesToDelete = [];
-                for (const id of selectedIds) {
-                    const entryIndex = FileState.kenvManager.entries.findIndex(e => e.id === id);
-                    if (entryIndex !== -1) {
-                        entriesToDelete.push(entryIndex);
-                    }
-                }
-                
-                // インデックスを降順でソートして、後ろから削除
-                entriesToDelete.sort((a, b) => b - a);
-                for (const index of entriesToDelete) {
-                    FileState.kenvManager.entries.splice(index, 1);
-                }
-                
-                // インデックスをクリアして再構築
-                FileState.kenvManager.kindex.sortIndexes = {
-                    name: [],
-                    size: [],
-                    uploadDate: []
-                };
-                FileState.kenvManager.kindex.searchIndexes = {
-                    name: {}
-                };
-                FileState.kenvManager.kindex.filterIndexes = {
-                    type: { file: [], directory: [] },
-                    status: { pending: [], verified: [], failed: [], verifying: [] }
-                };
-                
-                // すべてのエントリーのインデックスを再構築
-                FileState.kenvManager.entries.forEach((entry, index) => {
-                    FileState.kenvManager.updateIndex(entry, index);
-                });
-                
-                // LocalStorageに保存
-                try {
-                    await FileState.kenvManager.saveAll();
-                    log(`[KENV] ${selectedIds.length}個のエントリーを削除しました`, 'success');
-                } catch (error) {
-                    log(`[KENV] 削除エラー: ${error.message}`, 'error');
-                }
-                
-                // 選択をクリア
+                FileState.fileList = FileState.fileList.filter(f => !selectedIds.includes(f.id));
                 FileState.selectedFiles.clear();
-                
-                // UIを更新
-                updateFileListFromKENV();
+                updateFileListUI();
                 updateFileActions();
+                log(`[File] Deleted ${selectedIds.length} files from list`, 'info');
             }
         };
         

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.66 - KENV完全データ保存実装</title>
+    <title>Kaspa P2P File Storage v5.11.67 - salt固定カラム追加とpayloadSplit修正</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -3559,8 +3559,8 @@
                 }
                 
                 try {
-                    // CSVヘッダー（45カラム）
-                    const headers = 'id,type,version,created,network,name,path,metaTxId,metaTxBlockId,firstChunkTxId,uploadDate,blockTime,uploadedBy,source,status,fileSize,originalSize,compressedSize,mimeType,sha256,encrypted,compressionAlgorithm,compressionEnabled,variableChunk,payloadSplit,cid,totalChunks,chunkCount,chunkSize,segmentCount,totalFiles,fileCount,directoryCount,entryCount,checksum,uploadCost,uploadDuration,chunkStructureType,chunkLevel,totalGroups,passwordIncluded,password,externalRef,tags,notes,authWarning';
+                    // CSVヘッダー（v5.11.67: 46カラム - saltを追加）
+                    const headers = 'id,type,version,created,network,name,path,metaTxId,metaTxBlockId,firstChunkTxId,uploadDate,blockTime,uploadedBy,source,status,fileSize,originalSize,compressedSize,mimeType,sha256,encrypted,compressionAlgorithm,compressionEnabled,variableChunk,payloadSplit,cid,totalChunks,chunkCount,chunkSize,segmentCount,totalFiles,fileCount,directoryCount,entryCount,checksum,uploadCost,uploadDuration,chunkStructureType,chunkLevel,totalGroups,passwordIncluded,password,externalRef,tags,notes,authWarning,salt';
                     
                     let csvContent = headers + '\n';
                     
@@ -3612,7 +3612,8 @@
                             entry.externalRef || '',
                             entry.tags || '',
                             entry.notes || '',
-                            entry.authWarning || ''
+                            entry.authWarning || '',
+                            entry.salt || ''  // v5.11.67: saltカラムを追加
                         ].map(val => {
                             // CSV用にエスケープ
                             const str = String(val);
@@ -3847,17 +3848,20 @@
                         if (values[15]) entry.fileSize = parseInt(values[15]) || null;
                         if (values[10]) entry.uploadDate = values[10];
                         if (values[12]) entry.uploadedBy = values[12];
+                        if (values[24]) entry.payloadSplit = values[24];  // v5.11.67: payloadSplitを明示的に読み込み
                         if (values[41]) entry.password = values[41];
                         if (values[42]) entry.externalRef = values[42];
                         if (values[45]) entry.authWarning = values[45];
+                        if (values[46]) entry.salt = values[46];  // v5.11.67: saltカラムを読み込み
                         
                         // v5.11.66: 45カラム以降の可変カラムを処理
-                        if (values.length > 45) {
+                        // v5.11.67: 46カラム以降に変更（saltを追加したため）
+                        if (values.length > 46) {
                             const chunks = [];
                             const chunkBlockIds = [];
                             const segmentBoundaries = [];
                             
-                            let i = 46;  // 45カラム目の次から開始
+                            let i = 47;  // v5.11.67: 46カラム目の次から開始（saltを追加したため）
                             while (i < values.length) {
                                 if (values[i] === 'seg') {
                                     // セグメントバウンダリー（7カラム）
@@ -17905,7 +17909,7 @@
                         uploadDate: kenvEntry.uploadDate || new Date().toISOString(),
                         blockTime: kenvEntry.blockTime || null,
                         uploadedBy: kenvEntry.uploadedBy || "",
-                        payloadSplit: kenvEntry.payloadSplit === 'true',
+                        payloadSplit: kenvEntry.payloadSplit === 'true' || kenvEntry.payloadSplit === true,  // v5.11.67: 文字列と真偽値の両方に対応
                         segmentBoundaries: kenvEntry._segmentBoundaries || [] // v5.11.66: 保存されたセグメントバウンダリーを使用
                     },
                     

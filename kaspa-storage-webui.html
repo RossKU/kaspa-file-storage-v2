@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.65 - .kaspaファイルフォーマット修正</title>
+    <title>Kaspa P2P File Storage v5.11.66 - KENV完全データ保存実装</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -3622,7 +3622,31 @@
                             return str;
                         });
                         
-                        csvContent += row.join(',') + '\n';
+                        // v5.11.66: 固定45カラムの後に可変カラムを追加
+                        csvContent += row.join(',');
+                        
+                        // チャンクペア追加（tx1,blk1,tx2,blk2,...）
+                        if (entry._chunks && entry._chunkBlockIds) {
+                            for (let i = 0; i < entry._chunks.length; i++) {
+                                csvContent += ',' + entry._chunks[i];
+                                csvContent += ',' + entry._chunkBlockIds[i];
+                            }
+                        }
+                        
+                        // セグメントバウンダリー追加（seg,index,offset,size,originalSize,compressedSize,payloadIndex）
+                        if (entry._segmentBoundaries && entry._segmentBoundaries.length > 0) {
+                            for (const boundary of entry._segmentBoundaries) {
+                                csvContent += ',seg';  // マーカー
+                                csvContent += ',' + boundary.index;
+                                csvContent += ',' + boundary.offset;
+                                csvContent += ',' + boundary.size;
+                                csvContent += ',' + boundary.originalSize;
+                                csvContent += ',' + boundary.compressedSize;
+                                csvContent += ',' + boundary.payloadIndex;
+                            }
+                        }
+                        
+                        csvContent += '\n';
                     });
                     
                     const fileHandle = await WorkspaceState.handle.getFileHandle(this.kentryFile, { create: true });
@@ -3826,6 +3850,49 @@
                         if (values[41]) entry.password = values[41];
                         if (values[42]) entry.externalRef = values[42];
                         if (values[45]) entry.authWarning = values[45];
+                        
+                        // v5.11.66: 45カラム以降の可変カラムを処理
+                        if (values.length > 45) {
+                            const chunks = [];
+                            const chunkBlockIds = [];
+                            const segmentBoundaries = [];
+                            
+                            let i = 46;  // 45カラム目の次から開始
+                            while (i < values.length) {
+                                if (values[i] === 'seg') {
+                                    // セグメントバウンダリー（7カラム）
+                                    if (i + 6 < values.length) {
+                                        segmentBoundaries.push({
+                                            index: parseInt(values[i + 1]),
+                                            offset: parseInt(values[i + 2]),
+                                            size: parseInt(values[i + 3]),
+                                            originalSize: parseInt(values[i + 4]),
+                                            compressedSize: parseInt(values[i + 5]),
+                                            payloadIndex: parseInt(values[i + 6])
+                                        });
+                                        i += 7;
+                                    } else {
+                                        break;
+                                    }
+                                } else if (values[i] && values[i + 1]) {
+                                    // チャンクペア（2カラム）
+                                    chunks.push(values[i]);
+                                    chunkBlockIds.push(values[i + 1]);
+                                    i += 2;
+                                } else {
+                                    break;
+                                }
+                            }
+                            
+                            if (chunks.length > 0) {
+                                entry._chunks = chunks;
+                                entry._chunkBlockIds = chunkBlockIds;
+                            }
+                            
+                            if (segmentBoundaries.length > 0) {
+                                entry._segmentBoundaries = segmentBoundaries;
+                            }
+                        }
                         
                         this.entries.push(entry);
                     }
@@ -13364,6 +13431,33 @@
                         kenvEntry.totalChunks = FileState.kaspaMetadata.recovery?.totalChunks;
                         kenvEntry.chunkSize = config.chunkSize;
                         kenvEntry.payloadSplit = FileState.kaspaMetadata.metadata?.payloadSplit || false;
+                        
+                        // v5.11.66: 完全なデータ保存のための追加処理
+                        // salt保存
+                        if (FileState.kaspaMetadata?.encryption?.pbkdf2?.salt) {
+                            kenvEntry.salt = FileState.kaspaMetadata.encryption.pbkdf2.salt;
+                        }
+                        
+                        // 圧縮情報の詳細
+                        if (FileState.kaspaMetadata?.file?.compression) {
+                            const comp = FileState.kaspaMetadata.file.compression;
+                            kenvEntry.compressionAlgorithm = comp.algorithm;
+                            kenvEntry.compressionEnabled = comp.enabled;
+                            kenvEntry.originalSize = comp.originalSize;
+                            kenvEntry.compressedSize = comp.compressedSize;
+                            kenvEntry.variableChunk = comp.variableChunk || false;
+                        }
+                        
+                        // chunks/chunkBlockIds配列（内部プロパティとして保存）
+                        if (FileState.processedChunks && FileState.processedChunks.length > 0) {
+                            kenvEntry._chunks = FileState.processedChunks.map(c => c.txid);
+                            kenvEntry._chunkBlockIds = FileState.processedChunks.map(c => c.blockId);
+                        }
+                        
+                        // セグメントバウンダリー（内部プロパティとして保存）
+                        if (FileState.kaspaMetadata?.metadata?.segmentBoundaries) {
+                            kenvEntry._segmentBoundaries = FileState.kaspaMetadata.metadata.segmentBoundaries;
+                        }
                     }
                     
                     // インデックスを更新
@@ -17771,7 +17865,7 @@
                     encryption: {
                         algorithm: "AES-256-GCM",
                         pbkdf2: {
-                            salt: "", // KENVエントリーにはsalt情報がないため空
+                            salt: kenvEntry.salt || "", // v5.11.66: 保存されたsaltを使用
                             iterations: 100000
                         }
                     },
@@ -17792,9 +17886,9 @@
                         }
                     },
                     
-                    // チャンク情報（KENVには詳細がないため空配列）
-                    chunks: [],
-                    chunkBlockIds: [],
+                    // チャンク情報（v5.11.66: 保存されたデータを使用）
+                    chunks: kenvEntry._chunks || [],
+                    chunkBlockIds: kenvEntry._chunkBlockIds || [],
                     
                     // Recovery information
                     recovery: {
@@ -17812,7 +17906,7 @@
                         blockTime: kenvEntry.blockTime || null,
                         uploadedBy: kenvEntry.uploadedBy || "",
                         payloadSplit: kenvEntry.payloadSplit === 'true',
-                        segmentBoundaries: []
+                        segmentBoundaries: kenvEntry._segmentBoundaries || [] // v5.11.66: 保存されたセグメントバウンダリーを使用
                     },
                     
                     // Chunk structure

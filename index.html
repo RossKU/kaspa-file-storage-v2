@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.49 - SafeStorage実装とLocalStorage保存対応</title>
+    <title>Kaspa P2P File Storage v5.11.53 - 色の最適化（19色体系）</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -25,20 +25,16 @@
             --info-color: #17a2b8;
             
             /* Additional status and UI colors */
-            --status-connected: #49EACB;
             
             /* Sidebar specific colors */
             --sidebar-text: #ffffff;
-            --sidebar-border-light: rgba(255, 255, 255, 0.2);
             --sidebar-border: rgba(255, 255, 255, 0.3);
-            --sidebar-text-secondary: rgba(255, 255, 255, 0.8);
             --tooltip-bg: rgba(0, 0, 0, 0.9);
             --text-on-warning: #000000;
             
             /* Special purpose colors */
             --button-text-on-accent: #16213e;
             --border-dark: #333333;
-            --border-darker: #444444;
         }
 
         /* Dark Theme Colors */
@@ -60,20 +56,16 @@
             --info-color: #2196F3;
             
             /* Additional status and UI colors */
-            --status-connected: #49EACB;
             
             /* Sidebar specific colors */
             --sidebar-text: #ffffff;
-            --sidebar-border-light: rgba(255, 255, 255, 0.2);
             --sidebar-border: rgba(255, 255, 255, 0.3);
-            --sidebar-text-secondary: rgba(255, 255, 255, 0.8);
             --tooltip-bg: rgba(0, 0, 0, 0.9);
             --text-on-warning: #000000;
             
             /* Special purpose colors */
             --button-text-on-accent: #16213e;
             --border-dark: #333333;
-            --border-darker: #444444;
         }
 
         /* Base Styles */
@@ -127,7 +119,7 @@
 
         .sidebar-header {
             padding: 24px 20px;
-            border-bottom: 1px solid var(--sidebar-border-light);
+            border-bottom: 1px solid var(--sidebar-border);
             transition: all 0.3s ease;
         }
 
@@ -345,7 +337,8 @@
         }
 
         .sidebar-footer #appSubtitle {
-            color: var(--sidebar-text-secondary);
+            color: var(--sidebar-text);
+            opacity: 0.8;
         }
 
         /* Main Content Area */
@@ -1054,7 +1047,7 @@
             border-radius: 50%;
             margin-right: 8px;
         }
-        .status-connected { background: var(--status-connected); }
+        .status-connected { background: var(--success-color); }
         .status-disconnected { background: var(--error-color); }
         
         /* File Tab Styles */
@@ -1859,7 +1852,7 @@
                 
                 <div id="customEndpointSection" style="display: none; margin-top: 10px;">
                     <label>カスタムRPCエンドポイント</label>
-                    <input type="text" id="customRpcEndpoint" placeholder="wss://your-node.example.com:17210" style="width: 100%; padding: 8px; color: var(--text-primary); border: 1px solid var(--status-connected); border-radius: 5px;">
+                    <input type="text" id="customRpcEndpoint" placeholder="wss://your-node.example.com:17210" style="width: 100%; padding: 8px; color: var(--text-primary); border: 1px solid var(--success-color); border-radius: 5px;">
                 </div>
                 
                 <div id="nodeConnectionStatus" style="margin-top: 10px; padding: 10px; border-radius: 5px; display: none;">
@@ -1907,7 +1900,7 @@
                 <div style="margin: 15px 0;">
                     <button onclick="runPhase1Test()" style="
                         padding: 10px 20px;
-                        background: var(--status-connected);
+                        background: var(--success-color);
                         color: var(--button-text-on-accent);
                         border: none;
                         border-radius: 5px;
@@ -1948,7 +1941,7 @@
                     white-space: pre-wrap;
                     display: none;
                     font-size: 14px;
-                    color: var(--status-connected);
+                    color: var(--success-color);
                     border: 1px solid rgba(73, 234, 203, 0.3);
                 "></div>
             </div>
@@ -7409,7 +7402,7 @@
                             </div>
                         </div>
                         <details style="margin-top: 10px;">
-                            <summary style="cursor: pointer; color: var(--status-connected);">ファイル一覧を表示</summary>
+                            <summary style="cursor: pointer; color: var(--success-color);">ファイル一覧を表示</summary>
                             <div style="margin-top: 10px; padding-left: 20px;">
                                 ${dir.files.map(f => `
                                     <div style="margin-bottom: 5px;">
@@ -9102,7 +9095,7 @@
                         <button onclick="setupWorkspace()" style="margin-left: 10px; padding: 5px 10px; font-size: 12px;">変更</button>
                         <span onclick="alert('Kaspa P2P File Storage - 作業フォルダについて\\n\\n作業フォルダを設定すると：\\n✓ 進捗がファイルに自動保存されます\\n✓ ダウンロードファイルが整理されます\\n✓ ブラウザを閉じても進捗が残ります\\n\\n設定しない場合：\\n✓ ブラウザ内に進捗が保存されます\\n✓ ファイルの自動ダウンロードはありません\\n\\n※「作業フォルダ設定」ボタンで後から設定できます')" style="cursor: pointer; margin-left: 5px; color: var(--accent-color);">❓</span>
                     `;
-                    status.style.color = 'var(--status-connected)';
+                    status.style.color = 'var(--success-color)';
                 } else {
                     status.innerHTML = `
                         作業フォルダ: 未設定 (ブラウザ内保存のみ)
@@ -14418,7 +14411,7 @@
                             // v4.6.30: エスケープチェックは不要（DOM操作なので）
                         }
                         
-                        fileListHtml += '<div style="padding: 5px; border-bottom: 1px solid var(--border-darker); ' + borderStyle + '">';
+                        fileListHtml += '<div style="padding: 5px; border-bottom: 1px solid var(--border-dark); ' + borderStyle + '">';
                         fileListHtml += '<div style="display: flex; justify-content: space-between; align-items: center;">';
                         fileListHtml += '<span>' + icon + ' ' + (entry.path || entry.name) + '</span>';
                         // v4.6.29: rightSpanをプレースホルダーIDで一時的に置き換え

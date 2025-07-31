@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.59 - ファイル削除機能修正</title>
+    <title>Kaspa P2P File Storage v5.11.60 - KENV処理を履歴処理から分離</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -13325,51 +13325,6 @@
                     log(`[DEBUG] 履歴データ生成完了 - ID: ${uploadData.id}`, 'debug');
                     await WorkspaceState.historyManager.addUpload(uploadData);
                     
-                    // v5.11.41: Phase 1-B修正 - 正しいプロパティ名を使用
-                    if (FileState.kenvManager._initialized) {
-                        log('[KENV] アップロード完了エントリーを追加', 'info');
-                        const kenvEntry = FileState.kenvManager.addMinimalEntry(
-                            uploadData.fileName,  // 修正: name → fileName
-                            'kaspa-file',
-                            'upload'
-                        );
-                        
-                        // 既知の情報を設定（正しいプロパティ名を使用）
-                        kenvEntry.fileSize = uploadData.fileSize;  // 修正: size → fileSize
-                        kenvEntry.uploadDate = uploadData.uploadDate;
-                        kenvEntry.uploadedBy = UserState.address?.toString() || null;  // 修正: UserStateから取得
-                        kenvEntry.sha256 = uploadData.fileSha256;  // 修正: sha256 → fileSha256
-                        kenvEntry.encrypted = true;  // ファイルアップロードは常に暗号化
-                        kenvEntry.password = uploadData.password || null;
-                        kenvEntry.cid = uploadData.cid;
-                        kenvEntry.uploadCost = uploadData.totalCost;  // 修正: uploadCost → totalCost
-                        
-                        // メタデータから追加情報を取得
-                        if (FileState.kaspaMetadata) {
-                            kenvEntry.mimeType = FileState.kaspaMetadata.file?.mimeType;
-                            kenvEntry.totalChunks = FileState.kaspaMetadata.recovery?.totalChunks;
-                            kenvEntry.chunkSize = config.chunkSize;
-                            kenvEntry.payloadSplit = FileState.kaspaMetadata.metadata?.payloadSplit || false;
-                        }
-                        
-                        // インデックスを更新
-                        const lineNumber = FileState.kenvManager.entries.indexOf(kenvEntry);
-                        FileState.kenvManager.updateIndex(kenvEntry, lineNumber);
-                        
-                        // ファイルを保存（非同期で実行）
-                        FileState.kenvManager.saveAll().then(() => {
-                            log('[KENV] エントリーを保存しました', 'success');
-                            
-                            // v5.11.40: File Tabが開いている場合は更新
-                            const activeTab = document.querySelector('.tab-content.active');
-                            if (activeTab && activeTab.id === 'file-tab') {
-                                window.updateFileListFromKENV();
-                            }
-                        }).catch(error => {
-                            log(`[KENV] 保存エラー: ${error.message}`, 'error');
-                        });
-                    }
-                    
                     // Delete .kprogress file if exists
                     // v5.5.28: Fixed local variable reference - use FileState.progressManager
                     if (FileState.progressManager && WorkspaceState.handle) {
@@ -13380,6 +13335,51 @@
                             // File might not exist
                         }
                     }
+                }
+                
+                // KENV処理（履歴処理から独立） - 1. データ本体アップロード後
+                if (FileState.kenvManager._initialized) {
+                    log('[KENV] アップロード完了エントリーを追加', 'info');
+                    const kenvEntry = FileState.kenvManager.addMinimalEntry(
+                        currentFile.name,
+                        'kaspa-file',
+                        'upload'
+                    );
+                    
+                    // 既知の情報を設定
+                    kenvEntry.fileSize = currentFile.size;
+                    kenvEntry.uploadDate = new Date().toISOString();
+                    kenvEntry.uploadedBy = UserState.address?.toString() || null;
+                    kenvEntry.sha256 = fileHash;
+                    kenvEntry.encrypted = true;
+                    kenvEntry.password = FileState.currentPassword || null;
+                    kenvEntry.cid = window.currentFileCID || '';
+                    kenvEntry.uploadCost = totalCost;
+                    
+                    // メタデータから追加情報を取得
+                    if (FileState.kaspaMetadata) {
+                        kenvEntry.mimeType = FileState.kaspaMetadata.file?.mimeType;
+                        kenvEntry.totalChunks = FileState.kaspaMetadata.recovery?.totalChunks;
+                        kenvEntry.chunkSize = config.chunkSize;
+                        kenvEntry.payloadSplit = FileState.kaspaMetadata.metadata?.payloadSplit || false;
+                    }
+                    
+                    // インデックスを更新
+                    const lineNumber = FileState.kenvManager.entries.indexOf(kenvEntry);
+                    FileState.kenvManager.updateIndex(kenvEntry, lineNumber);
+                    
+                    // ファイルを保存（非同期で実行）
+                    FileState.kenvManager.saveAll().then(() => {
+                        log('[KENV] エントリーを保存しました', 'success');
+                        
+                        // File Tabが開いている場合は更新
+                        const activeTab = document.querySelector('.tab-content.active');
+                        if (activeTab && activeTab.id === 'file-tab') {
+                            window.updateFileListFromKENV();
+                        }
+                    }).catch(error => {
+                        log(`[KENV] 保存エラー: ${error.message}`, 'error');
+                    });
                 }
                 
                 // Check if meta-tx option is enabled
@@ -13404,6 +13404,24 @@
                                 await WorkspaceState.historyManager.saveToFile();
                                 log(`履歴の実際のコストを更新: ${actualCost.toFixed(8)} KAS`, 'info');
                             }
+                        }
+                    }
+                    
+                    // KENV処理（履歴処理から独立） - 3. 実際のコスト計算後
+                    if (FileState.kenvManager._initialized && window.currentFileCID) {
+                        const kenvEntries = FileState.kenvManager.entries;
+                        const kenvEntry = kenvEntries.find(e => e.cid === window.currentFileCID);
+                        
+                        if (kenvEntry) {
+                            kenvEntry.uploadCost = actualCost;
+                            log(`[KENV] 実際のコストを更新: ${actualCost.toFixed(8)} KAS`, 'info');
+                            
+                            // インデックスを更新
+                            const lineNumber = kenvEntries.indexOf(kenvEntry);
+                            FileState.kenvManager.updateIndex(kenvEntry, lineNumber);
+                            
+                            // ファイルを保存（非同期で実行）
+                            await FileState.kenvManager.saveAll();
                         }
                     }
                 } else {
@@ -13857,43 +13875,43 @@
                         localStorage.setItem(WorkspaceState.historyManager.dbName, JSON.stringify(history));
                         await WorkspaceState.historyManager.saveToFile();
                         log('[UploadHistoryManager] メタTxIDとBlockIDを履歴に追加しました', 'debug');
-                        
-                        // v5.11.40: Phase 1-B - Update KENV entry with meta-tx info
-                        if (FileState.kenvManager._initialized && window.currentFileCID) {
-                            log('[KENV] メタTx情報でエントリーを更新', 'info');
-                            const kenvEntries = FileState.kenvManager.entries;
-                            const kenvEntry = kenvEntries.find(e => e.cid === window.currentFileCID);
-                            
-                            if (kenvEntry) {
-                                kenvEntry.metaTxId = metaTxId;
-                                kenvEntry.metaTxBlockId = metaBlockId;
-                                kenvEntry.status = 'verified';
-                                
-                                // インデックスを更新
-                                const lineNumber = kenvEntries.indexOf(kenvEntry);
-                                FileState.kenvManager.updateIndex(kenvEntry, lineNumber);
-                                
-                                // ファイルを保存（非同期で実行）
-                                FileState.kenvManager.saveAll().then(() => {
-                                    log('[KENV] メタTx情報を保存しました', 'success');
-                                    
-                                    // File Tabが開いている場合は更新
-                                    const activeTab = document.querySelector('.tab-content.active');
-                                    if (activeTab && activeTab.id === 'file-tab') {
-                                        window.updateFileListFromKENV();
-                                    }
-                                }).catch(error => {
-                                    log(`[KENV] 保存エラー: ${error.message}`, 'error');
-                                });
-                            } else {
-                                log(`[KENV] CID ${window.currentFileCID} のエントリーが見つかりません`, 'warning');
-                            }
-                        }
                     } else {
                         log(`[DEBUG] CID ${window.currentFileCID} の履歴エントリーが見つかりません`, 'error');
                     }
                 } else {
                     log(`[DEBUG] 履歴更新スキップ - historyManager: ${!!WorkspaceState.historyManager}, CID: ${window.currentFileCID || 'なし'}`, 'warning');
+                }
+                
+                // KENV処理（履歴処理から独立） - 2. MetaTx作成後
+                if (FileState.kenvManager._initialized && window.currentFileCID) {
+                    log('[KENV] メタTx情報でエントリーを更新', 'info');
+                    const kenvEntries = FileState.kenvManager.entries;
+                    const kenvEntry = kenvEntries.find(e => e.cid === window.currentFileCID);
+                    
+                    if (kenvEntry) {
+                        kenvEntry.metaTxId = metaTxId;
+                        kenvEntry.metaTxBlockId = metaBlockId;
+                        kenvEntry.status = 'verified';
+                        
+                        // インデックスを更新
+                        const lineNumber = kenvEntries.indexOf(kenvEntry);
+                        FileState.kenvManager.updateIndex(kenvEntry, lineNumber);
+                        
+                        // ファイルを保存（非同期で実行）
+                        FileState.kenvManager.saveAll().then(() => {
+                            log('[KENV] メタTx情報を保存しました', 'success');
+                            
+                            // File Tabが開いている場合は更新
+                            const activeTab = document.querySelector('.tab-content.active');
+                            if (activeTab && activeTab.id === 'file-tab') {
+                                window.updateFileListFromKENV();
+                            }
+                        }).catch(error => {
+                            log(`[KENV] 保存エラー: ${error.message}`, 'error');
+                        });
+                    } else {
+                        log(`[KENV] CID ${window.currentFileCID} のエントリーが見つかりません`, 'warning');
+                    }
                 }
                 
                 // Auto-stop WebSocket monitoring after meta-tx creation

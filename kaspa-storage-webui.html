@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.64 - .kaspaファイル生成機能追加</title>
+    <title>Kaspa P2P File Storage v5.11.65 - .kaspaファイルフォーマット修正</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -17760,37 +17760,74 @@
                     return;
                 }
                 
-                // .kaspaファイルのメタデータ構造を作成
+                // .kaspaファイルのメタデータ構造を作成（v3.3フォーマット）
                 const kaspaMetadata = {
                     type: "kaspa-file",
-                    version: "3.4.2",
-                    metadata: {
-                        dataType: "KASPA_FILE_V2",
-                        metaTxId: kenvEntry.metaTxId,
-                        metaTxBlockId: kenvEntry.metaTxBlockId,
-                        reference: `${kenvEntry.metaTxId}:${kenvEntry.metaTxBlockId}`,
-                        source: "blockchain",
-                        network: config.network || "testnet-10"
+                    version: "3.3",
+                    created: kenvEntry.uploadDate || new Date().toISOString(),
+                    network: "testnet-10", // configが未定義のため固定値
+                    
+                    // Encryption at top level
+                    encryption: {
+                        algorithm: "AES-256-GCM",
+                        pbkdf2: {
+                            salt: "", // KENVエントリーにはsalt情報がないため空
+                            iterations: 100000
+                        }
                     },
-                    auth: {
-                        encrypted: kenvEntry.encrypted === 'true' || kenvEntry.encrypted === true,
-                        passwordIncluded: includePassword && !!kenvEntry.password,
-                        password: includePassword ? kenvEntry.password : undefined
-                    },
+                    
+                    // File information
                     file: {
                         name: kenvEntry.name,
                         size: parseInt(kenvEntry.fileSize) || 0,
                         mimeType: kenvEntry.mimeType || 'application/octet-stream',
-                        sha256: kenvEntry.sha256 || '',
-                        cid: kenvEntry.cid || ''
+                        sha256: kenvEntry.sha256 || "",
+                        encrypted: kenvEntry.encrypted === 'true' || kenvEntry.encrypted === true,
+                        compression: {
+                            algorithm: kenvEntry.compressionAlgorithm || "none",
+                            enabled: kenvEntry.compressionEnabled === 'true',
+                            originalSize: parseInt(kenvEntry.originalSize) || parseInt(kenvEntry.fileSize) || 0,
+                            compressedSize: parseInt(kenvEntry.compressedSize) || parseInt(kenvEntry.fileSize) || 0,
+                            variableChunk: kenvEntry.variableChunk === 'true'
+                        }
                     },
-                    upload: {
+                    
+                    // チャンク情報（KENVには詳細がないため空配列）
+                    chunks: [],
+                    chunkBlockIds: [],
+                    
+                    // Recovery information
+                    recovery: {
+                        totalChunks: parseInt(kenvEntry.totalChunks) || parseInt(kenvEntry.chunkCount) || 0,
+                        checksum: kenvEntry.sha256 || "",
+                        uploadCost: parseFloat(kenvEntry.uploadCost) || 0
+                    },
+                    
+                    // Metadata section with additional info
+                    metadata: {
+                        metaTxId: kenvEntry.metaTxId,
+                        metaTxBlockId: kenvEntry.metaTxBlockId,
+                        metaTxReference: `${kenvEntry.metaTxId}:${kenvEntry.metaTxBlockId}`,
                         uploadDate: kenvEntry.uploadDate || new Date().toISOString(),
-                        uploadedBy: kenvEntry.uploadedBy || '',
-                        uploadCost: parseFloat(kenvEntry.uploadCost) || 0,
+                        blockTime: kenvEntry.blockTime || null,
+                        uploadedBy: kenvEntry.uploadedBy || "",
+                        payloadSplit: kenvEntry.payloadSplit === 'true',
+                        segmentBoundaries: []
+                    },
+                    
+                    // Chunk structure
+                    chunkStructure: {
+                        type: "flat",
                         totalChunks: parseInt(kenvEntry.totalChunks) || parseInt(kenvEntry.chunkCount) || 0
+                    },
+                    
+                    // Auth section
+                    auth: {
+                        encrypted: kenvEntry.encrypted === 'true' || kenvEntry.encrypted === true,
+                        passwordIncluded: includePassword && !!kenvEntry.password,
+                        password: includePassword ? kenvEntry.password : undefined
                     }
-                };
+                }
                 
                 // パスワードを含まない場合はauthセクションからpasswordを削除
                 if (!includePassword) {

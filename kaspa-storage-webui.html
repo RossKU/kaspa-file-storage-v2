@@ -26,8 +26,6 @@
             
             /* Additional status and UI colors */
             --status-connected: #49EACB;
-            --status-disconnected: #e94560;
-            --input-text: #333333;
             
             /* Sidebar specific colors */
             --sidebar-text: #ffffff;
@@ -39,8 +37,6 @@
             
             /* Special purpose colors */
             --button-text-on-accent: #16213e;
-            --danger-bg: #c13651;
-            --status-connecting: #ff9800;
             --border-dark: #333333;
             --border-darker: #444444;
         }
@@ -65,8 +61,6 @@
             
             /* Additional status and UI colors */
             --status-connected: #49EACB;
-            --status-disconnected: #e94560;
-            --input-text: #eeeeee;
             
             /* Sidebar specific colors */
             --sidebar-text: #ffffff;
@@ -78,8 +72,6 @@
             
             /* Special purpose colors */
             --button-text-on-accent: #16213e;
-            --danger-bg: #c13651;
-            --status-connecting: #ff9800;
             --border-dark: #333333;
             --border-darker: #444444;
         }
@@ -1063,7 +1055,7 @@
             margin-right: 8px;
         }
         .status-connected { background: var(--status-connected); }
-        .status-disconnected { background: var(--status-disconnected); }
+        .status-disconnected { background: var(--error-color); }
         
         /* File Tab Styles */
         .file-table-wrapper {
@@ -1867,7 +1859,7 @@
                 
                 <div id="customEndpointSection" style="display: none; margin-top: 10px;">
                     <label>カスタムRPCエンドポイント</label>
-                    <input type="text" id="customRpcEndpoint" placeholder="wss://your-node.example.com:17210" style="width: 100%; padding: 8px; color: var(--input-text); border: 1px solid var(--status-connected); border-radius: 5px;">
+                    <input type="text" id="customRpcEndpoint" placeholder="wss://your-node.example.com:17210" style="width: 100%; padding: 8px; color: var(--text-primary); border: 1px solid var(--status-connected); border-radius: 5px;">
                 </div>
                 
                 <div id="nodeConnectionStatus" style="margin-top: 10px; padding: 10px; border-radius: 5px; display: none;">
@@ -6460,7 +6452,7 @@
                             <div>日時: ${date}</div>
                             <div>${isDirectory ? `ファイル数: ${item.fileCount}` : `チャンク: ${item.chunks}`} | コスト: ${item.totalCost?.toFixed(5) || 0} KAS</div>
                             ${item.metaTxId ? `<div>MetaTxID: ${item.metaTxId.substring(0, 16)}...</div>` : ''}
-                            ${isDirectory && item.failedCount > 0 ? `<div style="color: var(--status-disconnected);">エラー: ${item.failedCount} ファイル</div>` : ''}
+                            ${isDirectory && item.failedCount > 0 ? `<div style="color: var(--error-color);">エラー: ${item.failedCount} ファイル</div>` : ''}
                         </div>
                     </div>
                 `;
@@ -7411,7 +7403,7 @@
                                 <button onclick="window.directoryManager.exportDirectory('${dir.id}')" class="small-button" title="ディレクトリをエクスポート">
                                     💾
                                 </button>
-                                <button onclick="if(confirm('このディレクトリを削除しますか？')) window.directoryManager.deleteDirectory('${dir.id}'); window.directoryManager.updateUI();" class="small-button" title="削除" style="background: var(--danger-bg);">
+                                <button onclick="if(confirm('このディレクトリを削除しますか？')) window.directoryManager.deleteDirectory('${dir.id}'); window.directoryManager.updateUI();" class="small-button" title="削除" style="background: var(--error-color);">
                                     🗑️
                                 </button>
                             </div>
@@ -10431,7 +10423,7 @@
             if (manager.currentChecking && manager.currentChecking.status !== 'idle') {
                 if (manager.currentChecking.status === 'connecting') {
                     checkingSpan.textContent = '接続中...';
-                    checkingSpan.style.color = 'var(--status-connecting)';
+                    checkingSpan.style.color = 'var(--warning-color)';
                 } else if (manager.currentChecking.status === 'checking') {
                     checkingSpan.textContent = `${manager.currentChecking.blockCountM || '-'} (判定中...)`;
                     checkingSpan.style.color = 'var(--info-color)';

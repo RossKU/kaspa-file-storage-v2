@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.62 - TxIDコピー機能移植</title>
+    <title>Kaspa P2P File Storage v5.11.63-fix - 履歴マネージャー初期化無効化（修正版）</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -2432,8 +2432,10 @@
                     document.getElementById('uploadBtn').disabled = !UserState.address; // Only enable if wallet connected
                     
                     // Initialize history manager
+                    // Step 3: 履歴マネージャーの初期化を無効化
+                    // nullチェックはそのまま残す（エラーを防ぐため）
                     if (WorkspaceState.historyManager) {
-                        await WorkspaceState.historyManager.initialize(config.testPrivateKey);
+                        // await WorkspaceState.historyManager.initialize(config.testPrivateKey);
                         // WorkspaceState.historyManager.updateHistoryUI(); // Step 1: UI更新を無効化
                     }
                     
@@ -8988,14 +8990,10 @@
         }
         
         // Load history if available
+        // Step 3: loadWorkspaceHistory関数を無効化
         async function loadWorkspaceHistory() {
-            if (WorkspaceState.historyManager && WorkspaceState.historyManager.encryptionKey) {
-                try {
-                    await WorkspaceState.historyManager.loadFromFile();
-                } catch (err) {
-                    log('履歴ロードエラー: ' + err.message, 'warning');
-                }
-            }
+            // 履歴マネージャーの初期化を無効化したため、この関数は何もしない
+            return;
         }
         
         // Refactored setupWorkspace using helper functions
@@ -10630,8 +10628,10 @@
                 document.getElementById('uploadBtn').disabled = !UserState.address; // Only enable if wallet connected
                 
                 // Initialize history manager
+                // Step 3: 履歴マネージャーの初期化を無効化
+                // nullチェックはそのまま残す（エラーを防ぐため）
                 if (WorkspaceState.historyManager) {
-                    await WorkspaceState.historyManager.initialize(config.testPrivateKey);
+                    // await WorkspaceState.historyManager.initialize(config.testPrivateKey);
                     // WorkspaceState.historyManager.updateHistoryUI(); // Step 1: UI更新を無効化
                 }
                 
@@ -16203,7 +16203,12 @@
         }
         
         // Initialize history manager on load
-        WorkspaceState.historyManager = new UploadHistoryManager();
+        // Step 3: UploadHistoryManagerの初期化を無効化（構文エラー対策）
+        try {
+            WorkspaceState.historyManager = null; // new UploadHistoryManager();
+        } catch (e) {
+            console.error('履歴マネージャー初期化エラー:', e);
+        }
         window.directoryManager = new DirectoryManager();
         NetworkState.downloadManager = new DownloadManager();
         

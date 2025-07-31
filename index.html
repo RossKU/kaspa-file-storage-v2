@@ -7005,7 +7005,8 @@
                 }
                 
                 // Get file details from history
-                const history = WorkspaceState.historyManager?.getHistory() || [];
+                // Step 4: KENVから履歴データを取得
+                const history = getHistoryFromKENV();
                 const files = fileIds.map(id => {
                     const item = history.find(h => h.id === id);
                     if (!item) return null;
@@ -7388,7 +7389,8 @@
                 const fileList = document.getElementById('fileList');
                 if (!fileList) return;
                 
-                const history = WorkspaceState.historyManager?.getHistory() || [];
+                // Step 4: KENVから履歴データを取得
+                const history = getHistoryFromKENV();
                 const existingDirs = this.directories;
                 
                 if (history.length === 0 && existingDirs.length === 0) {
@@ -13394,19 +13396,6 @@
                     // v5.11.16: Calculate actual cost after meta-tx
                     const actualCost = await FileState.costTracking.calculateActualCost();
                     
-                    // Update the most recent history entry with actual cost
-                    if (WorkspaceState.historyManager) {
-                        const history = WorkspaceState.historyManager.getHistory();
-                        if (history.length > 0) {
-                            const lastEntry = history[history.length - 1];
-                            if (lastEntry.fileName === currentFile.name) {
-                                lastEntry.totalCost = actualCost;
-                                await WorkspaceState.historyManager.saveToFile();
-                                log(`履歴の実際のコストを更新: ${actualCost.toFixed(8)} KAS`, 'info');
-                            }
-                        }
-                    }
-                    
                     // KENV処理（履歴処理から独立） - 3. 実際のコスト計算後
                     if (FileState.kenvManager._initialized && window.currentFileCID) {
                         const kenvEntries = FileState.kenvManager.entries;
@@ -13665,18 +13654,9 @@
                         singleMetaTxs: singleMetaTxs
                     };
                     
-                    // Update history
-                    if (WorkspaceState.historyManager && window.currentFileCID) {
-                        const history = WorkspaceState.historyManager.getHistory();
-                        const latestUpload = history.find(h => h.cid === window.currentFileCID);
-                        if (latestUpload) {
-                            latestUpload.metaTxId = superMeta.txId;
-                            latestUpload.metaTxBlockId = superMeta.blockId;
-                            latestUpload.metaTxType = 'super';
-                            localStorage.setItem(WorkspaceState.historyManager.dbName, JSON.stringify(history));
-                            await WorkspaceState.historyManager.saveToFile();
-                        }
-                    }
+                    // Step 4: 履歴更新処理を削除（KENVで既に処理済み）
+                    // スーパーメタの情報はKENVで管理されているため、
+                    // ここでの履歴更新は不要
                     
                     log(`[SuperMeta] 🎉 スーパーメタデータ作成完了！`, 'success');
                     
@@ -13858,29 +13838,9 @@
                     createdAt: Date.now()
                 };
                 
-                // Update history with metaTxId
-                if (WorkspaceState.historyManager && window.currentFileCID) {
-                    log(`[DEBUG] 履歴更新開始 - CID: ${window.currentFileCID}`, 'debug');
-                    const history = WorkspaceState.historyManager.getHistory();
-                    const latestUpload = history.find(h => h.cid === window.currentFileCID);
-                    if (latestUpload) {
-                        log(`[DEBUG] 履歴エントリー発見 - ID: ${latestUpload.id}`, 'debug');
-                        // 両方のプロパティを正しく設定
-                        latestUpload.metaTxId = metaTxId;
-                        latestUpload.metaTxBlockId = metaBlockId;
-                        latestUpload.metaTxReference = metaTxReference; // 後方互換性のため
-                        log(`[DEBUG] メタTxID設定: ${metaTxId}`, 'debug');
-                        log(`[DEBUG] メタBlockID設定: ${metaBlockId || 'null'}`, 'debug');
-                        // Save updated history
-                        localStorage.setItem(WorkspaceState.historyManager.dbName, JSON.stringify(history));
-                        await WorkspaceState.historyManager.saveToFile();
-                        log('[UploadHistoryManager] メタTxIDとBlockIDを履歴に追加しました', 'debug');
-                    } else {
-                        log(`[DEBUG] CID ${window.currentFileCID} の履歴エントリーが見つかりません`, 'error');
-                    }
-                } else {
-                    log(`[DEBUG] 履歴更新スキップ - historyManager: ${!!WorkspaceState.historyManager}, CID: ${window.currentFileCID || 'なし'}`, 'warning');
-                }
+                // Step 4: 履歴更新処理を削除（KENVで既に処理済み）
+                // メタTxの情報はKENVで管理されているため、
+                // ここでの履歴更新は不要
                 
                 // KENV処理（履歴処理から独立） - 2. MetaTx作成後
                 if (FileState.kenvManager._initialized && window.currentFileCID) {
@@ -16246,6 +16206,64 @@
         WorkspaceState.historyManager = new UploadHistoryManager();
         window.directoryManager = new DirectoryManager();
         NetworkState.downloadManager = new DownloadManager();
+        
+        // Step 4: KENVエントリーを履歴形式に変換する関数
+        function getHistoryFromKENV() {
+            if (!FileState.kenvManager._initialized || !FileState.kenvManager.entries) {
+                return [];
+            }
+            
+            // KENVエントリーを履歴形式にマッピング
+            return FileState.kenvManager.entries
+                .filter(entry => entry.type !== 'kaspa-directory') // ディレクトリは履歴に含まれない
+                .map(entry => ({
+                    // 基本情報
+                    id: entry.id,
+                    fileName: entry.name,
+                    fileSize: entry.fileSize || 0,
+                    cid: entry.cid || '',
+                    
+                    // メタトランザクション情報
+                    metaTxId: entry.metaTxId || null,
+                    metaTxBlockId: entry.metaTxBlockId || null,
+                    
+                    // 日時情報
+                    uploadTime: entry.uploadDate || entry.created || new Date().toISOString(),
+                    uploadDate: entry.uploadDate || entry.created || new Date().toISOString(),
+                    blockTime: entry.blockTime || null,
+                    
+                    // その他の情報
+                    password: entry.password || null,
+                    fileSha256: entry.sha256 || null,
+                    totalCost: entry.uploadCost || 0,
+                    status: entry.status || 'pending',
+                    type: 'file', // 履歴では常に'file'
+                    
+                    // アップロード情報
+                    uploadedBy: entry.uploadedBy || null,
+                    network: 'mainnet', // デフォルト値
+                    
+                    // 圧縮情報（互換性のため）
+                    compression: {
+                        algorithm: entry.compressionAlgorithm || 'none',
+                        enabled: entry.compressionEnabled === 'true',
+                        originalSize: entry.originalSize || entry.fileSize || 0,
+                        compressedSize: entry.compressedSize || entry.fileSize || 0,
+                        variableChunk: entry.variableChunk === 'true'
+                    },
+                    
+                    // メタデータ（互換性のため）
+                    metadata: {
+                        file: {
+                            name: entry.name,
+                            size: entry.fileSize || 0,
+                            mimeType: entry.mimeType || 'application/octet-stream',
+                            sha256: entry.sha256 || null,
+                            encrypted: entry.encrypted === 'true'
+                        }
+                    }
+                }));
+        }
         
         // v5.11.18-fix6: downloadFromTxId helper function for DirectoryBuilderState
         async function downloadFromTxId(txId, blockId, password = '') {

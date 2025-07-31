@@ -17592,19 +17592,79 @@
         };
         
         // Handle share actions
-        window.shareAction = function(action) {
+        window.shareAction = async function(action) {
             const selectedIds = Array.from(FileState.selectedFiles);
-            if (selectedIds.length === 0) return;
+            if (selectedIds.length === 0) {
+                log('ファイルを選択してください', 'warning');
+                return;
+            }
+            if (selectedIds.length > 1) {
+                log('共有は1つのファイルのみ選択してください', 'warning');
+                return;
+            }
             
             // Close menu
             document.getElementById('shareMenu').classList.remove('show');
             
-            // Show placeholder message for now
-            log(`[File] Share action: ${action} (UI only - not implemented)`, 'info');
+            // Get KENV entry
+            const selectedId = selectedIds[0];
+            const kenvEntry = FileState.kenvManager.entries.find(e => e.id === selectedId);
+            if (!kenvEntry) {
+                log('選択されたファイルの情報が見つかりません', 'error');
+                return;
+            }
             
-            // Show password dialog for actions that need password
-            if (action === 'kaspa-password' || action === 'txid-password') {
-                showPasswordDialog(action);
+            try {
+                switch (action) {
+                    case 'txid-password':
+                        // TxID:BlockID:Password形式でコピー
+                        if (!kenvEntry.metaTxId) {
+                            log('メタトランザクションIDが存在しません', 'error');
+                            return;
+                        }
+                        if (!kenvEntry.password) {
+                            log('パスワードが保存されていません', 'error');
+                            return;
+                        }
+                        const blockId = kenvEntry.metaTxBlockId || '';
+                        const textWithPass = `${kenvEntry.metaTxId}:${blockId}:${kenvEntry.password}`;
+                        await window.copyToClipboard(textWithPass);
+                        log('パスワード付きTxIDをコピーしました（パスワードが含まれています）', 'warning');
+                        break;
+                        
+                    case 'txid-no-password':
+                        // TxID:BlockID形式でコピー
+                        if (!kenvEntry.metaTxId) {
+                            log('メタトランザクションIDが存在しません', 'error');
+                            return;
+                        }
+                        const blockIdOnly = kenvEntry.metaTxBlockId || '';
+                        const textNoPass = blockIdOnly ? `${kenvEntry.metaTxId}:${blockIdOnly}` : kenvEntry.metaTxId;
+                        await window.copyToClipboard(textNoPass);
+                        log(blockIdOnly ? 'TxID:BlockID形式でコピーしました' : 'TxIDをコピーしました', 'success');
+                        break;
+                        
+                    case 'password':
+                        // パスワードのみコピー
+                        if (!kenvEntry.password) {
+                            log('パスワードが保存されていません', 'error');
+                            return;
+                        }
+                        await window.copyToClipboard(kenvEntry.password);
+                        log('パスワードをコピーしました', 'success');
+                        break;
+                        
+                    case 'kaspa-password':
+                    case 'kaspa-no-password':
+                        // TODO: .kaspaファイル生成機能は別途実装が必要
+                        log(`${action}機能は未実装です`, 'info');
+                        break;
+                        
+                    default:
+                        log(`不明なアクション: ${action}`, 'error');
+                }
+            } catch (error) {
+                log(`共有エラー: ${error.message}`, 'error');
             }
         };
         

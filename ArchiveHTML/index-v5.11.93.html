@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.93 - Phase 3: ArchiveNodeManager連携</title>
+    <title>Kaspa P2P File Storage v5.11.92 - Phase 2: 重複イベントハンドラー統合</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -2367,16 +2367,6 @@
                 
                 const newNetwork = select.value;
                 manager.updateNetwork(newNetwork);
-                
-                // Sync with config.network (v5.11.93)
-                config.network = newNetwork;
-                log(`[Config] ネットワーク変更 (Archive UI): ${config.network}`, 'info');
-                
-                // Sync with main networkSelect
-                const networkSelect = document.getElementById('networkSelect');
-                if (networkSelect) {
-                    networkSelect.value = newNetwork;
-                }
                 
                 // Update threshold input with saved value for new network
                 const thresholdM = manager.archiveThreshold / 1000000;
@@ -9695,16 +9685,16 @@
             
             log('Archive Node Managerを初期化中...', 'info');
             
-            // Use config.network for initialization (v5.11.93)
-            const networkId = config.network;
+            // Get initial network from UI or default
+            const networkSelect = document.getElementById('archiveNetworkSelect');
+            const networkId = networkSelect ? networkSelect.value : 'mainnet';
             
             NetworkState.archiveManager = new ArchiveNodeManager({ networkId });
             await NetworkState.archiveManager.initialize();
             
-            // Set UI values from manager (v5.11.93)
-            const archiveNetworkSelect = document.getElementById('archiveNetworkSelect');
-            if (archiveNetworkSelect) {
-                archiveNetworkSelect.value = NetworkState.archiveManager.networkId;
+            // Set UI values from manager
+            if (networkSelect) {
+                networkSelect.value = NetworkState.archiveManager.networkId;
             }
             const thresholdInput = document.getElementById('archiveThresholdInput');
             if (thresholdInput) {
@@ -15118,17 +15108,6 @@
             document.getElementById('networkSelect').addEventListener('change', (e) => {
                 config.network = e.target.value;
                 log(`ネットワーク変更: ${config.network}`, 'info');
-                
-                // Sync with archiveNetworkSelect (v5.11.93)
-                const archiveNetworkSelect = document.getElementById('archiveNetworkSelect');
-                if (archiveNetworkSelect) {
-                    archiveNetworkSelect.value = config.network;
-                }
-                
-                // Update ArchiveNodeManager if exists
-                if (NetworkState.archiveManager) {
-                    NetworkState.archiveManager.updateNetwork(config.network);
-                }
             });
             
             document.getElementById('retryCount').addEventListener('change', (e) => {

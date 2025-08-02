@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.104 - ウォレット接続エラー修正</title>
+    <title>Kaspa P2P File Storage v5.11.103 - SystemHandlersエラー修正</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -2558,8 +2558,6 @@
                     }
                     
                     // Create wallet from private key (correct API usage)
-                    // v5.11.104: Add debug logging
-                    log(`秘密鍵の長さ: ${privateKey.length}文字`, 'debug');
                     UserState.privateKey = new NetworkState.kaspa.PrivateKey(privateKey);
                     const publicKey = UserState.privateKey.toPublicKey();
                     UserState.address = publicKey.toAddress(config.network);
@@ -2591,18 +2589,8 @@
                     document.getElementById('walletConnectBtn').textContent = '切断';
                     
                 } catch (error) {
-                    // v5.11.104: Improved error handling
-                    const errorMessage = error?.message || error?.toString() || '不明なエラーが発生しました';
-                    log(`ウォレット接続エラー: ${errorMessage}`, 'error');
-                    
-                    // More specific error messages for common issues
-                    if (errorMessage.includes('Invalid private key')) {
-                        alert('エラー: 無効な秘密鍵です。正しい形式で入力してください。');
-                    } else if (errorMessage.includes('not initialized')) {
-                        alert('エラー: システムが初期化されていません。先に「システムを初期化」を実行してください。');
-                    } else {
-                        alert(`エラー: ${errorMessage}`);
-                    }
+                    log(`ウォレット接続エラー: ${error.message}`, 'error');
+                    alert(`エラー: ${error.message}`);
                 }
             }
         };

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.92 - Phase 2: 重複イベントハンドラー統合</title>
+    <title>Kaspa P2P File Storage v5.11.91-hotfix - initializeConfigNetwork修正</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -15636,14 +15636,6 @@
             log(`デバッグ情報: ${JSON.stringify(debugInfo, null, 2)}`, 'debug');
             
             log('ページ読み込み完了 - システムを自動初期化します', 'info');
-            
-            // Initialize config.network from networkSelect (v5.11.92)
-            const networkSelect = document.getElementById('networkSelect');
-            if (networkSelect && networkSelect.value) {
-                config.network = networkSelect.value;
-                log(`[Config] ネットワーク設定初期化: ${config.network}`, 'info');
-            }
-            
             window.loadParallelSetting(); // Load parallel download setting
             AppState.loadDevWalletSetting(); // Load dev wallet setting
             
@@ -17169,8 +17161,42 @@
             }
         };
         
-        // Initialize event handlers (v5.11.92 - moved config initialization to module script)
+        // Initialize event handlers
         document.addEventListener('DOMContentLoaded', function() {
+            // Initialize config.network from networkSelect (v5.11.91-hotfix)
+            const networkSelect = document.getElementById('networkSelect');
+            if (networkSelect && networkSelect.value) {
+                config.network = networkSelect.value;
+                log(`[Config] ネットワーク設定初期化: ${config.network}`, 'info');
+            }
+            
+            // Network change handler
+            document.getElementById('networkSelect').addEventListener('change', (e) => {
+                config.network = e.target.value;
+                log(`[Config] ネットワーク変更: ${config.network}`, 'info');
+                log(`[Config] 次回の接続時に新しいネットワークが適用されます`, 'info');
+            });
+            
+            // Custom endpoint input handler
+            const customEndpointInput = document.getElementById('customRpcEndpoint');
+            if (customEndpointInput) {
+                customEndpointInput.addEventListener('blur', function() {
+                    const customUrl = this.value.trim();
+                    if (customUrl) {
+                        localStorage.setItem('kaspaCustomRpcEndpoint', customUrl);
+                        log(`[Config] カスタムRPCエンドポイント保存: ${customUrl}`, 'info');
+                    }
+                });
+            }
+            
+            // Initialize parallel download setting
+            // Already called at line 12666
+            
+            // Log archive node feature availability
+            log(`[システム] アーカイブノード接続機能が利用可能です`, 'info');
+            // config is not accessible here, use default value
+            log(`[システム] ノードタイプ: auto (デフォルト)`, 'debug');
+            
             // v5.11.48: Initialize KENV on page load
             FileState.kenvManager.initialize().then(() => {
                 FileState.kenvManager._initialized = true;

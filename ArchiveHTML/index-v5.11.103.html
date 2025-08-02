@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.103 - SystemHandlersエラー修正</title>
+    <title>Kaspa P2P File Storage v5.11.102 - ネットワーク切り替え時の再接続処理</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -1420,7 +1420,7 @@
                     <label>秘密鍵:</label>
                     <input type="password" id="walletPrivateKey" placeholder="秘密鍵を入力" style="width: 100%; margin-top: 8px;">
                 </div>
-                <button id="walletConnectBtn" style="width: 100%; margin-bottom: 12px;">接続</button>
+                <button id="walletConnectBtn" onclick="SystemHandlers.connectWallet()" style="width: 100%; margin-bottom: 12px;">接続</button>
                 
                 <div class="status-row">
                     <strong>アドレス:</strong>
@@ -1969,9 +1969,9 @@
             </div>
             
             <div class="grid-2">
-                <button id="initBtn">システムを初期化</button>
+                <button onclick="SystemHandlers.initializeSystem()" id="initBtn">システムを初期化</button>
                 <button onclick="setupWorkspace()" id="workspaceBtn">作業フォルダ設定</button>
-                <button id="testBtn" disabled>接続テスト</button>
+                <button onclick="SystemHandlers.testConnection()" id="testBtn" disabled>接続テスト</button>
             </div>
             <div id="initStatus" class="metric-box" style="display: none;"></div>
         </div>
@@ -15198,22 +15198,6 @@
         document.addEventListener('DOMContentLoaded', () => {
             // v5.8.0: Show workspace status on page load
             showWorkspaceStatus();
-            
-            // v5.11.103: Add event listeners for buttons (replacing onclick attributes)
-            const walletConnectBtn = document.getElementById('walletConnectBtn');
-            if (walletConnectBtn) {
-                walletConnectBtn.addEventListener('click', () => SystemHandlers.connectWallet());
-            }
-            
-            const initBtn = document.getElementById('initBtn');
-            if (initBtn) {
-                initBtn.addEventListener('click', () => SystemHandlers.initializeSystem());
-            }
-            
-            const testBtn = document.getElementById('testBtn');
-            if (testBtn) {
-                testBtn.addEventListener('click', () => SystemHandlers.testConnection());
-            }
             
             // Add document click event for closing sidebar on outside click
             document.addEventListener('click', (e) => {

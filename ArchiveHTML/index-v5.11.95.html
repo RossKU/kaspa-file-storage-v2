@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.95 - Phase 5: 完全削除</title>
+    <title>Kaspa P2P File Storage v5.11.94 - Phase 4: UI非表示化とテスト</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -1997,6 +1997,11 @@
                         <span>ネットワーク: <strong id="archiveNetworkDisplay">-</strong></span>
                         <span style="color: var(--text-secondary);">(設定タブで変更)</span>
                     </div>
+                    <!-- Hidden select for compatibility -->
+                    <select id="archiveNetworkSelect" onchange="NetworkState.archiveHandlers.updateArchiveNetwork()" style="display: none;">
+                        <option value="mainnet">Mainnet</option>
+                        <option value="testnet-10">Testnet</option>
+                    </select>
                     <!-- Threshold settings -->
                     <div style="display: flex; align-items: center; gap: 10px;">
                         <div style="display: flex; align-items: center; gap: 4px;">
@@ -2365,18 +2370,26 @@
             },
             
             updateArchiveNetwork: function() {
-                // v5.11.95 - Simplified after archiveNetworkSelect removal
-                // This function is kept for backward compatibility
-                // Network changes are now handled through main networkSelect
+                const select = document.getElementById('archiveNetworkSelect');
                 const manager = NetworkState.archiveManager;
                 if (!manager) return;
                 
-                // Update threshold input with saved value for current network
-                const thresholdM = manager.archiveThreshold / 1000000;
-                const thresholdInput = document.getElementById('archiveThresholdInput');
-                if (thresholdInput) {
-                    thresholdInput.value = thresholdM;
+                const newNetwork = select.value;
+                manager.updateNetwork(newNetwork);
+                
+                // Sync with config.network (v5.11.93)
+                config.network = newNetwork;
+                log(`[Config] ネットワーク変更 (Archive UI): ${config.network}`, 'info');
+                
+                // Sync with main networkSelect
+                const networkSelect = document.getElementById('networkSelect');
+                if (networkSelect) {
+                    networkSelect.value = newNetwork;
                 }
+                
+                // Update threshold input with saved value for new network
+                const thresholdM = manager.archiveThreshold / 1000000;
+                document.getElementById('archiveThresholdInput').value = thresholdM;
                 
                 updateArchiveNodeStatus();
             },
@@ -9697,7 +9710,11 @@
             NetworkState.archiveManager = new ArchiveNodeManager({ networkId });
             await NetworkState.archiveManager.initialize();
             
-            // Set UI values from manager (v5.11.95 - archiveNetworkSelect removed)
+            // Set UI values from manager (v5.11.93)
+            const archiveNetworkSelect = document.getElementById('archiveNetworkSelect');
+            if (archiveNetworkSelect) {
+                archiveNetworkSelect.value = NetworkState.archiveManager.networkId;
+            }
             const thresholdInput = document.getElementById('archiveThresholdInput');
             if (thresholdInput) {
                 thresholdInput.value = NetworkState.archiveManager.archiveThreshold / 1000000;
@@ -15111,7 +15128,13 @@
                 config.network = e.target.value;
                 log(`ネットワーク変更: ${config.network}`, 'info');
                 
-                // Update archive network display (v5.11.95 - archiveNetworkSelect removed)
+                // Sync with archiveNetworkSelect (v5.11.93)
+                const archiveNetworkSelect = document.getElementById('archiveNetworkSelect');
+                if (archiveNetworkSelect) {
+                    archiveNetworkSelect.value = config.network;
+                }
+                
+                // Update archive network display (v5.11.94)
                 const archiveNetworkDisplay = document.getElementById('archiveNetworkDisplay');
                 if (archiveNetworkDisplay) {
                     archiveNetworkDisplay.textContent = config.network === 'testnet-10' ? 'Testnet-10' : 'Mainnet';

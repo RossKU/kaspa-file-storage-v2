@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.101 - Phase 11: ネットワーク統合完了</title>
+    <title>Kaspa P2P File Storage v5.11.100 - Phase 10: 表示関連ハードコード除去</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -2612,8 +2612,8 @@
         // ===== Archive Node Manager (v5.10.21) =====
         class ArchiveNodeManager {
             constructor(config = {}) {
-                // Configuration (customizable) (v5.11.101)
-                this.networkId = config.network || config.defaultNetwork || 'testnet-10';
+                // Configuration (customizable)
+                this.networkId = config.networkId || 'mainnet';
                 this.archiveThreshold = this.loadThreshold(); // Load saved threshold
                 this.testOldBlocks = true; // Enable old block testing
                 this.blocksPerSecond = 10;
@@ -3319,7 +3319,7 @@
                     type: type,
                     version: null,
                     created: new Date().toISOString(),
-                    network: config.network || config.defaultNetwork, // v5.11.101
+                    network: config.network || 'mainnet',
                     name: name,
                     path: null,
                     metaTxId: null,
@@ -7921,8 +7921,7 @@
         
         // Configuration
         const config = {
-            defaultNetwork: 'testnet-10', // v5.11.101: Configurable default network
-            network: null, // v5.11.101: Will be initialized dynamically
+            network: 'testnet-10',
             retryCount: 3,
             timeout: 30000,
             testPrivateKey: 'b7e151628aed2a6abf7158809cf4f3c762e7160f38b4da56a784d9045190cfef',
@@ -15624,7 +15623,7 @@
                     
                     // アップロード情報
                     uploadedBy: entry.uploadedBy || null,
-                    network: config.network || config.defaultNetwork, // v5.11.101
+                    network: 'mainnet', // デフォルト値
                     
                     // 圧縮情報（互換性のため）
                     compression: {
@@ -15778,14 +15777,12 @@
             
             log('ページ読み込み完了 - システムを自動初期化します', 'info');
             
-            // Initialize config.network from networkSelect (v5.11.92, v5.11.101)
+            // Initialize config.network from networkSelect (v5.11.92)
             const networkSelect = document.getElementById('networkSelect');
             if (networkSelect && networkSelect.value) {
                 config.network = networkSelect.value;
-            } else {
-                config.network = config.defaultNetwork;
+                log(`[Config] ネットワーク設定初期化: ${config.network}`, 'info');
             }
-            log(`[Config] ネットワーク設定初期化: ${config.network}`, 'info');
             
             // Initialize archive network display (v5.11.94)
             const archiveNetworkDisplay = document.getElementById('archiveNetworkDisplay');
@@ -15876,7 +15873,7 @@
                     console.log('[MultiWallet] Public key generated successfully');
                     
                     // Network detection - より安全な方法
-                    let networkType = config.defaultNetwork; // デフォルト (v5.11.101)
+                    let networkType = 'testnet-10'; // デフォルト
                     
                     // グローバル変数をチェック
                     if (typeof NETWORK !== 'undefined' && NETWORK) {
@@ -15901,10 +15898,10 @@
                             address = privateKey.toAddress(NETWORK).toString();
                             console.log('[MultiWallet] Address generated with global NETWORK:', address);
                         }
-                        // 方法2: networkTypeを使用 (v5.11.101)
+                        // 方法2: testnet-10を直接指定
                         else {
-                            address = privateKey.toAddress(networkType).toString();
-                            console.log('[MultiWallet] Address generated with networkType:', address);
+                            address = privateKey.toAddress('testnet-10').toString();
+                            console.log('[MultiWallet] Address generated with testnet-10:', address);
                         }
                     } catch (addrError) {
                         console.error('[MultiWallet] Primary address generation failed:', addrError);

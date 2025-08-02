@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.98 - config not definedエラー修正</title>
+    <title>Kaspa P2P File Storage v5.11.97 - Phase 7: v2.1変換とKEVN復元</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -4186,123 +4186,6 @@
                     log('[KENV] LocalStorageをクリアしました', 'debug');
                 } else {
                     log(`[KENV] LocalStorageクリアエラー: ${result.error}`, 'error');
-                }
-            },
-            
-            // Generate .kaspa file from KENV entry (v5.11.98: Moved from non-module script)
-            async generateKaspaFile(entryId, includePassword) {
-                try {
-                    const kenvEntry = this.entries.find(e => e.id === entryId);
-                    if (!kenvEntry) {
-                        log('選択されたファイルの情報が見つかりません', 'error');
-                        return;
-                    }
-                    
-                    // メタトランザクションIDが必要
-                    if (!kenvEntry.metaTxId || !kenvEntry.metaTxBlockId) {
-                        log('メタトランザクション情報がありません', 'error');
-                        return;
-                    }
-                    
-                    // .kaspaファイルのメタデータ構造を作成（v3.3フォーマット）
-                    const kaspaMetadata = {
-                        type: "kaspa-file",
-                        version: "3.3",
-                        created: kenvEntry.uploadDate || new Date().toISOString(),
-                        network: config.network,
-                        
-                        // Encryption at top level
-                        encryption: {
-                            algorithm: "AES-256-GCM",
-                            pbkdf2: {
-                                salt: kenvEntry.salt || "", // v5.11.66: 保存されたsaltを使用
-                                iterations: 100000
-                            }
-                        },
-                        
-                        // File information
-                        file: {
-                            name: kenvEntry.name,
-                            size: parseInt(kenvEntry.fileSize) || 0,
-                            mimeType: kenvEntry.mimeType || 'application/octet-stream',
-                            sha256: kenvEntry.sha256 || "",
-                            encrypted: kenvEntry.encrypted === 'true' || kenvEntry.encrypted === true,
-                            compression: {
-                                algorithm: kenvEntry.compressionAlgorithm || "none",
-                                enabled: kenvEntry.compressionEnabled === 'true',
-                                originalSize: parseInt(kenvEntry.originalSize) || parseInt(kenvEntry.fileSize) || 0,
-                                compressedSize: parseInt(kenvEntry.compressedSize) || parseInt(kenvEntry.fileSize) || 0,
-                                variableChunk: kenvEntry.variableChunk === 'true'
-                            }
-                        },
-                        
-                        // チャンク情報（v5.11.66: 保存されたデータを使用）
-                        chunks: kenvEntry._chunks || [],
-                        chunkBlockIds: kenvEntry._chunkBlockIds || [],
-                        
-                        // Recovery information
-                        recovery: {
-                            totalChunks: parseInt(kenvEntry.totalChunks) || parseInt(kenvEntry.chunkCount) || 0,
-                            checksum: kenvEntry.sha256 || "",
-                            uploadCost: parseFloat(kenvEntry.uploadCost) || 0
-                        },
-                        
-                        // Metadata section with additional info
-                        metadata: {
-                            metaTxId: kenvEntry.metaTxId,
-                            metaTxBlockId: kenvEntry.metaTxBlockId,
-                            metaTxReference: `${kenvEntry.metaTxId}:${kenvEntry.metaTxBlockId}`,
-                            uploadDate: kenvEntry.uploadDate || new Date().toISOString(),
-                            blockTime: kenvEntry.blockTime || null,
-                            uploadedBy: kenvEntry.uploadedBy || "",
-                            payloadSplit: kenvEntry.payloadSplit === 'true' || kenvEntry.payloadSplit === true,  // v5.11.67: 文字列と真偽値の両方に対応
-                            segmentBoundaries: kenvEntry._segmentBoundaries || [] // v5.11.66: 保存されたセグメントバウンダリーを使用
-                        },
-                        
-                        // Chunk structure
-                        chunkStructure: {
-                            type: "flat",
-                            totalChunks: parseInt(kenvEntry.totalChunks) || parseInt(kenvEntry.chunkCount) || 0
-                        },
-                        
-                        // Auth section
-                        auth: {
-                            encrypted: kenvEntry.encrypted === 'true' || kenvEntry.encrypted === true,
-                            passwordIncluded: includePassword && !!kenvEntry.password,
-                            password: includePassword ? kenvEntry.password : undefined
-                        }
-                    }
-                    
-                    // パスワードを含まない場合はauthセクションからpasswordを削除
-                    if (!includePassword) {
-                        delete kaspaMetadata.auth.password;
-                    }
-                    
-                    // JSON文字列に変換
-                    const jsonString = JSON.stringify(kaspaMetadata, null, 2);
-                    
-                    // ファイル名を生成（CIDを使用）
-                    const cid = kenvEntry.cid || 'unknown';
-                    const filename = `${kenvEntry.name}.${cid}.kaspa`;
-                    
-                    // Blobを作成してダウンロード
-                    const blob = new Blob([jsonString], { type: 'application/octet-stream' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = filename;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
-                    
-                    log(includePassword ? 
-                        'パスワード付き.kaspaファイルを生成しました' : 
-                        'パスワードなし.kaspaファイルを生成しました', 'success');
-                        
-                } catch (error) {
-                    console.error('.kaspaファイル生成エラー:', error);
-                    log(`.kaspaファイル生成エラー: ${error.message}`, 'error');
                 }
             }
         };
@@ -17026,8 +16909,8 @@
                         
                     case 'kaspa-password':
                     case 'kaspa-no-password':
-                        // .kaspaファイル生成 (v5.11.98: Use kenvManager method)
-                        await FileState.kenvManager.generateKaspaFile(selectedId, action === 'kaspa-password');
+                        // .kaspaファイル生成
+                        await generateKaspaFromKENV(selectedId, action === 'kaspa-password');
                         break;
                         
                     default:
@@ -17110,7 +16993,121 @@
             }
         };
         
-        // v5.11.98: generateKaspaFromKENV moved to FileState.kenvManager.generateKaspaFile
+        // Generate .kaspa file from KENV entry
+        async function generateKaspaFromKENV(entryId, includePassword) {
+            try {
+                const kenvEntry = FileState.kenvManager.entries.find(e => e.id === entryId);
+                if (!kenvEntry) {
+                    log('選択されたファイルの情報が見つかりません', 'error');
+                    return;
+                }
+                
+                // メタトランザクションIDが必要
+                if (!kenvEntry.metaTxId || !kenvEntry.metaTxBlockId) {
+                    log('メタトランザクション情報がありません', 'error');
+                    return;
+                }
+                
+                // .kaspaファイルのメタデータ構造を作成（v3.3フォーマット）
+                const kaspaMetadata = {
+                    type: "kaspa-file",
+                    version: "3.3",
+                    created: kenvEntry.uploadDate || new Date().toISOString(),
+                    network: config.network,
+                    
+                    // Encryption at top level
+                    encryption: {
+                        algorithm: "AES-256-GCM",
+                        pbkdf2: {
+                            salt: kenvEntry.salt || "", // v5.11.66: 保存されたsaltを使用
+                            iterations: 100000
+                        }
+                    },
+                    
+                    // File information
+                    file: {
+                        name: kenvEntry.name,
+                        size: parseInt(kenvEntry.fileSize) || 0,
+                        mimeType: kenvEntry.mimeType || 'application/octet-stream',
+                        sha256: kenvEntry.sha256 || "",
+                        encrypted: kenvEntry.encrypted === 'true' || kenvEntry.encrypted === true,
+                        compression: {
+                            algorithm: kenvEntry.compressionAlgorithm || "none",
+                            enabled: kenvEntry.compressionEnabled === 'true',
+                            originalSize: parseInt(kenvEntry.originalSize) || parseInt(kenvEntry.fileSize) || 0,
+                            compressedSize: parseInt(kenvEntry.compressedSize) || parseInt(kenvEntry.fileSize) || 0,
+                            variableChunk: kenvEntry.variableChunk === 'true'
+                        }
+                    },
+                    
+                    // チャンク情報（v5.11.66: 保存されたデータを使用）
+                    chunks: kenvEntry._chunks || [],
+                    chunkBlockIds: kenvEntry._chunkBlockIds || [],
+                    
+                    // Recovery information
+                    recovery: {
+                        totalChunks: parseInt(kenvEntry.totalChunks) || parseInt(kenvEntry.chunkCount) || 0,
+                        checksum: kenvEntry.sha256 || "",
+                        uploadCost: parseFloat(kenvEntry.uploadCost) || 0
+                    },
+                    
+                    // Metadata section with additional info
+                    metadata: {
+                        metaTxId: kenvEntry.metaTxId,
+                        metaTxBlockId: kenvEntry.metaTxBlockId,
+                        metaTxReference: `${kenvEntry.metaTxId}:${kenvEntry.metaTxBlockId}`,
+                        uploadDate: kenvEntry.uploadDate || new Date().toISOString(),
+                        blockTime: kenvEntry.blockTime || null,
+                        uploadedBy: kenvEntry.uploadedBy || "",
+                        payloadSplit: kenvEntry.payloadSplit === 'true' || kenvEntry.payloadSplit === true,  // v5.11.67: 文字列と真偽値の両方に対応
+                        segmentBoundaries: kenvEntry._segmentBoundaries || [] // v5.11.66: 保存されたセグメントバウンダリーを使用
+                    },
+                    
+                    // Chunk structure
+                    chunkStructure: {
+                        type: "flat",
+                        totalChunks: parseInt(kenvEntry.totalChunks) || parseInt(kenvEntry.chunkCount) || 0
+                    },
+                    
+                    // Auth section
+                    auth: {
+                        encrypted: kenvEntry.encrypted === 'true' || kenvEntry.encrypted === true,
+                        passwordIncluded: includePassword && !!kenvEntry.password,
+                        password: includePassword ? kenvEntry.password : undefined
+                    }
+                }
+                
+                // パスワードを含まない場合はauthセクションからpasswordを削除
+                if (!includePassword) {
+                    delete kaspaMetadata.auth.password;
+                }
+                
+                // JSON文字列に変換
+                const jsonString = JSON.stringify(kaspaMetadata, null, 2);
+                
+                // ファイル名を生成（CIDを使用）
+                const cid = kenvEntry.cid || 'unknown';
+                const filename = `${kenvEntry.name}.${cid}.kaspa`;
+                
+                // Blobを作成してダウンロード
+                const blob = new Blob([jsonString], { type: 'application/octet-stream' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                log(includePassword ? 
+                    'パスワード付き.kaspaファイルを生成しました' : 
+                    'パスワードなし.kaspaファイルを生成しました', 'success');
+                    
+            } catch (error) {
+                log(`.kaspaファイル生成エラー: ${error.message}`, 'error');
+            }
+        }
         
         // Show password dialog for adding file
         window.showAddFilePasswordDialog = function(fileInfo, originalInfo) {

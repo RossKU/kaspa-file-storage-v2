@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.102 - ネットワーク切り替え時の再接続処理</title>
+    <title>Kaspa P2P File Storage v5.11.101 - Phase 11: ネットワーク統合完了</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -15235,34 +15235,9 @@
             });
             
             // Update config from settings
-            document.getElementById('networkSelect').addEventListener('change', async (e) => {
-                const previousNetwork = config.network;
+            document.getElementById('networkSelect').addEventListener('change', (e) => {
                 config.network = e.target.value;
-                log(`ネットワーク変更: ${previousNetwork} → ${config.network}`, 'info');
-                
-                // v5.11.102: ネットワーク変更時は接続をリセット
-                if (previousNetwork !== config.network && previousNetwork !== null) {
-                    // 1. ウォレットを切断
-                    if (UserState.address) {
-                        AppState.disconnectWallet();
-                        log('ネットワーク変更のためウォレットを切断しました', 'info');
-                    }
-                    
-                    // 2. RPC接続をリセット
-                    if (NetworkState.rpcClient) {
-                        try {
-                            await NetworkState.rpcClient.disconnect();
-                            NetworkState.rpcClient = null;
-                            log('既存のRPC接続を切断しました', 'info');
-                            
-                            // 3. 新しいネットワークで再接続
-                            await initializeRpcClient();
-                            log('新しいネットワークでRPC接続を確立しました', 'success');
-                        } catch (error) {
-                            log(`RPC再接続エラー: ${error.message}`, 'error');
-                        }
-                    }
-                }
+                log(`ネットワーク変更: ${config.network}`, 'info');
                 
                 // Update archive network display (v5.11.95 - archiveNetworkSelect removed)
                 const archiveNetworkDisplay = document.getElementById('archiveNetworkDisplay');

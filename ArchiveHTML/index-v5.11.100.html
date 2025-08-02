@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.100 - Phase 10: 表示関連ハードコード除去</title>
+    <title>Kaspa P2P File Storage v5.11.99 - Phase 8-9: APIエンドポイント動的化</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -7948,11 +7948,6 @@
                 'testnet-10': 'https://api-tn10.kaspa.org',
                 'mainnet': 'https://api.kaspa.org'
             },
-            // Network display names (v5.11.100: Phase 10)
-            networkDisplayNames: {
-                'testnet-10': 'Testnet-10',
-                'mainnet': 'Mainnet'
-            },
             lastConnectionType: null // Track last successful connection type
         };
 
@@ -7989,11 +7984,6 @@
                 log(errorMsg, 'error');
                 throw new Error(errorMsg);
             }
-        }
-        
-        // Format network display name (v5.11.100: Phase 10)
-        function formatNetworkDisplay(network) {
-            return config.networkDisplayNames[network] || network;
         }
         
         // Logging system
@@ -8094,8 +8084,8 @@
             rpcStatus.textContent = 'Connected';
             statusIndicator.className = 'status-indicator-large status-connected';
             
-            // Format network name (v5.11.100)
-            const networkDisplay = formatNetworkDisplay(network);
+            // Format network name
+            const networkDisplay = network === 'testnet-10' ? 'Testnet-10' : 'Mainnet';
             
             // Format node type and endpoint
             let nodeTypeDisplay = '';
@@ -15241,7 +15231,7 @@
                 // Update archive network display (v5.11.95 - archiveNetworkSelect removed)
                 const archiveNetworkDisplay = document.getElementById('archiveNetworkDisplay');
                 if (archiveNetworkDisplay) {
-                    archiveNetworkDisplay.textContent = formatNetworkDisplay(config.network);
+                    archiveNetworkDisplay.textContent = config.network === 'testnet-10' ? 'Testnet-10' : 'Mainnet';
                 }
                 
                 // Update ArchiveNodeManager if exists

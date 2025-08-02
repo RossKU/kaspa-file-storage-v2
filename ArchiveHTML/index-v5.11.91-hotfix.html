@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.91-hotfix - initializeConfigNetwork修正</title>
+    <title>Kaspa P2P File Storage v5.11.91 - Phase 1: ネットワーク設定動的化基盤</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -7822,6 +7822,15 @@
             },
             lastConnectionType: null // Track last successful connection type
         };
+
+        // Initialize config.network from networkSelect (v5.11.91)
+        function initializeConfigNetwork() {
+            const networkSelect = document.getElementById('networkSelect');
+            if (networkSelect && networkSelect.value) {
+                config.network = networkSelect.value;
+                log(`[Config] ネットワーク設定初期化: ${config.network}`, 'info');
+            }
+        }
 
         // Safe hex decode function
         function safeHexDecode(hexString, context = '') {
@@ -17163,12 +17172,8 @@
         
         // Initialize event handlers
         document.addEventListener('DOMContentLoaded', function() {
-            // Initialize config.network from networkSelect (v5.11.91-hotfix)
-            const networkSelect = document.getElementById('networkSelect');
-            if (networkSelect && networkSelect.value) {
-                config.network = networkSelect.value;
-                log(`[Config] ネットワーク設定初期化: ${config.network}`, 'info');
-            }
+            // Initialize config.network from networkSelect (v5.11.91)
+            initializeConfigNetwork();
             
             // Network change handler
             document.getElementById('networkSelect').addEventListener('change', (e) => {

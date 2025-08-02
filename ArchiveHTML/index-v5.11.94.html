@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.94 - Phase 4: UI非表示化とテスト</title>
+    <title>Kaspa P2P File Storage v5.11.93 - Phase 3: ArchiveNodeManager連携</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -1991,26 +1991,17 @@
                 </div>
                 
                 <!-- Network and Threshold Settings -->
-                <div style="font-size: 11px; margin-bottom: 8px;">
-                    <!-- Network display (v5.11.94) -->
-                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 4px;">
-                        <span>ネットワーク: <strong id="archiveNetworkDisplay">-</strong></span>
-                        <span style="color: var(--text-secondary);">(設定タブで変更)</span>
-                    </div>
-                    <!-- Hidden select for compatibility -->
-                    <select id="archiveNetworkSelect" onchange="NetworkState.archiveHandlers.updateArchiveNetwork()" style="display: none;">
+                <div style="font-size: 11px; margin-bottom: 8px; display: flex; align-items: center; gap: 10px;">
+                    <select id="archiveNetworkSelect" onchange="NetworkState.archiveHandlers.updateArchiveNetwork()" style="padding: 2px 4px; font-size: 11px;">
                         <option value="mainnet">Mainnet</option>
                         <option value="testnet-10">Testnet</option>
                     </select>
-                    <!-- Threshold settings -->
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <div style="display: flex; align-items: center; gap: 4px;">
-                            <label>閾値:</label>
-                            <input type="number" id="archiveThresholdInput" value="50" step="0.1" style="width: 50px; padding: 2px; font-size: 11px;" onchange="NetworkState.archiveHandlers.updateArchiveThreshold()">
-                            <span>M blocks</span>
-                        </div>
-                        <span style="color: var(--text-secondary); font-size: 10px;">(0.864M = 1日分)</span>
+                    <div style="display: flex; align-items: center; gap: 4px;">
+                        <label>閾値:</label>
+                        <input type="number" id="archiveThresholdInput" value="50" step="0.1" style="width: 50px; padding: 2px; font-size: 11px;" onchange="NetworkState.archiveHandlers.updateArchiveThreshold()">
+                        <span>M blocks</span>
                     </div>
+                    <span style="color: var(--text-secondary); font-size: 10px;">(0.864M = 1日分)</span>
                 </div>
                 
                 <!-- Test Block Hash Input -->
@@ -15134,12 +15125,6 @@
                     archiveNetworkSelect.value = config.network;
                 }
                 
-                // Update archive network display (v5.11.94)
-                const archiveNetworkDisplay = document.getElementById('archiveNetworkDisplay');
-                if (archiveNetworkDisplay) {
-                    archiveNetworkDisplay.textContent = config.network === 'testnet-10' ? 'Testnet-10' : 'Mainnet';
-                }
-                
                 // Update ArchiveNodeManager if exists
                 if (NetworkState.archiveManager) {
                     NetworkState.archiveManager.updateNetwork(config.network);
@@ -15678,12 +15663,6 @@
             if (networkSelect && networkSelect.value) {
                 config.network = networkSelect.value;
                 log(`[Config] ネットワーク設定初期化: ${config.network}`, 'info');
-            }
-            
-            // Initialize archive network display (v5.11.94)
-            const archiveNetworkDisplay = document.getElementById('archiveNetworkDisplay');
-            if (archiveNetworkDisplay) {
-                archiveNetworkDisplay.textContent = config.network === 'testnet-10' ? 'Testnet-10' : 'Mainnet';
             }
             
             window.loadParallelSetting(); // Load parallel download setting

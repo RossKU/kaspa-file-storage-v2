@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.99 - Phase 8-9: APIエンドポイント動的化</title>
+    <title>Kaspa P2P File Storage v5.11.98 - config not definedエラー修正</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -7943,11 +7943,6 @@
                 'testnet-10': null, // Use default resolver
                 'mainnet': null // Use default resolver
             },
-            // API endpoints (v5.11.99: Phase 8-9)
-            apiEndpoints: {
-                'testnet-10': 'https://api-tn10.kaspa.org',
-                'mainnet': 'https://api.kaspa.org'
-            },
             lastConnectionType: null // Track last successful connection type
         };
 
@@ -8121,8 +8116,10 @@
             const restApiResponse = document.getElementById('restApiResponse');
             
             try {
-                // Determine API endpoint based on network (v5.11.99)
-                const apiUrl = config.apiEndpoints[config.network];
+                // Determine API endpoint based on network
+                const apiUrl = config.network === 'testnet-10' ? 
+                    'https://api-tn10.kaspa.org' : 
+                    'https://api.kaspa.org';
                 
                 // Update endpoint display
                 restApiEndpoint.textContent = `Endpoint: ${apiUrl}`;
@@ -8833,7 +8830,8 @@
                             
                             // Fallback to REST API if RPC failed
                             if (!payload) {
-                                const networkApiUrl = config.apiEndpoints[config.network];
+                                const networkApiUrl = config.network === 'testnet-10' ? 
+                                    'https://api-tn10.kaspa.org' : 'https://api.kaspa.org';
                                 const url = `${networkApiUrl}/transactions/${txId}`;
                                 const response = await fetchWithTimeout(url, {}, 5000, 1);
                                 const data = await response.json();
@@ -8965,7 +8963,7 @@
                     // Fallback to Explorer API
                     if (!payload) {
                         log(`[DownloadManager] Explorer API経由でメタデータ取得`, 'info');
-                        const apiUrl = `${config.apiEndpoints[config.network]}/transactions/${metaTxId}`;
+                        const apiUrl = `https://api-tn10.kaspa.org/transactions/${metaTxId}`;
                         const response = await fetchWithTimeout(apiUrl, {}, 10000, 2);
                         
                         if (!response.ok) {
@@ -9052,7 +9050,8 @@
                     
                     // Fallback to REST API
                     try {
-                        const networkApiUrl = config.apiEndpoints[config.network];
+                        const networkApiUrl = config.network === 'testnet-10' ? 
+                            'https://api-tn10.kaspa.org' : 'https://api.kaspa.org';
                         const url = `${networkApiUrl}/transactions/${txId}`;
                         const response = await fetchWithTimeout(url, {}, 10000, 2);
                         
@@ -9139,7 +9138,8 @@
                     
                     // Fallback to REST API
                     try {
-                        const networkApiUrl = config.apiEndpoints[config.network];
+                        const networkApiUrl = config.network === 'testnet-10' ? 
+                            'https://api-tn10.kaspa.org' : 'https://api.kaspa.org';
                         const url = `${networkApiUrl}/transactions/${txId}`;
                         const response = await fetchWithTimeout(url, {}, 10000, 2);
                         
@@ -11028,7 +11028,7 @@
             for (let i = 0; i < maxRetries; i++) {
                 try {
                     const response = await fetchWithTimeout(
-                        `${config.apiEndpoints[config.network]}/transactions/${txid}`,
+                        `https://api-tn10.kaspa.org/transactions/${txid}`,
                         {},
                         10000,
                         2
@@ -11480,8 +11480,8 @@
                     }
                 }
                 
-                // Fallback to Explorer API (v5.11.99)
-                const apiUrl = `${config.apiEndpoints[config.network]}/transactions/${txid}`;
+                // Fallback to Explorer API
+                const apiUrl = `https://api-tn10.kaspa.org/transactions/${txid}`;
                 const response = await fetchWithTimeout(apiUrl, {}, 10000, 2); // 10s timeout, 2 retries
                 if (response.ok) {
                     log(`トランザクション確認 (API): ${txid.substring(0, 16)}...`, 'success');
@@ -12043,9 +12043,9 @@
                                     waitTime += 500;
                                 }
                                 
-                                // Fallback to Explorer API (v5.11.99)
+                                // Fallback to Explorer API
                                 if (!blockId) {
-                                    const apiUrl = `${config.apiEndpoints[config.network]}/transactions/${txid}`;
+                                    const apiUrl = `https://api-tn10.kaspa.org/transactions/${txid}`;
                                     const response = await fetchWithTimeout(apiUrl, {}, 15000, 3);
                                     if (response.ok) {
                                         const data = await response.json();
@@ -12422,7 +12422,7 @@
                                 } else {
                                     log(`RPC待機タイムアウト - Explorer APIを使用`);
                                 }
-                                const apiUrl = `${config.apiEndpoints[config.network]}/transactions/${txid}`;
+                                const apiUrl = `https://api-tn10.kaspa.org/transactions/${txid}`;
                                 const response = await fetchWithTimeout(apiUrl, {}, 15000, 3); // 15s timeout, 3 retries for important upload
                                 if (response.ok) {
                                     const data = await response.json();
@@ -14327,7 +14327,7 @@
                     try {
                     // First try to get via Explorer API (more reliable)
                     log('Explorer API経由でメタトランザクションを取得中...', 'info');
-                    const apiUrl = `${config.apiEndpoints[config.network]}/transactions/${metaTxId}`;
+                    const apiUrl = `https://api-tn10.kaspa.org/transactions/${metaTxId}`;
                     const response = await fetchWithTimeout(apiUrl, {}, 15000, 3); // 15s timeout, 3 retries
                     
                     if (response.ok) {
@@ -14568,7 +14568,7 @@
                                     if (!intPayload) {
                                         log(`[SuperMeta] REST API経由で中間メタデータを取得中...`, 'info');
                                         
-                                        const txResponse = await fetch(`${config.apiEndpoints[config.network]}/transactions/${intMetaTxId}`);
+                                        const txResponse = await fetch(`https://api.kaspa.org/transactions/${intMetaTxId}`);
                                         if (!txResponse.ok) {
                                             throw new Error(`中間メタデータが見つかりません: ${intMetaTxId}`);
                                         }

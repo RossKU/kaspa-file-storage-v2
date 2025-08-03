@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.106 - DirectoryManager段階的削除</title>
+    <title>Kaspa P2P File Storage v5.11.104 - ウォレット接続エラー修正</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -6388,13 +6388,152 @@
                 return tree;
             }
             
-            // v5.11.106: Removed getSubdirectories() method - unused
+            // Get all subdirectories of a directory
+            getSubdirectories(dirCID) {
+                const subdirs = [];
+                const queue = [dirCID];
+                
+                while (queue.length > 0) {
+                    const current = queue.shift();
+                    const children = this.directories.filter(d => d.parentCID === current);
+                    subdirs.push(...children);
+                    queue.push(...children.map(c => c.cid));
+                }
+                
+                return subdirs;
+            }
             
-            // v5.11.106: Removed getDirectoryPath() method - unused
+            // Get path from root to directory
+            getDirectoryPath(dirCID) {
+                const path = [];
+                let current = this.directories.find(d => d.cid === dirCID);
+                
+                while (current) {
+                    path.unshift(current);
+                    if (current.parentCID) {
+                        current = this.directories.find(d => d.cid === current.parentCID);
+                    } else {
+                        break;
+                    }
+                }
+                
+                return path;
+            }
             
-            // v5.11.106: Removed createDirectory() method - unused (dead code)
+            async createDirectory(name, fileIds, parentCID = null) {
+                if (!name || !name.trim()) {
+                    throw new Error('ディレクトリ名を入力してください');
+                }
+                
+                if (fileIds.length === 0) {
+                    throw new Error('少なくとも1つのファイルを選択してください');
+                }
+                
+                // Get file details from history
+                // Step 4: KENVから履歴データを取得
+                const history = getHistoryFromKENV();
+                const files = fileIds.map(id => {
+                    const item = history.find(h => h.id === id);
+                    if (!item) return null;
+                    
+                    return {
+                        id: item.id,
+                        name: item.fileName,
+                        cid: item.cid,
+                        metaTxId: item.metaTxId,
+                        metaTxBlockId: item.metaTxBlockId,
+                        size: item.fileSize,
+                        uploadTime: item.uploadTime
+                    };
+                }).filter(f => f !== null);
+                
+                if (files.length === 0 && fileIds.length > 0) {
+                    throw new Error('選択されたファイルが見つかりません');
+                }
+                
+                // Create DAG nodes for each file
+                const fileLinks = await Promise.all(files.map(async file => {
+                    // Create a file DAG node
+                    const fileNode = await this.createDAGNode('file', {
+                        name: file.name,
+                        metaTxId: file.metaTxId,
+                        metaTxBlockId: file.metaTxBlockId,
+                        uploadTime: file.uploadTime
+                    });
+                    
+                    return {
+                        name: file.name,
+                        cid: fileNode.cid,
+                        size: file.size,
+                        type: 'file'
+                    };
+                }));
+                
+                // Create directory DAG node with links to files
+                const dirNode = await this.createDAGNode('directory', {
+                    name: name.trim(),
+                    created: new Date().toISOString(),
+                    parentCID: parentCID
+                }, fileLinks);
+                
+                const directory = {
+                    id: 'dir_' + Date.now(),
+                    type: 'kaspa-directory',
+                    version: this.version,
+                    name: name.trim(),
+                    cid: dirNode.cid,  // DAG CID (display version)
+                    cidFull: dirNode.cidFull,  // v3.3: Full CID for metadata
+                    parentCID: parentCID,
+                    created: dirNode.created,
+                    files: files,
+                    totalSize: dirNode.size
+                };
+                
+                // Create and upload directory metadata
+                const dirMetadata = await this.uploadDirectoryMetadata(directory);
+                directory.metaTxId = dirMetadata.metaTxId;
+                directory.metaTxBlockId = dirMetadata.metaTxBlockId;
+                
+                this.directories.push(directory);
+                this.saveDirectories();
+                
+                log(`ディレクトリ「${name}」を作成しました（${files.length}ファイル, CID: ${dirNode.cid.substring(0, 8)}...）`, 'success');
+                return directory;
+            }
             
-            // v5.11.106: Removed uploadDirectoryMetadata() method - only used by createDirectory
+            async uploadDirectoryMetadata(directory) {
+                // Create directory metadata for blockchain storage
+                const metadata = {
+                    type: directory.type,
+                    version: directory.version,
+                    name: directory.name,
+                    created: directory.created,
+                    files: directory.files.map(f => ({
+                        name: f.name,
+                        cid: f.cid,
+                        metaTxId: f.metaTxId,
+                        metaTxBlockId: f.metaTxBlockId,
+                        size: f.size
+                    }))
+                };
+                
+                const metadataJson = JSON.stringify(metadata);
+                const encoder = new TextEncoder();
+                const metadataBytes = encoder.encode(metadataJson);
+                
+                // Simulate upload (in real implementation, this would use createMetaTransaction)
+                const simulatedTxId = 'dir_' + Array.from(crypto.getRandomValues(new Uint8Array(32)))
+                    .map(b => b.toString(16).padStart(2, '0')).join('');
+                const simulatedBlockId = 'blk_' + Array.from(crypto.getRandomValues(new Uint8Array(32)))
+                    .map(b => b.toString(16).padStart(2, '0')).join('');
+                
+                log(`[DirectoryManager] ディレクトリメタデータをアップロード（シミュレーション）: ${simulatedTxId.substring(0, 16)}...`, 'info');
+                
+                return {
+                    metaTxId: simulatedTxId,
+                    metaTxBlockId: simulatedBlockId
+                };
+            }
             
             getDirectory(id) {
                 return this.directories.find(d => d.id === id);

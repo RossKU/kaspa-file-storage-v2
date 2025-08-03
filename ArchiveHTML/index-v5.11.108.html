@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.109 - DirectoryBuilder KENV連携</title>
+    <title>Kaspa P2P File Storage v5.11.107 - ディレクトリメタデータ認識修正</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -5202,50 +5202,6 @@
                 this.showStatus(`.kaspaファイルを生成しました: ${filename}`, 'success');
             },
             
-            // v5.11.109: Save generated directory metadata to KENV
-            async saveToKENV() {
-                if (!this.generatedMetadata) {
-                    this.showStatus('生成されたメタデータがありません', 'error');
-                    return;
-                }
-                
-                try {
-                    // Create KENV entry
-                    const entry = FileState.kenvManager.addMinimalEntry(
-                        this.name,
-                        'kaspa-directory',
-                        'builder'
-                    );
-                    
-                    // Set directory-specific information
-                    entry.directoryMetadata = this.generatedMetadata.metadata;
-                    entry.password = this.generatedMetadata.password;
-                    entry.status = 'pending'; // Not uploaded yet
-                    entry.createdAt = new Date().toISOString();
-                    entry.cid = this.generatedMetadata.metadata.cid || null;
-                    
-                    // Update index
-                    const lineNumber = FileState.kenvManager.entries.indexOf(entry);
-                    FileState.kenvManager.updateIndex(entry, lineNumber);
-                    
-                    // Save to storage
-                    await FileState.kenvManager.saveAll();
-                    
-                    this.showStatus('KENVに保存しました。File Tabで確認できます', 'success');
-                    
-                    // Update File Tab if active
-                    if (document.querySelector('.tab-content.active')?.id === 'file-tab') {
-                        window.updateFileListFromKENV();
-                    }
-                    
-                    return entry.id;
-                } catch (error) {
-                    this.showStatus(`KENV保存エラー: ${error.message}`, 'error');
-                    console.error('[DirectoryBuilder] KENV save error:', error);
-                    return null;
-                }
-            },
-            
             async generateOnly() {
                 // Validate first
                 const valid = await this.validate();
@@ -5279,8 +5235,8 @@
                     
                     this.showStatus('ディレクトリメタデータを生成しました', 'success');
                     
-                    // v5.11.109: Save to KENV instead of auto-exporting
-                    await this.saveToKENV();
+                    // Enable additional actions
+                    this.exportAsKaspa();
                 } catch (error) {
                     this.showStatus(`生成エラー: ${error.message}`, 'error');
                 }

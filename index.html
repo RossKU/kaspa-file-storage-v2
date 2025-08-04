@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.115 - WebSocketデバッグログ追加</title>
+    <title>Kaspa P2P File Storage v5.11.114 - ダウンロードマネージャー表示改善</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -1888,20 +1888,6 @@
                 </div>
             </div>
             
-            <div class="metric-box">
-                <h3>デバッグ設定</h3>
-                <div class="setting-row">
-                    <div class="setting-label">
-                        WebSocketデバッグログ<br>
-                        <small style="color: var(--text-secondary);">1秒10ブロックの受信状況を詳細ログ出力</small>
-                    </div>
-                    <label class="toggle-switch">
-                        <input type="checkbox" id="wsDebugToggle" onchange="toggleWSDebug()">
-                        <span class="toggle-slider"></span>
-                    </label>
-                </div>
-            </div>
-            
             <!-- Multi-Wallet Phase 1 Test -->
             <div class="metric-box" style="margin-top: 30px;">
                 <h3>🧪 Multi-Wallet Phase 1 Test</h3>
@@ -2143,8 +2129,7 @@
         const AppState = {
             settings: {
                 parallelDownloadEnabled: false,  // Default OFF for v3.5.0 compatibility
-                devWalletEnabled: true,         // Dev wallet enabled by default
-                wsDebugEnabled: false           // WebSocketデバッグログ
+                devWalletEnabled: true          // Dev wallet enabled by default
             },
             monitoring: {
                 wsMonitorTimeout: null  // WebSocket monitoring timeout
@@ -2415,36 +2400,6 @@
         
         // Expose NetworkState to window for global access
         window.NetworkState = NetworkState;
-        
-        // WebSocketデバッグ情報
-        const WSDebugInfo = {
-            enabled: false,
-            blockCount: 0,
-            firstBlockTime: null,
-            lastBlockTime: null,
-            blockIntervals: [],
-            txConfirmations: new Map(),
-            startTime: null,
-            
-            reset() {
-                this.blockCount = 0;
-                this.firstBlockTime = null;
-                this.lastBlockTime = null;
-                this.blockIntervals = [];
-                this.txConfirmations.clear();
-                this.startTime = Date.now();
-            }
-        };
-        
-        // 統計表示タイマー
-        let wsDebugTimer = null;
-        
-        // 設定の読み込み
-        const savedWSDebug = localStorage.getItem('wsDebugEnabled');
-        if (savedWSDebug === 'true') {
-            AppState.settings.wsDebugEnabled = true;
-            WSDebugInfo.enabled = true;
-        }
         
         // System initialization functions (Section 4: GLOBAL STATE & INITIALIZATION)
         const SystemHandlers = {
@@ -11218,25 +11173,11 @@
         }
         
         async function waitForConfirmation(txid) {
-            const startTime = Date.now();
-            
-            // WebSocketデバッグ
-            if (WSDebugInfo.enabled) {
-                console.log(`⏳ TX確認待機開始: ${txid.substring(0, 16)}...`);
-                console.log(`   時刻: ${new Date().toISOString()}`);
-                
-                WSDebugInfo.txConfirmations.set(txid, {
-                    startTime: startTime,
-                    confirmed: false
-                });
-            }
-            
             log(`[DEBUG] waitForConfirmation開始 - TxID: ${txid.substring(0, 16)}...`, 'debug');
             
             // v5.4.52: Restored v5.4.0 active polling logic for better performance
             let blockId = null;
             let waitTime = 0;
-            let checkCount = 0;
             const maxWaitTime = 30000; // 30 seconds for RPC check
             
             // v5.4.52: Initial 2-second wait (from v5.4.0)
@@ -11244,15 +11185,6 @@
             
             // Active polling loop
             while (!blockId && waitTime < maxWaitTime) {
-                checkCount++;
-                
-                // デバッグログ
-                if (WSDebugInfo.enabled && (checkCount <= 10 || waitTime % 5000 < 100)) {
-                    console.log(`🔍 TX確認チェック #${checkCount}:`);
-                    console.log(`   経過時間: ${waitTime}ms`);
-                    console.log(`   監視中: ${NetworkState.ws.monitoredTransactions?.has(txid) || false}`);
-                }
-                
                 // Phase 0-O-2: Check both ConnectionManager and WebSocket status
                 if (!ConnectionManager.isConnected || !NetworkState.ws.connected) {
                     log(`[DEBUG] ネットワーク切断を検出 - BlockID待機を中断 (CM: ${ConnectionManager.isConnected}, WS: ${NetworkState.ws.connected})`, 'debug');
@@ -15666,11 +15598,6 @@
                 NetworkState.ws.connected = true;  // v5.6.4: Mark WebSocket as connected
                 
                 log('Block Addedイベントを購読しました', 'success');
-                if (WSDebugInfo.enabled) {
-                    console.log(`🔌 WebSocket接続確立: ${new Date().toISOString()}`);
-                    console.log(`   エンドポイント: ${selectedEndpoint}`);
-                    console.log(`   ネットワーク: ${config.network}`);
-                }
                 log('WebSocket経由でブロック追加イベントの監視を開始', 'info');
                 log(`[DEBUG] WebSocket購読完了 - navigator.onLine: ${navigator.onLine}`, 'debug');
                 
@@ -15703,44 +15630,9 @@
                     const block = event.data.block;
                     const blockId = block.header.hash;
                     const blockTime = new Date(Number(block.header.timestamp));
-                    const now = Date.now();
-                    
-                    // WebSocketデバッグ情報を更新
-                    if (WSDebugInfo.enabled) {
-                        WSDebugInfo.blockCount++;
-                        
-                        if (!WSDebugInfo.firstBlockTime) {
-                            WSDebugInfo.firstBlockTime = now;
-                            console.log(`🎯 最初のブロック受信: ${blockId.substring(0, 16)}...`);
-                        }
-                        
-                        if (WSDebugInfo.lastBlockTime) {
-                            const interval = now - WSDebugInfo.lastBlockTime;
-                            WSDebugInfo.blockIntervals.push(interval);
-                            if (WSDebugInfo.blockIntervals.length > 100) {
-                                WSDebugInfo.blockIntervals.shift();
-                            }
-                            
-                            // 異常検出
-                            if (interval > 500) {
-                                console.error(`❌ ブロック受信異常: ${interval}ms間隔 (期待値: 100ms)`);
-                            }
-                        }
-                        WSDebugInfo.lastBlockTime = now;
-                        
-                        // 詳細ログ（最初の10ブロックのみ）
-                        if (WSDebugInfo.blockCount <= 10) {
-                            console.log(`📦 Block Added #${WSDebugInfo.blockCount}:`);
-                            console.log(`   Hash: ${blockId.substring(0, 16)}...`);
-                            console.log(`   TX数: ${block.transactions?.length || 0}`);
-                            console.log(`   時刻: ${blockTime.toISOString()}`);
-                            if (WSDebugInfo.blockCount > 1) {
-                                console.log(`   間隔: ${now - (WSDebugInfo.lastBlockTime || now)}ms`);
-                            }
-                        }
-                    }
                     
                     // Clean up old transactions (older than 90 seconds)
+                    const now = Date.now();
                     for (const [txid, txData] of NetworkState.ws.monitoredTransactions.entries()) {
                         if (now - txData.timestamp > 90000) {
                             NetworkState.ws.monitoredTransactions.delete(txid);
@@ -15764,20 +15656,6 @@
                                     
                                     log(`[DEBUG] WebSocket: 監視中のトランザクション検出！ TxID: ${txId.substring(0, 16)}... BlockID: ${blockId.substring(0, 16)}...`, 'debug');
                                     log(`[DEBUG] WebSocket: ブロック時刻を保存 - Time: ${blockTime.toISOString()}`, 'debug');
-                                    
-                                    // デバッグ：TX確認成功
-                                    if (WSDebugInfo.enabled && WSDebugInfo.txConfirmations.has(txId)) {
-                                        const confirmTime = Date.now() - WSDebugInfo.txConfirmations.get(txId).startTime;
-                                        console.log(`✅ TX確認成功！`);
-                                        console.log(`   TxID: ${txId.substring(0, 16)}...`);
-                                        console.log(`   BlockID: ${blockId.substring(0, 16)}...`);
-                                        console.log(`   確認時間: ${confirmTime}ms`);
-                                        console.log(`   ブロック番号: #${WSDebugInfo.blockCount}`);
-                                        
-                                        WSDebugInfo.txConfirmations.get(txId).confirmed = true;
-                                        WSDebugInfo.txConfirmations.get(txId).confirmTime = confirmTime;
-                                    }
-                                    
                                     myTransactionFound = true;
                                     
                                     // v5.4.52: Removed pendingBlockIds callback mechanism - using direct polling instead
@@ -16137,16 +16015,6 @@
                 dirPasswordInput.addEventListener('input', function() {
                     updateSelectedFilesInfo();
                 });
-            }
-            
-            // WebSocketデバッグトグルの初期化
-            const wsDebugToggle = document.getElementById('wsDebugToggle');
-            if (wsDebugToggle) {
-                wsDebugToggle.checked = AppState.settings.wsDebugEnabled;
-                if (AppState.settings.wsDebugEnabled) {
-                    WSDebugInfo.reset();
-                    startWSDebugTimer();
-                }
             }
         });
     </script>
@@ -17432,69 +17300,6 @@
                 nodeInfo.style.display = 'none';
             }
         };
-        
-        // WebSocketデバッグトグル
-        window.toggleWSDebug = function() {
-            const toggle = document.getElementById('wsDebugToggle');
-            const enabled = toggle.checked;
-            
-            AppState.settings.wsDebugEnabled = enabled;
-            WSDebugInfo.enabled = enabled;
-            
-            if (enabled) {
-                log('🔍 WebSocketデバッグログを有効化しました', 'info');
-                WSDebugInfo.reset();
-                startWSDebugTimer();
-            } else {
-                log('🔍 WebSocketデバッグログを無効化しました', 'info');
-                stopWSDebugTimer();
-            }
-            
-            // 設定を保存
-            localStorage.setItem('wsDebugEnabled', AppState.settings.wsDebugEnabled.toString());
-        };
-        
-        function startWSDebugTimer() {
-            if (wsDebugTimer) return;
-            
-            wsDebugTimer = setInterval(() => {
-                if (!WSDebugInfo.enabled || WSDebugInfo.blockCount === 0) return;
-                
-                const elapsed = (Date.now() - WSDebugInfo.startTime) / 1000;
-                const bps = WSDebugInfo.blockCount / elapsed;
-                const avgInterval = WSDebugInfo.blockIntervals.length > 0 
-                    ? WSDebugInfo.blockIntervals.reduce((a,b) => a+b, 0) / WSDebugInfo.blockIntervals.length 
-                    : 0;
-                
-                console.log(`📊 WebSocket統計 (${elapsed.toFixed(1)}秒経過):`);
-                console.log(`   総ブロック数: ${WSDebugInfo.blockCount}`);
-                console.log(`   平均BPS: ${bps.toFixed(2)} (期待値: 10)`);
-                console.log(`   受信率: ${(bps / 10 * 100).toFixed(1)}%`);
-                console.log(`   平均間隔: ${avgInterval.toFixed(1)}ms`);
-                
-                if (bps < 8) {
-                    console.warn(`⚠️ ブロック受信率が低い！`);
-                }
-                
-                // TX確認状況
-                if (WSDebugInfo.txConfirmations.size > 0) {
-                    console.log(`📝 TX確認状況:`);
-                    for (const [txid, info] of WSDebugInfo.txConfirmations) {
-                        if (!info.confirmed) {
-                            const waiting = Date.now() - info.startTime;
-                            console.log(`   ${txid.substring(0, 8)}...: 待機中 (${waiting}ms)`);
-                        }
-                    }
-                }
-            }, 10000); // 10秒ごと
-        }
-        
-        function stopWSDebugTimer() {
-            if (wsDebugTimer) {
-                clearInterval(wsDebugTimer);
-                wsDebugTimer = null;
-            }
-        }
         
         // v5.11.98: generateKaspaFromKENV moved to FileState.kenvManager.generateKaspaFile
         

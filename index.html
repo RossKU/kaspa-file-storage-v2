@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.127 - ディレクトリアップロード機能の完全削除</title>
+    <title>Kaspa P2P File Storage v5.11.128 - DirectoryBuilder依存関数の復元</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -10984,14 +10984,152 @@
         // Reuse existing file upload logic for directory files
         // v5.11.127: Removed uploadFileChunks - directory upload feature moved to DirectoryBuilder
         
-        // Transaction helper functions for directory upload
-        // v5.11.127: Removed createTransaction - directory upload feature moved to DirectoryBuilder
+        // Transaction helper functions for directory upload (restored for DirectoryBuilder)
+        async function createTransaction(payloadBase64) {
+            // Get UTXOs
+            const { entries } = await NetworkState.rpcClient.getUtxosByAddresses([UserState.address.toString()]);
+            if (!entries || entries.length === 0) {
+                throw new Error('利用可能なUTXOがありません');
+            }
+            
+            // Format UTXOs
+            const formattedUtxos = entries.map(utxo => ({
+                address: UserState.address.toString(),
+                outpoint: {
+                    transactionId: utxo.outpoint.transactionId,
+                    index: utxo.outpoint.index
+                },
+                scriptPublicKey: utxo.scriptPublicKey,
+                amount: BigInt(utxo.amount),
+                isCoinbase: utxo.isCoinbase || false,
+                blockDaaScore: BigInt(utxo.blockDaaScore)
+            }));
+            
+            // Decode payload to bytes
+            const payloadBytes = fromBase64(payloadBase64);
+            
+            // Create transaction
+            const result = await NetworkState.kaspa.createTransactions({
+                entries: formattedUtxos,
+                outputs: [{
+                    address: UserState.address.toString(),
+                    amount: 100000000n // 1 KAS
+                }],
+                changeAddress: UserState.address.toString(),
+                priorityFee: 0n,  // v5.11.17: Priority Fee削除でコスト削減
+                networkId: config.network,
+                payload: payloadBytes
+            });
+            
+            if (!result.transactions || result.transactions.length === 0) {
+                throw new Error('トランザクションの作成に失敗しました');
+            }
+            
+            return result.transactions[0];
+        }
         
-        // v5.11.127: Removed sendTransaction - directory upload feature moved to DirectoryBuilder
+        async function sendTransaction(transaction) {
+            // Sign transaction
+            await transaction.sign([UserState.privateKey]);
+            
+            // Submit transaction with error handling
+            try {
+                const txid = await transaction.submit(NetworkState.rpcClient);
+                
+                if (!txid) {
+                    throw new Error('トランザクションの送信に失敗しました');
+                }
+                
+                return txid;
+            } catch (error) {
+                // Handle connection errors
+                if (error.message && error.message.includes('not connected')) {
+                    log('WebSocket接続が切断されました。再接続を試みます...', 'warning');
+                    
+                    // Reconnect
+                    await NetworkState.rpcClient.connect();
+                    log('RPC再接続成功', 'success');
+                    
+                    // Restart monitoring
+                    if (NetworkState.ws.monitorActive) {
+                        await startMonitoring();
+                    }
+                    
+                    // Retry transaction submission
+                    const txid = await transaction.submit(NetworkState.rpcClient);
+                    
+                    if (!txid) {
+                        throw new Error('トランザクションの送信に失敗しました（再試行後）');
+                    }
+                    
+                    return txid;
+                }
+                
+                // Re-throw other errors
+                throw error;
+            }
+        }
         
-        // v5.11.127: Removed waitForConfirmation - directory upload feature moved to DirectoryBuilder
-        
-        // v5.11.127: Removed fetchBlockIdFromExplorer - directory upload feature moved to DirectoryBuilder
+        async function waitForConfirmation(txid) {
+            log(`[DEBUG] waitForConfirmation開始 - TxID: ${txid.substring(0, 16)}...`, 'debug');
+            
+            // v5.4.52: Restored v5.4.0 active polling logic for better performance
+            let blockId = null;
+            let waitTime = 0;
+            const maxWaitTime = config.timeout || 300000; // v5.11.118: Use config.timeout (default 5 minutes)
+            
+            // v5.4.52: Initial 2-second wait (from v5.4.0)
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+            // Active polling loop
+            while (!blockId && waitTime < maxWaitTime) {
+                // Phase 0-O-2: Check both ConnectionManager and WebSocket status
+                if (!ConnectionManager.isConnected || !NetworkState.ws.connected) {
+                    log(`[DEBUG] ネットワーク切断を検出 - BlockID待機を中断 (CM: ${ConnectionManager.isConnected}, WS: ${NetworkState.ws.connected})`, 'debug');
+                    throw new Error('Network disconnected while waiting for BlockID');
+                }
+                
+                // Check WebSocket monitor first
+                if (NetworkState.ws.monitorActive && NetworkState.ws.monitoredTransactions && NetworkState.ws.monitoredTransactions.has(txid)) {
+                    const monitorData = NetworkState.ws.monitoredTransactions.get(txid);
+                    if (monitorData.blockId) {
+                        blockId = monitorData.blockId;
+                        log(`WebSocket経由でBlockID取得: ${blockId.substring(0, 16)}...`);
+                        // Remove from monitoring list
+                        // v5.11.117: Keep in monitoring list for 90 seconds after receipt
+                        // NetworkState.ws.monitoredTransactions.delete(txid);
+                        FileState.uploadingChunksCount--; // v5.5.36: Using FileState
+                        return blockId;
+                    }
+                }
+                
+                // After 30 seconds, try RPC
+                if (waitTime >= 30000 && NetworkState.rpcClient) {
+                    try {
+                        log('30秒経過 - RPCで確認を試みます...');
+                        const txInfo = await NetworkState.rpcClient.getTransaction({
+                            transactionId: txid,
+                            includeBlockInfo: true
+                        });
+                        
+                        if (txInfo && txInfo.blockHash) {
+                            blockId = txInfo.blockHash;
+                            log(`RPC経由でBlockID取得: ${blockId.substring(0, 16)}...`);
+                            return blockId;
+                        }
+                    } catch (err) {
+                        // Transaction might not be confirmed yet
+                        log(`RPC確認エラー: ${err.message}`, 'debug');
+                    }
+                }
+                
+                await new Promise(resolve => setTimeout(resolve, 500));
+                waitTime += 500;
+            }
+            
+            // Fallback - throw error if not found
+            throw new Error(`BlockIDの取得に失敗: ${txid}`);
+        }
 
         // Compression logic
         const COMPRESS_SKIP = new Set(['jpg','jpeg','png','gif','webp','mp4','avi','mov','mp3','wav','zip','rar','pdf']);

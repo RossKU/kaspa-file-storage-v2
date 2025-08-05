@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.130 - カスタムRPCエンドポイント機能の有効化</title>
+    <title>Kaspa P2P File Storage v5.11.131 - アップロードタブUIの簡略化</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -1631,36 +1631,15 @@
                 <button id="cancelResumeBtn" style="background: var(--text-secondary); margin-top: 10px;">キャンセル</button>
             </div>
             
-            <div class="grid-2">
-                <div>
-                    <label>パスワード (8文字以上)</label>
-                    <input type="password" id="uploadPassword" placeholder="強力なパスワードを入力">
-                </div>
-                <div>
-                    <label>チャンクサイズ</label>
-                    <select id="chunkSize">
-                        <option value="10">10KB chunks (安全)</option>
-                        <option value="12">12KB chunks (旧方式)</option>
-                        <option value="15">15KB chunks (リスクあり)</option>
-                        <option value="20">🧪 20KB chunks (実験的)</option>
-                    <option value="22" selected>🚀 22KB chunks (推奨・可変チャンク)</option>
-                    </select>
-                </div>
+            <!-- v5.11.131: Simplified vertical layout -->
+            <div style="margin-top: 20px;">
+                <label style="display: block; margin-bottom: 5px; font-weight: bold;">🔑 パスワード (8文字以上)</label>
+                <input type="password" id="uploadPassword" placeholder="強力なパスワードを入力" style="width: 100%; padding: 12px; font-size: 16px; border: 1px solid var(--border-color); border-radius: 5px; box-sizing: border-box;">
             </div>
             
-            <div class="checkbox-label">
-                <input type="checkbox" id="useMetaTx" checked>
-                <label for="useMetaTx">メタTxIDを使用（推奨：履歴から簡単に共有可能）</label>
-            </div>
-            
-            
-            <div class="checkbox-label">
-                <input type="checkbox" id="useRandomCid">
-                <label for="useRandomCid">ランダムCIDを使用（検閲回避）</label>
-            </div>
-            
-            <button onclick="processAndUpload()" id="uploadBtn" disabled>
-                ファイルを処理してアップロード
+            <!-- v5.11.131: Always visible upload button -->
+            <button onclick="processAndUpload()" id="uploadBtn" disabled style="margin-top: 20px; width: 100%; padding: 15px; font-size: 18px; font-weight: bold; background: var(--accent-color); color: var(--button-text-on-accent); border: none; border-radius: 8px; cursor: pointer; transition: all 0.3s; opacity: 0.5;">
+                📤 アップロード
             </button>
             
             <!-- Upload Progress -->
@@ -1976,6 +1955,35 @@
                         <input type="checkbox" id="forceArchiveNodeToggle" disabled onchange="toggleForceArchiveNode()">
                         <span class="toggle-slider"></span>
                     </label>
+                </div>
+            </div>
+            
+            <!-- v5.11.131: Upload Settings -->
+            <div class="metric-box" style="margin-top: 20px;">
+                <h3>📤 アップロード設定</h3>
+                <div style="margin-top: 15px;">
+                    <label>チャンクサイズ</label>
+                    <select id="chunkSize" style="width: 100%; padding: 8px; margin-top: 5px;">
+                        <option value="10">10KB chunks (安全)</option>
+                        <option value="12">12KB chunks (旧方式)</option>
+                        <option value="15">15KB chunks (リスクあり)</option>
+                        <option value="18" selected>18KB chunks (並列アップロード推奨)</option>
+                        <option value="20">20KB chunks (高リスク)</option>
+                    </select>
+                </div>
+                
+                <div style="margin-top: 15px;">
+                    <div class="checkbox-label">
+                        <input type="checkbox" id="useMetaTx" checked>
+                        <label for="useMetaTx">メタTxIDを使用（推奨：履歴から簡単に共有可能）</label>
+                    </div>
+                </div>
+                
+                <div style="margin-top: 10px;">
+                    <div class="checkbox-label">
+                        <input type="checkbox" id="useRandomCid">
+                        <label for="useRandomCid">ランダムCIDを使用（検閲回避）</label>
+                    </div>
                 </div>
             </div>
             
@@ -2633,7 +2641,7 @@
                     }
                     
                     document.getElementById('testBtn').disabled = false;
-                    document.getElementById('uploadBtn').disabled = !UserState.address; // Only enable if wallet connected
+                    updateUploadButtonState(UserState.address); // Only enable if wallet connected
                     
                     updateNetworkStatus('online', 'オンライン');
                     
@@ -2721,7 +2729,7 @@
                         document.getElementById('walletBalance').textContent = `${balance.toFixed(8)} KAS`;
                         
                         // Update upload button state
-                        document.getElementById('uploadBtn').disabled = false;
+                        updateUploadButtonState(true);
                     } else {
                         document.getElementById('walletBalance').textContent = 'RPC未接続';
                     }
@@ -8293,6 +8301,16 @@
             return parts.length > 1 ? parts[1] : 'Kaspa P2P File Storage';
         }
         
+        // v5.11.131: Update upload button state with proper styling
+        function updateUploadButtonState(enabled) {
+            const uploadBtn = document.getElementById('uploadBtn');
+            if (uploadBtn) {
+                uploadBtn.disabled = !enabled;
+                uploadBtn.style.opacity = enabled ? '1' : '0.5';
+                uploadBtn.style.cursor = enabled ? 'pointer' : 'not-allowed';
+            }
+        }
+        
         // Configuration
         const config = {
             defaultNetwork: 'testnet-10', // v5.11.101: Configurable default network
@@ -10440,7 +10458,7 @@
             }
             
             // Disable upload button
-            document.getElementById('uploadBtn').disabled = true;
+            updateUploadButtonState(false);
             
             log('ウォレット切断', 'info');
         };
@@ -11776,7 +11794,7 @@
                 log(`既存のチャンク情報を復元: ${FileState.processedChunks.length}個`, 'info');
             }
             
-            document.getElementById('uploadBtn').disabled = true;
+            updateUploadButtonState(false);
             const uploadProgressInit = document.getElementById('uploadProgress');
             if (uploadProgressInit) {
                 uploadProgressInit.style.display = 'block';
@@ -11932,7 +11950,7 @@
                     
                     if (!continueUpload) {
                         log('アップロードがキャンセルされました', 'info');
-                        document.getElementById('uploadBtn').disabled = false;
+                        updateUploadButtonState(true);
                         document.getElementById('uploadProgress').style.display = 'none';
                         // v5.5.28: Fixed local variable reference - use FileState.progressManager
                         FileState.progressManager = null;
@@ -12054,7 +12072,7 @@
                         };
                         
                         // Reset UI state
-                        document.getElementById('uploadBtn').disabled = false;
+                        updateUploadButtonState(true);
                         document.getElementById('uploadProgress').style.display = 'none';
                         
                         // Keep progress manager for resume capability

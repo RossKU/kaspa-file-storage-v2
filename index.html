@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.129 - アーカイブノードのハードコードURL削除</title>
+    <title>Kaspa P2P File Storage v5.11.130 - カスタムRPCエンドポイント機能の有効化</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -1911,7 +1911,7 @@
                 </select>
                 
                 <label>ノードタイプ</label>
-                <select id="nodeTypeSelect" onchange="onNodeTypeChange()">
+                <select id="nodeTypeSelect">
                     <option value="auto" selected>自動選択 (推奨)</option>
                     <option value="standard">通常ノード</option>
                     <option value="archive">アーカイブノード</option>
@@ -15445,6 +15445,58 @@
                     NetworkState.archiveManager.updateNetwork(config.network);
                 }
             });
+            
+            // v5.11.130: Node type selection handler
+            const nodeTypeSelect = document.getElementById('nodeTypeSelect');
+            const customEndpointSection = document.getElementById('customEndpointSection');
+            const customRpcEndpoint = document.getElementById('customRpcEndpoint');
+            
+            // Initialize from config
+            if (nodeTypeSelect) {
+                nodeTypeSelect.value = config.nodeType;
+                if (config.customEndpoint) {
+                    customRpcEndpoint.value = config.customEndpoint;
+                }
+                
+                // Initial visibility
+                if (config.nodeType === 'custom') {
+                    customEndpointSection.style.display = 'block';
+                }
+                
+                nodeTypeSelect.addEventListener('change', async (e) => {
+                    const previousNodeType = config.nodeType;
+                    config.nodeType = e.target.value;
+                    
+                    // Show/hide custom endpoint section
+                    if (config.nodeType === 'custom') {
+                        customEndpointSection.style.display = 'block';
+                    } else {
+                        customEndpointSection.style.display = 'none';
+                    }
+                    
+                    log(`ノードタイプ変更: ${previousNodeType} → ${config.nodeType}`, 'info');
+                    
+                    // If RPC is connected and node type changed, reconnect with new settings
+                    if (NetworkState.rpcClient && previousNodeType !== config.nodeType) {
+                        try {
+                            await NetworkState.rpcClient.disconnect();
+                            NetworkState.rpcClient = null;
+                            log('ノードタイプ変更のためRPC接続を切断しました', 'info');
+                            
+                            // Reconnect with new node type
+                            await initializeSystem();
+                        } catch (error) {
+                            log(`再接続エラー: ${error.message}`, 'error');
+                        }
+                    }
+                });
+                
+                // Custom endpoint input handler
+                customRpcEndpoint.addEventListener('input', (e) => {
+                    config.customEndpoint = e.target.value.trim();
+                    log(`カスタムエンドポイント更新: ${config.customEndpoint}`, 'info');
+                });
+            }
             
             document.getElementById('retryCount').addEventListener('change', (e) => {
                 config.retryCount = parseInt(e.target.value);

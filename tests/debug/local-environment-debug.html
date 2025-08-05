@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>ローカル環境デバッグ</title>
+    <style>
+        body { 
+            background: #1a1a1a; 
+            color: #e0e0e0; 
+            font-family: monospace; 
+            padding: 20px;
+        }
+        .section { 
+            margin: 20px 0; 
+            padding: 15px; 
+            background: #2a2a2a; 
+            border-radius: 4px;
+        }
+        .good { color: #4CAF50; }
+        .bad { color: #f44336; }
+        .warning { color: #ff9800; }
+        button {
+            background: #2A6F65;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <h1>ローカル環境問題デバッグ</h1>
+    
+    <div class="section">
+        <h2>1. ブラウザ環境チェック</h2>
+        <button onclick="checkBrowser()">ブラウザ診断</button>
+        <div id="browser-results"></div>
+    </div>
+    
+    <div class="section">
+        <h2>2. WebSocket制限チェック</h2>
+        <button onclick="checkWebSocketLimits()">WebSocket診断</button>
+        <div id="ws-results"></div>
+    </div>
+    
+    <div class="section">
+        <h2>3. プロキシ/VPN検出</h2>
+        <button onclick="checkProxy()">プロキシ診断</button>
+        <div id="proxy-results"></div>
+    </div>
+    
+    <div class="section">
+        <h2>4. 代替接続方法テスト</h2>
+        <button onclick="testAlternatives()">代替方法テスト</button>
+        <div id="alt-results"></div>
+    </div>
+
+    <script>
+        // 1. ブラウザ環境チェック
+        window.checkBrowser = function() {
+            const results = document.getElementById('browser-results');
+            results.innerHTML = '';
+            
+            // ブラウザ情報
+            results.innerHTML += `<p>ブラウザ: ${navigator.userAgent}</p>`;
+            
+            // 拡張機能の影響チェック
+            const extensionTests = [
+                { test: () => window.chrome && chrome.runtime, name: 'Chrome拡張機能API' },
+                { test: () => window.browser, name: 'Firefox拡張機能API' },
+                { test: () => document.querySelector('meta[name="ad-blocker"]'), name: '広告ブロッカー' }
+            ];
+            
+            extensionTests.forEach(({ test, name }) => {
+                try {
+                    const hasExtension = test();
+                    results.innerHTML += `
+                        <p class="${hasExtension ? 'warning' : 'good'}">
+                            ${name}: ${hasExtension ? '検出（干渉の可能性）' : '未検出'}
+                        </p>
+                    `;
+                } catch (e) {}
+            });
+            
+            // Service Worker
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.getRegistrations().then(regs => {
+                    results.innerHTML += `<p>Service Worker: ${regs.length}個登録</p>`;
+                });
+            }
+            
+            // ローカルストレージサイズ
+            let storageSize = 0;
+            for (let key in localStorage) {
+                storageSize += localStorage[key].length;
+            }
+            results.innerHTML += `
+                <p class="${storageSize > 5000000 ? 'warning' : 'good'}">
+                    LocalStorage使用量: ${(storageSize / 1024 / 1024).toFixed(2)} MB
+                </p>
+            `;
+            
+            // キャッシュクリア推奨
+            results.innerHTML += `
+                <h4>推奨事項:</h4>
+                <ul>
+                    <li>ブラウザのキャッシュをクリア（Ctrl+Shift+Delete）</li>
+                    <li>拡張機能を一時的に無効化</li>
+                    <li>プライベートウィンドウで試す</li>
+                </ul>
+            `;
+        };
+        
+        // 2. WebSocket制限チェック
+        window.checkWebSocketLimits = async function() {
+            const results = document.getElementById('ws-results');
+            results.innerHTML = '<p>WebSocket制限をテスト中...</p>';
+            
+            // 同時接続数テスト
+            const connections = [];
+            let maxConnections = 0;
+            
+            for (let i = 0; i < 10; i++) {
+                try {
+                    const ws = new WebSocket('wss://echo.websocket.org');
+                    connections.push(ws);
+                    
+                    await new Promise((resolve, reject) => {
+                        ws.onopen = () => {
+                            maxConnections++;
+                            resolve();
+                        };
+                        ws.onerror = reject;
+                        setTimeout(reject, 3000);
+                    });
+                } catch (e) {
+                    break;
+                }
+            }
+            
+            // クリーンアップ
+            connections.forEach(ws => ws.close());
+            
+            results.innerHTML = `
+                <p class="${maxConnections < 5 ? 'bad' : 'good'}">
+                    同時WebSocket接続数: ${maxConnections}/10
+                    ${maxConnections < 5 ? ' ⚠️ 制限されています' : ''}
+                </p>
+            `;
+            
+            // CORS制限テスト
+            try {
+                const response = await fetch('https://api-tn10.kaspa.org/info/health', {
+                    mode: 'cors'
+                });
+                results.innerHTML += '<p class="good">CORS: 正常</p>';
+            } catch (e) {
+                results.innerHTML += '<p class="bad">CORS: 制限あり</p>';
+            }
+            
+            // ファイアウォール/アンチウイルスの可能性
+            results.innerHTML += `
+                <h4>考えられる原因:</h4>
+                <ul>
+                    <li>企業/学校のファイアウォール</li>
+                    <li>アンチウイルスソフトのWebシールド</li>
+                    <li>ISPレベルでのWebSocket制限</li>
+                    <li>ルーターのセキュリティ設定</li>
+                </ul>
+            `;
+        };
+        
+        // 3. プロキシ/VPN検出
+        window.checkProxy = async function() {
+            const results = document.getElementById('proxy-results');
+            results.innerHTML = '<p>ネットワーク経路をチェック中...</p>';
+            
+            // RTT（往復遅延時間）測定
+            const rtts = [];
+            for (let i = 0; i < 5; i++) {
+                const start = performance.now();
+                try {
+                    await fetch('https://www.google.com/favicon.ico?t=' + Date.now());
+                    rtts.push(performance.now() - start);
+                } catch (e) {}
+            }
+            
+            const avgRtt = rtts.reduce((a, b) => a + b, 0) / rtts.length;
+            
+            results.innerHTML = `
+                <p class="${avgRtt > 500 ? 'warning' : 'good'}">
+                    平均RTT: ${avgRtt.toFixed(0)}ms
+                    ${avgRtt > 500 ? ' (プロキシ/VPNの可能性)' : ''}
+                </p>
+            `;
+            
+            // WebRTC IP漏洩テスト（プロキシ検出）
+            try {
+                const pc = new RTCPeerConnection({
+                    iceServers: [{urls: 'stun:stun.l.google.com:19302'}]
+                });
+                pc.createDataChannel('');
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+                
+                pc.onicecandidate = (e) => {
+                    if (e.candidate) {
+                        const ip = e.candidate.candidate.match(/(\d+\.\d+\.\d+\.\d+)/);
+                        if (ip) {
+                            results.innerHTML += `<p>検出されたIP: ${ip[1]}</p>`;
+                        }
+                    }
+                };
+            } catch (e) {}
+            
+            results.innerHTML += `
+                <h4>対策:</h4>
+                <ul>
+                    <li>VPNを使用している場合は一時的に無効化</li>
+                    <li>企業プロキシの場合は直接接続を試す</li>
+                    <li>モバイルテザリングで接続してテスト</li>
+                </ul>
+            `;
+        };
+        
+        // 4. 代替接続方法
+        window.testAlternatives = async function() {
+            const results = document.getElementById('alt-results');
+            results.innerHTML = '<h3>代替接続方法をテスト中...</h3>';
+            
+            // HTTPフォールバック
+            results.innerHTML += '<h4>1. HTTP API（WebSocket不使用）</h4>';
+            try {
+                const start = performance.now();
+                const response = await fetch('https://api-tn10.kaspa.org/addresses/kaspatest:qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqkx9awp4e/balance');
+                const time = performance.now() - start;
+                
+                if (response.ok) {
+                    results.innerHTML += `<p class="good">✓ HTTP API: ${time.toFixed(0)}ms</p>`;
+                    results.innerHTML += `
+                        <p>HTTP APIは正常に動作しています。WebSocketの問題の可能性が高いです。</p>
+                        <pre>
+// 一時的な回避策：HTTP APIを使用
+async function getBalance(address) {
+    const response = await fetch(\`https://api-tn10.kaspa.org/addresses/\${address}/balance\`);
+    return await response.json();
+}
+                        </pre>
+                    `;
+                }
+            } catch (e) {
+                results.innerHTML += '<p class="bad">✗ HTTP APIも失敗</p>';
+            }
+            
+            // 2. 別ポートテスト
+            results.innerHTML += '<h4>2. 別ポート/プロトコル</h4>';
+            const altPorts = [
+                { url: 'https://kaspa.org', name: 'HTTPS (443)' },
+                { url: 'http://kaspa.org', name: 'HTTP (80)' }
+            ];
+            
+            for (const { url, name } of altPorts) {
+                try {
+                    const start = performance.now();
+                    await fetch(url, { mode: 'no-cors' });
+                    const time = performance.now() - start;
+                    results.innerHTML += `<p class="good">${name}: ${time.toFixed(0)}ms</p>`;
+                } catch (e) {
+                    results.innerHTML += `<p class="bad">${name}: 失敗</p>`;
+                }
+            }
+            
+            // 3. 診断サマリー
+            results.innerHTML += `
+                <h4>診断サマリー</h4>
+                <div style="background: #333; padding: 15px; border-radius: 4px;">
+                    <p><strong>最も可能性の高い原因:</strong></p>
+                    <ol>
+                        <li>WebSocketがファイアウォール/プロキシでブロックされている</li>
+                        <li>ISPがWebSocketトラフィックを制限している</li>
+                        <li>ブラウザ拡張機能が干渉している</li>
+                    </ol>
+                    
+                    <p><strong>推奨される解決策:</strong></p>
+                    <ol>
+                        <li>別のネットワーク（モバイルテザリング等）で試す</li>
+                        <li>プライベートブラウジングモードで試す</li>
+                        <li>別のブラウザ（Firefox/Edge）で試す</li>
+                        <li>PCを再起動して試す</li>
+                    </ol>
+                </div>
+            `;
+        };
+        
+        // 自動実行
+        checkBrowser();
+    </script>
+</body>
+</html>

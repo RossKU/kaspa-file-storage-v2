@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>シンプルRPCテスト</title>
+    <style>
+        body { background: #1a1a1a; color: #e0e0e0; font-family: monospace; padding: 20px; }
+        .step { margin: 10px 0; padding: 10px; background: #2a2a2a; border-radius: 4px; }
+        .slow { color: #f44336; font-weight: bold; }
+        .fast { color: #4CAF50; }
+        .time { color: #03A9F4; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>最小限のRPCテスト</h1>
+    <button onclick="testMinimal()">テスト開始</button>
+    <div id="log"></div>
+
+    <script type="module">
+        const log = document.getElementById('log');
+        
+        window.testMinimal = async function() {
+            log.innerHTML = '';
+            const totalStart = performance.now();
+            
+            function addLog(msg, time = null) {
+                const timeStr = time ? ` <span class="time">${time.toFixed(0)}ms</span>` : '';
+                const slowClass = time && time > 3000 ? 'slow' : '';
+                log.innerHTML += `<div class="step ${slowClass}">${msg}${timeStr}</div>`;
+            }
+            
+            try {
+                // 1. スクリプトロード
+                const scriptStart = performance.now();
+                const script = document.createElement('script');
+                script.src = 'kaspa-core.js';
+                document.head.appendChild(script);
+                
+                await new Promise((resolve, reject) => {
+                    script.onload = resolve;
+                    script.onerror = reject;
+                });
+                
+                addLog('1. kaspa-core.js ロード', performance.now() - scriptStart);
+                
+                // 2. WASM初期化
+                const initStart = performance.now();
+                await init();
+                addLog('2. WASM初期化', performance.now() - initStart);
+                
+                // 3. RpcClient作成
+                const clientStart = performance.now();
+                const rpcClient = new RpcClient({
+                    url: 'wss://tn10.katnip.sh/wrpc/kaspa/testnet-10',
+                    networkId: 'testnet-10'
+                });
+                addLog('3. RpcClient インスタンス作成', performance.now() - clientStart);
+                
+                // 4. 接続
+                const connectStart = performance.now();
+                await rpcClient.connect();
+                addLog('4. RPC接続', performance.now() - connectStart);
+                
+                // 5. 簡単なRPC呼び出し
+                const callStart = performance.now();
+                const info = await rpcClient.getInfo();
+                addLog('5. getInfo呼び出し', performance.now() - callStart);
+                
+                // 6. 切断
+                const disconnectStart = performance.now();
+                await rpcClient.disconnect();
+                addLog('6. 切断', performance.now() - disconnectStart);
+                
+                // 総時間
+                const totalTime = performance.now() - totalStart;
+                addLog(`<strong>総時間: ${totalTime.toFixed(0)}ms</strong>`);
+                
+                // 診断
+                if (totalTime > 10000) {
+                    addLog('<div style="background:#f44336;padding:15px;margin-top:20px;border-radius:4px;">');
+                    addLog('<strong>🔍 診断結果：極端に遅い</strong>');
+                    addLog('最も時間がかかったステップを確認してください。');
+                    addLog('</div>');
+                }
+                
+            } catch (error) {
+                addLog(`エラー: ${error.message}`, null);
+            }
+        };
+    </script>
+</body>
+</html>

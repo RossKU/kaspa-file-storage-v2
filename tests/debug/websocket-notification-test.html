@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket通知テスト</title>
+    <style>
+        body { background: #1a1a1a; color: #e0e0e0; font-family: monospace; padding: 20px; }
+        .test { margin: 10px 0; padding: 15px; background: #2a2a2a; border-radius: 4px; }
+        .success { color: #4CAF50; }
+        .error { color: #f44336; }
+        .event { background: #333; padding: 10px; margin: 5px 0; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <h1>WebSocket通知機能テスト</h1>
+    <button onclick="testNotifications()">通知テスト開始</button>
+    <div id="log"></div>
+
+    <script type="module">
+        const log = document.getElementById('log');
+        
+        function addLog(msg, type = '') {
+            const time = new Date().toISOString().substr(11, 12);
+            log.innerHTML += `<div class="test ${type}">[${time}] ${msg}</div>`;
+        }
+        
+        window.testNotifications = async function() {
+            log.innerHTML = '';
+            addLog('テスト開始');
+            
+            try {
+                // WASM初期化
+                await init();
+                addLog('WASM初期化完了', 'success');
+                
+                // RPC接続
+                const rpcClient = new RpcClient({
+                    url: 'wss://tn10.katnip.sh/wrpc/kaspa/testnet-10',
+                    networkId: 'testnet-10'
+                });
+                
+                await rpcClient.connect();
+                addLog('RPC接続成功', 'success');
+                
+                // 1. subscribeBlockAddedのテスト
+                addLog('subscribeBlockAdded呼び出し中...');
+                let eventCount = 0;
+                
+                try {
+                    await rpcClient.subscribeBlockAdded(async (event) => {
+                        eventCount++;
+                        addLog(`<div class="event">Block Added Event #${eventCount}: ${JSON.stringify(event).substr(0, 100)}...</div>`, 'success');
+                    });
+                    
+                    addLog('subscribeBlockAdded成功 - イベント待機中...', 'success');
+                    
+                    // 30秒待機
+                    await new Promise(resolve => {
+                        let seconds = 0;
+                        const interval = setInterval(() => {
+                            seconds++;
+                            if (seconds % 5 === 0) {
+                                addLog(`待機中... ${seconds}秒 (受信イベント: ${eventCount})`);
+                            }
+                            if (seconds >= 30) {
+                                clearInterval(interval);
+                                resolve();
+                            }
+                        }, 1000);
+                    });
+                    
+                } catch (e) {
+                    addLog(`subscribeBlockAddedエラー: ${e.message}`, 'error');
+                }
+                
+                // 2. 他の通知メソッドのテスト
+                addLog('他の通知メソッドをテスト中...');
+                
+                // getInfo（通常のRPC呼び出し）
+                try {
+                    const info = await rpcClient.getInfo();
+                    addLog('getInfo成功 - 通常のRPC呼び出しは正常', 'success');
+                } catch (e) {
+                    addLog('getInfoエラー', 'error');
+                }
+                
+                // 診断結果
+                addLog(`<div style="background:#f44336;padding:15px;margin-top:20px;border-radius:4px;">
+                    <h3>診断結果</h3>
+                    <p>受信したBlock Addedイベント: ${eventCount}</p>
+                    ${eventCount === 0 ? '<p><strong>WebSocket通知が受信されていません！</strong></p>' : ''}
+                    <p>考えられる原因:</p>
+                    <ul>
+                        <li>RPCサーバーが通知を送信していない</li>
+                        <li>WebSocketの通知チャンネルがブロックされている</li>
+                        <li>subscribeメソッドの実装に問題がある</li>
+                    </ul>
+                </div>`);
+                
+                await rpcClient.disconnect();
+                
+            } catch (error) {
+                addLog(`エラー: ${error.message}`, 'error');
+            }
+        };
+    </script>
+    
+    <script src="kaspa-core.js"></script>
+</body>
+</html>

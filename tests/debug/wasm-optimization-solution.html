@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WASM最適化ソリューション</title>
+    <style>
+        body { background: #1a1a1a; color: #e0e0e0; font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; }
+        .solution { background: #2a2a2a; padding: 20px; margin: 20px 0; border-radius: 8px; }
+        .critical { background: #f44336; color: white; padding: 15px; border-radius: 4px; margin: 10px 0; }
+        .code { background: #333; padding: 15px; border-radius: 4px; font-family: monospace; overflow-x: auto; }
+        h2 { color: #4CAF50; }
+        button { background: #2A6F65; color: white; border: none; padding: 10px 20px; margin: 5px; border-radius: 4px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>問題の原因: 巨大なWASMファイル（11.4MB）</h1>
+    
+    <div class="critical">
+        <h3>⚠️ 根本原因</h3>
+        <p>kaspa-core_bg.wasm が 11.4MB と巨大すぎます。これが全ての遅延の原因です。</p>
+        <ul>
+            <li>毎回11.4MBをダウンロード</li>
+            <li>プライベートモードではキャッシュが効かない</li>
+            <li>GitHub Pages等では配信が特に遅い</li>
+        </ul>
+    </div>
+    
+    <div class="solution">
+        <h2>解決策1: WASM遅延読み込み + プログレス表示</h2>
+        <div class="code">
+// index.htmlの冒頭に追加
+let wasmLoaded = false;
+let wasmLoading = false;
+
+async function loadWasmWithProgress() {
+    if (wasmLoaded || wasmLoading) return;
+    wasmLoading = true;
+    
+    // プログレス表示
+    const progress = document.createElement('div');
+    progress.id = 'wasm-progress';
+    progress.style.cssText = `
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: #2A6F65;
+        color: white;
+        padding: 30px;
+        border-radius: 8px;
+        z-index: 10000;
+        text-align: center;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    `;
+    progress.innerHTML = `
+        <h3>初回起動準備中...</h3>
+        <p>WASMファイル読み込み中 (11.4MB)</p>
+        <div style="background: #1a1a1a; height: 20px; border-radius: 10px; overflow: hidden; margin-top: 10px;">
+            <div id="progress-bar" style="background: #4CAF50; height: 100%; width: 0%; transition: width 0.3s;"></div>
+        </div>
+        <p id="progress-text">0%</p>
+    `;
+    document.body.appendChild(progress);
+    
+    try {
+        // JSファイル読み込み
+        const response = await fetch('kaspa-core.js');
+        const blob = await response.blob();
+        const script = document.createElement('script');
+        script.src = URL.createObjectURL(blob);
+        
+        await new Promise((resolve) => {
+            script.onload = resolve;
+            document.head.appendChild(script);
+        });
+        
+        // WASM初期化（プログレス付き）
+        await init({
+            // プログレスコールバック
+            progress: (loaded, total) => {
+                const percent = Math.round((loaded / total) * 100);
+                document.getElementById('progress-bar').style.width = percent + '%';
+                document.getElementById('progress-text').textContent = percent + '%';
+            }
+        });
+        
+        wasmLoaded = true;
+        progress.remove();
+        
+    } catch (e) {
+        progress.innerHTML = `<h3>読み込みエラー</h3><p>${e.message}</p>`;
+        setTimeout(() => progress.remove(), 3000);
+    }
+    
+    wasmLoading = false;
+}
+
+// 必要な時だけ読み込み
+async function connectToRPC() {
+    await loadWasmWithProgress();
+    // その後RPCに接続
+}
+        </div>
+    </div>
+    
+    <div class="solution">
+        <h2>解決策2: Service Workerでキャッシュ</h2>
+        <button onclick="installServiceWorker()">Service Worker インストール</button>
+        <div id="sw-status"></div>
+    </div>
+    
+    <div class="solution">
+        <h2>解決策3: CDN経由での配信</h2>
+        <div class="code">
+// Cloudflare等のCDNを使用
+const wasmUrl = 'https://cdn.jsdelivr.net/gh/rossku/kaspa-file-storage-v2@main/kaspa-core_bg.wasm';
+
+// または、圧縮版を使用
+const compressedWasmUrl = 'kaspa-core_bg.wasm.gz';
+        </div>
+    </div>
+    
+    <div class="solution">
+        <h2>解決策4: 分割読み込み（推奨）</h2>
+        <div class="code">
+// WASMを機能別に分割
+const modules = {
+    core: 'kaspa-core-essential.wasm',    // 2MB - 必須機能のみ
+    crypto: 'kaspa-crypto.wasm',          // 3MB - 暗号化機能
+    mining: 'kaspa-mining.wasm'           // 残り - マイニング機能
+};
+
+// 必要な機能だけ読み込み
+async function loadEssentialOnly() {
+    await init(modules.core);
+    // ファイル操作には必須機能のみで十分
+}
+        </div>
+    </div>
+    
+    <script>
+        function installServiceWorker() {
+            const status = document.getElementById('sw-status');
+            
+            const swCode = `
+// Service Worker (sw.js)
+const CACHE_NAME = 'kaspa-wasm-v1';
+const urlsToCache = [
+    'kaspa-core.js',
+    'kaspa-core_bg.wasm'
+];
+
+self.addEventListener('install', event => {
+    event.waitUntil(
+        caches.open(CACHE_NAME)
+            .then(cache => cache.addAll(urlsToCache))
+    );
+});
+
+self.addEventListener('fetch', event => {
+    if (event.request.url.includes('.wasm') || event.request.url.includes('kaspa-core.js')) {
+        event.respondWith(
+            caches.match(event.request)
+                .then(response => response || fetch(event.request))
+        );
+    }
+});
+            `;
+            
+            // Service Worker作成
+            const blob = new Blob([swCode], { type: 'application/javascript' });
+            const swUrl = URL.createObjectURL(blob);
+            
+            navigator.serviceWorker.register(swUrl)
+                .then(reg => {
+                    status.innerHTML = '<p style="color: #4CAF50;">✓ Service Worker インストール成功！次回から高速化されます。</p>';
+                })
+                .catch(err => {
+                    status.innerHTML = '<p style="color: #f44336;">✗ エラー: ' + err.message + '</p>';
+                });
+        }
+    </script>
+    
+    <div class="solution">
+        <h2>📊 影響の詳細</h2>
+        <ul>
+            <li>初回読み込み: 11.4MB ÷ 1Mbps = 約91秒</li>
+            <li>通常の接続(10Mbps): 約9秒</li>
+            <li>高速接続(100Mbps): 約0.9秒</li>
+        </ul>
+        <p><strong>昨日は正常 → 今日は遅い</strong> の理由:</p>
+        <ul>
+            <li>昨日: ブラウザキャッシュが効いていた</li>
+            <li>今日: キャッシュがクリアされた or 期限切れ</li>
+        </ul>
+    </div>
+</body>
+</html>

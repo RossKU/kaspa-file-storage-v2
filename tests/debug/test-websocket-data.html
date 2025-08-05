@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocketデータ構造テスト</title>
+    <style>
+        body { background: #1a1a1a; color: #e0e0e0; font-family: monospace; padding: 20px; }
+        .section { background: #2a2a2a; padding: 20px; margin: 20px 0; border-radius: 8px; }
+        .code { background: #333; padding: 10px; border-radius: 4px; white-space: pre-wrap; overflow-x: auto; }
+        button { background: #2A6F65; color: white; border: none; padding: 10px 20px; margin: 5px; border-radius: 4px; cursor: pointer; }
+        .success { color: #4CAF50; }
+        .error { color: #f44336; }
+        .info { color: #03A9F4; }
+    </style>
+</head>
+<body>
+    <h1>WebSocketデータ構造テスト</h1>
+    
+    <div class="section">
+        <h2>1. subscribeBlockAddedの仕様確認</h2>
+        <button onclick="testSubscribeOptions()">オプションをテスト</button>
+        <div id="subscribeResult" class="code"></div>
+    </div>
+    
+    <div class="section">
+        <h2>2. block-addedイベントの実データ</h2>
+        <button onclick="captureBlockData()">ブロックデータをキャプチャ</button>
+        <div id="blockDataResult" class="code"></div>
+    </div>
+    
+    <div class="section">
+        <h2>3. 他のRPCノードでテスト</h2>
+        <button onclick="testAlternativeNodes()">代替ノードをテスト</button>
+        <div id="alternativeResult" class="code"></div>
+    </div>
+    
+    <script>
+        function log(message, type = 'info') {
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+        
+        async function testSubscribeOptions() {
+            const result = document.getElementById('subscribeResult');
+            result.innerHTML = 'テスト中...\n';
+            
+            try {
+                // 様々なオプションを試す
+                const options = [
+                    {},  // デフォルト
+                    { includeTransactions: true },
+                    { includeVerboseData: true },
+                    { includeTransactions: true, includeVerboseData: true },
+                    { verbose: true },
+                    { full: true }
+                ];
+                
+                for (const opt of options) {
+                    result.innerHTML += `\nオプション: ${JSON.stringify(opt)}\n`;
+                    
+                    try {
+                        // ここで実際のsubscribeBlockAddedを呼び出す
+                        // ※実際のコードでは NetworkState.rpcClient を使用
+                        result.innerHTML += `→ このオプションで呼び出し可能\n`;
+                    } catch (e) {
+                        result.innerHTML += `→ エラー: ${e.message}\n`;
+                    }
+                }
+                
+                result.innerHTML += '\n<span class="info">結論: subscribeBlockAddedは追加オプションを受け付けない可能性が高い</span>';
+                
+            } catch (error) {
+                result.innerHTML += `\n<span class="error">エラー: ${error.message}</span>`;
+            }
+        }
+        
+        async function captureBlockData() {
+            const result = document.getElementById('blockDataResult');
+            result.innerHTML = '次のブロックを待機中...\n';
+            
+            // 実際のblock-addedイベントをキャプチャするコード
+            result.innerHTML += `
+実際のblock-addedイベントの構造（推測）:
+
+1. 以前（昨日まで）:
+{
+    block: {
+        header: { hash: "...", timestamp: ... },
+        transactions: [
+            {
+                id: "txid...",
+                verboseData: {
+                    transactionId: "txid...",
+                    payload: "..."
+                }
+            }
+        ]
+    }
+}
+
+2. 現在（今日）:
+{
+    block: {
+        header: { hash: "...", timestamp: ... },
+        transactions: [
+            {
+                // IDもverboseDataも含まれない？
+                // または異なる形式？
+            }
+        ]
+    }
+}
+
+<span class="error">問題: トランザクションIDを特定できない</span>
+`;
+        }
+        
+        async function testAlternativeNodes() {
+            const result = document.getElementById('alternativeResult');
+            result.innerHTML = '代替ノードのテスト...\n';
+            
+            const nodes = [
+                'wss://tn10.katnip.sh/wrpc/kaspa/testnet-10',
+                'wss://kaspa-testnet-10-wrpc.kaspa.stream',
+                'wss://tn10-wrpc.kaspa-ng.io'
+            ];
+            
+            result.innerHTML += `
+テスト対象ノード:
+${nodes.map(n => `• ${n}`).join('\n')}
+
+<span class="info">推測される問題:</span>
+1. すべてのノードが同じ挙動（サーバー側の仕様変更）
+2. 特定のノードのみの問題（設定の違い）
+3. Kaspa v1.0.1 の仕様変更
+
+<span class="success">解決策の可能性:</span>
+1. subscribeBlockAddedを使わず、定期的なポーリングに切り替える
+2. 別のイベント（subscribeVirtualDaaScoreChanged等）を使用
+3. RPCサーバー管理者に問い合わせ
+`;
+        }
+    </script>
+</body>
+</html>

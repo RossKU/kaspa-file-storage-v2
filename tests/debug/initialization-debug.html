@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>初期化プロセス診断</title>
+    <style>
+        body { background: #1a1a1a; color: #e0e0e0; font-family: monospace; padding: 20px; }
+        .step { margin: 10px 0; padding: 10px; background: #2a2a2a; border-radius: 4px; }
+        .slow { color: #f44336; }
+        .fast { color: #4CAF50; }
+        .time { color: #03A9F4; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>Kaspa File Storage 初期化プロセス診断</h1>
+    <div id="log"></div>
+    
+    <script>
+        const log = document.getElementById('log');
+        const startTime = performance.now();
+        let lastTime = startTime;
+        
+        function logStep(msg, extraInfo = '') {
+            const now = performance.now();
+            const stepTime = now - lastTime;
+            const totalTime = now - startTime;
+            lastTime = now;
+            
+            const stepClass = stepTime > 1000 ? 'slow' : 'fast';
+            
+            log.innerHTML += `
+                <div class="step">
+                    <span class="${stepClass}">[+${stepTime.toFixed(0)}ms]</span>
+                    <span class="time">[総計: ${totalTime.toFixed(0)}ms]</span>
+                    ${msg}
+                    ${extraInfo ? `<br><small>${extraInfo}</small>` : ''}
+                </div>
+            `;
+        }
+        
+        logStep('診断開始');
+        
+        // 1. HTMLパース完了
+        document.addEventListener('DOMContentLoaded', () => {
+            logStep('DOMContentLoaded イベント発火');
+            
+            // index.htmlの構造を確認
+            const scriptTags = document.querySelectorAll('script');
+            const styleTags = document.querySelectorAll('style');
+            const linkTags = document.querySelectorAll('link[rel="stylesheet"]');
+            
+            logStep(`リソース数: Script=${scriptTags.length}, Style=${styleTags.length}, Link=${linkTags.length}`);
+            
+            // 大きなインラインスクリプトを検出
+            let totalInlineJS = 0;
+            scriptTags.forEach((script, i) => {
+                if (!script.src && script.textContent) {
+                    totalInlineJS += script.textContent.length;
+                }
+            });
+            
+            logStep(`インラインJavaScriptサイズ: ${(totalInlineJS / 1024).toFixed(2)} KB`);
+        });
+        
+        // 2. 全リソース読み込み完了
+        window.addEventListener('load', () => {
+            logStep('window.onload イベント発火（全リソース読み込み完了）');
+        });
+        
+        // 3. 実際のアプリケーションで何が起きているかシミュレート
+        async function simulateAppInit() {
+            logStep('アプリ初期化シミュレーション開始');
+            
+            // WASMチェック
+            logStep('WASM存在チェック');
+            if (typeof init === 'function') {
+                const wasmStart = performance.now();
+                try {
+                    await init();
+                    const wasmTime = performance.now() - wasmStart;
+                    logStep(`WASM初期化完了`, `所要時間: ${wasmTime.toFixed(0)}ms`);
+                } catch (e) {
+                    logStep(`WASM初期化エラー: ${e.message}`, '', 'slow');
+                }
+            }
+            
+            // 重い処理の可能性
+            const suspects = [
+                { name: 'LocalStorage読み込み', test: () => {
+                    let size = 0;
+                    for (let key in localStorage) {
+                        size += localStorage[key].length;
+                    }
+                    return `${Object.keys(localStorage).length}項目, ${(size/1024).toFixed(2)}KB`;
+                }},
+                { name: 'グローバル変数数', test: () => Object.keys(window).length },
+                { name: 'DOM要素数', test: () => document.getElementsByTagName('*').length },
+                { name: 'イベントリスナー推定', test: () => {
+                    // Performance APIでイベントリスナー数を推定
+                    const entries = performance.getEntriesByType('measure');
+                    return entries.length;
+                }}
+            ];
+            
+            for (const suspect of suspects) {
+                const start = performance.now();
+                const result = suspect.test();
+                const time = performance.now() - start;
+                logStep(`${suspect.name}: ${result}`, `計測時間: ${time.toFixed(0)}ms`);
+            }
+        }
+        
+        // 4. 同期的なブロッキング処理を検出
+        const originalSetTimeout = window.setTimeout;
+        const originalSetInterval = window.setInterval;
+        let timeoutCount = 0;
+        let intervalCount = 0;
+        
+        window.setTimeout = function(...args) {
+            timeoutCount++;
+            return originalSetTimeout.apply(this, args);
+        };
+        
+        window.setInterval = function(...args) {
+            intervalCount++;
+            logStep(`setInterval登録 #${intervalCount}`, `間隔: ${args[1]}ms`);
+            return originalSetInterval.apply(this, args);
+        };
+        
+        // 実行
+        setTimeout(() => {
+            logStep(`登録されたタイマー: setTimeout=${timeoutCount}, setInterval=${intervalCount}`);
+            simulateAppInit();
+        }, 100);
+        
+        // 5. 最も疑わしい原因
+        setTimeout(() => {
+            log.innerHTML += `
+                <div class="step" style="background: #333; margin-top: 20px;">
+                    <h3>🔍 最も疑わしい原因</h3>
+                    <ol>
+                        <li><strong>巨大な単一HTMLファイル（15,000行以上）</strong>
+                            <ul>
+                                <li>パース時間が長い</li>
+                                <li>複数のDOMContentLoadedリスナー</li>
+                                <li>大量のインラインJavaScript</li>
+                            </ul>
+                        </li>
+                        <li><strong>同期的な初期化処理</strong>
+                            <ul>
+                                <li>ConnectionManager.init()が同期的</li>
+                                <li>複数の初期化が順次実行</li>
+                            </ul>
+                        </li>
+                        <li><strong>不要な処理の実行</strong>
+                            <ul>
+                                <li>使用しない機能の初期化</li>
+                                <li>過剰なsetInterval</li>
+                            </ul>
+                        </li>
+                    </ol>
+                    
+                    <h3>💡 解決策</h3>
+                    <p>index.htmlの<strong>先頭</strong>に以下を追加:</p>
+                    <pre style="background: #222; padding: 10px;">
+&lt;script&gt;
+// 初期化を遅延実行
+window._delayedInit = true;
+window._initFunctions = [];
+
+// 本来のDOMContentLoadedを上書き
+const _addEventListener = EventTarget.prototype.addEventListener;
+EventTarget.prototype.addEventListener = function(type, listener, ...args) {
+    if (type === 'DOMContentLoaded' && window._delayedInit) {
+        window._initFunctions.push(listener);
+        return;
+    }
+    return _addEventListener.call(this, type, listener, ...args);
+};
+
+// 準備ができたら実行
+setTimeout(() => {
+    window._delayedInit = false;
+    window._initFunctions.forEach(fn => fn());
+}, 100);
+&lt;/script&gt;
+                    </pre>
+                </div>
+            `;
+        }, 5000);
+    </script>
+</body>
+</html>

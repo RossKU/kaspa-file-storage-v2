@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WASMバージョン問題診断</title>
+    <style>
+        body { background: #1a1a1a; color: #e0e0e0; font-family: monospace; padding: 20px; }
+        .critical { background: #f44336; color: white; padding: 20px; margin: 20px 0; }
+    </style>
+</head>
+<body>
+    <h1>WASM/ライブラリバージョン問題の可能性</h1>
+    
+    <div class="critical">
+        <h2>🎯 最も可能性の高い原因</h2>
+        
+        <h3>kaspa-core.js / kaspa-core_bg.wasm のバージョン問題</h3>
+        
+        <p><strong>症状が一致：</strong></p>
+        <ul>
+            <li>昨日まで正常 → 今日から全バージョン遅い</li>
+            <li>別IP、別環境でも同じ</li>
+            <li>ローカルサーバーでも同じ</li>
+            <li>特定のRPCメソッドだけ遅い</li>
+        </ul>
+        
+        <p><strong>考えられるシナリオ：</strong></p>
+        <ol>
+            <li>WASMファイルが外部CDNから読み込まれている</li>
+            <li>そのCDNのWASMが更新された</li>
+            <li>新しいWASMに特定のメソッドのバグがある</li>
+        </ol>
+        
+        <h3>確認方法</h3>
+        <pre>
+// コンソールで実行
+console.log(typeof RpcClient);
+console.log(RpcClient.prototype.getBlock.toString());
+
+// WASMのバージョン確認
+if (window.__wasm_version) {
+    console.log('WASM Version:', window.__wasm_version);
+}
+        </pre>
+        
+        <h3>解決策</h3>
+        <ol>
+            <li>古いバージョンのWASMファイルを使用</li>
+            <li>異なるKaspaライブラリを使用</li>
+            <li>直接REST APIを使用（WASMを回避）</li>
+        </ol>
+    </div>
+    
+    <button onclick="testDirectAPI()">REST API直接テスト</button>
+    <div id="results"></div>
+    
+    <script>
+        async function testDirectAPI() {
+            const results = document.getElementById('results');
+            results.innerHTML = '<h3>REST API直接呼び出しテスト</h3>';
+            
+            // WASMを使わずに直接REST APIを呼び出す
+            try {
+                const start = performance.now();
+                const response = await fetch('https://api-tn10.kaspa.org/info/blockreward');
+                const data = await response.json();
+                const time = performance.now() - start;
+                
+                results.innerHTML += `<p>REST API応答時間: ${time.toFixed(0)}ms</p>`;
+                results.innerHTML += `<p>データ: ${JSON.stringify(data)}</p>`;
+                
+                if (time < 1000) {
+                    results.innerHTML += '<p style="color:#4CAF50">✓ REST APIは正常に高速です</p>';
+                    results.innerHTML += '<p style="color:#f44336">→ WASMライブラリの問題が確定</p>';
+                }
+            } catch (e) {
+                results.innerHTML += `<p>エラー: ${e.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>

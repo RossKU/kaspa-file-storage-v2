@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>深層RPC分析</title>
+    <style>
+        body { background: #1a1a1a; color: #e0e0e0; font-family: monospace; padding: 20px; }
+        .test { margin: 10px 0; padding: 15px; background: #2a2a2a; border-radius: 4px; }
+        .critical { background: #f44336; color: white; padding: 20px; margin: 20px 0; }
+        .timing { color: #03A9F4; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>深層RPC分析</h1>
+    <button onclick="runDeepAnalysis()">分析開始</button>
+    <div id="log"></div>
+
+    <script type="module">
+        const log = document.getElementById('log');
+        
+        function addLog(msg, timing = null) {
+            const time = new Date().toISOString().substr(11, 12);
+            const timingStr = timing ? ` <span class="timing">${timing.toFixed(0)}ms</span>` : '';
+            log.innerHTML += `<div class="test">[${time}] ${msg}${timingStr}</div>`;
+        }
+        
+        window.runDeepAnalysis = async function() {
+            log.innerHTML = '';
+            addLog('深層分析開始');
+            
+            try {
+                // WASM初期化
+                await init();
+                addLog('WASM初期化完了');
+                
+                // 複数のRPCエンドポイントでテスト
+                const endpoints = [
+                    'wss://tn10.katnip.sh/wrpc/kaspa/testnet-10',
+                    'wss://kaspa-testnet-10-wrpc.kaspa.stream',
+                    'wss://tn10rpc.kaspa.ws'
+                ];
+                
+                for (const endpoint of endpoints) {
+                    addLog(`\nテスト: ${endpoint}`);
+                    
+                    try {
+                        const rpcClient = new RpcClient({
+                            url: endpoint,
+                            networkId: 'testnet-10'
+                        });
+                        
+                        // 接続
+                        const connectStart = performance.now();
+                        await rpcClient.connect();
+                        const connectTime = performance.now() - connectStart;
+                        addLog('接続成功', connectTime);
+                        
+                        // 1. getInfo（軽い呼び出し）
+                        const infoStart = performance.now();
+                        await rpcClient.getInfo();
+                        const infoTime = performance.now() - infoStart;
+                        addLog('getInfo', infoTime);
+                        
+                        // 2. 最新ブロックの取得
+                        const tipStart = performance.now();
+                        const tips = await rpcClient.getVirtualSelectedParentBlueScore();
+                        const tipTime = performance.now() - tipStart;
+                        addLog('getVirtualSelectedParentBlueScore', tipTime);
+                        
+                        // 3. 特定のブロック取得（存在するブロック）
+                        const blockStart = performance.now();
+                        try {
+                            // 最近のブロックハッシュを使用
+                            const blockInfo = await rpcClient.getBlock({
+                                hash: '000000000000000000000000000000000000000000000000000000000000000000',
+                                includeTransactions: false
+                            });
+                            const blockTime = performance.now() - blockStart;
+                            addLog('getBlock（genesis）', blockTime);
+                        } catch (e) {
+                            const blockTime = performance.now() - blockStart;
+                            addLog(`getBlockエラー: ${e.message}`, blockTime);
+                        }
+                        
+                        // 4. トランザクション取得（存在しないもの）
+                        const txStart = performance.now();
+                        try {
+                            await rpcClient.getTransaction({
+                                transactionId: 'bcf9f96250ce567c0000000000000000000000000000000000000000000000000',
+                                includeBlockInfo: true
+                            });
+                        } catch (e) {
+                            const txTime = performance.now() - txStart;
+                            addLog(`getTransaction（存在しない）`, txTime);
+                        }
+                        
+                        // 5. submitTransaction相当の処理時間
+                        const submitTest = async () => {
+                            // ダミートランザクション作成
+                            const tx = new Transaction({
+                                version: 0,
+                                inputs: [],
+                                outputs: [{
+                                    address: 'kaspatest:qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqkx9awp4e',
+                                    amount: 1000n
+                                }],
+                                lockTime: 0n,
+                                subnetworkId: new Uint8Array(20),
+                                gas: 0n,
+                                payload: new Uint8Array([1,2,3])
+                            });
+                            
+                            const submitStart = performance.now();
+                            try {
+                                await rpcClient.submitTransaction({
+                                    transaction: tx,
+                                    allowOrphan: false
+                                });
+                            } catch (e) {
+                                const submitTime = performance.now() - submitStart;
+                                addLog(`submitTransaction（ダミー）`, submitTime);
+                            }
+                        };
+                        
+                        await submitTest();
+                        
+                        await rpcClient.disconnect();
+                        
+                    } catch (e) {
+                        addLog(`エラー: ${e.message}`);
+                    }
+                }
+                
+                // 診断結果
+                log.innerHTML += `
+                    <div class="critical">
+                        <h3>🔍 診断から分かること</h3>
+                        <p>特定のRPC呼び出しだけが遅い場合：</p>
+                        <ul>
+                            <li>getInfo/getVirtualSelectedParentBlueScore → 速い</li>
+                            <li>getBlock/getTransaction → 遅い</li>
+                        </ul>
+                        <p>これは、<strong>特定のRPCメソッドにレート制限</strong>がかかっている可能性を示します。</p>
+                    </div>
+                `;
+                
+            } catch (error) {
+                addLog(`エラー: ${error.message}`);
+            }
+        };
+    </script>
+    
+    <script src="kaspa-core.js"></script>
+</body>
+</html>

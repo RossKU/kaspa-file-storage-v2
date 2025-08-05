@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Kaspa外部要因チェッカー</title>
+    <style>
+        body { 
+            background: #1a1a1a; 
+            color: #e0e0e0; 
+            font-family: monospace; 
+            padding: 20px;
+        }
+        .test { 
+            margin: 10px 0; 
+            padding: 15px; 
+            background: #2a2a2a; 
+            border-radius: 4px;
+        }
+        .good { color: #4CAF50; }
+        .bad { color: #f44336; }
+        .info { color: #03A9F4; }
+        pre { 
+            background: #333; 
+            padding: 10px; 
+            border-radius: 4px; 
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>Kaspa外部要因診断（2025-08-04）</h1>
+    <div id="results"></div>
+
+    <script>
+        const results = document.getElementById('results');
+        
+        async function checkExternalFactors() {
+            results.innerHTML = '<h2>外部要因をチェック中...</h2>';
+            
+            // 1. 複数のKaspa RPCエンドポイントをテスト
+            const endpoints = {
+                'Testnet-10': [
+                    'wss://tn10.katnip.sh/wrpc/kaspa/testnet-10',
+                    'wss://kaspa-testnet-10-wrpc.kaspa.stream',
+                    'wss://tn10rpc.kaspa.ws',
+                    'wss://testnet-10.kaspa.red',
+                    'wss://tn10-wrpc.kaspa-ng.io'
+                ],
+                'Mainnet': [
+                    'wss://kaspa-wrpc.kaspa.stream',
+                    'wss://wrpc.kaspa.ws',
+                    'wss://kaspa.aspectron.org',
+                    'wss://mainnet.kaspa.red',
+                    'wss://kaspa.rocketnode.space'
+                ]
+            };
+            
+            results.innerHTML += '<h3>RPCエンドポイント応答速度</h3>';
+            
+            for (const [network, urls] of Object.entries(endpoints)) {
+                results.innerHTML += `<h4>${network}</h4>`;
+                
+                for (const url of urls) {
+                    const start = performance.now();
+                    let status = '';
+                    
+                    try {
+                        const ws = new WebSocket(url);
+                        await new Promise((resolve, reject) => {
+                            ws.onopen = () => {
+                                const time = performance.now() - start;
+                                status = `<span class="${time < 2000 ? 'good' : 'bad'}">✓ ${time.toFixed(0)}ms</span>`;
+                                ws.close();
+                                resolve();
+                            };
+                            ws.onerror = () => {
+                                status = '<span class="bad">✗ 接続失敗</span>';
+                                reject();
+                            };
+                            setTimeout(() => {
+                                status = '<span class="bad">✗ タイムアウト</span>';
+                                reject();
+                            }, 10000);
+                        });
+                    } catch (e) {}
+                    
+                    results.innerHTML += `<div class="test">${url}: ${status}</div>`;
+                }
+            }
+            
+            // 2. 公開APIステータスチェック
+            results.innerHTML += '<h3>Kaspa公開APIステータス</h3>';
+            
+            const apis = [
+                { name: 'Testnet-10 API', url: 'https://api-tn10.kaspa.org/info/health' },
+                { name: 'Mainnet API', url: 'https://api.kaspa.org/info/health' },
+                { name: 'Explorer API', url: 'https://explorer.kaspa.org/api/info' }
+            ];
+            
+            for (const api of apis) {
+                try {
+                    const start = performance.now();
+                    const response = await fetch(api.url);
+                    const time = performance.now() - start;
+                    const status = response.ok ? 
+                        `<span class="${time < 1000 ? 'good' : 'bad'}">✓ ${time.toFixed(0)}ms</span>` :
+                        `<span class="bad">✗ HTTP ${response.status}</span>`;
+                    
+                    results.innerHTML += `<div class="test">${api.name}: ${status}</div>`;
+                } catch (e) {
+                    results.innerHTML += `<div class="test">${api.name}: <span class="bad">✗ エラー</span></div>`;
+                }
+            }
+            
+            // 3. DNS解決速度チェック
+            results.innerHTML += '<h3>DNS解決速度</h3>';
+            
+            const dnsTests = [
+                'kaspa.org',
+                'kaspa.stream',
+                'kaspa.ws',
+                'google.com' // 比較用
+            ];
+            
+            for (const domain of dnsTests) {
+                const start = performance.now();
+                try {
+                    const img = new Image();
+                    img.src = `https://${domain}/favicon.ico?t=${Date.now()}`;
+                    
+                    await new Promise((resolve) => {
+                        img.onload = img.onerror = () => {
+                            const time = performance.now() - start;
+                            results.innerHTML += `
+                                <div class="test">
+                                    ${domain}: <span class="${time < 500 ? 'good' : 'bad'}">${time.toFixed(0)}ms</span>
+                                    ${domain === 'google.com' ? ' (比較用)' : ''}
+                                </div>
+                            `;
+                            resolve();
+                        };
+                        setTimeout(resolve, 5000);
+                    });
+                } catch (e) {}
+            }
+            
+            // 4. ネットワーク品質チェック
+            results.innerHTML += '<h3>ネットワーク品質</h3>';
+            
+            if (navigator.connection) {
+                const conn = navigator.connection;
+                results.innerHTML += `
+                    <div class="test">
+                        接続タイプ: <span class="info">${conn.effectiveType || '不明'}</span><br>
+                        下り速度: <span class="info">${conn.downlink || '不明'} Mbps</span><br>
+                        RTT: <span class="info">${conn.rtt || '不明'} ms</span>
+                    </div>
+                `;
+            }
+            
+            // 5. 代替エンドポイントの提案
+            results.innerHTML += `
+                <h3>診断結果と推奨事項</h3>
+                <div class="test">
+                    <h4>🔍 状況分析</h4>
+                    <p>昨日は正常で今日は全バージョンが遅い → <strong>外部要因が原因</strong></p>
+                    
+                    <h4>💡 考えられる原因</h4>
+                    <ul>
+                        <li>Kaspa RPCサーバーの負荷増大</li>
+                        <li>特定のRPCサーバーでのレート制限</li>
+                        <li>地域的なネットワーク問題</li>
+                        <li>ISPレベルでの制限</li>
+                    </ul>
+                    
+                    <h4>🛠️ 対策</h4>
+                    <ol>
+                        <li>上記テストで速いエンドポイントを使用</li>
+                        <li>VPNを使用している場合は無効化</li>
+                        <li>DNSを変更（1.1.1.1 または 8.8.8.8）</li>
+                        <li>時間を置いて再試行（サーバー側の一時的な問題の可能性）</li>
+                    </ol>
+                </div>
+            `;
+            
+            // 6. 最速のエンドポイントを特定
+            results.innerHTML += `
+                <h3>推奨エンドポイント</h3>
+                <div class="test">
+                    <p>上記テスト結果から最速のエンドポイントを選択してください。</p>
+                    <pre>
+// index.htmlで以下のように設定：
+const config = {
+    network: 'testnet-10',
+    rpcEndpoint: '最速だったエンドポイントのURL'
+};
+                    </pre>
+                </div>
+            `;
+        }
+        
+        // 自動実行
+        checkExternalFactors();
+        
+        // 定期的に再チェック
+        setInterval(() => {
+            results.innerHTML += '<hr><p class="info">再チェック中...</p>';
+            checkExternalFactors();
+        }, 30000); // 30秒ごと
+    </script>
+</body>
+</html>

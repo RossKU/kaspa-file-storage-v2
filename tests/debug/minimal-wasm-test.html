@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WASM最小テスト</title>
+    <style>
+        body { background: #1a1a1a; color: #e0e0e0; font-family: monospace; padding: 20px; }
+        .log { margin: 5px 0; padding: 5px; background: #2a2a2a; }
+        .error { color: #f44336; }
+        .success { color: #4CAF50; }
+        .time { color: #03A9F4; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>WASM配信問題診断</h1>
+    <div id="log"></div>
+    
+    <script>
+        const log = document.getElementById('log');
+        
+        function addLog(msg, type = '') {
+            log.innerHTML += `<div class="log ${type}">${new Date().toISOString().substr(11, 8)} - ${msg}</div>`;
+        }
+        
+        async function testWASMDirectly() {
+            addLog('テスト開始');
+            
+            // 1. WASMファイルの直接ダウンロードテスト
+            addLog('1. WASMファイル直接ダウンロード開始');
+            const wasmStart = performance.now();
+            
+            try {
+                const response = await fetch('kaspa-core_bg.wasm');
+                const wasmSize = response.headers.get('content-length');
+                const wasmTime = performance.now() - wasmStart;
+                
+                addLog(`WASMサイズ: ${(wasmSize / 1024 / 1024).toFixed(2)} MB`, 'success');
+                addLog(`ダウンロード時間: <span class="time">${wasmTime.toFixed(0)}ms</span>`, wasmTime > 5000 ? 'error' : 'success');
+                
+                // 2. Response headersチェック
+                addLog('2. レスポンスヘッダー:');
+                response.headers.forEach((value, key) => {
+                    addLog(`  ${key}: ${value}`);
+                });
+                
+                // 3. JSファイルのテスト
+                addLog('3. JSファイル読み込みテスト');
+                const jsStart = performance.now();
+                const jsResponse = await fetch('kaspa-core.js');
+                const jsTime = performance.now() - jsStart;
+                addLog(`JS読み込み時間: <span class="time">${jsTime.toFixed(0)}ms</span>`, jsTime > 2000 ? 'error' : 'success');
+                
+            } catch (e) {
+                addLog(`エラー: ${e.message}`, 'error');
+            }
+            
+            // 4. 別のCDNから読み込みテスト
+            addLog('4. 代替CDNテスト');
+            const cdns = [
+                'https://unpkg.com/@kaspa/core-lib@latest/kaspa-core_bg.wasm',
+                'https://cdn.jsdelivr.net/npm/@kaspa/core-lib@latest/kaspa-core_bg.wasm',
+                'https://cdnjs.cloudflare.com/ajax/libs/kaspa-core/latest/kaspa-core_bg.wasm'
+            ];
+            
+            for (const cdn of cdns) {
+                try {
+                    const start = performance.now();
+                    const response = await fetch(cdn);
+                    const time = performance.now() - start;
+                    addLog(`${cdn}: ${response.ok ? `<span class="time">${time.toFixed(0)}ms</span>` : '404'}`, response.ok ? 'success' : 'error');
+                } catch (e) {
+                    addLog(`${cdn}: 失敗`, 'error');
+                }
+            }
+            
+            // 5. 最小限のWASM初期化
+            addLog('5. WASM初期化テスト（最小限）');
+            try {
+                const script = document.createElement('script');
+                script.src = 'kaspa-core.js';
+                
+                await new Promise((resolve, reject) => {
+                    script.onload = resolve;
+                    script.onerror = reject;
+                    document.head.appendChild(script);
+                });
+                
+                addLog('JSロード成功', 'success');
+                
+                // init関数の存在確認
+                if (typeof init === 'function') {
+                    const initStart = performance.now();
+                    await init();
+                    const initTime = performance.now() - initStart;
+                    addLog(`WASM初期化成功: <span class="time">${initTime.toFixed(0)}ms</span>`, 'success');
+                } else {
+                    addLog('init関数が見つかりません', 'error');
+                }
+                
+            } catch (e) {
+                addLog(`初期化エラー: ${e.message}`, 'error');
+            }
+            
+            // 6. 診断結果
+            addLog('━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+            addLog('診断完了');
+            
+            // GitHub Pages特有の問題チェック
+            if (location.hostname.includes('github.io')) {
+                addLog('⚠️ GitHub Pagesでホストされています', 'error');
+                addLog('GitHub Pagesは大きなファイルの配信に制限がある可能性があります');
+            }
+        }
+        
+        testWASMDirectly();
+    </script>
+</body>
+</html>

@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>RPC使用パターン分析</title>
+    <style>
+        body { background: #1a1a1a; color: #e0e0e0; font-family: monospace; padding: 20px; }
+        .critical { background: #f44336; color: white; padding: 20px; margin: 20px 0; border-radius: 4px; }
+        .insight { background: #2A6F65; color: white; padding: 15px; margin: 10px 0; border-radius: 4px; }
+        .test { margin: 10px 0; padding: 15px; background: #2a2a2a; border-radius: 4px; }
+        pre { background: #333; padding: 10px; border-radius: 4px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>アプリケーションのRPC使用パターン分析</h1>
+    <div id="results"></div>
+
+    <script type="module">
+        const results = document.getElementById('results');
+        
+        async function analyzeRPCUsagePattern() {
+            results.innerHTML = '<h2>分析中...</h2>';
+            
+            // index.htmlのRPC呼び出しパターンを分析
+            results.innerHTML += '<h3>1. RPC呼び出しパターン</h3>';
+            
+            // このアプリ特有のRPC使用を特定
+            const suspectedPatterns = [
+                {
+                    name: 'アーカイブノード検索',
+                    description: '2秒ごとにアーカイブノードを検索（setInterval）',
+                    impact: '継続的なRPC負荷'
+                },
+                {
+                    name: 'ブロック情報取得',
+                    description: 'getBlock呼び出しの頻度',
+                    impact: '大量のデータ転送'
+                },
+                {
+                    name: 'トランザクション送信',
+                    description: 'submitTransactionの連続呼び出し',
+                    impact: 'レート制限のトリガー'
+                },
+                {
+                    name: 'WebSocket再接続',
+                    description: '切断と再接続の繰り返し',
+                    impact: '接続オーバーヘッド'
+                }
+            ];
+            
+            suspectedPatterns.forEach(pattern => {
+                results.innerHTML += `
+                    <div class="test">
+                        <strong>${pattern.name}</strong><br>
+                        ${pattern.description}<br>
+                        <span style="color: #ff9800;">影響: ${pattern.impact}</span>
+                    </div>
+                `;
+            });
+            
+            // 2. 昨日と今日の違い
+            results.innerHTML += `
+                <div class="insight">
+                    <h3>🔍 昨日と今日の決定的な違い</h3>
+                    <p><strong>仮説：累積的な影響</strong></p>
+                    <ul>
+                        <li>昨日: 初回使用、RPC側にキャッシュなし</li>
+                        <li>今日: RPC側があなたのパターンを「異常」と認識</li>
+                    </ul>
+                    <p>つまり、<strong>アプリ自体は変わっていないが、RPC側の扱いが変わった</strong></p>
+                </div>
+            `;
+            
+            // 3. このアプリ特有の問題
+            results.innerHTML += '<h3>2. このアプリ固有のRPC使用問題</h3>';
+            
+            // アーカイブノード関連の処理を確認
+            results.innerHTML += `
+                <div class="critical">
+                    <h3>⚠️ 最も可能性の高い原因</h3>
+                    <p><strong>アーカイブノードマネージャーの継続的なポーリング</strong></p>
+                    <ol>
+                        <li>2秒ごとにupdateArchiveNodeStatus()を実行</li>
+                        <li>各更新で複数のgetBlock()呼び出し</li>
+                        <li>24時間で43,200回のRPC呼び出し</li>
+                        <li>RPC側が「DoS攻撃的な挙動」と判定</li>
+                    </ol>
+                    <p>結果：<strong>ソフトバン（一時的な速度制限）</strong>が適用された</p>
+                </div>
+            `;
+            
+            // 4. 検証方法
+            results.innerHTML += `
+                <h3>3. 検証方法</h3>
+                <div class="test">
+                    <p>以下をブラウザコンソールで実行して確認：</p>
+                    <pre>
+// アーカイブノード更新を停止
+clearInterval(window.archiveUpdateInterval);
+
+// 既存のsetIntervalを確認
+console.log('Active intervals:', window._activeIntervals);
+
+// RPC呼び出し頻度を確認
+let rpcCallCount = 0;
+const originalSend = WebSocket.prototype.send;
+WebSocket.prototype.send = function(...args) {
+    rpcCallCount++;
+    console.log('RPC Call #' + rpcCallCount);
+    return originalSend.apply(this, args);
+};
+                    </pre>
+                </div>
+            `;
+            
+            // 5. 解決策
+            results.innerHTML += `
+                <div class="insight">
+                    <h3>💡 即効性のある解決策</h3>
+                    <button onclick="disableHeavyPolling()">重いポーリングを無効化</button>
+                    <button onclick="optimizeRPCCalls()">RPC呼び出しを最適化</button>
+                    
+                    <div style="margin-top: 20px;">
+                        <p><strong>根本的な解決：</strong></p>
+                        <ol>
+                            <li>アーカイブノード更新頻度を60秒に変更</li>
+                            <li>getBlock呼び出しをキャッシュ</li>
+                            <li>不要な初期化処理をスキップ</li>
+                        </ol>
+                    </div>
+                </div>
+            `;
+        }
+        
+        window.disableHeavyPolling = function() {
+            const code = `
+// index.htmlの先頭に追加
+window.DISABLE_ARCHIVE_POLLING = true;
+
+// または既存のsetIntervalをオーバーライド
+const _setInterval = window.setInterval;
+window.setInterval = function(fn, delay) {
+    if (fn.toString().includes('updateArchiveNodeStatus')) {
+        console.log('アーカイブノード更新を60秒に変更');
+        return _setInterval(fn, 60000); // 60秒
+    }
+    return _setInterval(fn, delay);
+};
+            `;
+            
+            results.innerHTML += `
+                <div class="test">
+                    <h4>コード追加場所: index.htmlの&lt;script&gt;タグ直後</h4>
+                    <pre>${code}</pre>
+                </div>
+            `;
+        };
+        
+        window.optimizeRPCCalls = function() {
+            const code = `
+// RPC呼び出しをバッチ処理
+class RPCBatcher {
+    constructor(rpcClient) {
+        this.client = rpcClient;
+        this.queue = [];
+        this.processing = false;
+    }
+    
+    async getBlock(hash) {
+        // 同じハッシュの呼び出しをまとめる
+        return this.batch('getBlock', hash);
+    }
+    
+    async batch(method, ...args) {
+        return new Promise((resolve) => {
+            this.queue.push({ method, args, resolve });
+            this.process();
+        });
+    }
+    
+    async process() {
+        if (this.processing || this.queue.length === 0) return;
+        
+        this.processing = true;
+        await new Promise(r => setTimeout(r, 100)); // 100ms待機
+        
+        // バッチ処理
+        const batch = this.queue.splice(0, 10); // 最大10件
+        // 実際の処理...
+        
+        this.processing = false;
+        if (this.queue.length > 0) this.process();
+    }
+}
+            `;
+            
+            results.innerHTML += `
+                <div class="test">
+                    <h4>RPC呼び出しの最適化</h4>
+                    <pre>${code}</pre>
+                </div>
+            `;
+        };
+        
+        analyzeRPCUsagePattern();
+    </script>
+</body>
+</html>

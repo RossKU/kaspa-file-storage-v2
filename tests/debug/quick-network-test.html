@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Kaspaネットワーク速度テスト</title>
+    <style>
+        body { 
+            background: #1a1a1a; 
+            color: #e0e0e0; 
+            font-family: monospace; 
+            padding: 20px;
+        }
+        .test { 
+            margin: 10px 0; 
+            padding: 10px; 
+            background: #2a2a2a; 
+            border-radius: 4px;
+        }
+        .fast { color: #4CAF50; }
+        .medium { color: #ff9800; }
+        .slow { color: #f44336; }
+    </style>
+</head>
+<body>
+    <h1>Kaspaネットワーク速度比較テスト</h1>
+    <div id="results"></div>
+
+    <script>
+        async function testSpeed() {
+            const results = document.getElementById('results');
+            
+            // 1. 直接API呼び出しテスト（WASM不使用）
+            const apiTests = [
+                {
+                    name: 'Testnet-10 API (直接)',
+                    url: 'https://api-tn10.kaspa.org/info/blockreward'
+                },
+                {
+                    name: 'Mainnet API (直接)',  
+                    url: 'https://api.kaspa.org/info/blockreward'
+                },
+                {
+                    name: 'Alternative Testnet API',
+                    url: 'https://tn10.kasplex.org/v1/info/blockreward'
+                }
+            ];
+
+            for (const test of apiTests) {
+                const start = performance.now();
+                try {
+                    const response = await fetch(test.url);
+                    const data = await response.json();
+                    const time = performance.now() - start;
+                    
+                    const speedClass = time < 500 ? 'fast' : time < 2000 ? 'medium' : 'slow';
+                    results.innerHTML += `
+                        <div class="test">
+                            ${test.name}: <span class="${speedClass}">${time.toFixed(0)}ms</span>
+                            ${time > 2000 ? ' ⚠️ 遅い' : ''}
+                        </div>
+                    `;
+                } catch (e) {
+                    results.innerHTML += `
+                        <div class="test">
+                            ${test.name}: <span class="slow">エラー: ${e.message}</span>
+                        </div>
+                    `;
+                }
+            }
+
+            // 2. WebSocket接続速度テスト
+            results.innerHTML += '<h3>WebSocket接続テスト</h3>';
+            
+            const wsTests = [
+                'wss://tn10.katnip.sh/wrpc/kaspa/testnet-10',
+                'wss://kaspa-testnet-10-wrpc.kaspa.stream',
+                'wss://tn10rpc.kaspa.ws'
+            ];
+
+            for (const url of wsTests) {
+                const start = performance.now();
+                try {
+                    const ws = new WebSocket(url);
+                    await new Promise((resolve, reject) => {
+                        ws.onopen = () => {
+                            const time = performance.now() - start;
+                            const speedClass = time < 1000 ? 'fast' : time < 3000 ? 'medium' : 'slow';
+                            results.innerHTML += `
+                                <div class="test">
+                                    ${url}: <span class="${speedClass}">${time.toFixed(0)}ms</span>
+                                    ${time > 3000 ? ' ⚠️ 接続が遅い' : ''}
+                                </div>
+                            `;
+                            ws.close();
+                            resolve();
+                        };
+                        ws.onerror = reject;
+                        setTimeout(() => reject(new Error('Timeout')), 10000);
+                    });
+                } catch (e) {
+                    results.innerHTML += `
+                        <div class="test">
+                            ${url}: <span class="slow">接続失敗</span>
+                        </div>
+                    `;
+                }
+            }
+
+            // 3. DNS解決テスト
+            results.innerHTML += '<h3>DNS解決速度（推定）</h3>';
+            
+            const dnsTests = [
+                'api-tn10.kaspa.org',
+                'kaspa.stream',
+                'kaspa.ws'
+            ];
+
+            for (const domain of dnsTests) {
+                const start = performance.now();
+                try {
+                    // 画像読み込みでDNS解決時間を推定
+                    const img = new Image();
+                    img.src = `https://${domain}/favicon.ico?t=${Date.now()}`;
+                    
+                    await new Promise((resolve, reject) => {
+                        img.onload = img.onerror = () => {
+                            const time = performance.now() - start;
+                            results.innerHTML += `
+                                <div class="test">
+                                    ${domain}: <span class="${time < 500 ? 'fast' : 'slow'}">${time.toFixed(0)}ms</span>
+                                </div>
+                            `;
+                            resolve();
+                        };
+                        setTimeout(reject, 5000);
+                    });
+                } catch (e) {
+                    results.innerHTML += `
+                        <div class="test">
+                            ${domain}: <span class="slow">測定失敗</span>
+                        </div>
+                    `;
+                }
+            }
+
+            // 診断結果
+            results.innerHTML += `
+                <h3>診断結果</h3>
+                <div class="test">
+                    <p>🔍 可能性のある原因：</p>
+                    <ul>
+                        <li>DNS解決が遅い → DNSサーバーを変更（8.8.8.8など）</li>
+                        <li>特定のエンドポイントのみ遅い → 別のRPCサーバーを使用</li>
+                        <li>すべて遅い → ネットワーク環境の問題</li>
+                        <li>WebSocketのみ遅い → ファイアウォール/プロキシの問題</li>
+                    </ul>
+                </div>
+            `;
+        }
+
+        testSpeed();
+    </script>
+</body>
+</html>

@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>HTMLアプリ パフォーマンスプロファイラー</title>
+    <style>
+        body { 
+            background: #1a1a1a; 
+            color: #e0e0e0; 
+            font-family: monospace; 
+            padding: 20px;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        .metric { 
+            margin: 10px 0; 
+            padding: 15px; 
+            background: #2a2a2a; 
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .good { color: #4CAF50; }
+        .warning { color: #ff9800; }
+        .bad { color: #f44336; }
+        button {
+            background: #2A6F65;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .chart {
+            height: 200px;
+            background: #333;
+            margin: 20px 0;
+            border-radius: 4px;
+            position: relative;
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body>
+    <h1>HTMLアプリ パフォーマンス分析</h1>
+    
+    <button onclick="startProfiling()">プロファイリング開始</button>
+    <button onclick="compareWithVanilla()">素のRPC vs HTMLアプリ比較</button>
+    <button onclick="checkMemoryLeaks()">メモリリーク検査</button>
+    
+    <div id="results"></div>
+    <div class="chart" id="memoryChart"></div>
+
+    <script type="module">
+        const results = document.getElementById('results');
+        
+        window.startProfiling = async function() {
+            results.innerHTML = '<h2>プロファイリング中...</h2>';
+            
+            const profile = {
+                startTime: performance.now(),
+                startMemory: performance.memory ? performance.memory.usedJSHeapSize : 0,
+                metrics: {}
+            };
+            
+            // 1. DOM要素数チェック
+            profile.metrics.domElements = document.getElementsByTagName('*').length;
+            results.innerHTML += `
+                <div class="metric">
+                    <span>DOM要素数:</span>
+                    <span class="${profile.metrics.domElements > 5000 ? 'bad' : profile.metrics.domElements > 2000 ? 'warning' : 'good'}">
+                        ${profile.metrics.domElements}
+                        ${profile.metrics.domElements > 5000 ? ' ⚠️ 多すぎる' : ''}
+                    </span>
+                </div>
+            `;
+            
+            // 2. イベントリスナー数チェック
+            const allElements = document.getElementsByTagName('*');
+            let listenerCount = 0;
+            for (let el of allElements) {
+                const listeners = getEventListeners ? getEventListeners(el) : {};
+                for (let type in listeners) {
+                    listenerCount += listeners[type].length;
+                }
+            }
+            profile.metrics.eventListeners = listenerCount;
+            
+            // 3. タイマー数チェック
+            let activeTimers = 0;
+            const originalSetInterval = window.setInterval;
+            const originalSetTimeout = window.setTimeout;
+            window.setInterval = function(...args) {
+                activeTimers++;
+                return originalSetInterval.apply(this, args);
+            };
+            window.setTimeout = function(...args) {
+                activeTimers++;
+                return originalSetTimeout.apply(this, args);
+            };
+            
+            // 4. WASMモジュールサイズ
+            try {
+                const wasmResponse = await fetch('kaspa-core_bg.wasm');
+                const wasmSize = wasmResponse.headers.get('content-length');
+                profile.metrics.wasmSize = parseInt(wasmSize) / 1024 / 1024; // MB
+                
+                results.innerHTML += `
+                    <div class="metric">
+                        <span>WASMサイズ:</span>
+                        <span class="${profile.metrics.wasmSize > 10 ? 'warning' : 'good'}">
+                            ${profile.metrics.wasmSize.toFixed(2)} MB
+                        </span>
+                    </div>
+                `;
+            } catch (e) {
+                console.error('WASM size check failed:', e);
+            }
+            
+            // 5. グローバル変数数
+            const globalVars = Object.keys(window).length;
+            profile.metrics.globalVariables = globalVars;
+            results.innerHTML += `
+                <div class="metric">
+                    <span>グローバル変数数:</span>
+                    <span class="${globalVars > 500 ? 'bad' : globalVars > 200 ? 'warning' : 'good'}">
+                        ${globalVars}
+                        ${globalVars > 500 ? ' ⚠️ 多すぎる' : ''}
+                    </span>
+                </div>
+            `;
+            
+            // 6. CSS複雑度
+            const styleSheets = document.styleSheets.length;
+            let totalRules = 0;
+            for (let sheet of document.styleSheets) {
+                try {
+                    totalRules += sheet.cssRules.length;
+                } catch (e) {}
+            }
+            profile.metrics.cssRules = totalRules;
+            results.innerHTML += `
+                <div class="metric">
+                    <span>CSSルール数:</span>
+                    <span class="${totalRules > 5000 ? 'bad' : totalRules > 2000 ? 'warning' : 'good'}">
+                        ${totalRules}
+                    </span>
+                </div>
+            `;
+            
+            // 7. スクリプト実行時間
+            const scriptTime = performance.now() - profile.startTime;
+            results.innerHTML += `
+                <div class="metric">
+                    <span>初期化時間:</span>
+                    <span class="${scriptTime > 5000 ? 'bad' : scriptTime > 2000 ? 'warning' : 'good'}">
+                        ${scriptTime.toFixed(0)}ms
+                    </span>
+                </div>
+            `;
+            
+            // 診断結果
+            results.innerHTML += '<h3>診断結果と推奨事項</h3>';
+            
+            if (profile.metrics.domElements > 5000) {
+                results.innerHTML += '<div class="metric bad">✗ DOM要素が多すぎます。仮想スクロールの実装を検討してください。</div>';
+            }
+            
+            if (profile.metrics.wasmSize > 10) {
+                results.innerHTML += '<div class="metric warning">⚠ WASMファイルが大きいです。遅延読み込みを検討してください。</div>';
+            }
+            
+            if (profile.metrics.globalVariables > 500) {
+                results.innerHTML += '<div class="metric bad">✗ グローバル汚染が深刻です。モジュール化を進めてください。</div>';
+            }
+        };
+        
+        window.compareWithVanilla = async function() {
+            results.innerHTML = '<h2>比較テスト実行中...</h2>';
+            
+            // 1. 素のfetch APIでテスト
+            const vanillaStart = performance.now();
+            try {
+                const response = await fetch('https://api-tn10.kaspa.org/info/blockreward');
+                const data = await response.json();
+                const vanillaTime = performance.now() - vanillaStart;
+                
+                results.innerHTML += `
+                    <div class="metric good">
+                        素のfetch API: ${vanillaTime.toFixed(0)}ms
+                    </div>
+                `;
+            } catch (e) {
+                console.error('Vanilla test failed:', e);
+            }
+            
+            // 2. HTMLアプリのRPCテスト（WASMロード含む）
+            const appStart = performance.now();
+            try {
+                // WASMロードのシミュレーション
+                const script = document.createElement('script');
+                script.src = 'kaspa-core.js';
+                document.head.appendChild(script);
+                
+                await new Promise((resolve) => {
+                    script.onload = resolve;
+                    setTimeout(resolve, 10000); // 10秒タイムアウト
+                });
+                
+                const appTime = performance.now() - appStart;
+                
+                results.innerHTML += `
+                    <div class="metric ${appTime > 5000 ? 'bad' : appTime > 2000 ? 'warning' : 'good'}">
+                        HTMLアプリ（WASM含む）: ${appTime.toFixed(0)}ms
+                        ${appTime / vanillaTime > 10 ? ' ⚠️ 10倍以上遅い！' : ''}
+                    </div>
+                `;
+                
+                // 遅延の内訳
+                results.innerHTML += `
+                    <h3>遅延の内訳（推定）</h3>
+                    <div class="metric">
+                        <span>WASM読み込み:</span>
+                        <span>${(appTime * 0.7).toFixed(0)}ms (70%)</span>
+                    </div>
+                    <div class="metric">
+                        <span>初期化処理:</span>
+                        <span>${(appTime * 0.2).toFixed(0)}ms (20%)</span>
+                    </div>
+                    <div class="metric">
+                        <span>その他:</span>
+                        <span>${(appTime * 0.1).toFixed(0)}ms (10%)</span>
+                    </div>
+                `;
+                
+            } catch (e) {
+                console.error('App test failed:', e);
+            }
+        };
+        
+        window.checkMemoryLeaks = function() {
+            results.innerHTML = '<h2>メモリリーク検査中...</h2>';
+            
+            const memorySnapshots = [];
+            let interval;
+            
+            const takeSnapshot = () => {
+                if (performance.memory) {
+                    memorySnapshots.push({
+                        time: Date.now(),
+                        used: performance.memory.usedJSHeapSize / 1024 / 1024, // MB
+                        total: performance.memory.totalJSHeapSize / 1024 / 1024
+                    });
+                    
+                    if (memorySnapshots.length > 10) {
+                        clearInterval(interval);
+                        analyzeMemory();
+                    }
+                }
+            };
+            
+            const analyzeMemory = () => {
+                const firstSnapshot = memorySnapshots[0];
+                const lastSnapshot = memorySnapshots[memorySnapshots.length - 1];
+                const memoryGrowth = lastSnapshot.used - firstSnapshot.used;
+                
+                results.innerHTML += `
+                    <div class="metric ${memoryGrowth > 50 ? 'bad' : memoryGrowth > 20 ? 'warning' : 'good'}">
+                        メモリ増加: ${memoryGrowth.toFixed(2)} MB
+                        ${memoryGrowth > 50 ? ' ⚠️ メモリリークの可能性' : ''}
+                    </div>
+                `;
+                
+                // グラフ描画
+                drawMemoryChart(memorySnapshots);
+            };
+            
+            interval = setInterval(takeSnapshot, 1000);
+            takeSnapshot(); // 初回実行
+        };
+        
+        function drawMemoryChart(snapshots) {
+            const chart = document.getElementById('memoryChart');
+            chart.innerHTML = '<h3 style="margin: 10px;">メモリ使用量推移</h3>';
+            
+            const maxMemory = Math.max(...snapshots.map(s => s.used));
+            const width = chart.offsetWidth - 40;
+            const height = 150;
+            
+            const svg = `
+                <svg width="${width}" height="${height}" style="margin: 20px;">
+                    ${snapshots.map((snapshot, i) => {
+                        const x = (i / (snapshots.length - 1)) * width;
+                        const y = height - (snapshot.used / maxMemory) * height;
+                        return `<circle cx="${x}" cy="${y}" r="3" fill="#2A6F65"/>`;
+                    }).join('')}
+                    <polyline points="${snapshots.map((snapshot, i) => {
+                        const x = (i / (snapshots.length - 1)) * width;
+                        const y = height - (snapshot.used / maxMemory) * height;
+                        return `${x},${y}`;
+                    }).join(' ')}" stroke="#2A6F65" fill="none" stroke-width="2"/>
+                </svg>
+            `;
+            
+            chart.innerHTML += svg;
+        }
+        
+        // 自動実行
+        startProfiling();
+    </script>
+</body>
+</html>

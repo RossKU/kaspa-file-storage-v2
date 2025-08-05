@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ローカルサーバーテスト</title>
+    <style>
+        body { 
+            background: #1a1a1a; 
+            color: #e0e0e0; 
+            font-family: Arial, sans-serif; 
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .server { 
+            background: #2a2a2a; 
+            padding: 20px; 
+            margin: 20px 0; 
+            border-radius: 8px;
+        }
+        .online { border-left: 4px solid #4CAF50; }
+        .offline { border-left: 4px solid #f44336; }
+        .url { 
+            background: #333; 
+            padding: 10px; 
+            margin: 5px 0; 
+            border-radius: 4px; 
+            font-family: monospace;
+            cursor: pointer;
+        }
+        .url:hover { background: #444; }
+        button {
+            background: #2A6F65;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 18px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 10px;
+        }
+        button:hover { background: #1f5049; }
+        .timing { color: #03A9F4; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>🚀 ローカルサーバーテスト</h1>
+    
+    <div class="server">
+        <h2>サーバー起動方法</h2>
+        <p>Termuxで以下のいずれかを実行：</p>
+        <div class="url" onclick="copyToClipboard('./start-local-server.sh')">
+            ./start-local-server.sh
+        </div>
+        <div class="url" onclick="copyToClipboard('node local-server.js')">
+            node local-server.js
+        </div>
+        <div class="url" onclick="copyToClipboard('python3 -m http.server 8080')">
+            python3 -m http.server 8080
+        </div>
+        <p style="font-size: 12px; color: #888;">クリックでコピー</p>
+    </div>
+    
+    <div class="server">
+        <h2>アクセスURL</h2>
+        <div id="urls"></div>
+    </div>
+    
+    <div style="text-align: center; margin: 40px 0;">
+        <button onclick="testLocalSpeed()">🔍 速度テスト開始</button>
+        <button onclick="openMainApp()">📁 アプリを開く</button>
+    </div>
+    
+    <div id="results"></div>
+    
+    <script>
+        // 可能なURLを生成
+        const urls = [
+            'http://localhost:8080',
+            'http://127.0.0.1:8080'
+        ];
+        
+        // URLリスト表示
+        const urlsDiv = document.getElementById('urls');
+        urls.forEach(url => {
+            urlsDiv.innerHTML += `
+                <div class="url" onclick="window.open('${url}')">${url}</div>
+            `;
+        });
+        
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                alert('コピーしました: ' + text);
+            });
+        }
+        
+        function openMainApp() {
+            // 現在のURLからローカルサーバーのURLを推測
+            const baseUrl = window.location.origin;
+            window.open(baseUrl + '/index.html');
+        }
+        
+        async function testLocalSpeed() {
+            const results = document.getElementById('results');
+            results.innerHTML = '<div class="server"><h3>速度テスト実行中...</h3></div>';
+            
+            // 1. GitHub Pages (現在のホスト) との比較
+            results.innerHTML += '<div class="server"><h3>比較テスト</h3>';
+            
+            // ローカルファイルテスト
+            try {
+                const localStart = performance.now();
+                const response = await fetch('kaspa-core_bg.wasm', { cache: 'no-store' });
+                const localTime = performance.now() - localStart;
+                const size = response.headers.get('content-length');
+                
+                results.innerHTML += `
+                    <p>ローカルサーバー (このページ):</p>
+                    <p>WASM読み込み: <span class="timing">${localTime.toFixed(0)}ms</span> (${(size/1024/1024).toFixed(2)}MB)</p>
+                `;
+            } catch (e) {
+                results.innerHTML += `<p>ローカルテスト失敗: ${e.message}</p>`;
+            }
+            
+            // GitHub Pagesテスト（もし存在すれば）
+            try {
+                const ghStart = performance.now();
+                const ghResponse = await fetch('https://rossku.github.io/kaspa-file-storage-v2/kaspa-core_bg.wasm', { 
+                    cache: 'no-store',
+                    mode: 'cors'
+                });
+                const ghTime = performance.now() - ghStart;
+                
+                results.innerHTML += `
+                    <p>GitHub Pages:</p>
+                    <p>WASM読み込み: <span class="timing">${ghTime.toFixed(0)}ms</span></p>
+                    <p>速度差: <strong>${(ghTime / localTime).toFixed(1)}倍</strong></p>
+                `;
+            } catch (e) {
+                results.innerHTML += `<p>GitHub Pages未設定またはアクセス不可</p>`;
+            }
+            
+            results.innerHTML += '</div>';
+            
+            // 2. RPC接続テスト
+            results.innerHTML += '<div class="server"><h3>RPC接続テスト</h3>';
+            
+            try {
+                // WASMロード
+                const script = document.createElement('script');
+                script.src = 'kaspa-core.js';
+                document.head.appendChild(script);
+                
+                await new Promise(resolve => {
+                    script.onload = resolve;
+                });
+                
+                await init();
+                
+                // RPC接続
+                const rpcStart = performance.now();
+                const rpcClient = new RpcClient({
+                    url: 'wss://tn10.katnip.sh/wrpc/kaspa/testnet-10',
+                    networkId: 'testnet-10'
+                });
+                
+                await rpcClient.connect();
+                const rpcTime = performance.now() - rpcStart;
+                
+                results.innerHTML += `
+                    <p>RPC接続成功: <span class="timing">${rpcTime.toFixed(0)}ms</span></p>
+                    <p style="color: #4CAF50;">✅ ローカルサーバーからは正常に接続できます！</p>
+                `;
+                
+                await rpcClient.disconnect();
+                
+            } catch (e) {
+                results.innerHTML += `<p style="color: #f44336;">RPC接続エラー: ${e.message}</p>`;
+            }
+            
+            results.innerHTML += '</div>';
+        }
+        
+        // 自動的にローカルサーバーの状態をチェック
+        async function checkServerStatus() {
+            try {
+                const response = await fetch('/');
+                document.body.classList.add('server-online');
+            } catch (e) {
+                document.body.classList.add('server-offline');
+            }
+        }
+        
+        checkServerStatus();
+    </script>
+</body>
+</html>

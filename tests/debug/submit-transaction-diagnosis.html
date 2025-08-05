@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>submitTransaction診断</title>
+    <style>
+        body { background: #1a1a1a; color: #e0e0e0; font-family: monospace; padding: 20px; }
+        .critical { background: #f44336; color: white; padding: 20px; margin: 20px 0; border-radius: 4px; font-size: 1.2em; }
+        .test { margin: 10px 0; padding: 15px; background: #2a2a2a; border-radius: 4px; }
+        .timing { color: #03A9F4; font-weight: bold; }
+        pre { background: #333; padding: 10px; border-radius: 4px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>submitTransaction処理の診断</h1>
+    <div id="results"></div>
+
+    <script type="module">
+        const results = document.getElementById('results');
+        
+        async function diagnoseSubmitTransaction() {
+            results.innerHTML = '<h2>診断開始...</h2>';
+            
+            // WASMロード
+            try {
+                const script = document.createElement('script');
+                script.src = 'kaspa-core.js';
+                document.head.appendChild(script);
+                
+                await new Promise((resolve) => {
+                    script.onload = resolve;
+                });
+                
+                await init();
+                results.innerHTML += '<div class="test">✓ WASM初期化成功</div>';
+            } catch (e) {
+                results.innerHTML += '<div class="test">✗ WASM初期化失敗: ' + e.message + '</div>';
+                return;
+            }
+            
+            // 1. RPC接続テスト
+            results.innerHTML += '<h3>1. RPC接続プロセス分析</h3>';
+            
+            const endpoints = [
+                'wss://tn10.katnip.sh/wrpc/kaspa/testnet-10',
+                'wss://kaspa-testnet-10-wrpc.kaspa.stream'
+            ];
+            
+            for (const endpoint of endpoints) {
+                results.innerHTML += `<h4>エンドポイント: ${endpoint}</h4>`;
+                
+                try {
+                    // RpcClient作成
+                    const createStart = performance.now();
+                    const rpcClient = new RpcClient({
+                        url: endpoint,
+                        networkId: 'testnet-10'
+                    });
+                    const createTime = performance.now() - createStart;
+                    results.innerHTML += `<div class="test">RpcClient作成: <span class="timing">${createTime.toFixed(2)}ms</span></div>`;
+                    
+                    // 接続
+                    const connectStart = performance.now();
+                    await rpcClient.connect();
+                    const connectTime = performance.now() - connectStart;
+                    results.innerHTML += `<div class="test">接続: <span class="timing">${connectTime.toFixed(2)}ms</span></div>`;
+                    
+                    // ダミートランザクション作成
+                    results.innerHTML += '<h4>2. トランザクション処理テスト</h4>';
+                    
+                    // ダミーUTXO
+                    const dummyUtxo = {
+                        address: 'kaspatest:qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqkx9awp4e',
+                        outpoint: {
+                            transactionId: '0000000000000000000000000000000000000000000000000000000000000000',
+                            index: 0
+                        },
+                        utxoEntry: {
+                            amount: 100000000n,
+                            scriptPublicKey: new ScriptPublicKey(0, new Uint8Array(25)),
+                            blockDaaScore: 0n,
+                            isCoinbase: false
+                        }
+                    };
+                    
+                    // トランザクション作成時間
+                    const txCreateStart = performance.now();
+                    const tx = new Transaction({
+                        inputs: [],
+                        outputs: [{
+                            address: 'kaspatest:qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqkx9awp4e',
+                            amount: 1000n
+                        }],
+                        payload: new Uint8Array([1,2,3,4,5])
+                    });
+                    const txCreateTime = performance.now() - txCreateStart;
+                    results.innerHTML += `<div class="test">Transaction作成: <span class="timing">${txCreateTime.toFixed(2)}ms</span></div>`;
+                    
+                    // submit関数の存在確認
+                    if (typeof tx.submit === 'function') {
+                        results.innerHTML += '<div class="test">✓ submit関数が存在</div>';
+                        
+                        // submitのテスト（実際には送信しない）
+                        try {
+                            // submitを呼び出すが、実際のトランザクションは無効なのでエラーになる
+                            const submitStart = performance.now();
+                            await tx.submit(rpcClient).catch(e => {
+                                const submitTime = performance.now() - submitStart;
+                                results.innerHTML += `<div class="test">submit呼び出し時間: <span class="timing">${submitTime.toFixed(2)}ms</span></div>`;
+                                throw e;
+                            });
+                        } catch (e) {
+                            results.innerHTML += `<div class="test">予想通りのエラー: ${e.message}</div>`;
+                        }
+                    } else {
+                        results.innerHTML += '<div class="test">✗ submit関数が見つからない</div>';
+                    }
+                    
+                    await rpcClient.disconnect();
+                    
+                } catch (e) {
+                    results.innerHTML += `<div class="test">エラー: ${e.message}</div>`;
+                }
+            }
+            
+            // 3. 問題の特定
+            results.innerHTML += `
+                <div class="critical">
+                    <h3>🎯 判明した問題</h3>
+                    <p><strong>transaction.submit()の実装に問題がある可能性：</strong></p>
+                    <ol>
+                        <li>submitメソッドが内部で複数のRPC呼び出しを行っている</li>
+                        <li>submitの前に不要な検証処理が入っている</li>
+                        <li>submitがリトライループに入っている</li>
+                        <li>WASM側のsubmit実装が非効率</li>
+                    </ol>
+                </div>
+            `;
+            
+            // 4. 回避策
+            results.innerHTML += `
+                <h3>回避策</h3>
+                <div class="test">
+                    <p>transaction.submit()の代わりに直接RPC呼び出し：</p>
+                    <pre>
+// 代替実装
+async function fastSubmitTransaction(transaction, rpcClient) {
+    // トランザクションをシリアライズ
+    const serialized = transaction.serialize();
+    
+    // 直接submitTransactionを呼び出し
+    return await rpcClient.submitTransaction({
+        transaction: serialized,
+        allowOrphan: false
+    });
+}
+                    </pre>
+                </div>
+            `;
+        }
+        
+        diagnoseSubmitTransaction();
+    </script>
+</body>
+</html>

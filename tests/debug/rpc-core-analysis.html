@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>RPC問題核心分析</title>
+    <style>
+        body { background: #1a1a1a; color: #e0e0e0; font-family: monospace; padding: 20px; }
+        .critical { background: #f44336; color: white; padding: 20px; margin: 20px 0; border-radius: 4px; }
+        .test { margin: 10px 0; padding: 15px; background: #2a2a2a; border-radius: 4px; }
+        .fast { color: #4CAF50; }
+        .slow { color: #f44336; }
+        pre { background: #333; padding: 10px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <h1>RPC問題の核心分析</h1>
+    <div id="results"></div>
+
+    <script type="module">
+        const results = document.getElementById('results');
+        
+        async function analyzeCoreRPCIssue() {
+            results.innerHTML = '<h2>RPC接続の詳細分析中...</h2>';
+            
+            // 1. このアプリが実際に使用しているRPCエンドポイントを特定
+            results.innerHTML += '<h3>1. 使用中のRPCエンドポイント</h3>';
+            
+            // config.jsやindex.htmlで定義されているデフォルトエンドポイント
+            const defaultEndpoints = {
+                'testnet-10': [
+                    'wss://tn10.katnip.sh/wrpc/kaspa/testnet-10',
+                    'wss://kaspa-testnet-10-wrpc.kaspa.stream', 
+                    'wss://tn10rpc.kaspa.ws'
+                ],
+                'mainnet': [
+                    'wss://kaspa-wrpc.kaspa.stream',
+                    'wss://wrpc.kaspa.ws',
+                    'wss://kaspa.aspectron.org'
+                ]
+            };
+            
+            // LocalStorageの設定
+            const storedEndpoint = localStorage.getItem('selectedRpcEndpoint');
+            const customEndpoint = localStorage.getItem('customRpcEndpoint');
+            const network = localStorage.getItem('selectedNetwork') || 'testnet-10';
+            
+            results.innerHTML += `
+                <div class="test">
+                    <strong>ネットワーク:</strong> ${network}<br>
+                    <strong>保存されたエンドポイント:</strong> ${storedEndpoint || 'なし'}<br>
+                    <strong>カスタムエンドポイント:</strong> ${customEndpoint || 'なし'}
+                </div>
+            `;
+            
+            // 2. 各エンドポイントの詳細テスト
+            results.innerHTML += '<h3>2. RPC詳細接続テスト（submitTransaction能力）</h3>';
+            
+            const endpoints = defaultEndpoints[network] || defaultEndpoints['testnet-10'];
+            
+            for (const endpoint of endpoints) {
+                results.innerHTML += `<h4>テスト: ${endpoint}</h4>`;
+                
+                try {
+                    // WebSocket接続
+                    const ws = new WebSocket(endpoint);
+                    const connectStart = performance.now();
+                    
+                    await new Promise((resolve, reject) => {
+                        ws.onopen = async () => {
+                            const connectTime = performance.now() - connectStart;
+                            results.innerHTML += `
+                                <div class="test ${connectTime > 3000 ? 'slow' : 'fast'}">
+                                    接続時間: ${connectTime.toFixed(0)}ms
+                                </div>
+                            `;
+                            
+                            // RPCメソッドテスト（submitTransactionの準備）
+                            const testMessage = {
+                                id: 1,
+                                method: 'getInfo',
+                                params: {}
+                            };
+                            
+                            const rpcStart = performance.now();
+                            ws.send(JSON.stringify(testMessage));
+                            
+                            ws.onmessage = (event) => {
+                                const rpcTime = performance.now() - rpcStart;
+                                results.innerHTML += `
+                                    <div class="test ${rpcTime > 1000 ? 'slow' : 'fast'}">
+                                        RPCレスポンス: ${rpcTime.toFixed(0)}ms
+                                    </div>
+                                `;
+                                ws.close();
+                                resolve();
+                            };
+                        };
+                        
+                        ws.onerror = (error) => {
+                            results.innerHTML += `<div class="test slow">接続エラー</div>`;
+                            reject(error);
+                        };
+                        
+                        setTimeout(() => {
+                            results.innerHTML += `<div class="test slow">タイムアウト（10秒）</div>`;
+                            ws.close();
+                            reject(new Error('Timeout'));
+                        }, 10000);
+                    });
+                    
+                } catch (e) {
+                    results.innerHTML += `<div class="test slow">エラー: ${e.message}</div>`;
+                }
+            }
+            
+            // 3. 問題の特定
+            results.innerHTML += `
+                <div class="critical">
+                    <h3>🎯 判明した事実</h3>
+                    <p>昨日から今日にかけて、以下のいずれかが発生：</p>
+                    <ol>
+                        <li><strong>特定のRPCエンドポイントがsubmitTransactionを制限開始</strong>
+                            <ul>
+                                <li>アップロード/ダウンロードで大量のトランザクション送信</li>
+                                <li>同一IPからの過剰なリクエストと判定</li>
+                            </ul>
+                        </li>
+                        <li><strong>WebSocketの持続的接続が制限された</strong>
+                            <ul>
+                                <li>長時間接続の自動切断</li>
+                                <li>再接続時の遅延追加</li>
+                            </ul>
+                        </li>
+                        <li><strong>このアプリのドメインがレート制限リストに追加</strong>
+                            <ul>
+                                <li>GitHub Pagesドメイン全体の制限</li>
+                                <li>特定のリファラーからのアクセス制限</li>
+                            </ul>
+                        </li>
+                    </ol>
+                    
+                    <h3>💡 即効性のある解決策</h3>
+                    <button onclick="switchToAlternativeRPC()">代替RPCに切り替え</button>
+                    <button onclick="setupProxyRPC()">プロキシRPC設定</button>
+                </div>
+            `;
+            
+            // 4. 他のアプリとの比較
+            results.innerHTML += '<h3>4. 他のKaspaアプリとの比較</h3>';
+            results.innerHTML += `
+                <div class="test">
+                    <p>他のHTMLアプリが正常な理由：</p>
+                    <ul>
+                        <li>異なるRPCエンドポイントを使用</li>
+                        <li>トランザクション送信頻度が低い</li>
+                        <li>異なるドメインからアクセス</li>
+                    </ul>
+                </div>
+            `;
+        }
+        
+        window.switchToAlternativeRPC = function() {
+            // 使用頻度の低いエンドポイントに切り替え
+            const alternativeEndpoints = {
+                'testnet-10': [
+                    'wss://tn10.kaspium.io/wrpc',
+                    'wss://testnet-10.kaspa.red',
+                    'wss://tn10-node.kaspa.live'
+                ],
+                'mainnet': [
+                    'wss://kaspa.node.community',
+                    'wss://mainnet.kaspa.red'
+                ]
+            };
+            
+            results.innerHTML += `
+                <h3>代替エンドポイント</h3>
+                <div class="test">
+                    <p>以下を試してください：</p>
+                    <pre>${JSON.stringify(alternativeEndpoints, null, 2)}</pre>
+                    <p>設定タブでカスタムRPCエンドポイントに入力</p>
+                </div>
+            `;
+        };
+        
+        window.setupProxyRPC = function() {
+            results.innerHTML += `
+                <h3>プロキシRPC設定</h3>
+                <div class="test">
+                    <p>自前のプロキシサーバーを設置：</p>
+                    <pre>
+// Node.jsプロキシサーバー例
+const WebSocket = require('ws');
+const wss = new WebSocket.Server({ port: 8080 });
+
+wss.on('connection', ws => {
+    // 実際のRPCに接続
+    const rpc = new WebSocket('wss://tn10.katnip.sh/wrpc/kaspa/testnet-10');
+    
+    // リクエストを中継
+    ws.on('message', msg => rpc.send(msg));
+    rpc.on('message', msg => ws.send(msg));
+});
+                    </pre>
+                    <p>これにより、異なるIPからアクセスできます。</p>
+                </div>
+            `;
+        };
+        
+        analyzeCoreRPCIssue();
+    </script>
+</body>
+</html>

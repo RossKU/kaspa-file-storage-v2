@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Rusty Kaspa公式WASM取得</title>
+    <style>
+        body { background: #1a1a1a; color: #e0e0e0; font-family: Arial, sans-serif; padding: 20px; }
+        .option { background: #2a2a2a; padding: 20px; margin: 20px 0; border-radius: 8px; }
+        .command { background: #333; padding: 15px; margin: 10px 0; border-radius: 4px; font-family: monospace; cursor: pointer; }
+        .command:hover { background: #444; }
+        button { background: #2A6F65; color: white; border: none; padding: 15px 30px; margin: 10px; border-radius: 4px; cursor: pointer; font-size: 16px; }
+        button:hover { background: #1f5049; }
+        .success { color: #4CAF50; }
+        .warning { background: #ff9800; color: black; padding: 15px; margin: 20px 0; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <h1>🦀 Rusty Kaspa公式WASMファイル取得</h1>
+    
+    <div class="warning">
+        <strong>重要:</strong> 現在のkaspa-core.jsとkaspa-core_bg.wasmが不一致の可能性があります。
+        公式リポジトリから正しいペアを取得しましょう。
+    </div>
+    
+    <div class="option">
+        <h2>方法1: 最新の安定版リリース（推奨）</h2>
+        <p>Rusty Kaspa v0.15.x の最新リリースから：</p>
+        <div class="command" onclick="copyCommand(this)">
+# 最新リリースのWASMパッケージ
+wget https://github.com/kaspanet/rusty-kaspa/releases/download/v0.15.2/kaspa-wasm-nodejs-v0.15.2.zip
+unzip kaspa-wasm-nodejs-v0.15.2.zip
+
+# またはブラウザ版
+wget https://github.com/kaspanet/rusty-kaspa/releases/download/v0.15.2/kaspa-wasm-v0.15.2.zip
+unzip kaspa-wasm-v0.15.2.zip
+        </div>
+    </div>
+    
+    <div class="option">
+        <h2>方法2: NPMから（最も簡単）</h2>
+        <div class="command" onclick="copyCommand(this)">
+# バックアップ
+mv kaspa-core.js kaspa-core.js.old
+mv kaspa-core_bg.wasm kaspa-core_bg.wasm.old
+
+# NPMから直接ダウンロード
+curl -o kaspa-core.js https://unpkg.com/@kaspa/core-lib@0.15.2/kaspa-core.js
+curl -o kaspa-core_bg.wasm https://unpkg.com/@kaspa/core-lib@0.15.2/kaspa-core_bg.wasm
+        </div>
+    </div>
+    
+    <div class="option">
+        <h2>方法3: GitHub APIで最新版を確認</h2>
+        <button onclick="checkLatestVersion()">最新バージョンを確認</button>
+        <div id="latestVersion"></div>
+    </div>
+    
+    <div class="option">
+        <h2>方法4: 現在のファイルの詳細を確認</h2>
+        <button onclick="checkCurrentFiles()">現在のファイルを診断</button>
+        <div id="currentFiles"></div>
+    </div>
+    
+    <script>
+        function copyCommand(element) {
+            const text = element.textContent.trim();
+            navigator.clipboard.writeText(text).then(() => {
+                alert('コマンドをコピーしました');
+            });
+        }
+        
+        async function checkLatestVersion() {
+            const div = document.getElementById('latestVersion');
+            div.innerHTML = '<p>確認中...</p>';
+            
+            try {
+                const response = await fetch('https://api.github.com/repos/kaspanet/rusty-kaspa/releases/latest');
+                const data = await response.json();
+                
+                div.innerHTML = `
+                    <h3 class="success">最新リリース: ${data.tag_name}</h3>
+                    <p>リリース日: ${new Date(data.published_at).toLocaleDateString()}</p>
+                    <p>ダウンロード:</p>
+                `;
+                
+                // WASMファイルを探す
+                data.assets.forEach(asset => {
+                    if (asset.name.includes('wasm')) {
+                        div.innerHTML += `
+                            <div class="command" onclick="window.open('${asset.browser_download_url}')">
+                                ${asset.name} (${(asset.size / 1024 / 1024).toFixed(2)} MB)
+                            </div>
+                        `;
+                    }
+                });
+                
+            } catch (e) {
+                div.innerHTML = `<p>エラー: ${e.message}</p>`;
+            }
+        }
+        
+        async function checkCurrentFiles() {
+            const div = document.getElementById('currentFiles');
+            div.innerHTML = '<p>診断中...</p>';
+            
+            try {
+                // 現在のファイル情報
+                const jsResp = await fetch('kaspa-core.js', { method: 'HEAD' });
+                const wasmResp = await fetch('kaspa-core_bg.wasm', { method: 'HEAD' });
+                
+                div.innerHTML = `
+                    <h3>現在のファイル:</h3>
+                    <p><strong>kaspa-core.js:</strong></p>
+                    <ul>
+                        <li>サイズ: ${(jsResp.headers.get('content-length') / 1024).toFixed(2)} KB</li>
+                        <li>最終更新: ${jsResp.headers.get('last-modified') || '不明'}</li>
+                    </ul>
+                    <p><strong>kaspa-core_bg.wasm:</strong></p>
+                    <ul>
+                        <li>サイズ: ${(wasmResp.headers.get('content-length') / 1024 / 1024).toFixed(2)} MB</li>
+                        <li>最終更新: ${wasmResp.headers.get('last-modified') || '不明'}</li>
+                    </ul>
+                `;
+                
+                // JSファイルの内容を少し確認
+                const jsText = await (await fetch('kaspa-core.js')).text();
+                const versionMatch = jsText.match(/version.*?['"]([0-9.]+)['"]/);
+                if (versionMatch) {
+                    div.innerHTML += `<p class="success">検出されたバージョン: ${versionMatch[1]}</p>`;
+                }
+                
+            } catch (e) {
+                div.innerHTML = `<p>エラー: ${e.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kaspa RPC診断ツール</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #e0e0e0;
+        }
+        .test-section {
+            background: #2a2a2a;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+        }
+        .result {
+            background: #333;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .success { color: #4CAF50; }
+        .error { color: #f44336; }
+        .warning { color: #ff9800; }
+        button {
+            background: #2A6F65;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #1f5049;
+        }
+        .timing {
+            color: #03A9F4;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>Kaspa RPC診断ツール</h1>
+    
+    <div class="test-section">
+        <h2>1. WASM SDK動作テスト</h2>
+        <button onclick="testWASM()">WASMテスト実行</button>
+        <div id="wasm-results"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>2. RPC接続テスト</h2>
+        <select id="network-select">
+            <option value="testnet-10">Testnet-10</option>
+            <option value="mainnet">Mainnet</option>
+        </select>
+        <button onclick="testRPCConnection()">接続テスト実行</button>
+        <div id="rpc-results"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>3. APIレスポンステスト</h2>
+        <button onclick="testAPIEndpoints()">APIテスト実行</button>
+        <div id="api-results"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>4. 総合パフォーマンステスト</h2>
+        <button onclick="runFullDiagnostic()">総合診断実行</button>
+        <div id="full-results"></div>
+    </div>
+
+    <script type="module">
+        // グローバルに関数を公開
+        window.testWASM = async function() {
+            const results = document.getElementById('wasm-results');
+            results.innerHTML = '';
+
+            try {
+                const start = performance.now();
+                
+                // WASM SDKロード
+                const script = document.createElement('script');
+                script.src = 'kaspa-core.js';
+                document.head.appendChild(script);
+                
+                await new Promise((resolve, reject) => {
+                    script.onload = resolve;
+                    script.onerror = reject;
+                    setTimeout(() => reject(new Error('Timeout')), 5000);
+                });
+
+                const loadTime = performance.now() - start;
+                results.innerHTML += `<div class="result success">✓ WASM SDKロード成功 <span class="timing">${loadTime.toFixed(2)}ms</span></div>`;
+
+                // 初期化テスト
+                const initStart = performance.now();
+                await init();
+                const initTime = performance.now() - initStart;
+                results.innerHTML += `<div class="result success">✓ WASM初期化成功 <span class="timing">${initTime.toFixed(2)}ms</span></div>`;
+
+                // 基本機能テスト
+                if (typeof RpcClient !== 'undefined') {
+                    results.innerHTML += `<div class="result success">✓ RpcClient利用可能</div>`;
+                } else {
+                    results.innerHTML += `<div class="result error">✗ RpcClient未定義</div>`;
+                }
+
+            } catch (error) {
+                results.innerHTML += `<div class="result error">✗ WASMエラー: ${error.message}</div>`;
+            }
+        };
+
+        window.testRPCConnection = async function() {
+            const results = document.getElementById('rpc-results');
+            const network = document.getElementById('network-select').value;
+            results.innerHTML = '';
+
+            const endpoints = {
+                'testnet-10': [
+                    'wss://tn10.katnip.sh/wrpc/kaspa/testnet-10',
+                    'wss://kaspa-testnet-10-wrpc.kaspa.stream',
+                    'wss://tn10rpc.kaspa.ws'
+                ],
+                'mainnet': [
+                    'wss://kaspa-wrpc.kaspa.stream',
+                    'wss://wrpc.kaspa.ws',
+                    'wss://kaspa.aspectron.org'
+                ]
+            };
+
+            for (const endpoint of endpoints[network]) {
+                try {
+                    const start = performance.now();
+                    
+                    // WebSocket接続テスト
+                    const ws = new WebSocket(endpoint);
+                    
+                    await new Promise((resolve, reject) => {
+                        ws.onopen = () => {
+                            const connectTime = performance.now() - start;
+                            results.innerHTML += `<div class="result success">✓ ${endpoint} <span class="timing">${connectTime.toFixed(2)}ms</span></div>`;
+                            ws.close();
+                            resolve();
+                        };
+                        ws.onerror = () => reject(new Error('Connection failed'));
+                        setTimeout(() => reject(new Error('Timeout')), 10000);
+                    });
+                    
+                } catch (error) {
+                    results.innerHTML += `<div class="result error">✗ ${endpoint}: ${error.message}</div>`;
+                }
+            }
+        };
+
+        window.testAPIEndpoints = async function() {
+            const results = document.getElementById('api-results');
+            const network = document.getElementById('network-select').value;
+            results.innerHTML = '';
+
+            const apiEndpoints = {
+                'testnet-10': 'https://api-tn10.kaspa.org',
+                'mainnet': 'https://api.kaspa.org'
+            };
+
+            const tests = [
+                { path: '/info/blockreward', name: 'Block Reward' },
+                { path: '/info/coinsupply', name: 'Coin Supply' },
+                { path: '/info/marketcap', name: 'Market Cap' }
+            ];
+
+            for (const test of tests) {
+                try {
+                    const start = performance.now();
+                    const response = await fetch(apiEndpoints[network] + test.path);
+                    const responseTime = performance.now() - start;
+                    
+                    if (response.ok) {
+                        results.innerHTML += `<div class="result success">✓ ${test.name} <span class="timing">${responseTime.toFixed(2)}ms</span></div>`;
+                    } else {
+                        results.innerHTML += `<div class="result warning">⚠ ${test.name}: ${response.status}</div>`;
+                    }
+                } catch (error) {
+                    results.innerHTML += `<div class="result error">✗ ${test.name}: ${error.message}</div>`;
+                }
+            }
+        };
+
+        window.runFullDiagnostic = async function() {
+            const results = document.getElementById('full-results');
+            results.innerHTML = '<div class="result">診断開始...</div>';
+
+            const diagnostics = {
+                wasmLoad: 0,
+                rpcConnect: 0,
+                apiResponse: 0,
+                totalTime: 0
+            };
+
+            const start = performance.now();
+
+            // 1. WASMテスト
+            await testWASM();
+            diagnostics.wasmLoad = performance.now() - start;
+
+            // 2. RPC接続テスト
+            const rpcStart = performance.now();
+            await testRPCConnection();
+            diagnostics.rpcConnect = performance.now() - rpcStart;
+
+            // 3. APIテスト
+            const apiStart = performance.now();
+            await testAPIEndpoints();
+            diagnostics.apiResponse = performance.now() - apiStart;
+
+            diagnostics.totalTime = performance.now() - start;
+
+            // 診断結果まとめ
+            results.innerHTML = `
+                <div class="result"><strong>診断結果サマリー</strong></div>
+                <div class="result">WASM読み込み: <span class="timing">${diagnostics.wasmLoad.toFixed(2)}ms</span></div>
+                <div class="result">RPC接続: <span class="timing">${diagnostics.rpcConnect.toFixed(2)}ms</span></div>
+                <div class="result">API応答: <span class="timing">${diagnostics.apiResponse.toFixed(2)}ms</span></div>
+                <div class="result">総実行時間: <span class="timing">${diagnostics.totalTime.toFixed(2)}ms</span></div>
+                
+                <div class="result ${diagnostics.totalTime > 30000 ? 'error' : diagnostics.totalTime > 10000 ? 'warning' : 'success'}">
+                    ${diagnostics.totalTime > 30000 ? '✗ 非常に遅い（ネットワークまたはシステムの問題）' :
+                      diagnostics.totalTime > 10000 ? '⚠ 遅い（最適化が必要）' :
+                      '✓ 正常な速度'}
+                </div>
+            `;
+
+            // 問題の特定
+            if (diagnostics.wasmLoad > 5000) {
+                results.innerHTML += '<div class="result error">✗ WASM読み込みが遅い</div>';
+            }
+            if (diagnostics.rpcConnect > 20000) {
+                results.innerHTML += '<div class="result error">✗ RPC接続が遅い（ネットワーク問題の可能性）</div>';
+            }
+            if (diagnostics.apiResponse > 10000) {
+                results.innerHTML += '<div class="result error">✗ API応答が遅い（Kaspaネットワークの問題の可能性）</div>';
+            }
+        };
+    </script>
+
+    <script src="kaspa-core.js"></script>
+</body>
+</html>

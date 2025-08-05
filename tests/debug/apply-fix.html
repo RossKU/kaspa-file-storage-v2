@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>即座に修正を適用</title>
+    <style>
+        body { background: #1a1a1a; color: #e0e0e0; font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; }
+        .critical { background: #f44336; color: white; padding: 20px; margin: 20px 0; border-radius: 4px; }
+        .success { background: #4CAF50; color: white; padding: 20px; margin: 20px 0; border-radius: 4px; }
+        .code { background: #333; padding: 15px; border-radius: 4px; font-family: monospace; overflow-x: auto; }
+        button { background: #2A6F65; color: white; border: none; padding: 15px 30px; margin: 10px; border-radius: 4px; cursor: pointer; font-size: 16px; }
+        button:hover { background: #1f5049; }
+    </style>
+</head>
+<body>
+    <h1>🔧 waitForConfirmation 30秒バグ修正</h1>
+    
+    <div class="critical">
+        <h2>発見した問題</h2>
+        <p><strong>waitForConfirmation関数が30秒待ってからRPCチェックを開始</strong></p>
+        <ul>
+            <li>実際: 0.1秒でブロックに含まれる</li>
+            <li>現状: 30秒後に検出</li>
+            <li>原因: <code>if (waitTime >= 30000)</code> の条件</li>
+        </ul>
+    </div>
+    
+    <h2>修正方法</h2>
+    
+    <h3>方法1: 即座に修正（推奨）</h3>
+    <div class="code">
+# index.htmlの最後（&lt;/body&gt;タグの直前）に追加：
+&lt;script src="immediate-fix.js"&gt;&lt;/script&gt;
+    </div>
+    
+    <h3>方法2: index.html直接修正</h3>
+    <p>index.htmlの11887行目付近を修正：</p>
+    <div class="code">
+// 変更前:
+if (waitTime >= 30000 && NetworkState.rpcClient) {
+
+// 変更後:
+if (waitTime >= 1000 && NetworkState.rpcClient) {  // 1秒後から開始
+    </div>
+    
+    <h3>方法3: 一時的な回避策</h3>
+    <button onclick="applyTemporaryFix()">一時的に修正を適用</button>
+    <div id="fixResult"></div>
+    
+    <script>
+        function applyTemporaryFix() {
+            const script = document.createElement('script');
+            script.src = '../immediate-fix.js';
+            script.onload = () => {
+                document.getElementById('fixResult').innerHTML = '<div class="success">✅ 修正を適用しました！ブラウザで http://localhost:8080 をリロードしてください。</div>';
+            };
+            script.onerror = () => {
+                document.getElementById('fixResult').innerHTML = '<div class="critical">❌ 修正の適用に失敗しました。手動でimmediate-fix.jsをindex.htmlに追加してください。</div>';
+            };
+            document.head.appendChild(script);
+        }
+    </script>
+    
+    <div class="success">
+        <h2>期待される結果</h2>
+        <ul>
+            <li>トランザクション確認: 30秒 → 1-2秒</li>
+            <li>アップロード速度: 大幅改善</li>
+            <li>WebSocket通知が動作しなくても高速</li>
+        </ul>
+    </div>
+</body>
+</html>

@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Kaspa File Storage固有問題デバッグ</title>
+    <style>
+        body { 
+            background: #1a1a1a; 
+            color: #e0e0e0; 
+            font-family: monospace; 
+            padding: 20px;
+        }
+        .test { 
+            margin: 10px 0; 
+            padding: 15px; 
+            background: #2a2a2a; 
+            border-radius: 4px;
+        }
+        .good { color: #4CAF50; }
+        .bad { color: #f44336; }
+        .warning { color: #ff9800; }
+        pre { 
+            background: #333; 
+            padding: 10px; 
+            border-radius: 4px; 
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>Kaspa File Storage固有の問題診断</h1>
+    <div id="results"></div>
+
+    <script type="module">
+        const results = document.getElementById('results');
+        
+        async function diagnoseAppSpecificIssues() {
+            results.innerHTML = '<h2>アプリ固有の問題を診断中...</h2>';
+            
+            // 1. WASMファイルサイズと読み込み
+            results.innerHTML += '<h3>1. WASM読み込みテスト</h3>';
+            
+            try {
+                const wasmStart = performance.now();
+                const wasmResponse = await fetch('kaspa-core_bg.wasm');
+                const wasmSize = parseInt(wasmResponse.headers.get('content-length') || '0');
+                const wasmTime = performance.now() - wasmStart;
+                
+                results.innerHTML += `
+                    <div class="test">
+                        WASMファイルサイズ: ${(wasmSize / 1024 / 1024).toFixed(2)} MB<br>
+                        読み込み時間: <span class="${wasmTime > 5000 ? 'bad' : wasmTime > 2000 ? 'warning' : 'good'}">${wasmTime.toFixed(0)}ms</span>
+                    </div>
+                `;
+                
+                // WASMが大きすぎる場合の警告
+                if (wasmSize > 10 * 1024 * 1024) {
+                    results.innerHTML += `
+                        <div class="test warning">
+                            ⚠️ WASMファイルが大きすぎます（10MB以上）
+                            <p>昨日から今日にかけてブラウザのキャッシュがクリアされた可能性があります。</p>
+                        </div>
+                    `;
+                }
+            } catch (e) {
+                results.innerHTML += `<div class="test bad">✗ WASM読み込みエラー: ${e.message}</div>`;
+            }
+            
+            // 2. LocalStorage/SessionStorage使用量
+            results.innerHTML += '<h3>2. ストレージ使用量チェック</h3>';
+            
+            let localStorageSize = 0;
+            let localStorageItems = 0;
+            for (let key in localStorage) {
+                localStorageSize += (key.length + localStorage[key].length) * 2; // UTF-16
+                localStorageItems++;
+            }
+            
+            results.innerHTML += `
+                <div class="test ${localStorageSize > 5 * 1024 * 1024 ? 'bad' : 'good'}">
+                    LocalStorage: ${(localStorageSize / 1024 / 1024).toFixed(2)} MB (${localStorageItems}項目)
+                    ${localStorageSize > 5 * 1024 * 1024 ? '<br>⚠️ 容量制限に近づいています' : ''}
+                </div>
+            `;
+            
+            // 大きなデータを探す
+            const largeItems = [];
+            for (let key in localStorage) {
+                if (localStorage[key].length > 100000) {
+                    largeItems.push({
+                        key: key,
+                        size: localStorage[key].length
+                    });
+                }
+            }
+            
+            if (largeItems.length > 0) {
+                results.innerHTML += '<div class="test warning">大きなLocalStorageアイテム:</div>';
+                largeItems.forEach(item => {
+                    results.innerHTML += `
+                        <div class="test">
+                            ${item.key}: ${(item.size / 1024).toFixed(2)} KB
+                        </div>
+                    `;
+                });
+            }
+            
+            // 3. 特定のエンドポイントへのレート制限チェック
+            results.innerHTML += '<h3>3. RPCエンドポイント別テスト</h3>';
+            
+            const endpoints = [
+                'wss://tn10.katnip.sh/wrpc/kaspa/testnet-10',
+                'wss://kaspa-testnet-10-wrpc.kaspa.stream',
+                'wss://tn10rpc.kaspa.ws'
+            ];
+            
+            for (const endpoint of endpoints) {
+                try {
+                    // 複数回接続してレート制限をチェック
+                    let successCount = 0;
+                    let totalTime = 0;
+                    
+                    for (let i = 0; i < 3; i++) {
+                        const start = performance.now();
+                        const ws = new WebSocket(endpoint);
+                        
+                        await new Promise((resolve, reject) => {
+                            ws.onopen = () => {
+                                successCount++;
+                                totalTime += performance.now() - start;
+                                ws.close();
+                                resolve();
+                            };
+                            ws.onerror = reject;
+                            setTimeout(reject, 5000);
+                        });
+                        
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                    }
+                    
+                    const avgTime = totalTime / successCount;
+                    results.innerHTML += `
+                        <div class="test ${avgTime > 3000 ? 'bad' : avgTime > 1000 ? 'warning' : 'good'}">
+                            ${endpoint}<br>
+                            成功: ${successCount}/3, 平均: ${avgTime.toFixed(0)}ms
+                        </div>
+                    `;
+                } catch (e) {
+                    results.innerHTML += `
+                        <div class="test bad">
+                            ${endpoint}<br>
+                            ✗ エラー（レート制限の可能性）
+                        </div>
+                    `;
+                }
+            }
+            
+            // 4. ブラウザキャッシュ状態
+            results.innerHTML += '<h3>4. キャッシュ状態診断</h3>';
+            
+            if ('caches' in window) {
+                const cacheNames = await caches.keys();
+                results.innerHTML += `
+                    <div class="test">
+                        キャッシュストレージ: ${cacheNames.length}個のキャッシュ
+                    </div>
+                `;
+            }
+            
+            // 5. 特定の診断と解決策
+            results.innerHTML += `
+                <h3>診断結果と解決策</h3>
+                <div class="test" style="background: #333;">
+                    <h4>🔍 最も可能性の高い原因:</h4>
+                    <ol>
+                        <li><strong>ブラウザキャッシュのクリア</strong>
+                            <ul>
+                                <li>昨日から今日にかけてキャッシュがクリアされた</li>
+                                <li>WASMファイルの再ダウンロードが必要</li>
+                            </ul>
+                        </li>
+                        <li><strong>特定エンドポイントのレート制限</strong>
+                            <ul>
+                                <li>同一IPからの頻繁なアクセス</li>
+                                <li>LocalStorageに保存された接続情報の問題</li>
+                            </ul>
+                        </li>
+                        <li><strong>LocalStorageの肥大化</strong>
+                            <ul>
+                                <li>アップロード履歴の蓄積</li>
+                                <li>キャッシュデータの増大</li>
+                            </ul>
+                        </li>
+                    </ol>
+                    
+                    <h4>💡 推奨される解決策:</h4>
+                    <button onclick="clearAppData()">アプリデータをクリア</button>
+                    <button onclick="resetEndpoints()">エンドポイント設定リセット</button>
+                    <button onclick="forceReloadWASM()">WASM強制再読み込み</button>
+                </div>
+            `;
+        }
+        
+        // 解決策の実装
+        window.clearAppData = function() {
+            if (confirm('LocalStorageの大きなデータをクリアしますか？')) {
+                // 大きなデータのみクリア
+                for (let key in localStorage) {
+                    if (localStorage[key].length > 100000 || key.includes('cache')) {
+                        localStorage.removeItem(key);
+                        results.innerHTML += `<p class="good">✓ ${key} をクリアしました</p>`;
+                    }
+                }
+                results.innerHTML += '<p class="good">完了！ページをリロードしてください。</p>';
+            }
+        };
+        
+        window.resetEndpoints = function() {
+            // エンドポイント関連の設定をリセット
+            const endpointKeys = Object.keys(localStorage).filter(key => 
+                key.includes('endpoint') || key.includes('rpc') || key.includes('kaspa')
+            );
+            
+            endpointKeys.forEach(key => {
+                localStorage.removeItem(key);
+            });
+            
+            results.innerHTML += '<p class="good">✓ エンドポイント設定をリセットしました</p>';
+        };
+        
+        window.forceReloadWASM = function() {
+            // キャッシュを無視してWASMを再読み込み
+            const script = document.createElement('script');
+            script.src = 'kaspa-core.js?t=' + Date.now();
+            document.head.appendChild(script);
+            
+            results.innerHTML += '<p class="good">✓ WASMを強制再読み込みしています...</p>';
+        };
+        
+        // 自動実行
+        diagnoseAppSpecificIssues();
+    </script>
+</body>
+</html>

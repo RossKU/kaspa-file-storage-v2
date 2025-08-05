@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>根本原因分析</title>
+    <style>
+        body { background: #1a1a1a; color: #e0e0e0; font-family: monospace; padding: 20px; }
+        .critical { background: #f44336; color: white; padding: 15px; margin: 10px 0; border-radius: 4px; }
+        .test { margin: 10px 0; padding: 10px; background: #2a2a2a; border-radius: 4px; }
+        .success { color: #4CAF50; }
+        .fail { color: #f44336; }
+    </style>
+</head>
+<body>
+    <h1>根本原因分析</h1>
+    <div id="results"></div>
+
+    <script>
+        const results = document.getElementById('results');
+        
+        async function analyzeRootCause() {
+            results.innerHTML = '<h2>分析開始...</h2>';
+            
+            // 1. ホスティング環境の確認
+            results.innerHTML += '<h3>1. ホスティング環境</h3>';
+            
+            const currentURL = window.location.href;
+            results.innerHTML += `<div class="test">現在のURL: ${currentURL}</div>`;
+            
+            if (currentURL.includes('github.io')) {
+                results.innerHTML += '<div class="critical">⚠️ GitHub Pagesでホストされています</div>';
+                
+                // GitHub Pages特有の問題をチェック
+                results.innerHTML += '<h3>2. GitHub Pages CDN速度テスト</h3>';
+                
+                // 静的ファイルの読み込み速度
+                const files = [
+                    { name: 'index.html', url: 'index.html?t=' + Date.now() },
+                    { name: 'kaspa-core.js', url: 'kaspa-core.js?t=' + Date.now() },
+                    { name: 'kaspa-core_bg.wasm', url: 'kaspa-core_bg.wasm?t=' + Date.now() }
+                ];
+                
+                for (const file of files) {
+                    try {
+                        const start = performance.now();
+                        const response = await fetch(file.url, { cache: 'no-store' });
+                        const time = performance.now() - start;
+                        const size = response.headers.get('content-length');
+                        
+                        results.innerHTML += `
+                            <div class="test">
+                                ${file.name}: ${time.toFixed(0)}ms 
+                                (${size ? (size/1024/1024).toFixed(2) + 'MB' : 'サイズ不明'})
+                                ${time > 3000 ? ' ⚠️ 遅い' : ''}
+                            </div>
+                        `;
+                    } catch (e) {
+                        results.innerHTML += `<div class="test fail">${file.name}: エラー</div>`;
+                    }
+                }
+            }
+            
+            // 2. 実際に使用されているRPCエンドポイント
+            results.innerHTML += '<h3>3. 使用中のRPCエンドポイント</h3>';
+            
+            // LocalStorageから設定を確認
+            const rpcEndpoint = localStorage.getItem('selectedRpcEndpoint');
+            const customEndpoint = localStorage.getItem('customRpcEndpoint');
+            
+            results.innerHTML += `
+                <div class="test">
+                    保存されたRPCエンドポイント: ${rpcEndpoint || 'なし'}<br>
+                    カスタムエンドポイント: ${customEndpoint || 'なし'}
+                </div>
+            `;
+            
+            // 3. CORSヘッダーの確認
+            results.innerHTML += '<h3>4. CORS設定確認</h3>';
+            
+            try {
+                const testResponse = await fetch('https://api-tn10.kaspa.org/info/health');
+                const corsHeaders = {
+                    'Access-Control-Allow-Origin': testResponse.headers.get('access-control-allow-origin'),
+                    'Access-Control-Allow-Methods': testResponse.headers.get('access-control-allow-methods')
+                };
+                
+                results.innerHTML += `<div class="test">CORS: ${JSON.stringify(corsHeaders, null, 2)}</div>`;
+            } catch (e) {
+                results.innerHTML += `<div class="test fail">CORS確認失敗: ${e.message}</div>`;
+            }
+            
+            // 4. 最も可能性の高い原因
+            results.innerHTML += `
+                <div class="critical">
+                    <h3>🎯 最も可能性の高い原因</h3>
+                    <ol>
+                        <li><strong>GitHub Pages CDNの速度低下</strong>
+                            <ul>
+                                <li>特定の地域でのCDN問題</li>
+                                <li>大きなWASMファイル（11.4MB）の配信遅延</li>
+                            </ul>
+                        </li>
+                        <li><strong>特定のRPCエンドポイントのレート制限</strong>
+                            <ul>
+                                <li>LocalStorageに保存された古いエンドポイント</li>
+                                <li>そのエンドポイントがレート制限を開始</li>
+                            </ul>
+                        </li>
+                    </ol>
+                    
+                    <h3>💡 解決策</h3>
+                    <button onclick="clearRPCSettings()">RPCエンドポイント設定をクリア</button>
+                    <button onclick="testAlternativeHosting()">代替ホスティングをテスト</button>
+                </div>
+            `;
+        }
+        
+        window.clearRPCSettings = function() {
+            // RPC関連の設定をクリア
+            const keysToRemove = [
+                'selectedRpcEndpoint',
+                'customRpcEndpoint',
+                'kaspa_fastest_endpoint_testnet-10',
+                'kaspa_fastest_endpoint_mainnet'
+            ];
+            
+            keysToRemove.forEach(key => {
+                localStorage.removeItem(key);
+            });
+            
+            results.innerHTML += '<div class="test success">✓ RPC設定をクリアしました。ページをリロードしてください。</div>';
+        };
+        
+        window.testAlternativeHosting = function() {
+            // 代替ホスティングのテスト
+            results.innerHTML += `
+                <h3>代替ホスティング案</h3>
+                <div class="test">
+                    <p>1. Cloudflare Pages（推奨）</p>
+                    <p>2. Vercel</p>
+                    <p>3. Netlify</p>
+                    <p>4. 自前のVPS + Cloudflare CDN</p>
+                    <p>これらは大きなファイルの配信に最適化されています。</p>
+                </div>
+            `;
+        };
+        
+        analyzeRootCause();
+    </script>
+</body>
+</html>

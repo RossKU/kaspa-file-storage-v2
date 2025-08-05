@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WASM/JS不一致チェック</title>
+    <style>
+        body { background: #1a1a1a; color: #e0e0e0; font-family: monospace; padding: 20px; }
+        .critical { background: #f44336; color: white; padding: 20px; margin: 20px 0; border-radius: 4px; }
+        .success { color: #4CAF50; }
+        .warning { color: #ff9800; }
+        .test { margin: 10px 0; padding: 15px; background: #2a2a2a; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <h1>🔍 WASM/kaspa-core 不一致診断</h1>
+    <button onclick="checkMismatch()">診断開始</button>
+    <div id="results"></div>
+
+    <script>
+        async function checkMismatch() {
+            const results = document.getElementById('results');
+            results.innerHTML = '<h2>診断中...</h2>';
+            
+            // 1. ファイル情報を取得
+            results.innerHTML += '<h3>1. ファイル情報</h3>';
+            
+            try {
+                // JSファイル
+                const jsResponse = await fetch('kaspa-core.js', { method: 'HEAD' });
+                const jsSize = jsResponse.headers.get('content-length');
+                const jsModified = jsResponse.headers.get('last-modified');
+                
+                results.innerHTML += `
+                    <div class="test">
+                        kaspa-core.js:<br>
+                        サイズ: ${(jsSize / 1024).toFixed(2)} KB<br>
+                        最終更新: ${jsModified || '不明'}
+                    </div>
+                `;
+                
+                // WASMファイル
+                const wasmResponse = await fetch('kaspa-core_bg.wasm', { method: 'HEAD' });
+                const wasmSize = wasmResponse.headers.get('content-length');
+                const wasmModified = wasmResponse.headers.get('last-modified');
+                
+                results.innerHTML += `
+                    <div class="test">
+                        kaspa-core_bg.wasm:<br>
+                        サイズ: ${(wasmSize / 1024 / 1024).toFixed(2)} MB<br>
+                        最終更新: ${wasmModified || '不明'}
+                    </div>
+                `;
+                
+                // 更新日時の比較
+                if (jsModified && wasmModified) {
+                    const jsDate = new Date(jsModified);
+                    const wasmDate = new Date(wasmModified);
+                    const diff = Math.abs(jsDate - wasmDate) / 1000 / 60; // 分
+                    
+                    if (diff > 60) {
+                        results.innerHTML += `
+                            <div class="test warning">
+                                ⚠️ ファイルの更新時刻が${diff.toFixed(0)}分異なります！
+                                <br>→ バージョン不一致の可能性
+                            </div>
+                        `;
+                    }
+                }
+                
+            } catch (e) {
+                results.innerHTML += `<div class="test">ファイル情報取得エラー: ${e.message}</div>`;
+            }
+            
+            // 2. JSファイルの内容チェック
+            results.innerHTML += '<h3>2. kaspa-core.js内容チェック</h3>';
+            
+            try {
+                const jsText = await (await fetch('kaspa-core.js')).text();
+                
+                // バージョン情報を探す
+                const versionMatch = jsText.match(/version['"]\s*:\s*['"]([^'"]+)['"]/i);
+                if (versionMatch) {
+                    results.innerHTML += `<div class="test">JSバージョン: ${versionMatch[1]}</div>`;
+                }
+                
+                // WASM参照を確認
+                const wasmRefMatch = jsText.match(/kaspa[_-]core[_-]bg\.wasm/gi);
+                if (wasmRefMatch) {
+                    results.innerHTML += `<div class="test success">✓ WASMファイル参照: ${wasmRefMatch.length}箇所</div>`;
+                }
+                
+                // 異常なパターンを検出
+                if (jsText.includes('kaspa_core_bg.wasm') && jsText.includes('kaspa-core_bg.wasm')) {
+                    results.innerHTML += `
+                        <div class="test warning">
+                            ⚠️ 複数のWASMファイル名パターンが混在！
+                        </div>
+                    `;
+                }
+                
+            } catch (e) {
+                results.innerHTML += `<div class="test">JS読み込みエラー: ${e.message}</div>`;
+            }
+            
+            // 3. 実際の初期化テスト
+            results.innerHTML += '<h3>3. 初期化互換性テスト</h3>';
+            
+            try {
+                // スクリプトタグで読み込み
+                const script = document.createElement('script');
+                script.src = 'kaspa-core.js?t=' + Date.now(); // キャッシュ回避
+                
+                await new Promise((resolve, reject) => {
+                    script.onload = resolve;
+                    script.onerror = reject;
+                    document.head.appendChild(script);
+                });
+                
+                results.innerHTML += '<div class="test success">✓ JS読み込み成功</div>';
+                
+                // init関数の存在確認
+                if (typeof init === 'function') {
+                    results.innerHTML += '<div class="test success">✓ init関数が存在</div>';
+                    
+                    // 初期化試行
+                    try {
+                        await init();
+                        results.innerHTML += '<div class="test success">✓ WASM初期化成功</div>';
+                        
+                        // RpcClientの存在確認
+                        if (typeof RpcClient === 'function') {
+                            results.innerHTML += '<div class="test success">✓ RpcClientが利用可能</div>';
+                            
+                            // メソッドの存在確認
+                            const methods = ['connect', 'disconnect', 'getInfo', 'getBlock', 'submitTransaction'];
+                            const proto = RpcClient.prototype;
+                            
+                            methods.forEach(method => {
+                                if (typeof proto[method] === 'function') {
+                                    results.innerHTML += `<div class="test">・${method}メソッド: OK</div>`;
+                                } else {
+                                    results.innerHTML += `<div class="test warning">・${method}メソッド: 見つからない！</div>`;
+                                }
+                            });
+                        }
+                        
+                    } catch (e) {
+                        results.innerHTML += `
+                            <div class="test warning">
+                                ⚠️ WASM初期化エラー: ${e.message}
+                                <br>→ JS/WASMバージョン不一致の可能性大！
+                            </div>
+                        `;
+                    }
+                } else {
+                    results.innerHTML += '<div class="test warning">⚠️ init関数が見つからない</div>';
+                }
+                
+            } catch (e) {
+                results.innerHTML += `<div class="test warning">スクリプトロードエラー: ${e.message}</div>`;
+            }
+            
+            // 診断結果
+            results.innerHTML += `
+                <div class="critical">
+                    <h3>診断結果</h3>
+                    <p>もしJS/WASMのバージョン不一致が見つかった場合：</p>
+                    <ol>
+                        <li>両ファイルを同じバージョンに揃える</li>
+                        <li>ブラウザキャッシュをクリア</li>
+                        <li>古いバージョンのファイルセットを使用</li>
+                    </ol>
+                    
+                    <p><strong>これが原因の場合、昨日から今日にかけて：</strong></p>
+                    <ul>
+                        <li>GitHubが片方のファイルだけ更新した</li>
+                        <li>CDNのキャッシュが不整合</li>
+                        <li>デプロイ時のミス</li>
+                    </ul>
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>

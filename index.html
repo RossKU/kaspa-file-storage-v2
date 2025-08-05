@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.128 - DirectoryBuilder依存関数の復元</title>
+    <title>Kaspa P2P File Storage v5.11.129 - アーカイブノードのハードコードURL削除</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -2659,7 +2659,7 @@
                     
                     // Test Explorer API
                     const apiStart = Date.now();
-                    const response = await fetchWithTimeout('https://api-tn10.kaspa.org/info/health', {}, 5000, 1);
+                    const response = await fetchWithTimeout(`${config.apiEndpoints[config.network]}/info/health`, {}, 5000, 1);
                     const apiTime = Date.now() - apiStart;
                     log(`Explorer API応答時間: ${apiTime}ms`, 'success');
                     
@@ -8311,8 +8311,8 @@
             currentEndpoint: null, // Currently connected endpoint
             customEndpoint: null, // User-defined custom endpoint
             archiveEndpoints: {
-                'testnet-10': 'wss://archive-tn10.kaspa.org:17210',
-                'mainnet': 'wss://archive.kaspa.org:17110'
+                'testnet-10': null, // Archive nodes not available
+                'mainnet': null // Archive nodes not available
             },
             standardEndpoints: {
                 'testnet-10': null, // Use default resolver
@@ -10566,10 +10566,18 @@
             
             // Determine endpoint based on nodeType
             if (config.nodeType === 'archive') {
-                // Use archive node endpoint
+                // Check if archive endpoint exists
                 endpoint = config.archiveEndpoints[config.network];
-                config.currentEndpoint = endpoint;
-                log(`[RPC] アーカイブノードを使用: ${endpoint}`, 'info');
+                if (!endpoint) {
+                    log(`[RPC] アーカイブノードは${config.network}では利用できません`, 'warning');
+                    // Fall back to standard resolver
+                    config.nodeType = 'auto';
+                    config.currentEndpoint = null;
+                    log(`[RPC] 標準Resolverにフォールバック`, 'info');
+                } else {
+                    config.currentEndpoint = endpoint;
+                    log(`[RPC] アーカイブノードを使用: ${endpoint}`, 'info');
+                }
             } else if (config.nodeType === 'custom' && config.customEndpoint) {
                 // Use custom endpoint
                 endpoint = config.customEndpoint;
@@ -17323,7 +17331,7 @@
                 details.textContent = 'Status: Active';
                 connections.textContent = '接続数: 3/5';
                 nodeInfo.style.display = 'block';
-                document.getElementById('archiveServer').textContent = 'wss://archive-mainnet.kaspa.org';
+                document.getElementById('archiveServer').textContent = 'N/A (Archive nodes not available)';
                 document.getElementById('archiveVersion').textContent = 'rusty-kaspa/0.15.2';
                 document.getElementById('archiveBlocks').textContent = '85.3M';
             } else {

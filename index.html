@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.134 - UX/セキュリティ改善3点セット</title>
+    <title>Kaspa P2P File Storage v5.11.135 - アップロードボタンの状態遷移修正</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -1622,8 +1622,8 @@
                 <input type="password" id="uploadPassword" placeholder="強力なパスワードを入力" style="width: 100%; padding: 12px; font-size: 16px; border: 1px solid var(--border-color); border-radius: 5px; box-sizing: border-box;">
             </div>
             
-            <!-- v5.11.131: Always visible upload button -->
-            <button onclick="processAndUpload()" id="uploadBtn" disabled style="margin-top: 20px; width: 100%; padding: 15px; font-size: 18px; font-weight: bold; background: var(--accent-color); color: var(--button-text-on-accent); border: none; border-radius: 8px; cursor: pointer; transition: all 0.3s; opacity: 0.5;">
+            <!-- v5.11.135: Always visible upload button (fixed initial state) -->
+            <button onclick="processAndUpload()" id="uploadBtn" disabled style="margin-top: 20px; width: 100%; padding: 15px; font-size: 18px; font-weight: bold; background: var(--text-secondary); color: var(--button-text-on-accent); border: none; border-radius: 8px; cursor: not-allowed; transition: all 0.3s; opacity: 0.6;">
                 📤 アップロード
             </button>
             
@@ -8294,17 +8294,32 @@
             return parts.length > 1 ? parts[1] : 'Kaspa P2P File Storage';
         }
         
-        // v5.11.134: Update upload button state with proper styling (enhanced disabled state)
-        function updateUploadButtonState(enabled) {
+        // v5.11.135: Update upload button state with proper styling (3-condition check)
+        function updateUploadButtonState(forceState = null) {
             const uploadBtn = document.getElementById('uploadBtn');
-            if (uploadBtn) {
-                uploadBtn.disabled = !enabled;
-                uploadBtn.style.opacity = enabled ? '1' : '0.6';
-                uploadBtn.style.cursor = enabled ? 'pointer' : 'not-allowed';
-                // v5.11.134: Change background color for disabled state
-                uploadBtn.style.background = enabled ? 'var(--accent-color)' : 'var(--text-secondary)';
-                uploadBtn.style.transform = enabled ? 'scale(1)' : 'scale(0.98)';
+            if (!uploadBtn) return;
+            
+            let enabled = false;
+            
+            // If forceState is provided, use it (for upload in progress)
+            if (forceState !== null) {
+                enabled = forceState;
+            } else {
+                // Check all 3 conditions
+                const hasWallet = UserState.address !== null;
+                const hasFile = FileState.currentFile !== null;
+                const passwordInput = document.getElementById('uploadPassword');
+                const hasPassword = passwordInput && passwordInput.value.length >= 8;
+                
+                // All 3 conditions must be met
+                enabled = hasWallet && hasFile && hasPassword;
             }
+            
+            uploadBtn.disabled = !enabled;
+            uploadBtn.style.opacity = enabled ? '1' : '0.6';
+            uploadBtn.style.cursor = enabled ? 'pointer' : 'not-allowed';
+            uploadBtn.style.background = enabled ? 'var(--accent-color)' : 'var(--text-secondary)';
+            uploadBtn.style.transform = enabled ? 'scale(1)' : 'scale(0.98)';
         }
         
         // Configuration
@@ -13043,18 +13058,20 @@
                     }
                 }, 10000);
                 
-                document.getElementById('uploadBtn').disabled = false;
-                
-                // v5.11.134: Clear file selection and password after upload completion
+                // v5.11.135: Clear file selection and password after upload completion
                 if (!FileState.networkErrorOccurred) {
                     // Clear password for security
                     document.getElementById('uploadPassword').value = '';
                     // Clear file selection
                     document.getElementById('fileInput').value = '';
-                    // Reset selected files state
+                    // Reset file state
+                    FileState.currentFile = null;
                     FileState.selectedFiles = [];
                     log('ファイル選択とパスワードをクリアしました', 'debug');
                 }
+                
+                // v5.11.135: Re-evaluate button state after clearing (should be disabled)
+                updateUploadButtonState();
                 
                 // v5.11.126: Hide upload progress on error or network issue
                 if (FileState.networkErrorOccurred || !FileState.uploadSessionActive) {
@@ -15523,6 +15540,14 @@
                 });
             }
             
+            // v5.11.135: Add password input event handler
+            const uploadPasswordInput = document.getElementById('uploadPassword');
+            if (uploadPasswordInput) {
+                uploadPasswordInput.addEventListener('input', () => {
+                    updateUploadButtonState();
+                });
+            }
+            
             document.getElementById('retryCount').addEventListener('change', (e) => {
                 config.retryCount = parseInt(e.target.value);
                 log(`リトライ回数変更: ${config.retryCount}`, 'info');
@@ -16561,6 +16586,9 @@
                 // Update UI for new upload
                 UIHandlers.updateFileSelectionUI(file, false);
             }
+            
+            // v5.11.135: Update upload button state when file is selected
+            updateUploadButtonState();
         };
         
         // v5.3.6: Debug helper for upload status - moved to UIHandlers

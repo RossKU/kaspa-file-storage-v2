@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.141 - 5ノード並列監視（4補助+1メイン）</title>
+    <title>Kaspa P2P File Storage v5.12.0 - ブロックイベントフィルター実装</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -2160,6 +2160,55 @@
             </div>
         </div>
         
+        <!-- v5.12.0: Block Event Filter -->
+        <div class="container">
+            <h2>🚫 ブロックイベントフィルター</h2>
+            <div class="metric-box" style="border: 2px solid var(--warning-color); padding: 15px;">
+                <p style="margin-bottom: 10px; color: var(--warning-color);">
+                    ⚠️ WebSocket接続は維持しつつ、BlockIDイベントのみを無視します
+                </p>
+                
+                <div style="margin: 10px 0;">
+                    <label style="display: flex; align-items: center; gap: 10px;">
+                        <input type="checkbox" id="block-filter-enabled" onchange="DebugHandlers.toggleBlockFilter(this.checked)">
+                        <span style="font-weight: bold;">フィルター有効</span>
+                    </label>
+                </div>
+                
+                <div style="margin: 15px 0;">
+                    <label style="font-weight: bold;">対象ノード（空 = 全ノード）:</label>
+                    <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px;">
+                        <label style="display: flex; align-items: center; gap: 5px;">
+                            <input type="checkbox" value="main" onchange="DebugHandlers.updateFilterTargets()">
+                            <span>メインRPC</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 5px;">
+                            <input type="checkbox" value="aux-1" onchange="DebugHandlers.updateFilterTargets()">
+                            <span>補助RPC-1</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 5px;">
+                            <input type="checkbox" value="aux-2" onchange="DebugHandlers.updateFilterTargets()">
+                            <span>補助RPC-2</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 5px;">
+                            <input type="checkbox" value="aux-3" onchange="DebugHandlers.updateFilterTargets()">
+                            <span>補助RPC-3</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 5px;">
+                            <input type="checkbox" value="aux-4" onchange="DebugHandlers.updateFilterTargets()">
+                            <span>補助RPC-4</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <div style="margin-top: 15px; padding: 10px; background: var(--bg-secondary); border-radius: 5px;">
+                    <div style="margin-bottom: 5px;">フィルター済み: <span id="filter-blocked-count" style="font-weight: bold;">0</span>件</div>
+                    <div>最終フィルター: <span id="filter-last-blocked">-</span></div>
+                    <button onclick="DebugHandlers.resetFilterStats()" style="margin-top: 10px; padding: 5px 10px;">統計リセット</button>
+                </div>
+            </div>
+        </div>
+        
         <!-- Debug Log -->
         <div class="container">
             <h2>🐛 デバッグログ</h2>
@@ -2265,6 +2314,47 @@
         
         // Expose AppState to window for global access
         window.AppState = AppState;
+        
+        // ===== v5.12.0: Debug Handlers for Block Event Filter =====
+        const DebugHandlers = {
+            toggleBlockFilter(enabled) {
+                NetworkState.blockEventFilter.enabled = enabled;
+                const status = enabled ? '有効' : '無効';
+                const color = enabled ? 'var(--warning-color)' : 'var(--text-secondary)';
+                log(`🚫 [BlockFilter] フィルター${status}`, enabled ? 'warn' : 'info');
+                
+                // Update UI
+                const filterSection = document.querySelector('#block-filter-enabled').closest('.metric-box');
+                if (filterSection) {
+                    filterSection.style.borderColor = enabled ? 'var(--error-color)' : 'var(--warning-color)';
+                }
+            },
+            
+            updateFilterTargets() {
+                const checkboxes = document.querySelectorAll('input[type="checkbox"][value^="main"], input[type="checkbox"][value^="aux-"]');
+                const targets = [];
+                checkboxes.forEach(cb => {
+                    if (cb.checked) {
+                        targets.push(cb.value);
+                    }
+                });
+                NetworkState.blockEventFilter.targetNodes = targets;
+                
+                const targetText = targets.length === 0 ? '全ノード' : targets.join(', ');
+                log(`🎯 [BlockFilter] 対象ノード: ${targetText}`, 'info');
+            },
+            
+            resetFilterStats() {
+                NetworkState.blockEventFilter.blockedCount = 0;
+                NetworkState.blockEventFilter.lastBlocked = null;
+                document.getElementById('filter-blocked-count').textContent = '0';
+                document.getElementById('filter-last-blocked').textContent = '-';
+                log('📊 [BlockFilter] 統計リセット', 'info');
+            }
+        };
+        
+        // Expose DebugHandlers for UI access
+        window.DebugHandlers = DebugHandlers;
         
         // ===== Phase 2: User State Refactoring (v5.4.30) =====
         const UserState = {
@@ -2429,6 +2519,12 @@
             rpcClient: null,            // RPC client instance
             auxRpcClients: [],          // v5.11.141: Multiple auxiliary RPCs (4 nodes)
             rpcScores: { main: 0, aux: [0, 0, 0, 0] }, // v5.11.141: Track detection scores for each node
+            blockEventFilter: {  // v5.12.0: Block event filter for testing
+                enabled: false,
+                targetNodes: [],  // Empty = filter all nodes, or specify ['main', 'aux-1', 'aux-2', 'aux-3', 'aux-4']
+                blockedCount: 0,  // Counter for filtered events
+                lastBlocked: null // Timestamp of last blocked event
+            },
             ws: {
                 connection: null,       // WebSocket connection
                 connected: false,       // WebSocket connection state
@@ -17824,6 +17920,25 @@
             },
             
             handleBlockAdded(event, nodeId) {
+                // v5.12.0: Block event filter for testing
+                if (NetworkState.blockEventFilter.enabled) {
+                    const shouldFilter = NetworkState.blockEventFilter.targetNodes.length === 0 || 
+                                        NetworkState.blockEventFilter.targetNodes.includes(nodeId);
+                    if (shouldFilter) {
+                        NetworkState.blockEventFilter.blockedCount++;
+                        NetworkState.blockEventFilter.lastBlocked = Date.now();
+                        this.log(`🚫 [BlockFilter] BlockID受信したが無視: ${nodeId} (フィルター済み: ${NetworkState.blockEventFilter.blockedCount}件)`, 'debug');
+                        
+                        // Update UI
+                        const countEl = document.getElementById('filter-blocked-count');
+                        const lastEl = document.getElementById('filter-last-blocked');
+                        if (countEl) countEl.textContent = NetworkState.blockEventFilter.blockedCount;
+                        if (lastEl) lastEl.textContent = new Date().toLocaleTimeString('ja-JP');
+                        
+                        return; // Block event is filtered out
+                    }
+                }
+                
                 const blockHash = event.blockHash || event.hash;
                 if (!blockHash) return;
                 

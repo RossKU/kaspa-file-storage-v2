@@ -17645,35 +17645,35 @@
                     }
                     
                     // 最大3つのノードを選択
-                    const nodes = Array.from(NetworkState.archiveManager.connections.values()).slice(0, 3);
+                    const nodes = Array.from(NetworkState.archiveManager.connections.entries()).slice(0, 3);
                     this.log(`${nodes.length}個のノードに接続を試みます`);
                     
-                    // 各ノードに補助RPCClient接続を作成
-                    for (const node of nodes) {
+                    // 各ノードの既存RPCClient接続を利用してBlock-addedをリッスン
+                    for (const [nodeId, nodeData] of nodes) {
                         try {
-                            const auxRpc = new NetworkState.kaspa.RpcClient({
-                                url: node.url,
-                                networkId: config.network
-                            });
-                            
-                            await auxRpc.connect();
+                            // 既存のRPCClientを使用（既に接続済み）
+                            const rpcClient = nodeData.client;
+                            if (!rpcClient || !rpcClient.isConnected) {
+                                this.log(`❌ ノード未接続: ${nodeId}`);
+                                continue;
+                            }
                             
                             // Block-addedイベントのリスナーを追加
-                            await auxRpc.subscribeBlockAdded(async (event) => {
-                                this.handleBlockAdded(event, node.url);
+                            await rpcClient.subscribeBlockAdded(async (event) => {
+                                this.handleBlockAdded(event, nodeId);
                             });
                             
                             this.auxConnections.push({
-                                rpc: auxRpc,
-                                url: node.url,
-                                nodeId: node.nodeId
+                                rpc: rpcClient,
+                                nodeId: nodeId,
+                                stats: nodeData.stats
                             });
                             
-                            this.log(`✅ 接続成功: ${node.url}`);
+                            this.log(`✅ リスナー追加成功: ${nodeId}`);
                             this.updateConnectionDisplay();
                             
                         } catch (err) {
-                            this.log(`❌ 接続失敗: ${node.url} - ${err.message}`);
+                            this.log(`❌ リスナー追加失敗: ${nodeId} - ${err.message}`);
                         }
                     }
                     
@@ -17697,12 +17697,12 @@
                 
                 this.log('複数WebSocketテストを停止中...');
                 
-                // 全ての補助接続を切断
+                // 全ての補助接続のリスナーを解除
                 for (const conn of this.auxConnections) {
                     try {
                         await conn.rpc.unsubscribeBlockAdded();
-                        await conn.rpc.disconnect();
-                        this.log(`切断: ${conn.url}`);
+                        // 注意: RPCClient自体は切断しない（アーカイブノード探索で使用中の可能性）
+                        this.log(`リスナー解除: ${conn.nodeId}`);
                     } catch (err) {
                         // 無視
                     }
@@ -17775,7 +17775,8 @@
                 
                 let html = '<strong>接続中のノード:</strong><ul style="margin: 5px 0; padding-left: 20px;">';
                 for (const conn of this.auxConnections) {
-                    html += `<li>${conn.nodeId || conn.url}</li>`;
+                    const blockCount = conn.stats?.blockCount ? ` (${conn.stats.blockCount} blocks)` : '';
+                    html += `<li>${conn.nodeId}${blockCount}</li>`;
                 }
                 html += '</ul>';
                 container.innerHTML = html;

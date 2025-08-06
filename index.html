@@ -17661,8 +17661,28 @@
                             }
                             
                             // Block-addedイベントのリスナーを追加
-                            await rpcClient.subscribeBlockAdded(async (event) => {
-                                this.handleBlockAdded(event, nodeId);
+                            // メインのWebSocket監視と同じ方式で実装
+                            await rpcClient.subscribeBlockAdded();
+                            
+                            // addEventListenerでイベントを受信
+                            rpcClient.addEventListener('block-added', (event) => {
+                                // デバッグログ
+                                this.log(`🔔 Block-addedイベント受信 from ${nodeId}`, 'debug');
+                                
+                                // event.data.blockでブロックデータを取得（メインと同じ構造）
+                                const block = event.data?.block;
+                                if (block) {
+                                    // handleBlockAddedが期待する形式に変換
+                                    const blockEvent = {
+                                        blockHash: block.header?.hash,
+                                        verboseData: {
+                                            transactionIds: block.transactions?.map(tx => tx.id) || []
+                                        }
+                                    };
+                                    this.handleBlockAdded(blockEvent, nodeId);
+                                } else {
+                                    this.log(`⚠️ Block-addedイベントにblockデータがありません: ${nodeId}`, 'warn');
+                                }
                             });
                             
                             this.auxConnections.push({
@@ -17707,11 +17727,13 @@
                 // 全ての補助接続のリスナーを解除
                 for (const conn of this.auxConnections) {
                     try {
+                        // イベントリスナーを削除（メインと同じ方式）
+                        conn.rpc.removeAllEventListeners();
                         await conn.rpc.unsubscribeBlockAdded();
                         // 注意: RPCClient自体は切断しない（アーカイブノード探索で使用中の可能性）
                         this.log(`リスナー解除: ${conn.nodeId}`);
                     } catch (err) {
-                        // 無視
+                        this.log(`リスナー解除エラー: ${conn.nodeId} - ${err.message}`);
                     }
                 }
                 

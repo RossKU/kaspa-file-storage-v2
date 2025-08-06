@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.12.0 - ブロックイベントフィルター実装</title>
+    <title>Kaspa P2P File Storage v5.12.1 - ブロックイベントフィルター修正</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -15915,6 +15915,26 @@
                             
                             // Set up listener with duplicate check
                             auxClient.addEventListener('block-added', (event) => {
+                                // v5.12.1: Block event filter for auxiliary RPCs
+                                if (NetworkState.blockEventFilter.enabled) {
+                                    const nodeId = `aux-${i+1}`;
+                                    const shouldFilter = NetworkState.blockEventFilter.targetNodes.length === 0 || 
+                                                        NetworkState.blockEventFilter.targetNodes.includes(nodeId);
+                                    if (shouldFilter) {
+                                        NetworkState.blockEventFilter.blockedCount++;
+                                        NetworkState.blockEventFilter.lastBlocked = Date.now();
+                                        log(`🚫 [BlockFilter] BlockID受信したが無視: ${nodeId} (フィルター済み: ${NetworkState.blockEventFilter.blockedCount}件)`, 'debug');
+                                        
+                                        // Update UI
+                                        const countEl = document.getElementById('filter-blocked-count');
+                                        const lastEl = document.getElementById('filter-last-blocked');
+                                        if (countEl) countEl.textContent = NetworkState.blockEventFilter.blockedCount;
+                                        if (lastEl) lastEl.textContent = new Date().toLocaleTimeString('ja-JP');
+                                        
+                                        return; // Block event is filtered out
+                                    }
+                                }
+                                
                                 const block = event.data.block;
                                 const blockId = block.header.hash;
                                 
@@ -15986,6 +16006,25 @@
                 });
                 
                 NetworkState.rpcClient.addEventListener('block-added', (event) => {
+                    // v5.12.1: Block event filter for main RPC
+                    if (NetworkState.blockEventFilter.enabled) {
+                        const shouldFilter = NetworkState.blockEventFilter.targetNodes.length === 0 || 
+                                            NetworkState.blockEventFilter.targetNodes.includes('main');
+                        if (shouldFilter) {
+                            NetworkState.blockEventFilter.blockedCount++;
+                            NetworkState.blockEventFilter.lastBlocked = Date.now();
+                            log(`🚫 [BlockFilter] BlockID受信したが無視: メインRPC (フィルター済み: ${NetworkState.blockEventFilter.blockedCount}件)`, 'debug');
+                            
+                            // Update UI
+                            const countEl = document.getElementById('filter-blocked-count');
+                            const lastEl = document.getElementById('filter-last-blocked');
+                            if (countEl) countEl.textContent = NetworkState.blockEventFilter.blockedCount;
+                            if (lastEl) lastEl.textContent = new Date().toLocaleTimeString('ja-JP');
+                            
+                            return; // Block event is filtered out
+                        }
+                    }
+                    
                     const block = event.data.block;
                     const blockId = block.header.hash;
                     const blockTime = new Date(Number(block.header.timestamp));
@@ -17920,25 +17959,7 @@
             },
             
             handleBlockAdded(event, nodeId) {
-                // v5.12.0: Block event filter for testing
-                if (NetworkState.blockEventFilter.enabled) {
-                    const shouldFilter = NetworkState.blockEventFilter.targetNodes.length === 0 || 
-                                        NetworkState.blockEventFilter.targetNodes.includes(nodeId);
-                    if (shouldFilter) {
-                        NetworkState.blockEventFilter.blockedCount++;
-                        NetworkState.blockEventFilter.lastBlocked = Date.now();
-                        this.log(`🚫 [BlockFilter] BlockID受信したが無視: ${nodeId} (フィルター済み: ${NetworkState.blockEventFilter.blockedCount}件)`, 'debug');
-                        
-                        // Update UI
-                        const countEl = document.getElementById('filter-blocked-count');
-                        const lastEl = document.getElementById('filter-last-blocked');
-                        if (countEl) countEl.textContent = NetworkState.blockEventFilter.blockedCount;
-                        if (lastEl) lastEl.textContent = new Date().toLocaleTimeString('ja-JP');
-                        
-                        return; // Block event is filtered out
-                    }
-                }
-                
+                // Note: Block filtering moved to actual RPC listeners in v5.12.1
                 const blockHash = event.blockHash || event.hash;
                 if (!blockHash) return;
                 

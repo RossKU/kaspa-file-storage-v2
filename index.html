@@ -17623,6 +17623,8 @@
             auxConnections: [],
             isActive: false,
             detectedBlocks: new Map(),
+            blockCounts: new Map(), // v5.11.137-fix: 各ノードのブロック受信数
+            statsInterval: null, // v5.11.137-fix: 統計表示用タイマー
             
             async start() {
                 if (this.isActive) {
@@ -17681,6 +17683,11 @@
                         this.isActive = true;
                         document.getElementById('multiWsStatusText').textContent = `${this.auxConnections.length}個のノードでリッスン中`;
                         this.log(`${this.auxConnections.length}個のノードでBlock-addedイベントをリッスン開始`);
+                        
+                        // v5.11.137-fix: 統計情報を定期的に表示
+                        this.statsInterval = setInterval(() => {
+                            this.showStats();
+                        }, 10000); // 10秒ごと
                     } else {
                         this.log('接続できるノードがありませんでした');
                         this.reset();
@@ -17712,9 +17719,14 @@
                 this.log('複数WebSocketテストを停止しました');
             },
             
-            handleBlockAdded(event, nodeUrl) {
+            handleBlockAdded(event, nodeId) {
                 const blockHash = event.blockHash || event.hash;
                 if (!blockHash) return;
+                
+                // v5.11.137-fix: ノードごとのブロック受信数をカウント
+                const currentCount = this.blockCounts.get(nodeId) || 0;
+                this.blockCounts.set(nodeId, currentCount + 1);
+                this.updateConnectionDisplay();
                 
                 const shortHash = blockHash.substring(0, 16);
                 const timestamp = Date.now();
@@ -17722,11 +17734,11 @@
                 // 初回検出かチェック
                 if (!this.detectedBlocks.has(blockHash)) {
                     this.detectedBlocks.set(blockHash, {
-                        firstNode: nodeUrl,
+                        firstNode: nodeId,
                         timestamp: timestamp,
                         count: 1
                     });
-                    this.log(`🆕 新ブロック検出: ${shortHash}... (from ${nodeUrl})`, 'success');
+                    this.log(`🆕 新ブロック検出: ${shortHash}... (from ${nodeId})`, 'success');
                     
                     // 監視中のトランザクションをチェック
                     if (NetworkState.ws.monitoredTransactions && NetworkState.ws.monitoredTransactions.size > 0) {
@@ -17737,7 +17749,7 @@
                     const blockInfo = this.detectedBlocks.get(blockHash);
                     blockInfo.count++;
                     const delay = timestamp - blockInfo.timestamp;
-                    this.log(`♻️ ブロック再検出: ${shortHash}... (from ${nodeUrl}, ${delay}ms遅延)`, 'debug');
+                    this.log(`♻️ ブロック再検出: ${shortHash}... (from ${nodeId}, ${delay}ms遅延)`, 'debug');
                 }
                 
                 // 古いエントリーをクリーンアップ（1分以上前）
@@ -17775,8 +17787,10 @@
                 
                 let html = '<strong>接続中のノード:</strong><ul style="margin: 5px 0; padding-left: 20px;">';
                 for (const conn of this.auxConnections) {
-                    const blockCount = conn.stats?.blockCount ? ` (${conn.stats.blockCount} blocks)` : '';
-                    html += `<li>${conn.nodeId}${blockCount}</li>`;
+                    const archiveBlocks = conn.stats?.blockCount ? ` (${conn.stats.blockCount} blocks)` : '';
+                    const receivedCount = this.blockCounts.get(conn.nodeId) || 0;
+                    const receivedInfo = receivedCount > 0 ? ` | 📊 受信: ${receivedCount}` : '';
+                    html += `<li>${conn.nodeId}${archiveBlocks}${receivedInfo}</li>`;
                 }
                 html += '</ul>';
                 container.innerHTML = html;
@@ -17786,10 +17800,30 @@
                 this.auxConnections = [];
                 this.isActive = false;
                 this.detectedBlocks.clear();
+                this.blockCounts.clear(); // v5.11.137-fix: カウントもクリア
+                if (this.statsInterval) {
+                    clearInterval(this.statsInterval);
+                    this.statsInterval = null;
+                }
                 document.getElementById('multiWsStartBtn').disabled = false;
                 document.getElementById('multiWsStopBtn').disabled = true;
                 document.getElementById('multiWsStatusText').textContent = '未接続';
                 document.getElementById('multiWsConnections').innerHTML = '';
+            },
+            
+            showStats() {
+                // v5.11.137-fix: 統計情報を表示
+                let totalBlocks = 0;
+                let statsText = '📊 統計: ';
+                for (const [nodeId, count] of this.blockCounts.entries()) {
+                    totalBlocks += count;
+                }
+                
+                if (totalBlocks > 0) {
+                    statsText += `合計 ${totalBlocks} ブロック受信 | `;
+                    statsText += `ユニーク: ${this.detectedBlocks.size}`;
+                    this.log(statsText, 'info');
+                }
             },
             
             log(message, type = 'info') {

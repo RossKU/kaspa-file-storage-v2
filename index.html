@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.132 - チャンクサイズ設定の修正</title>
+    <title>Kaspa P2P File Storage v5.11.133 - チャンクサイズ選択肢の簡略化</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -1964,11 +1964,8 @@
                 <div style="margin-top: 15px;">
                     <label>チャンクサイズ</label>
                     <select id="chunkSize" style="width: 100%; padding: 8px; margin-top: 5px;">
-                        <option value="10">10KB chunks (安全)</option>
-                        <option value="12">12KB chunks (旧方式)</option>
-                        <option value="15">15KB chunks (リスクあり)</option>
-                        <option value="20">🧪 20KB chunks (実験的)</option>
-                        <option value="22" selected>🚀 22KB chunks (推奨・可変チャンク)</option>
+                        <option value="20">🧪 20KB chunks (実験的・旧方式)</option>
+                        <option value="22" selected>🚀 22KB chunks (推奨・新方式)</option>
                     </select>
                 </div>
                 
@@ -3746,7 +3743,7 @@
                                 processSegmentSize: 1048576,
                                 chunksPerMeta: 160,
                                 maxChunksSupported: 25600,
-                                defaultChunkSize: 12288
+                                defaultChunkSize: 22528
                             }
                         },
                         workspace: {
@@ -11919,10 +11916,10 @@
                     if (requestedChunkSize >= 22528) {
                         log(`🚀 動的最適化: ${(actualChunkSize/1024).toFixed(1)}KB チャンクを使用`, 'warning');
                         log('📊 ペイロード効率: ' + ((actualChunkSize / 23984) * 100).toFixed(1) + '% (理論最大値に対して)', 'info');
-                        log('⚠️ この機能は実験的です。問題が発生した場合は12KB以下を選択してください', 'warning');
+                        log('⚠️ この機能は実験的です。問題が発生した場合は20KBを選択してください', 'warning');
                     } else {
                         log(`🧪 実験的機能: ${(actualChunkSize/1024).toFixed(1)}KB チャンクを使用`, 'warning');
-                        log('⚠️ この機能は実験的です。問題が発生した場合は12KB以下を選択してください', 'warning');
+                        log('⚠️ この機能は実験的です。問題が発生した場合は20KBを選択してください', 'warning');
                     }
                 } else {
                     // 通常: 安全なサイズ（変更なし）

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.140 - 2ノードリッスン専用実装</title>
+    <title>Kaspa P2P File Storage v5.11.141 - 5ノード並列監視（4補助+1メイン）</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -2427,8 +2427,8 @@
         const NetworkState = {
             kaspa: null,                // Kaspa SDK instance
             rpcClient: null,            // RPC client instance
-            auxRpcClient: null,         // v5.11.140: Single auxiliary RPC for listening
-            rpcScores: { main: 0, aux: 0 }, // v5.11.140: Track detection scores
+            auxRpcClients: [],          // v5.11.141: Multiple auxiliary RPCs (4 nodes)
+            rpcScores: { main: 0, aux: [0, 0, 0, 0] }, // v5.11.141: Track detection scores for each node
             ws: {
                 connection: null,       // WebSocket connection
                 connected: false,       // WebSocket connection state
@@ -15799,52 +15799,58 @@
                 await NetworkState.rpcClient.subscribeBlockAdded();
                 NetworkState.ws.connected = true;  // v5.6.4: Mark WebSocket as connected
                 
-                // v5.11.140: Create and subscribe auxiliary RPC client for 2-node listening
-                try {
-                    log('[2ノード監視] 補助RPCクライアントを作成中...', 'info');
-                    
-                    // Create auxiliary RPC client using same resolver
-                    NetworkState.auxRpcClient = new NetworkState.kaspa.RpcClient({
-                        resolver: new NetworkState.kaspa.Resolver(),
-                        networkId: config.network
-                    });
-                    
-                    await NetworkState.auxRpcClient.connect();
-                    await NetworkState.auxRpcClient.subscribeBlockAdded();
-                    
-                    // Set up listener immediately after subscribe
-                    NetworkState.auxRpcClient.addEventListener('block-added', (event) => {
-                        const block = event.data.block;
-                        const blockId = block.header.hash;
-                        
-                        if (block.transactions && block.transactions.length > 0) {
-                            for (const tx of block.transactions) {
-                                // Match main RPC's transaction ID extraction
-                                const txId = tx.verboseData?.transactionId || tx.id || tx.transactionId;
-                                if (txId && NetworkState.ws.monitoredTransactions.has(txId)) {
-                                    const existing = NetworkState.ws.monitoredTransactions.get(txId);
-                                    if (!existing.blockId) {
-                                        existing.blockId = blockId;
-                                        existing.blockTime = new Date(Number(block.header.timestamp));
-                                        existing.foundAt = new Date();
-                                        existing.receivedAt = Date.now();
-                                        
-                                        log(`🏆 [補助RPC] 最速でBlockID検出: ${blockId.substring(0, 16)}... (TxID: ${txId.substring(0, 16)}...)`, 'success');
-                                        NetworkState.rpcScores.aux++;
-                                        log(`[スコア] メイン: ${NetworkState.rpcScores.main}, 補助: ${NetworkState.rpcScores.aux}`, 'info');
-                                        
-                                        setTimeout(checkMonitoringStop, 100);
+                // v5.11.141: Create and subscribe 4 auxiliary RPC clients with staggered start
+                NetworkState.auxRpcClients = [];
+                const numAuxNodes = 4;
+                
+                for (let i = 0; i < numAuxNodes; i++) {
+                    setTimeout(async () => {
+                        try {
+                            log(`[補助RPC-${i+1}] 接続開始（${i}秒遅延）...`, 'info');
+                            
+                            const auxClient = new NetworkState.kaspa.RpcClient({
+                                resolver: new NetworkState.kaspa.Resolver(),
+                                networkId: config.network
+                            });
+                            
+                            await auxClient.connect();
+                            await auxClient.subscribeBlockAdded();
+                            NetworkState.auxRpcClients[i] = auxClient;
+                            
+                            // Set up listener with duplicate check
+                            auxClient.addEventListener('block-added', (event) => {
+                                const block = event.data.block;
+                                const blockId = block.header.hash;
+                                
+                                if (block.transactions && block.transactions.length > 0) {
+                                    for (const tx of block.transactions) {
+                                        const txId = tx.verboseData?.transactionId || tx.id || tx.transactionId;
+                                        if (txId && NetworkState.ws.monitoredTransactions.has(txId)) {
+                                            const existing = NetworkState.ws.monitoredTransactions.get(txId);
+                                            if (!existing.blockId) {
+                                                existing.blockId = blockId;
+                                                existing.blockTime = new Date(Number(block.header.timestamp));
+                                                existing.foundAt = new Date();
+                                                existing.receivedAt = Date.now();
+                                                
+                                                log(`🏆 [補助RPC-${i+1}] 最速でBlockID検出: ${blockId.substring(0, 16)}...`, 'success');
+                                                NetworkState.rpcScores.aux[i]++;
+                                                const totalAux = NetworkState.rpcScores.aux.reduce((a, b) => a + b, 0);
+                                                log(`[スコア] メイン: ${NetworkState.rpcScores.main}, 補助合計: ${totalAux} (各: ${NetworkState.rpcScores.aux.join(', ')})`, 'info');
+                                                
+                                                setTimeout(checkMonitoringStop, 100);
+                                            }
+                                        }
                                     }
                                 }
-                            }
+                            });
+                            
+                            log(`[補助RPC-${i+1}] 監視開始完了`, 'success');
+                            
+                        } catch (error) {
+                            log(`[補助RPC-${i+1}] 接続エラー: ${error.message}`, 'warning');
                         }
-                    });
-                    
-                    log('[2ノード監視] 補助RPCの監視を開始しました', 'success');
-                    
-                } catch (auxError) {
-                    log(`[2ノード監視] 補助RPC接続エラー: ${auxError.message}`, 'warning');
-                    // Continue with main RPC only
+                    }, i * 1000); // Each node starts 1 second after the previous
                 }
                 
                 log('Block Addedイベントを購読しました', 'success');
@@ -15920,20 +15926,21 @@
                                 if (NetworkState.ws.monitoredTransactions.has(txId)) {
                                     // Update existing entry (preserve original data)
                                     const existing = NetworkState.ws.monitoredTransactions.get(txId);
-                                    existing.blockId = blockId;
-                                    existing.blockTime = blockTime;
-                                    existing.foundAt = new Date();
-                                    existing.receivedAt = Date.now();  // v5.11.117: Track receive time for better cleanup
+                                    // v5.11.141: Add duplicate check for main RPC too
+                                    if (!existing.blockId) {
+                                        existing.blockId = blockId;
+                                        existing.blockTime = blockTime;
+                                        existing.foundAt = new Date();
+                                        existing.receivedAt = Date.now();  // v5.11.117: Track receive time for better cleanup
                                     
                                     log(`[DEBUG] WebSocket: 監視中のトランザクション検出！ TxID: ${txId.substring(0, 16)}... BlockID: ${blockId.substring(0, 16)}...`, 'debug');
                                     log(`[DEBUG] WebSocket: ブロック時刻を保存 - Time: ${blockTime.toISOString()}`, 'debug');
                                     myTransactionFound = true;
                                     
-                                    // v5.11.140: Track main RPC score
-                                    if (!existing.scoreRecorded) {
+                                        // v5.11.141: Track main RPC score (moved inside duplicate check)
                                         NetworkState.rpcScores.main++;
-                                        existing.scoreRecorded = true;
-                                        log(`[メインRPC] BlockID検出 - スコア: メイン: ${NetworkState.rpcScores.main}, 補助: ${NetworkState.rpcScores.aux}`, 'info');
+                                        const totalAux = NetworkState.rpcScores.aux.reduce((a, b) => a + b, 0);
+                                        log(`[メインRPC] BlockID検出 - スコア: メイン: ${NetworkState.rpcScores.main}, 補助合計: ${totalAux}`, 'info');
                                     }
                                     
                                     // v5.4.52: Removed pendingBlockIds callback mechanism - using direct polling instead
@@ -16003,17 +16010,22 @@
                     NetworkState.rpcClient.removeAllEventListeners();
                     log('[DEBUG] イベントリスナーをクリアしました', 'debug');
                     
-                    // v5.11.140: Stop auxiliary RPC client
-                    if (NetworkState.auxRpcClient) {
-                        try {
-                            await NetworkState.auxRpcClient.unsubscribeBlockAdded();
-                            NetworkState.auxRpcClient.removeAllEventListeners();
-                            await NetworkState.auxRpcClient.disconnect();
-                            NetworkState.auxRpcClient = null;
-                            log('[2ノード監視] 補助RPC監視を停止しました', 'info');
-                        } catch (err) {
-                            log(`[2ノード監視] 補助RPC停止エラー: ${err.message}`, 'debug');
+                    // v5.11.141: Stop all auxiliary RPC clients
+                    if (NetworkState.auxRpcClients && NetworkState.auxRpcClients.length > 0) {
+                        for (let i = 0; i < NetworkState.auxRpcClients.length; i++) {
+                            const auxClient = NetworkState.auxRpcClients[i];
+                            if (auxClient) {
+                                try {
+                                    await auxClient.unsubscribeBlockAdded();
+                                    auxClient.removeAllEventListeners();
+                                    await auxClient.disconnect();
+                                    log(`[補助RPC-${i+1}] 監視を停止しました`, 'info');
+                                } catch (err) {
+                                    log(`[補助RPC-${i+1}] 停止エラー: ${err.message}`, 'debug');
+                                }
+                            }
                         }
+                        NetworkState.auxRpcClients = [];
                     }
                     
                     NetworkState.ws.connected = false;  // v5.6.4: Mark WebSocket as disconnected

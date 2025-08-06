@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.133 - チャンクサイズ選択肢の簡略化</title>
+    <title>Kaspa P2P File Storage v5.11.134 - UX/セキュリティ改善3点セット</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -1457,16 +1457,7 @@
                 </div>
             </div>
             
-            <!-- Workspace Folder -->
-            <div class="status-box">
-                <h3>📁 作業フォルダ</h3>
-                <div class="status-row">
-                    <div id="workspaceFolderStatus">
-                        <span>📁 未設定</span>
-                    </div>
-                    <button onclick="setupWorkspace()">設定</button>
-                </div>
-            </div>
+            <!-- v5.11.134: Workspace Folder moved to Settings tab -->
             
             <!-- Wallet Settings -->
             <div class="status-box">
@@ -1597,13 +1588,7 @@
 
     <!-- Upload Tab -->
     <div id="upload-tab" class="tab-content">
-        <!-- Workspace Status (Always Visible) -->
-        <div class="container" style="padding: 16px; margin-bottom: 20px; border-radius: 8px;">
-            <div id="workspaceStatusDisplay" style="color: var(--warning-color); font-size: 14px;">
-                作業フォルダ: 未設定 (ブラウザ内保存のみ)
-                <button onclick="setupWorkspace()" style="margin-left: 10px; padding: 5px 10px; font-size: 12px;">設定</button>
-            </div>
-        </div>
+        <!-- v5.11.134: Workspace Status moved to Settings tab -->
 
         <!-- File Upload -->
         <div class="container">
@@ -2064,9 +2049,20 @@
                 </div>
             </div>
             
-            <div class="grid-2">
+            <!-- v5.11.134: Workspace settings consolidated here -->
+            <div class="metric-box" style="margin-top: 20px;">
+                <h3>📁 作業フォルダ設定</h3>
+                <div id="workspaceStatusDisplay" style="margin-top: 10px; padding: 10px; background: var(--background-light); border-radius: 5px; font-size: 14px;">
+                    作業フォルダ: 未設定 (ブラウザ内保存のみ)
+                </div>
+                <button onclick="setupWorkspace()" id="workspaceBtn" style="width: 100%; margin-top: 10px;">作業フォルダを選択</button>
+                <p style="font-size: 12px; color: var(--text-secondary); margin-top: 10px;">
+                    作業フォルダを設定すると、進捗ファイルが自動保存され、ブラウザを閉じても作業を継続できます。
+                </p>
+            </div>
+            
+            <div class="grid-2" style="margin-top: 20px;">
                 <button id="initBtn">システムを初期化</button>
-                <button onclick="setupWorkspace()" id="workspaceBtn">作業フォルダ設定</button>
                 <button id="testBtn" disabled>接続テスト</button>
             </div>
             <div id="initStatus" class="metric-box" style="display: none;"></div>
@@ -8298,13 +8294,16 @@
             return parts.length > 1 ? parts[1] : 'Kaspa P2P File Storage';
         }
         
-        // v5.11.131: Update upload button state with proper styling
+        // v5.11.134: Update upload button state with proper styling (enhanced disabled state)
         function updateUploadButtonState(enabled) {
             const uploadBtn = document.getElementById('uploadBtn');
             if (uploadBtn) {
                 uploadBtn.disabled = !enabled;
-                uploadBtn.style.opacity = enabled ? '1' : '0.5';
+                uploadBtn.style.opacity = enabled ? '1' : '0.6';
                 uploadBtn.style.cursor = enabled ? 'pointer' : 'not-allowed';
+                // v5.11.134: Change background color for disabled state
+                uploadBtn.style.background = enabled ? 'var(--accent-color)' : 'var(--text-secondary)';
+                uploadBtn.style.transform = enabled ? 'scale(1)' : 'scale(0.98)';
             }
         }
         
@@ -13045,6 +13044,19 @@
                 }, 10000);
                 
                 document.getElementById('uploadBtn').disabled = false;
+                
+                // v5.11.134: Clear file selection and password after upload completion
+                if (!FileState.networkErrorOccurred) {
+                    // Clear password for security
+                    document.getElementById('uploadPassword').value = '';
+                    // Clear file selection
+                    document.getElementById('fileInput').value = '';
+                    // Reset selected files state
+                    FileState.selectedFiles = [];
+                    // Clear file info display
+                    document.getElementById('selectedFileInfo').innerHTML = '';
+                    log('ファイル選択とパスワードをクリアしました', 'debug');
+                }
                 
                 // v5.11.126: Hide upload progress on error or network issue
                 if (FileState.networkErrorOccurred || !FileState.uploadSessionActive) {

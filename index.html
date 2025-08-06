@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.11.135 - アップロードボタンの状態遷移修正</title>
+    <title>Kaspa P2P File Storage v5.11.136 - BlockID取得の安定性向上</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -12220,44 +12220,71 @@
                                 // Wait for confirmation
                                 await new Promise(resolve => setTimeout(resolve, 2000));
                                 
-                                // Get BlockID (existing logic)
+                                // v5.11.136: Enhanced BlockID acquisition with REST API polling
                                 let waitTime = 0;
-                                const maxWaitTime = 30000;  // v5.11.118: Keep 30s for chunk confirmation (different from TX confirmation)
+                                const maxWaitTime = config.timeout || 300000;  // Use config.timeout (5 minutes)
+                                const apiUrl = `${config.apiEndpoints[config.network]}/transactions/${txid}`;
+                                let lastApiCheck = 0;
+                                
+                                log(`ペイロード ${i + 1} BlockID待機中... (最大${maxWaitTime/1000}秒)`, 'info');
                                 
                                 while (!blockId && waitTime < maxWaitTime) {
-                                    // Phase 0-O-2: Check both ConnectionManager and WebSocket status
+                                    // Check network connection
                                     if (!ConnectionManager.isConnected || !NetworkState.ws.connected) {
                                         log(`[DEBUG] ネットワーク切断を検出 - BlockID待機を中断 (CM: ${ConnectionManager.isConnected}, WS: ${NetworkState.ws.connected})`, 'debug');
                                         throw new Error('Network disconnected while waiting for BlockID');
                                     }
                                     
+                                    // Check WebSocket monitoring
                                     if (NetworkState.ws.monitorActive && NetworkState.ws.monitoredTransactions.has(txid)) {
                                         const monitorData = NetworkState.ws.monitoredTransactions.get(txid);
                                         if (monitorData.blockId) {
                                             blockId = monitorData.blockId;
-                                            // v5.11.117: Keep in monitoring list for 90 seconds after receipt
-                                            // NetworkState.ws.monitoredTransactions.delete(txid);
+                                            log(`WebSocket経由でBlockID取得: ${blockId.substring(0, 16)}... (${waitTime/1000}秒)`, 'success');
                                             FileState.uploadingChunksCount--; // v5.5.36: Using FileState
                                             break;
                                         }
+                                    }
+                                    
+                                    // v5.11.136: Poll REST API every 10 seconds
+                                    if (waitTime - lastApiCheck >= 10000) {
+                                        try {
+                                            const response = await fetchWithTimeout(apiUrl, {}, 5000, 1);
+                                            if (response.ok) {
+                                                const data = await response.json();
+                                                blockId = data.block_hash?.[0] || data.accepting_block_hash;
+                                                if (blockId) {
+                                                    log(`REST API経由でBlockID取得: ${blockId.substring(0, 16)}... (${waitTime/1000}秒)`, 'success');
+                                                    FileState.uploadingChunksCount--;
+                                                    break;
+                                                }
+                                                log(`REST APIチェック: TxIDは確認済み、BlockID待機中... (${waitTime/1000}秒)`, 'debug');
+                                            }
+                                        } catch (apiError) {
+                                            log(`REST APIエラー: ${apiError.message} (${waitTime/1000}秒)`, 'debug');
+                                        }
+                                        lastApiCheck = waitTime;
                                     }
                                     
                                     await new Promise(resolve => setTimeout(resolve, 500));
                                     waitTime += 500;
                                 }
                                 
-                                // Fallback to Explorer API (v5.11.99)
+                                // v5.11.136: Handle timeout with user notification
                                 if (!blockId) {
-                                    const apiUrl = `${config.apiEndpoints[config.network]}/transactions/${txid}`;
-                                    const response = await fetchWithTimeout(apiUrl, {}, 15000, 3);
-                                    if (response.ok) {
-                                        const data = await response.json();
-                                        blockId = data.block_hash?.[0] || data.accepting_block_hash;
-                                    }
-                                }
-                                
-                                if (!blockId) {
-                                    throw new Error('BlockID取得失敗');
+                                    // Stop upload session
+                                    FileState.uploadSessionActive = false;
+                                    
+                                    // User notification
+                                    const errorMsg = `ネットワークが不安定です。\n\n` +
+                                                   `5分間BlockIDを取得できませんでした。\n` +
+                                                   `TxID: ${txid.substring(0, 16)}...\n\n` +
+                                                   `進捗は自動保存されています。\n` +
+                                                   `ネットワークが安定してから再開してください。`;
+                                    alert(errorMsg);
+                                    log(`アップロード停止: 5分タイムアウト (TxID: ${txid.substring(0, 16)}...)`, 'error');
+                                    
+                                    throw new Error('Network timeout - upload stopped after 5 minutes');
                                 }
                                 
                                 // Update status
@@ -12573,11 +12600,16 @@
                             log(`トランザクション確認を待機中...`);
                             
                             // Wait for confirmation (WebSocket or RPC)
+                            // v5.11.136: Enhanced BlockID acquisition with REST API polling
                             let waitTime = 0;
-                            const maxWaitTime = 30000; // v5.11.118: Keep 30s for chunk confirmation (different from TX confirmation)
+                            const maxWaitTime = config.timeout || 300000; // Use config.timeout (5 minutes)
+                            const apiUrl = `${config.apiEndpoints[config.network]}/transactions/${txid}`;
+                            let lastApiCheck = 0;
+                            
+                            log(`チャンク ${i + 1} BlockID待機中... (最大${maxWaitTime/1000}秒)`, 'info');
                             
                             while (!blockId && waitTime < maxWaitTime) {
-                                // Phase 0-O: Check network connection
+                                // Check network connection
                                 if (!ConnectionManager.isConnected) {
                                     log(`[DEBUG] ネットワーク切断を検出 - BlockID待機を中断`, 'debug');
                                     throw new Error('Network disconnected while waiting for BlockID');
@@ -12588,31 +12620,44 @@
                                     const monitorData = NetworkState.ws.monitoredTransactions.get(txid);
                                     if (monitorData.blockId) {
                                         blockId = monitorData.blockId;
-                                        log(`WebSocket経由でBlockID取得: ${blockId.substring(0, 16)}...`);
-                                        // Remove from monitoring list
-                                        // v5.11.117: Keep in monitoring list for 90 seconds after receipt
-                                        // NetworkState.ws.monitoredTransactions.delete(txid);
+                                        log(`WebSocket経由でBlockID取得: ${blockId.substring(0, 16)}... (${waitTime/1000}秒)`, 'success');
                                         FileState.uploadingChunksCount--; // v5.5.36: Using FileState
                                         log(`[DEBUG] WebSocket監視リストから削除: TxID: ${txid.substring(0, 16)}... (BlockID取得済み)`, 'debug');
                                         break;
                                     }
                                 }
                                 
-                                // After 30 seconds, try RPC
-                                if (waitTime >= 30000) {
+                                // v5.11.136: Poll REST API every 10 seconds
+                                if (waitTime - lastApiCheck >= 10000) {
                                     try {
-                                        log('30秒経過 - RPCで確認を試みます...');
+                                        const response = await fetchWithTimeout(apiUrl, {}, 5000, 1);
+                                        if (response.ok) {
+                                            const data = await response.json();
+                                            blockId = data.block_hash?.[0] || data.accepting_block_hash;
+                                            if (blockId) {
+                                                log(`REST API経由でBlockID取得: ${blockId.substring(0, 16)}... (${waitTime/1000}秒)`, 'success');
+                                                if (NetworkState.ws.monitoredTransactions.has(txid)) {
+                                                    FileState.uploadingChunksCount--;
+                                                }
+                                                break;
+                                            }
+                                            log(`REST APIチェック: TxIDは確認済み、BlockID待機中... (${waitTime/1000}秒)`, 'debug');
+                                        }
+                                    } catch (apiError) {
+                                        log(`REST APIエラー: ${apiError.message} (${waitTime/1000}秒)`, 'debug');
+                                    }
+                                    lastApiCheck = waitTime;
+                                }
+                                
+                                // After 30 seconds, also try RPC with archive nodes
+                                if (waitTime >= 30000 && waitTime % 10000 === 0) {
+                                    try {
                                         const txInfo = await getTransactionWithArchive(txid);
-                                        
                                         if (txInfo && txInfo.blockHash) {
                                             blockId = txInfo.blockHash;
-                                            log(`RPC経由でBlockID取得: ${blockId.substring(0, 16)}...`);
-                                            // Remove from monitoring list if found via RPC
+                                            log(`RPC経由でBlockID取得: ${blockId.substring(0, 16)}... (${waitTime/1000}秒)`, 'success');
                                             if (NetworkState.ws.monitoredTransactions.has(txid)) {
-                                                // v5.11.117: Keep in monitoring list for 90 seconds after receipt
-                                                // NetworkState.ws.monitoredTransactions.delete(txid);
-                                                FileState.uploadingChunksCount--; // v5.5.36: Using FileState
-                                                log(`[DEBUG] WebSocket監視リストから削除: TxID: ${txid.substring(0, 16)}... (RPC経由でBlockID取得)`, 'debug');
+                                                FileState.uploadingChunksCount--;
                                             }
                                             break;
                                         }
@@ -12625,27 +12670,21 @@
                                 waitTime += 500;
                             }
                             
-                            // Fallback to Explorer API
+                            // v5.11.136: Handle timeout with user notification
                             if (!blockId) {
-                                if (NetworkState.ws.monitorActive && NetworkState.ws.monitoredTransactions.has(txid)) {
-                                    const elapsed = Date.now() - NetworkState.ws.monitoredTransactions.get(txid).timestamp;
-                                    log(`WebSocketで${elapsed/1000}秒間見つからず - Explorer APIを使用`);
-                                } else {
-                                    log(`RPC待機タイムアウト - Explorer APIを使用`);
-                                }
-                                const apiUrl = `${config.apiEndpoints[config.network]}/transactions/${txid}`;
-                                const response = await fetchWithTimeout(apiUrl, {}, 15000, 3); // 15s timeout, 3 retries for important upload
-                                if (response.ok) {
-                                    const data = await response.json();
-                                    blockId = data.block_hash?.[0] || data.accepting_block_hash;
-                                    if (blockId) {
-                                        log(`Explorer API経由でBlockID取得: ${blockId.substring(0, 16)}...`);
-                                    }
-                                }
-                            }
-                            
-                            if (!blockId) {
-                                throw new Error('BlockID取得失敗');
+                                // Stop upload session
+                                FileState.uploadSessionActive = false;
+                                
+                                // User notification
+                                const errorMsg = `ネットワークが不安定です。\n\n` +
+                                               `5分間BlockIDを取得できませんでした。\n` +
+                                               `TxID: ${txid.substring(0, 16)}...\n\n` +
+                                               `進捗は自動保存されています。\n` +
+                                               `ネットワークが安定してから再開してください。`;
+                                alert(errorMsg);
+                                log(`アップロード停止: 5分タイムアウト (TxID: ${txid.substring(0, 16)}...)`, 'error');
+                                
+                                throw new Error('Network timeout - upload stopped after 5 minutes');
                             }
                             
                             // Update status

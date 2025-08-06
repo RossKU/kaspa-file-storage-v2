@@ -2722,7 +2722,7 @@
                         document.getElementById('walletBalance').textContent = `${balance.toFixed(8)} KAS`;
                         
                         // Update upload button state
-                        updateUploadButtonState(true);
+                        updateUploadButtonState();
                     } else {
                         document.getElementById('walletBalance').textContent = 'RPC未接続';
                     }
@@ -11961,7 +11961,7 @@
                     
                     if (!continueUpload) {
                         log('アップロードがキャンセルされました', 'info');
-                        updateUploadButtonState(true);
+                        updateUploadButtonState();
                         document.getElementById('uploadProgress').style.display = 'none';
                         // v5.5.28: Fixed local variable reference - use FileState.progressManager
                         FileState.progressManager = null;
@@ -12083,7 +12083,7 @@
                         };
                         
                         // Reset UI state
-                        updateUploadButtonState(true);
+                        updateUploadButtonState();
                         document.getElementById('uploadProgress').style.display = 'none';
                         
                         // Keep progress manager for resume capability
@@ -13067,6 +13067,17 @@
                     // Reset file state
                     FileState.currentFile = null;
                     FileState.selectedFiles = [];
+                    
+                    // v5.11.135-fix: Reset file selection UI to initial state
+                    const label = document.querySelector('.file-input-label');
+                    if (label) {
+                        label.innerHTML = `
+                            📁 ファイルを選択<br>
+                            <small>またはドラッグ&ドロップ</small>
+                        `;
+                        label.classList.remove('file-selected', 'resume-mode');
+                    }
+                    
                     log('ファイル選択とパスワードをクリアしました', 'debug');
                 }
                 

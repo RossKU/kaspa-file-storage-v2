@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.12.13 - セッションベースKENV管理</title>
+    <title>Kaspa P2P File Storage v5.12.14 - ディレクトリビルダーKENV統合</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -6098,6 +6098,44 @@
                             metadata: metadata,
                             password: password
                         };
+                        
+                        // v5.12.14: Add KENV entry for directory upload
+                        if (FileState.kenvManager._initialized) {
+                            log('[KENV] ディレクトリアップロードエントリーを追加', 'info');
+                            const kenvEntry = FileState.kenvManager.addMinimalEntry(
+                                this.name,
+                                'kaspa-directory',
+                                'upload'
+                            );
+                            
+                            // Store entry ID for this session
+                            FileState.currentKenvEntryId = kenvEntry.id;
+                            log(`[KENV] ディレクトリセッションエントリーID: ${kenvEntry.id}`, 'debug');
+                            
+                            // Set directory-specific information
+                            kenvEntry.uploadDate = new Date().toISOString();
+                            kenvEntry.uploadedBy = UserState.address?.toString() || null;
+                            kenvEntry.encrypted = true;
+                            kenvEntry.password = password || null;
+                            kenvEntry.metaTxId = result.txid;
+                            kenvEntry.metaTxBlockId = result.blockId;
+                            kenvEntry.uploadCost = result.cost || 0.00021;
+                            
+                            // Add directory metadata
+                            kenvEntry.fileCount = metadata.directory.fileCount;
+                            kenvEntry.directoryCount = metadata.directory.directoryCount;
+                            kenvEntry.totalSize = metadata.directory.totalSize;
+                            kenvEntry.network = config.network;
+                            
+                            // Save to localStorage
+                            FileState.kenvManager.saveToStorage();
+                            log('[KENV] ディレクトリエントリー保存完了', 'info');
+                            
+                            // Update file tab if needed
+                            if (typeof updateFileTab === 'function') {
+                                updateFileTab();
+                            }
+                        }
                         
                         this.showStatus(`アップロード完了: TxID ${result.txid}`, 'success');
                         

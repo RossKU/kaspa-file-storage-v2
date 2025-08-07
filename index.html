@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.12.11 - スーパーメタKENV統合修正（FileState版）</title>
+    <title>Kaspa P2P File Storage v5.12.12 - メタTxなし.kaspaファイル生成対応</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -4884,10 +4884,10 @@
                         return;
                     }
                     
-                    // ファイルの場合、メタトランザクションIDが必要
+                    // ファイルの場合、メタトランザクションIDはオプショナル
+                    // v5.12.12: メタTxIDがなくても.kaspaファイル生成可能に変更
                     if (!kenvEntry.metaTxId || !kenvEntry.metaTxBlockId) {
-                        log('メタトランザクション情報がありません', 'error');
-                        return;
+                        log('メタトランザクション情報がありません。チャンク情報のみで.kaspaファイルを生成します', 'warning');
                     }
                     
                     // .kaspaファイルのメタデータ構造を作成（v3.3フォーマット）
@@ -4935,9 +4935,10 @@
                         
                         // Metadata section with additional info
                         metadata: {
-                            metaTxId: kenvEntry.metaTxId,
-                            metaTxBlockId: kenvEntry.metaTxBlockId,
-                            metaTxReference: `${kenvEntry.metaTxId}:${kenvEntry.metaTxBlockId}`,
+                            metaTxId: kenvEntry.metaTxId || null,
+                            metaTxBlockId: kenvEntry.metaTxBlockId || null,
+                            metaTxReference: (kenvEntry.metaTxId && kenvEntry.metaTxBlockId) ? 
+                                `${kenvEntry.metaTxId}:${kenvEntry.metaTxBlockId}` : null,
                             uploadDate: kenvEntry.uploadDate || new Date().toISOString(),
                             blockTime: kenvEntry.blockTime || null,
                             uploadedBy: kenvEntry.uploadedBy || "",

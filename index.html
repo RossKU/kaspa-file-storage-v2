@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.12.5 - スコープエラー修正＆キャッシュ対策</title>
+    <title>Kaspa P2P File Storage v5.12.6 - 完了メッセージ表示修正</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -13254,6 +13254,9 @@
                 } else {
                     log('⚠️ BlockID取得に失敗しました。復元時にREST APIが必要です', 'warning');
                 }
+                
+                // v5.12.6: Update status to complete for meta-tx case
+                uploadStatusUI.updateStatus('✅', 'アップロード完了！ファイルタブを確認してください', 5);
                 
                 // Add meta-tx to metadata for .kaspa file generation
                 window.kaspaMetadata.metaTx = {

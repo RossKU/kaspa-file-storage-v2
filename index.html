@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.12.8 - UIシンプル化</title>
+    <title>Kaspa P2P File Storage v5.12.9 - サムネイル表示機能追加</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -587,6 +587,83 @@
         .file-input-label:hover {
             background: var(--accent-light);
             border-color: var(--accent-color);
+        }
+
+        /* Thumbnail Preview Styles */
+        #thumbnailPreview {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        #thumbnailImage {
+            width: 128px;
+            height: 128px;
+            object-fit: cover;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            border: 2px solid var(--border-color);
+        }
+
+        #fileDetails {
+            flex: 1;
+            text-align: left;
+            position: relative;
+        }
+
+        #fileName {
+            display: block;
+            font-weight: bold;
+            color: var(--text-primary);
+            font-size: 1.1em;
+            margin-bottom: 5px;
+            word-break: break-all;
+        }
+
+        #fileSize {
+            display: block;
+            color: var(--text-secondary);
+            font-size: 0.9em;
+        }
+
+        #clearFileBtn {
+            position: absolute;
+            top: -10px;
+            right: -10px;
+            background: var(--error-color);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            cursor: pointer;
+            font-size: 14px;
+            line-height: 1;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s;
+        }
+
+        #clearFileBtn:hover {
+            transform: scale(1.1);
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .file-input-label.has-file {
+            padding: 20px;
         }
 
         /* Metric Box */
@@ -1595,8 +1672,18 @@
             <h2>📁 ファイルアップロード</h2>
             
             <label for="fileInput" class="file-input-label">
-                📁 ファイルを選択<br>
-                <small>またはドラッグ&ドロップ</small>
+                <div id="thumbnailPreview" style="display:none;">
+                    <img id="thumbnailImage" />
+                    <div id="fileDetails">
+                        <span id="fileName"></span>
+                        <span id="fileSize"></span>
+                        <button id="clearFileBtn" onclick="event.preventDefault(); event.stopPropagation(); clearFileSelection();">✕</button>
+                    </div>
+                </div>
+                <div id="defaultPrompt">
+                    📁 ファイルを選択<br>
+                    <small>またはドラッグ&ドロップ</small>
+                </div>
             </label>
             <input type="file" id="fileInput" onchange="handleFileSelect(event)">
             
@@ -16444,6 +16531,125 @@
         
         // Connection test function moved to SystemHandlers
         
+        // Thumbnail generation function
+        window.generateThumbnail = function(file) {
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    // Create canvas for resizing
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    
+                    // Set canvas size to 128x128
+                    const size = 128;
+                    canvas.width = size;
+                    canvas.height = size;
+                    
+                    // Calculate scaling and positioning for center crop
+                    const scale = Math.max(size / img.width, size / img.height);
+                    const scaledWidth = img.width * scale;
+                    const scaledHeight = img.height * scale;
+                    const offsetX = (size - scaledWidth) / 2;
+                    const offsetY = (size - scaledHeight) / 2;
+                    
+                    // Draw resized image
+                    ctx.drawImage(img, offsetX, offsetY, scaledWidth, scaledHeight);
+                    
+                    // Convert to data URL and display
+                    const thumbnailUrl = canvas.toDataURL('image/jpeg', 0.8);
+                    showFileInfo(file, thumbnailUrl);
+                };
+                img.src = e.target.result;
+            };
+            
+            reader.readAsDataURL(file);
+        };
+        
+        // Show file info with or without thumbnail
+        window.showFileInfo = function(file, thumbnailUrl) {
+            const label = document.querySelector('.file-input-label');
+            const preview = document.getElementById('thumbnailPreview');
+            const defaultPrompt = document.getElementById('defaultPrompt');
+            const thumbnailImage = document.getElementById('thumbnailImage');
+            const fileName = document.getElementById('fileName');
+            const fileSize = document.getElementById('fileSize');
+            
+            // Hide default prompt and show preview
+            defaultPrompt.style.display = 'none';
+            preview.style.display = 'flex';
+            
+            // Add has-file class for styling
+            label.classList.add('has-file');
+            
+            // Set file info
+            fileName.textContent = file.name;
+            fileSize.textContent = `${(file.size / 1024 / 1024).toFixed(2)} MB`;
+            
+            // Set thumbnail or file type icon
+            if (thumbnailUrl) {
+                thumbnailImage.src = thumbnailUrl;
+                thumbnailImage.style.display = 'block';
+            } else {
+                // Use emoji icon for non-image files
+                thumbnailImage.style.display = 'none';
+                const iconDiv = document.createElement('div');
+                iconDiv.style.width = '128px';
+                iconDiv.style.height = '128px';
+                iconDiv.style.display = 'flex';
+                iconDiv.style.alignItems = 'center';
+                iconDiv.style.justifyContent = 'center';
+                iconDiv.style.fontSize = '64px';
+                iconDiv.style.background = 'var(--bg-secondary)';
+                iconDiv.style.borderRadius = '8px';
+                iconDiv.style.border = '2px solid var(--border-color)';
+                
+                // Choose icon based on file type
+                let icon = '📄'; // Default
+                if (file.type.startsWith('video/')) icon = '🎥';
+                else if (file.type.startsWith('audio/')) icon = '🎵';
+                else if (file.type.includes('pdf')) icon = '📑';
+                else if (file.type.includes('zip') || file.type.includes('rar')) icon = '📦';
+                else if (file.type.includes('text')) icon = '📝';
+                
+                iconDiv.textContent = icon;
+                thumbnailImage.parentNode.replaceChild(iconDiv, thumbnailImage);
+            }
+        };
+        
+        // Clear file selection
+        window.clearFileSelection = function() {
+            const label = document.querySelector('.file-input-label');
+            const preview = document.getElementById('thumbnailPreview');
+            const defaultPrompt = document.getElementById('defaultPrompt');
+            const fileInput = document.getElementById('fileInput');
+            
+            // Reset UI
+            preview.style.display = 'none';
+            defaultPrompt.style.display = 'block';
+            label.classList.remove('has-file');
+            
+            // Clear file input and state
+            fileInput.value = '';
+            FileState.currentFile = null;
+            FileState.selectedFiles.clear();
+            
+            // Reset thumbnail image
+            const thumbnailImage = document.getElementById('thumbnailImage');
+            if (thumbnailImage) {
+                thumbnailImage.src = '';
+                thumbnailImage.style.display = 'block';
+            }
+            
+            // Update upload button state
+            if (window.updateUploadButtonState) {
+                window.updateUploadButtonState();
+            }
+            
+            log('ファイル選択をクリアしました', 'info');
+        };
+        
         // File selection handler (moved from FILE OPERATIONS)
         window.handleFileSelect = async function(event) {
             // v5.11.127: Removed directory mode flag - feature moved to DirectoryBuilder
@@ -16454,6 +16660,14 @@
             
             FileState.currentFile = file;
             log(`ファイル選択: ${file.name} (${(file.size/1024).toFixed(1)}KB)`);
+            
+            // Generate thumbnail for image files
+            if (file.type.startsWith('image/') && file.size <= 100 * 1024 * 1024) { // 100MB limit
+                generateThumbnail(file);
+            } else {
+                // Show file info without thumbnail
+                showFileInfo(file, null);
+            }
             
             // Check file size warning
             checkFileSizeWarning(file);

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.12.3 - DirectoryManager段階的削除 Phase 1-3</title>
+    <title>Kaspa P2P File Storage v5.12.4 - アップロード完了UI改善（完全版）</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -12883,7 +12883,7 @@
                     document.getElementById('fileInput').value = '';
                     // Reset file state
                     FileState.currentFile = null;
-                    FileState.selectedFiles = [];
+                    FileState.selectedFiles.clear();
                     
                     // v5.11.135-fix: Reset file selection UI to initial state
                     const label = document.querySelector('.file-input-label');
@@ -12901,9 +12901,18 @@
                 // v5.11.135: Re-evaluate button state after clearing (should be disabled)
                 updateUploadButtonState();
                 
-                // v5.11.126: Hide upload progress on error or network issue
-                if (FileState.networkErrorOccurred || !FileState.uploadSessionActive) {
+                // v5.12.4: Hide upload progress with appropriate timing
+                if (FileState.networkErrorOccurred) {
+                    // Error occurred - hide immediately
                     document.getElementById('uploadProgress').style.display = 'none';
+                } else if (!FileState.uploadSessionActive) {
+                    // Success - hide after 10 seconds
+                    setTimeout(() => {
+                        const uploadProgress = document.getElementById('uploadProgress');
+                        if (uploadProgress) {
+                            uploadProgress.style.display = 'none';
+                        }
+                    }, 10000);
                 }
                 
                 // v4.7.13: Reset ProgressManager to prevent reuse

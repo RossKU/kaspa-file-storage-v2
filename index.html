@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.12.12 - メタTxなし.kaspaファイル生成対応</title>
+    <title>Kaspa P2P File Storage v5.12.13 - セッションベースKENV管理</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -3634,6 +3634,7 @@
             pendingProgress: null,    // Progress data for resume functionality (v5.5.39)
             currentFileCID: null,     // Current file's short CID (v5.5.39)
             currentFileCIDFull: null,  // Current file's full CID (v5.5.39)
+            currentKenvEntryId: null,  // Current KENV entry ID for session (v5.12.13)
             // v5.9.0: File list management
             fileList: [],             // List of files displayed in File tab
             selectedFiles: new Set(),  // Set of selected file IDs
@@ -12795,6 +12796,10 @@
                         'upload'
                     );
                     
+                    // v5.12.13: Store entry ID for this upload session
+                    FileState.currentKenvEntryId = kenvEntry.id;
+                    log(`[KENV] セッションエントリーID: ${kenvEntry.id}`, 'debug');
+                    
                     // 既知の情報を設定
                     kenvEntry.fileSize = currentFile.size;
                     kenvEntry.uploadDate = new Date().toISOString();
@@ -12875,9 +12880,10 @@
                     const actualCost = await FileState.costTracking.calculateActualCost();
                     
                     // KENV処理（履歴処理から独立） - 3. 実際のコスト計算後
-                    if (FileState.kenvManager._initialized && window.currentFileCID) {
+                    // v5.12.13: Use entry ID instead of CID for session-based lookup
+                    if (FileState.kenvManager._initialized && FileState.currentKenvEntryId) {
                         const kenvEntries = FileState.kenvManager.entries;
-                        const kenvEntry = kenvEntries.find(e => e.cid === window.currentFileCID);
+                        const kenvEntry = kenvEntries.find(e => e.id === FileState.currentKenvEntryId);
                         
                         if (kenvEntry) {
                             kenvEntry.uploadCost = actualCost;
@@ -13178,10 +13184,11 @@
                     log(`[SuperMeta] 🎉 スーパーメタデータ作成完了！`, 'success');
                     
                     // v5.12.11: Update KENV entry with super meta TxID
-                    if (FileState.kenvManager._initialized && FileState.currentFileCID) {
+                    // v5.12.13: Use entry ID instead of CID for session-based lookup
+                    if (FileState.kenvManager._initialized && FileState.currentKenvEntryId) {
                         log('[KENV] スーパーメタTx情報でエントリーを更新', 'info');
                         const kenvEntries = FileState.kenvManager.entries;
-                        const kenvEntry = kenvEntries.find(e => e.cid === FileState.currentFileCID);
+                        const kenvEntry = kenvEntries.find(e => e.id === FileState.currentKenvEntryId);
                         
                         if (kenvEntry) {
                             kenvEntry.metaTxId = superMeta.txId;
@@ -13399,10 +13406,11 @@
                 // ここでの履歴更新は不要
                 
                 // KENV処理（履歴処理から独立） - 2. MetaTx作成後
-                if (FileState.kenvManager._initialized && window.currentFileCID) {
+                // v5.12.13: Use entry ID instead of CID for session-based lookup
+                if (FileState.kenvManager._initialized && FileState.currentKenvEntryId) {
                     log('[KENV] メタTx情報でエントリーを更新', 'info');
                     const kenvEntries = FileState.kenvManager.entries;
-                    const kenvEntry = kenvEntries.find(e => e.cid === window.currentFileCID);
+                    const kenvEntry = kenvEntries.find(e => e.id === FileState.currentKenvEntryId);
                     
                     if (kenvEntry) {
                         kenvEntry.metaTxId = metaTxId;

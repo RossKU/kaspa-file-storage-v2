@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.12.1 - ブロックイベントフィルター修正</title>
+    <title>Kaspa P2P File Storage v5.12.2 - REST API Kill機能追加</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -1890,7 +1890,28 @@
                 <div id="nodeConnectionStatus" style="margin-top: 10px; padding: 10px; border-radius: 5px; display: none;">
                     <strong>接続状態:</strong> <span id="nodeConnectionInfo">未接続</span>
                 </div>
-                
+            </div>
+            
+            <!-- v5.12.2: REST API Control -->
+            <div class="metric-box">
+                <h3>REST API設定</h3>
+                <div style="margin-bottom: 15px;">
+                    <label style="display: flex; align-items: center; gap: 10px;">
+                        <input type="checkbox" id="restApiEnabled" checked onchange="DebugHandlers.toggleRestApiGlobal(this.checked)">
+                        <span>REST API有効化</span>
+                    </label>
+                    <p style="margin: 10px 0 0 0; font-size: 0.9em; color: var(--text-secondary);">
+                        ⚠️ REST APIはサードパーティ製です。無効化するとWebSocketのみ使用されます。<br>
+                        プライバシー重視の方は無効化を推奨します。
+                    </p>
+                </div>
+                <div style="padding: 10px; background: var(--bg-secondary); border-radius: 5px;">
+                    <div>状態: <span id="rest-api-global-status" style="font-weight: bold;">有効</span></div>
+                    <div>スキップ回数: <span id="rest-api-skip-count">0</span></div>
+                </div>
+            </div>
+            
+            <div class="metric-box" style="display: none;">
                 <!-- v5.11.116: WebSocket Block Statistics -->
                 <div id="wsBlockStats" style="margin-top: 10px; padding: 10px; border-radius: 5px; background: var(--upload-bg); display: none;">
                     <strong>📊 WebSocket統計</strong>
@@ -2209,6 +2230,31 @@
             </div>
         </div>
         
+        <!-- v5.12.2: REST API Kill Switch -->
+        <div class="container">
+            <h2>🔪 REST API Killスイッチ</h2>
+            <div class="metric-box" style="border: 2px solid var(--error-color); padding: 15px;">
+                <p style="margin-bottom: 10px; color: var(--error-color);">
+                    ⚠️ REST APIを一時的に無効化します（デバッグ用）
+                </p>
+                
+                <div style="margin: 15px 0;">
+                    <button onclick="DebugHandlers.killRestApi()" id="rest-api-kill-btn" style="background: var(--error-color); color: white; padding: 10px 20px; margin-right: 10px;">
+                        Kill REST API
+                    </button>
+                    <button onclick="DebugHandlers.reviveRestApi()" id="rest-api-revive-btn" style="padding: 10px 20px;" disabled>
+                        REST API復活
+                    </button>
+                </div>
+                
+                <div style="margin-top: 15px; padding: 10px; background: var(--bg-secondary); border-radius: 5px;">
+                    <div>状態: <span id="rest-api-kill-status" style="font-weight: bold; color: var(--success-color);">● 有効</span></div>
+                    <div>スキップ回数: <span id="rest-api-kill-skip-count">0</span></div>
+                    <div>最終スキップ: <span id="rest-api-last-skip">-</span></div>
+                </div>
+            </div>
+        </div>
+        
         <!-- Debug Log -->
         <div class="container">
             <h2>🐛 デバッグログ</h2>
@@ -2350,6 +2396,55 @@
                 document.getElementById('filter-blocked-count').textContent = '0';
                 document.getElementById('filter-last-blocked').textContent = '-';
                 log('📊 [BlockFilter] 統計リセット', 'info');
+            },
+            
+            // v5.12.2: REST API Kill functions
+            toggleRestApiGlobal(enabled) {
+                NetworkState.restApiControl.globalEnabled = enabled;
+                const statusEl = document.getElementById('rest-api-global-status');
+                if (statusEl) {
+                    statusEl.textContent = enabled ? '有効' : '無効';
+                    statusEl.style.color = enabled ? 'var(--success-color)' : 'var(--error-color)';
+                }
+                log(`🔧 [REST API] グローバル設定: ${enabled ? '有効' : '無効'}`, 'info');
+            },
+            
+            killRestApi() {
+                if (confirm('REST APIを一時的に無効化しますか？')) {
+                    NetworkState.restApiControl.temporaryKilled = true;
+                    document.getElementById('rest-api-kill-btn').disabled = true;
+                    document.getElementById('rest-api-revive-btn').disabled = false;
+                    const statusEl = document.getElementById('rest-api-kill-status');
+                    if (statusEl) {
+                        statusEl.textContent = '● 無効（Kill中）';
+                        statusEl.style.color = 'var(--error-color)';
+                    }
+                    log('🔪 [REST API Kill] REST API一時無効化', 'error');
+                }
+            },
+            
+            reviveRestApi() {
+                NetworkState.restApiControl.temporaryKilled = false;
+                document.getElementById('rest-api-kill-btn').disabled = false;
+                document.getElementById('rest-api-revive-btn').disabled = true;
+                const statusEl = document.getElementById('rest-api-kill-status');
+                if (statusEl) {
+                    statusEl.textContent = '● 有効';
+                    statusEl.style.color = 'var(--success-color)';
+                }
+                log('✅ [REST API Kill] REST API復活', 'success');
+            },
+            
+            updateRestApiStats() {
+                const skipCountEl = document.getElementById('rest-api-kill-skip-count');
+                const lastSkipEl = document.getElementById('rest-api-last-skip');
+                const globalSkipCountEl = document.getElementById('rest-api-skip-count');
+                
+                if (skipCountEl) skipCountEl.textContent = NetworkState.restApiControl.skipCount;
+                if (globalSkipCountEl) globalSkipCountEl.textContent = NetworkState.restApiControl.skipCount;
+                if (lastSkipEl && NetworkState.restApiControl.lastSkipped) {
+                    lastSkipEl.textContent = new Date(NetworkState.restApiControl.lastSkipped).toLocaleTimeString('ja-JP');
+                }
             }
         };
         
@@ -2524,6 +2619,12 @@
                 targetNodes: [],  // Empty = filter all nodes, or specify ['main', 'aux-1', 'aux-2', 'aux-3', 'aux-4']
                 blockedCount: 0,  // Counter for filtered events
                 lastBlocked: null // Timestamp of last blocked event
+            },
+            restApiControl: {  // v5.12.2: REST API Kill control
+                globalEnabled: true,     // Global setting (persistent)
+                temporaryKilled: false,  // Debug kill switch (temporary)
+                skipCount: 0,           // Number of skipped REST API calls
+                lastSkipped: null       // Timestamp of last skip
             },
             ws: {
                 connection: null,       // WebSocket connection
@@ -12374,22 +12475,34 @@
                                     
                                     // v5.11.136: Poll REST API every 10 seconds
                                     if (waitTime - lastApiCheck >= 10000) {
-                                        try {
-                                            const response = await fetchWithTimeout(apiUrl, {}, 5000, 1);
-                                            if (response.ok) {
-                                                const data = await response.json();
-                                                blockId = data.block_hash?.[0] || data.accepting_block_hash;
-                                                if (blockId) {
-                                                    log(`REST API経由でBlockID取得: ${blockId.substring(0, 16)}... (${waitTime/1000}秒)`, 'success');
-                                                    FileState.uploadingChunksCount--;
-                                                    break;
-                                                }
-                                                log(`REST APIチェック: TxIDは確認済み、BlockID待機中... (${waitTime/1000}秒)`, 'debug');
+                                        // v5.12.2: REST API Kill check
+                                        if (!NetworkState.restApiControl.globalEnabled || NetworkState.restApiControl.temporaryKilled) {
+                                            NetworkState.restApiControl.skipCount++;
+                                            NetworkState.restApiControl.lastSkipped = Date.now();
+                                            log(`🚫 [REST API Kill] REST APIスキップ (無効化中) - スキップ回数: ${NetworkState.restApiControl.skipCount}`, 'debug');
+                                            // Update UI stats
+                                            if (typeof DebugHandlers !== 'undefined' && DebugHandlers.updateRestApiStats) {
+                                                DebugHandlers.updateRestApiStats();
                                             }
-                                        } catch (apiError) {
-                                            log(`REST APIエラー: ${apiError.message} (${waitTime/1000}秒)`, 'debug');
+                                            lastApiCheck = waitTime;
+                                        } else {
+                                            try {
+                                                const response = await fetchWithTimeout(apiUrl, {}, 5000, 1);
+                                                if (response.ok) {
+                                                    const data = await response.json();
+                                                    blockId = data.block_hash?.[0] || data.accepting_block_hash;
+                                                    if (blockId) {
+                                                        log(`REST API経由でBlockID取得: ${blockId.substring(0, 16)}... (${waitTime/1000}秒)`, 'success');
+                                                        FileState.uploadingChunksCount--;
+                                                        break;
+                                                    }
+                                                    log(`REST APIチェック: TxIDは確認済み、BlockID待機中... (${waitTime/1000}秒)`, 'debug');
+                                                }
+                                            } catch (apiError) {
+                                                log(`REST APIエラー: ${apiError.message} (${waitTime/1000}秒)`, 'debug');
+                                            }
+                                            lastApiCheck = waitTime;
                                         }
-                                        lastApiCheck = waitTime;
                                     }
                                     
                                     await new Promise(resolve => setTimeout(resolve, 500));
@@ -12755,24 +12868,36 @@
                                 
                                 // v5.11.136: Poll REST API every 10 seconds
                                 if (waitTime - lastApiCheck >= 10000) {
-                                    try {
-                                        const response = await fetchWithTimeout(apiUrl, {}, 5000, 1);
-                                        if (response.ok) {
-                                            const data = await response.json();
-                                            blockId = data.block_hash?.[0] || data.accepting_block_hash;
-                                            if (blockId) {
-                                                log(`REST API経由でBlockID取得: ${blockId.substring(0, 16)}... (${waitTime/1000}秒)`, 'success');
-                                                if (NetworkState.ws.monitoredTransactions.has(txid)) {
-                                                    FileState.uploadingChunksCount--;
-                                                }
-                                                break;
-                                            }
-                                            log(`REST APIチェック: TxIDは確認済み、BlockID待機中... (${waitTime/1000}秒)`, 'debug');
+                                    // v5.12.2: REST API Kill check
+                                    if (!NetworkState.restApiControl.globalEnabled || NetworkState.restApiControl.temporaryKilled) {
+                                        NetworkState.restApiControl.skipCount++;
+                                        NetworkState.restApiControl.lastSkipped = Date.now();
+                                        log(`🚫 [REST API Kill] REST APIスキップ (無効化中) - スキップ回数: ${NetworkState.restApiControl.skipCount}`, 'debug');
+                                        // Update UI stats
+                                        if (typeof DebugHandlers !== 'undefined' && DebugHandlers.updateRestApiStats) {
+                                            DebugHandlers.updateRestApiStats();
                                         }
-                                    } catch (apiError) {
-                                        log(`REST APIエラー: ${apiError.message} (${waitTime/1000}秒)`, 'debug');
+                                        lastApiCheck = waitTime;
+                                    } else {
+                                        try {
+                                            const response = await fetchWithTimeout(apiUrl, {}, 5000, 1);
+                                            if (response.ok) {
+                                                const data = await response.json();
+                                                blockId = data.block_hash?.[0] || data.accepting_block_hash;
+                                                if (blockId) {
+                                                    log(`REST API経由でBlockID取得: ${blockId.substring(0, 16)}... (${waitTime/1000}秒)`, 'success');
+                                                    if (NetworkState.ws.monitoredTransactions.has(txid)) {
+                                                        FileState.uploadingChunksCount--;
+                                                    }
+                                                    break;
+                                                }
+                                                log(`REST APIチェック: TxIDは確認済み、BlockID待機中... (${waitTime/1000}秒)`, 'debug');
+                                            }
+                                        } catch (apiError) {
+                                            log(`REST APIエラー: ${apiError.message} (${waitTime/1000}秒)`, 'debug');
+                                        }
+                                        lastApiCheck = waitTime;
                                     }
-                                    lastApiCheck = waitTime;
                                 }
                                 
                                 // After 30 seconds, also try RPC with archive nodes

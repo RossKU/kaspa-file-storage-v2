@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.12.14 - ディレクトリビルダーKENV統合</title>
+    <title>Kaspa P2P File Storage v5.12.15 - サムネイル表示修正</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -13024,14 +13024,9 @@
                     FileState.currentFile = null;
                     FileState.selectedFiles.clear();
                     
-                    // v5.11.135-fix: Reset file selection UI to initial state
-                    const label = document.querySelector('.file-input-label');
-                    if (label) {
-                        label.innerHTML = `
-                            📁 ファイルを選択<br>
-                            <small>またはドラッグ&ドロップ</small>
-                        `;
-                        label.classList.remove('file-selected', 'resume-mode');
+                    // v5.12.15: Use clearFileSelection to preserve HTML structure
+                    if (typeof clearFileSelection === 'function') {
+                        clearFileSelection();
                     }
                     
                     log('ファイル選択とパスワードをクリアしました', 'debug');

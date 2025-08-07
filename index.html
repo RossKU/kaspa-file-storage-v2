@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.12.15 - サムネイル表示修正</title>
+    <title>Kaspa P2P File Storage v5.12.16 - FileタブUIコンパクト化</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -1224,7 +1224,7 @@
         }
         .file-table th,
         .file-table td {
-            padding: 12px 8px;
+            padding: 8px 6px;
             text-align: left;
             border-bottom: 1px solid var(--border-color);
         }
@@ -1270,6 +1270,7 @@
         
         /* Add padding to file tab content to avoid overlap with actions bar */
         #file-tab .container {
+            padding-top: 10px;
             padding-bottom: 80px;  /* Space for fixed file actions bar */
         }
         .file-action-btn {
@@ -1559,34 +1560,32 @@
 
     <!-- File Tab -->
     <div id="file-tab" class="tab-content">
-        <div class="container">
-            <h2>📂 ファイル管理</h2>
+        <div class="container" style="padding-top: 10px;">
+            <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 600;">📂 ファイル管理</h3>
             
-            <!-- KENV Search and Sort Controls -->
-            <div style="margin-bottom: 16px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
-                <div style="flex: 1; min-width: 200px;">
-                    <input type="text" id="kenvSearchInput" placeholder="🔍 ファイル名で検索..." 
-                           style="width: 100%; padding: 8px; border-radius: 4px;"
-                           onkeyup="searchKENVFiles(this.value)">
-                </div>
+            <!-- KENV Search and Sort Controls - Compact Single Line -->
+            <div style="margin-bottom: 8px; display: flex; gap: 8px; align-items: center;">
+                <input type="text" id="kenvSearchInput" placeholder="🔍 検索..." 
+                       style="flex: 1; padding: 6px 10px; border-radius: 4px; font-size: 14px;"
+                       onkeyup="searchKENVFiles(this.value)">
                 
                 <select id="kenvSortSelect" onchange="sortKENVFiles(this.value)" 
-                        style="padding: 8px; border-radius: 4px;">
-                    <option value="name">📝 名前順</option>
-                    <option value="size">📈 サイズ順</option>
-                    <option value="date">📅 日付順</option>
+                        style="padding: 6px 10px; border-radius: 4px; font-size: 14px;">
+                    <option value="name">名前</option>
+                    <option value="size">サイズ</option>
+                    <option value="date">日付</option>
                 </select>
                 
                 <select id="kenvFilterSelect" onchange="filterKENVFiles(this.value)" 
-                        style="padding: 8px; border-radius: 4px;">
-                    <option value="all">📄 すべて</option>
-                    <option value="file">📄 ファイルのみ</option>
-                    <option value="directory">📁 ディレクトリのみ</option>
-                    <option value="verified">✅ 検証済み</option>
-                    <option value="pending">⏸️ 未検証</option>
+                        style="padding: 6px 10px; border-radius: 4px; font-size: 14px;">
+                    <option value="all">すべて</option>
+                    <option value="file">📄</option>
+                    <option value="directory">📁</option>
+                    <option value="verified">✅</option>
+                    <option value="pending">⏸️</option>
                 </select>
                 
-                <button onclick="addFile()" style="padding: 10px 20px;">
+                <button onclick="addFile()" style="padding: 6px 12px; font-size: 14px;">
                     ➕ Add File
                 </button>
             </div>

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.12.9-hotfix - サムネイル表示エラー修正</title>
+    <title>Kaspa P2P File Storage v5.12.10 - サムネイル表示の直接切替対応</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -16602,19 +16602,32 @@
             if (thumbnailUrl) {
                 thumbnailImage.src = thumbnailUrl;
                 thumbnailImage.style.display = 'block';
+                // Remove icon div if exists
+                const existingIcon = document.getElementById('fileIconDiv');
+                if (existingIcon) {
+                    existingIcon.style.display = 'none';
+                }
             } else {
                 // Use emoji icon for non-image files
                 thumbnailImage.style.display = 'none';
-                const iconDiv = document.createElement('div');
-                iconDiv.style.width = '128px';
-                iconDiv.style.height = '128px';
-                iconDiv.style.display = 'flex';
-                iconDiv.style.alignItems = 'center';
-                iconDiv.style.justifyContent = 'center';
-                iconDiv.style.fontSize = '64px';
-                iconDiv.style.background = 'var(--bg-secondary)';
-                iconDiv.style.borderRadius = '8px';
-                iconDiv.style.border = '2px solid var(--border-color)';
+                
+                // Check if icon div already exists
+                let iconDiv = document.getElementById('fileIconDiv');
+                if (!iconDiv) {
+                    iconDiv = document.createElement('div');
+                    iconDiv.id = 'fileIconDiv';
+                    iconDiv.style.width = '128px';
+                    iconDiv.style.height = '128px';
+                    iconDiv.style.display = 'flex';
+                    iconDiv.style.alignItems = 'center';
+                    iconDiv.style.justifyContent = 'center';
+                    iconDiv.style.fontSize = '64px';
+                    iconDiv.style.background = 'var(--bg-secondary)';
+                    iconDiv.style.borderRadius = '8px';
+                    iconDiv.style.border = '2px solid var(--border-color)';
+                    // Insert after thumbnail image
+                    thumbnailImage.parentNode.insertBefore(iconDiv, thumbnailImage.nextSibling);
+                }
                 
                 // Choose icon based on file type
                 let icon = '📄'; // Default
@@ -16623,9 +16636,10 @@
                 else if (file.type.includes('pdf')) icon = '📑';
                 else if (file.type.includes('zip') || file.type.includes('rar')) icon = '📦';
                 else if (file.type.includes('text')) icon = '📝';
+                else if (file.name.endsWith('.kaspa')) icon = '🔷';
                 
                 iconDiv.textContent = icon;
-                thumbnailImage.parentNode.replaceChild(iconDiv, thumbnailImage);
+                iconDiv.style.display = 'flex';
             }
         };
         
@@ -16651,6 +16665,12 @@
             if (thumbnailImage) {
                 thumbnailImage.src = '';
                 thumbnailImage.style.display = 'block';
+            }
+            
+            // Hide icon div if exists
+            const iconDiv = document.getElementById('fileIconDiv');
+            if (iconDiv) {
+                iconDiv.style.display = 'none';
             }
             
             // Update upload button state

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.12.9 - サムネイル表示機能追加</title>
+    <title>Kaspa P2P File Storage v5.12.9-hotfix - サムネイル表示エラー修正</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -6781,28 +6781,33 @@
             
             // Update file selection UI
             updateFileSelectionUI: function(file, isResume = false, resumeStats = null) {
-                const label = document.querySelector('.file-input-label');
-                if (isResume && resumeStats) {
-                    label.innerHTML = `
-                        <div class="file-info">
-                            <span class="filename">${file.name}</span>
-                            <span class="filesize">${(file.size / 1024 / 1024).toFixed(2)} MB</span>
-                        </div>
-                        <div class="resume-info">
-                            <span class="resume-status">レジューム: ${resumeStats.completed}/${resumeStats.total} チャンク (${resumeStats.percentage}%)</span>
-                            <span class="resume-cid">CID: ${resumeStats.cid}</span>
-                        </div>
-                    `;
-                    label.classList.add('file-selected', 'resume-mode');
+                // v5.12.9: Use new showFileInfo function
+                if (file.type.startsWith('image/') && file.size <= 100 * 1024 * 1024) {
+                    window.generateThumbnail(file);
                 } else {
-                    label.innerHTML = `
-                        <div class="file-info">
-                            <span class="filename">${file.name}</span>
-                            <span class="filesize">${(file.size / 1024 / 1024).toFixed(2)} MB</span>
-                        </div>
-                    `;
-                    label.classList.add('file-selected');
-                    label.classList.remove('resume-mode');
+                    window.showFileInfo(file, null);
+                }
+                
+                // Add resume info if needed
+                if (isResume && resumeStats) {
+                    const label = document.querySelector('.file-input-label');
+                    if (label) {
+                        label.classList.add('file-selected', 'resume-mode');
+                        // Add resume status to file info
+                        const fileSize = document.getElementById('fileSize');
+                        if (fileSize) {
+                            fileSize.innerHTML = `${(file.size / 1024 / 1024).toFixed(2)} MB<br>
+                                <span style="color: var(--success-color); font-size: 0.85em;">
+                                    レジューム: ${resumeStats.completed}/${resumeStats.total} チャンク (${resumeStats.percentage || Math.round(resumeStats.completed/resumeStats.total*100)}%)
+                                </span>`;
+                        }
+                    }
+                } else {
+                    const label = document.querySelector('.file-input-label');
+                    if (label) {
+                        label.classList.add('file-selected');
+                        label.classList.remove('resume-mode');
+                    }
                 }
             },
             
@@ -16576,6 +16581,12 @@
             const fileName = document.getElementById('fileName');
             const fileSize = document.getElementById('fileSize');
             
+            // Check if elements exist
+            if (!preview || !defaultPrompt || !fileName || !fileSize) {
+                console.warn('Thumbnail preview elements not found');
+                return;
+            }
+            
             // Hide default prompt and show preview
             defaultPrompt.style.display = 'none';
             preview.style.display = 'flex';
@@ -16740,7 +16751,7 @@
                     
                     // Update UI to show resume status
                     const stats = FileState.progressManager.getStats();
-                    updateFileSelectionUI(file, true, stats);
+                    UIHandlers.updateFileSelectionUI(file, true, stats);
                     
                     log(`レジューム準備完了: ${stats.completed}/${stats.total} チャンク完了`, 'success');
                     

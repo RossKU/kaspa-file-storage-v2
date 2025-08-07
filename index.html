@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.12.10 - サムネイル表示の直接切替対応</title>
+    <title>Kaspa P2P File Storage v5.12.11 - スーパーメタKENV統合修正（FileState版）</title>
     <style>
         /* CSS Variables for Theme System */
         :root {
@@ -13175,6 +13175,39 @@
                     // ここでの履歴更新は不要
                     
                     log(`[SuperMeta] 🎉 スーパーメタデータ作成完了！`, 'success');
+                    
+                    // v5.12.11: Update KENV entry with super meta TxID
+                    if (FileState.kenvManager._initialized && FileState.currentFileCID) {
+                        log('[KENV] スーパーメタTx情報でエントリーを更新', 'info');
+                        const kenvEntries = FileState.kenvManager.entries;
+                        const kenvEntry = kenvEntries.find(e => e.cid === FileState.currentFileCID);
+                        
+                        if (kenvEntry) {
+                            kenvEntry.metaTxId = superMeta.txId;
+                            kenvEntry.metaTxBlockId = superMeta.blockId;
+                            kenvEntry.status = 'verified';
+                            kenvEntry.isSuperMeta = true;  // スーパーメタフラグを追加
+                            
+                            // インデックスを更新
+                            const lineNumber = kenvEntries.indexOf(kenvEntry);
+                            FileState.kenvManager.updateIndex(kenvEntry, lineNumber);
+                            
+                            // ファイルを保存（非同期で実行）
+                            FileState.kenvManager.saveAll().then(() => {
+                                log('[KENV] スーパーメタTx情報を保存しました', 'success');
+                                
+                                // File Tabが開いている場合は更新
+                                const activeTab = document.querySelector('.tab-content.active');
+                                if (activeTab && activeTab.id === 'file-tab') {
+                                    window.updateFileListFromKENV();
+                                }
+                            }).catch(error => {
+                                log(`[KENV] 保存エラー: ${error.message}`, 'error');
+                            });
+                        } else {
+                            log(`[KENV] CID ${FileState.currentFileCID} のエントリーが見つかりません`, 'warning');
+                        }
+                    }
                     
                     // v5.12.7: Update status to complete for super meta case
                     uploadStatusUI.updateStatus('✅', 'アップロード完了！ファイルタブを確認してください', 5);

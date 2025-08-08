@@ -3,8 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.12.17 - レスポンシブFileタブUI</title>
+    <title>Kaspa P2P File Storage v5.12.18 - テーブルヘッダークリックソート</title>
     <style>
+        /* Sort arrow styles */
+        .sort-arrow {
+            display: inline-block;
+            font-size: 12px;
+            margin-left: 4px;
+            transition: opacity 0.2s;
+        }
+        
+        .sortable:hover {
+            background-color: rgba(42, 111, 101, 0.1);
+        }
+        
+        .sortable:active {
+            background-color: rgba(42, 111, 101, 0.2);
+        }
+        
+        th.sortable {
+            position: relative;
+            transition: background-color 0.2s;
+        }
         /* CSS Variables for Theme System */
         :root {
             /* Light Theme Colors */
@@ -1629,7 +1649,7 @@
                        onkeyup="searchKENVFiles(this.value)">
                 
                 <div class="file-selects">
-                    <select id="kenvSortSelect" onchange="sortKENVFiles(this.value)" 
+                    <select id="kenvSortSelect" onchange="toggleSort(this.value)" 
                             class="file-select">
                         <option value="name">名前</option>
                         <option value="size">サイズ</option>
@@ -1655,12 +1675,18 @@
                                 <input type="checkbox" id="selectAll" onchange="toggleSelectAll()">
                             </th>
                             <th style="width: 50px;">Icon</th>
-                            <th>ファイル名</th>
-                            <th>容量</th>
+                            <th class="sortable" onclick="toggleSort('name')" style="cursor: pointer; user-select: none;">
+                                ファイル名 <span id="sortArrowName" class="sort-arrow">↑</span>
+                            </th>
+                            <th class="sortable" onclick="toggleSort('size')" style="cursor: pointer; user-select: none;">
+                                容量 <span id="sortArrowSize" class="sort-arrow" style="opacity: 0.3;"></span>
+                            </th>
                             <th class="hide-mobile">CID</th>
                             <th class="hide-mobile">MetaTxID</th>
                             <th class="hide-mobile">アップローダー</th>
-                            <th>UP日</th>
+                            <th class="sortable" onclick="toggleSort('date')" style="cursor: pointer; user-select: none;">
+                                UP日 <span id="sortArrowDate" class="sort-arrow" style="opacity: 0.3;"></span>
+                            </th>
                             <th class="hide-mobile">登録日</th>
                         </tr>
                     </thead>
@@ -17526,32 +17552,85 @@
             }
         };
         
+        // Sort state management
+        window.sortState = {
+            column: 'name',
+            ascending: true
+        };
+        
+        // Toggle sort direction
+        window.toggleSort = function(column) {
+            // Update arrow display
+            document.querySelectorAll('.sort-arrow').forEach(arrow => {
+                arrow.style.opacity = '0.3';
+                arrow.textContent = '';
+            });
+            
+            // Toggle direction if same column, otherwise reset to ascending
+            if (sortState.column === column) {
+                sortState.ascending = !sortState.ascending;
+            } else {
+                sortState.column = column;
+                sortState.ascending = true;
+            }
+            
+            // Update arrow for active column
+            const arrowId = 'sortArrow' + column.charAt(0).toUpperCase() + column.slice(1);
+            const arrow = document.getElementById(arrowId);
+            if (arrow) {
+                arrow.style.opacity = '1';
+                arrow.textContent = sortState.ascending ? '↑' : '↓';
+            }
+            
+            // Update select box to match (if exists)
+            const sortSelect = document.getElementById('kenvSortSelect');
+            if (sortSelect) {
+                sortSelect.value = column;
+            }
+            
+            // Perform sort
+            sortKENVFiles(column, sortState.ascending);
+        };
+        
         // Sort KENV files
-        window.sortKENVFiles = function(sortBy) {
+        window.sortKENVFiles = function(sortBy, ascending = null) {
             const tbody = document.getElementById('fileListBody');
             tbody.innerHTML = '';
+            
+            // Use provided ascending value or current state
+            if (ascending !== null) {
+                sortState.ascending = ascending;
+                sortState.column = sortBy;
+            }
             
             let sortedEntries = [];
             
             switch (sortBy) {
                 case 'name':
                     sortedEntries = [...FileState.kenvManager.kindex.sortIndexes.name];
+                    if (!sortState.ascending) {
+                        sortedEntries.reverse();
+                    }
                     break;
                 case 'size':
                     sortedEntries = [...FileState.kenvManager.kindex.sortIndexes.size]
-                        .reverse() // 大きい順
                         .map(([size, lineNum]) => {
                             const entry = FileState.kenvManager.entries[lineNum];
                             return [entry.name, lineNum, entry.type[0]];
                         });
+                    if (!sortState.ascending) {
+                        sortedEntries.reverse();
+                    }
                     break;
                 case 'date':
                     sortedEntries = [...FileState.kenvManager.kindex.sortIndexes.uploadDate]
-                        .reverse() // 新しい順
                         .map(([timestamp, lineNum]) => {
                             const entry = FileState.kenvManager.entries[lineNum];
                             return [entry.name, lineNum, entry.type[0]];
                         });
+                    if (!sortState.ascending) {
+                        sortedEntries.reverse();
+                    }
                     break;
             }
             

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.12.18 - テーブルヘッダークリックソート</title>
+    <title>Kaspa P2P File Storage v5.12.19 - 完全なクリーンアップ処理</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -13096,18 +13096,30 @@
                     }
                 }, 10000);
                 
-                // v5.11.135: Clear file selection and password after upload completion
+                // v5.12.19: Complete cleanup after successful upload
                 if (!FileState.networkErrorOccurred) {
                     // Clear password for security
                     document.getElementById('uploadPassword').value = '';
                     // Clear file selection
                     document.getElementById('fileInput').value = '';
+                    
+                    // v5.12.19: Remove progress data from localStorage
+                    if (FileState.progressManager) {
+                        // Always remove from localStorage
+                        localStorage.removeItem('kaspa-upload-progress');
+                        localStorage.removeItem('kaspa-upload-metadata');
+                        log('localStorageから進捗データを削除しました', 'debug');
+                    }
+                    
                     // Reset file state
                     FileState.currentFile = null;
                     FileState.selectedFiles.clear();
                     
-                    // v5.12.15: Do not call clearFileSelection() here
-                    // It would clear the progress file UI which we want to keep
+                    // v5.12.19: Clear UI after successful upload
+                    if (typeof clearFileSelection === 'function') {
+                        clearFileSelection();
+                        log('アップロード完了後UIをクリアしました', 'debug');
+                    }
                     
                     log('ファイル選択とパスワードをクリアしました', 'debug');
                 }

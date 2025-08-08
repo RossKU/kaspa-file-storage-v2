@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.12.21-fix - 最小幅と表示改善</title>
+    <title>Kaspa P2P File Storage v5.12.22 - モバイルカード表示</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -1540,6 +1540,86 @@
             /* Hide less important columns on mobile */
             .file-table .hide-mobile {
                 display: none;
+            }
+            
+            /* Mobile card-style table display */
+            .file-table thead {
+                display: none;  /* Hide header */
+            }
+            
+            .file-table tbody {
+                display: block;
+            }
+            
+            .file-table tr {
+                display: block;
+                position: relative;
+                padding: 12px 16px;
+                border-bottom: 1px solid var(--border-color);
+                margin-bottom: 0;
+            }
+            
+            .file-table tr:active {
+                background-color: rgba(42, 111, 101, 0.1);
+            }
+            
+            .file-table td {
+                display: none;  /* Hide all by default */
+                border: none;
+                padding: 0;
+                white-space: normal;
+                overflow: visible;
+                text-overflow: clip;
+            }
+            
+            /* Checkbox (visible but repositioned) */
+            .file-table td:nth-child(1) {
+                display: block;
+                position: absolute;
+                left: 16px;
+                top: 50%;
+                transform: translateY(-50%);
+                width: auto;
+            }
+            
+            /* Icon (visible) */
+            .file-table td:nth-child(2) {
+                display: block;
+                position: absolute;
+                left: 48px;
+                top: 50%;
+                transform: translateY(-50%);
+                width: auto;
+                font-size: 24px;
+            }
+            
+            /* File name (top row) */
+            .file-table td:nth-child(3) {
+                display: block;
+                margin-left: 72px;
+                margin-bottom: 4px;
+                font-size: 14px;
+                font-weight: 500;
+                max-width: calc(100% - 80px);
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+            
+            /* Size (bottom left) */
+            .file-table td:nth-child(4) {
+                display: inline-block;
+                margin-left: 72px;
+                font-size: 12px;
+                color: var(--text-secondary);
+                margin-right: 12px;
+            }
+            
+            /* UP date (bottom right) */
+            .file-table td:nth-child(8) {
+                display: inline-block;
+                font-size: 12px;
+                color: var(--text-secondary);
             }
         }
         

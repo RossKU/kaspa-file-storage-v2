@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.12.20 - 全カラムソート対応</title>
+    <title>Kaspa P2P File Storage v5.12.21 - テキスト省略表示</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -1248,12 +1248,54 @@
             width: 100%;
             border-collapse: collapse;
             min-width: 800px;
+            table-layout: fixed;  /* Fixed layout for consistent column widths */
         }
         .file-table th,
         .file-table td {
             padding: 8px 6px;
             text-align: left;
             border-bottom: 1px solid var(--border-color);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        /* Column width settings */
+        .file-table th:nth-child(1),
+        .file-table td:nth-child(1) { width: 40px; }  /* Checkbox */
+        .file-table th:nth-child(2),
+        .file-table td:nth-child(2) { width: 50px; }  /* Icon */
+        .file-table th:nth-child(3),
+        .file-table td:nth-child(3) { 
+            width: 250px;  /* File name */
+            max-width: 250px;
+        }
+        .file-table th:nth-child(4),
+        .file-table td:nth-child(4) { width: 80px; }  /* Size */
+        .file-table th:nth-child(5),
+        .file-table td:nth-child(5) { 
+            width: 150px;  /* CID */
+            max-width: 150px;
+        }
+        .file-table th:nth-child(6),
+        .file-table td:nth-child(6) { 
+            width: 150px;  /* MetaTxID */
+            max-width: 150px;
+        }
+        .file-table th:nth-child(7),
+        .file-table td:nth-child(7) { 
+            width: 180px;  /* Uploader */
+            max-width: 180px;
+        }
+        .file-table th:nth-child(8),
+        .file-table td:nth-child(8) { width: 100px; }  /* Upload date */
+        .file-table th:nth-child(9),
+        .file-table td:nth-child(9) { width: 100px; }  /* Registration date */
+        
+        /* Tooltip on hover for truncated text */
+        .file-table td[title]:hover {
+            cursor: help;
+            background-color: rgba(42, 111, 101, 0.05);
         }
         .file-table th {
             font-weight: 600;
@@ -1451,10 +1493,17 @@
             }
             .file-table {
                 font-size: 12px;
+                table-layout: auto;  /* Auto layout for mobile */
             }
             .file-table th,
             .file-table td {
                 padding: 8px 4px;
+            }
+            /* Adjust column widths for mobile */
+            .file-table th:nth-child(3),
+            .file-table td:nth-child(3) { 
+                width: auto;
+                max-width: 150px;  /* Smaller width for file names on mobile */
             }
             .file-icon {
                 font-size: 16px;
@@ -17487,19 +17536,20 @@
             const uploadDate = entry.uploadDate ? formatDate(entry.uploadDate) : '-';
             const addedDate = entry.created ? formatDate(entry.created) : '-';
             
+            // Add title attributes for tooltip display
             tr.innerHTML = `
                 <td><input type="checkbox" class="file-checkbox" data-id="${entry.id}" onchange="updateFileActions()"></td>
                 <td><span class="file-icon">${icon}</span></td>
-                <td>
+                <td title="${entry.name}">
                     <span>${entry.name}</span>
                     <span style="margin-left: 5px; font-size: 0.8em;">${statusIcon}</span>
                 </td>
-                <td>${size}</td>
-                <td class="hide-mobile">${cid}</td>
-                <td class="hide-mobile">${metaTxId}</td>
-                <td class="hide-mobile">${uploader}</td>
-                <td>${uploadDate}</td>
-                <td class="hide-mobile">${addedDate}</td>
+                <td title="${size}">${size}</td>
+                <td class="hide-mobile" title="${entry.cid || '-'}">${cid}</td>
+                <td class="hide-mobile" title="${entry.metaTxId || '-'}">${metaTxId}</td>
+                <td class="hide-mobile" title="${entry.uploadedBy || '-'}">${uploader}</td>
+                <td title="${uploadDate}">${uploadDate}</td>
+                <td class="hide-mobile" title="${addedDate}">${addedDate}</td>
             `;
             
             // Add click handler for row (excluding checkbox)

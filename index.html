@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.12.22 - モバイルカード表示</title>
+    <title>Kaspa P2P File Storage v5.12.38 - シンプル固定表示</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -1241,13 +1241,12 @@
         
         /* File Tab Styles */
         .file-table-wrapper {
-            overflow-x: auto;
-            -webkit-overflow-scrolling: touch;
+            overflow-x: hidden;
+            width: 100%;
         }
         .file-table {
             width: 100%;
             border-collapse: collapse;
-            min-width: 800px;
             table-layout: fixed;  /* Fixed layout for consistent column widths */
         }
         .file-table th,
@@ -1508,7 +1507,9 @@
                 font-size: 13px !important;
             }
             .file-table-wrapper {
-                margin: 0 -16px;
+                margin: 0;
+                padding: 0;
+                width: 100%;
             }
             .file-table {
                 font-size: 12px;
@@ -1537,89 +1538,26 @@
                 padding: 6px 12px;
                 font-size: 12px;
             }
-            /* Hide less important columns on mobile */
+            /* Simple mobile table - hide non-essential columns */
+            .file-table th:nth-child(5),  /* CID */
+            .file-table td:nth-child(5),
+            .file-table th:nth-child(7),  /* Uploader */
+            .file-table td:nth-child(7),
+            .file-table th:nth-child(9),  /* Registration date */
+            .file-table td:nth-child(9),
+            .file-table th:nth-child(10), /* Actions */
+            .file-table td:nth-child(10),
             .file-table .hide-mobile {
-                display: none;
+                display: none !important;
             }
             
-            /* Mobile card-style table display */
-            .file-table thead {
-                display: none;  /* Hide header */
+            /* Adjust font size and padding for mobile */
+            .file-table {
+                font-size: 11px;
             }
-            
-            .file-table tbody {
-                display: block;
-            }
-            
-            .file-table tr {
-                display: block;
-                position: relative;
-                padding: 12px 16px;
-                border-bottom: 1px solid var(--border-color);
-                margin-bottom: 0;
-            }
-            
-            .file-table tr:active {
-                background-color: rgba(42, 111, 101, 0.1);
-            }
-            
+            .file-table th,
             .file-table td {
-                display: none;  /* Hide all by default */
-                border: none;
-                padding: 0;
-                white-space: normal;
-                overflow: visible;
-                text-overflow: clip;
-            }
-            
-            /* Checkbox (visible but repositioned) */
-            .file-table td:nth-child(1) {
-                display: block;
-                position: absolute;
-                left: 16px;
-                top: 50%;
-                transform: translateY(-50%);
-                width: auto;
-            }
-            
-            /* Icon (visible) */
-            .file-table td:nth-child(2) {
-                display: block;
-                position: absolute;
-                left: 48px;
-                top: 50%;
-                transform: translateY(-50%);
-                width: auto;
-                font-size: 24px;
-            }
-            
-            /* File name (top row) */
-            .file-table td:nth-child(3) {
-                display: block;
-                margin-left: 72px;
-                margin-bottom: 4px;
-                font-size: 14px;
-                font-weight: 500;
-                max-width: calc(100% - 80px);
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
-            }
-            
-            /* Size (bottom left) */
-            .file-table td:nth-child(4) {
-                display: inline-block;
-                margin-left: 72px;
-                font-size: 12px;
-                color: var(--text-secondary);
-                margin-right: 12px;
-            }
-            
-            /* UP date (bottom right) */
-            .file-table td:nth-child(8) {
-                display: inline-block;
-                font-size: 12px;
-                color: var(--text-secondary);
+                padding: 6px 2px;
             }
         }
         
@@ -1852,7 +1790,7 @@
                             <th class="hide-mobile sortable" onclick="toggleSort('cid')" style="cursor: pointer; user-select: none;">
                                 CID <span id="sortArrowCid" class="sort-arrow" style="opacity: 0.3;"></span>
                             </th>
-                            <th class="hide-mobile sortable" onclick="toggleSort('meta')" style="cursor: pointer; user-select: none;">
+                            <th class="sortable" onclick="toggleSort('meta')" style="cursor: pointer; user-select: none;">
                                 MetaTxID <span id="sortArrowMeta" class="sort-arrow" style="opacity: 0.3;"></span>
                             </th>
                             <th class="hide-mobile sortable" onclick="toggleSort('uploader')" style="cursor: pointer; user-select: none;">
@@ -1874,7 +1812,7 @@
                             <td>sample.txt</td>
                             <td>1.2 KB</td>
                             <td class="hide-mobile">Qm...</td>
-                            <td class="hide-mobile">a1b2c3...</td>
+                            <td>a1b2c3...</td>
                             <td class="hide-mobile">kaspa:...</td>
                             <td>12/25</td>
                             <td class="hide-mobile">12/25</td>
@@ -1885,7 +1823,7 @@
                             <td>docs</td>
                             <td>5.3 MB</td>
                             <td class="hide-mobile">Qm...</td>
-                            <td class="hide-mobile">-</td>
+                            <td>-</td>
                             <td class="hide-mobile">kaspa:...</td>
                             <td>12/24</td>
                             <td class="hide-mobile">12/24</td>
@@ -17435,7 +17373,7 @@
                         <td>${file.name}</td>
                         <td>${sizeDisplay}</td>
                         <td class="hide-mobile">${file.cid}</td>
-                        <td class="hide-mobile">${file.metaTxId}</td>
+                        <td>${file.metaTxId}</td>
                         <td class="hide-mobile">${file.uploader || '-'}</td>
                         <td>${file.uploadDate || '-'}</td>
                         <td class="hide-mobile">${file.addedDate || '-'}</td>
@@ -17658,7 +17596,7 @@
                 </td>
                 <td title="${size}">${size}</td>
                 <td class="hide-mobile" title="${entry.cid || '-'}">${cid}</td>
-                <td class="hide-mobile" title="${entry.metaTxId || '-'}">${metaTxId}</td>
+                <td title="${entry.metaTxId || '-'}">${metaTxId}</td>
                 <td class="hide-mobile" title="${entry.uploadedBy || '-'}">${uploader}</td>
                 <td title="${uploadDate}">${uploadDate}</td>
                 <td class="hide-mobile" title="${addedDate}">${addedDate}</td>

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.12.38 - シンプル固定表示</title>
+    <title>Kaspa P2P File Storage v5.12.39 - シンプル6カラム表示</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -1513,7 +1513,7 @@
             }
             .file-table {
                 font-size: 12px;
-                table-layout: auto;  /* Auto layout for mobile */
+                table-layout: fixed;  /* Fixed layout for consistent column widths */
             }
             .file-table th,
             .file-table td {
@@ -1538,18 +1538,7 @@
                 padding: 6px 12px;
                 font-size: 12px;
             }
-            /* Simple mobile table - hide non-essential columns */
-            .file-table th:nth-child(5),  /* CID */
-            .file-table td:nth-child(5),
-            .file-table th:nth-child(7),  /* Uploader */
-            .file-table td:nth-child(7),
-            .file-table th:nth-child(9),  /* Registration date */
-            .file-table td:nth-child(9),
-            .file-table th:nth-child(10), /* Actions */
-            .file-table td:nth-child(10),
-            .file-table .hide-mobile {
-                display: none !important;
-            }
+            /* All 6 columns are visible on mobile */
             
             /* Adjust font size and padding for mobile */
             .file-table {
@@ -1775,6 +1764,14 @@
             
             <div class="file-table-wrapper">
                 <table class="file-table">
+                    <colgroup>
+                        <col style="width: 40px;">  <!-- チェックボックス -->
+                        <col style="width: 50px;">  <!-- アイコン -->
+                        <col style="width: auto;">  <!-- ファイル名 -->
+                        <col style="width: 100px;"> <!-- 容量 -->
+                        <col style="width: 150px;"> <!-- MetaTxID -->
+                        <col style="width: 120px;"> <!-- UP日 -->
+                    </colgroup>
                     <thead>
                         <tr>
                             <th style="width: 40px;">
@@ -1787,20 +1784,11 @@
                             <th class="sortable" onclick="toggleSort('size')" style="cursor: pointer; user-select: none;">
                                 容量 <span id="sortArrowSize" class="sort-arrow" style="opacity: 0.3;"></span>
                             </th>
-                            <th class="hide-mobile sortable" onclick="toggleSort('cid')" style="cursor: pointer; user-select: none;">
-                                CID <span id="sortArrowCid" class="sort-arrow" style="opacity: 0.3;"></span>
-                            </th>
                             <th class="sortable" onclick="toggleSort('meta')" style="cursor: pointer; user-select: none;">
                                 MetaTxID <span id="sortArrowMeta" class="sort-arrow" style="opacity: 0.3;"></span>
                             </th>
-                            <th class="hide-mobile sortable" onclick="toggleSort('uploader')" style="cursor: pointer; user-select: none;">
-                                アップローダー <span id="sortArrowUploader" class="sort-arrow" style="opacity: 0.3;"></span>
-                            </th>
                             <th class="sortable" onclick="toggleSort('date')" style="cursor: pointer; user-select: none;">
                                 UP日 <span id="sortArrowDate" class="sort-arrow" style="opacity: 0.3;"></span>
-                            </th>
-                            <th class="hide-mobile sortable" onclick="toggleSort('created')" style="cursor: pointer; user-select: none;">
-                                登録日 <span id="sortArrowCreated" class="sort-arrow" style="opacity: 0.3;"></span>
                             </th>
                         </tr>
                     </thead>
@@ -17372,11 +17360,8 @@
                         <td><span class="file-icon">${icon}</span></td>
                         <td>${file.name}</td>
                         <td>${sizeDisplay}</td>
-                        <td class="hide-mobile">${file.cid}</td>
                         <td>${file.metaTxId}</td>
-                        <td class="hide-mobile">${file.uploader || '-'}</td>
                         <td>${file.uploadDate || '-'}</td>
-                        <td class="hide-mobile">${file.addedDate || '-'}</td>
                     </tr>
                 `;
             }).join('');

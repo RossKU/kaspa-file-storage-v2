@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.12.39 - シンプル6カラム表示</title>
+    <title>Kaspa P2P File Storage v5.12.40 - KENV統一6カラム表示</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -3819,8 +3819,7 @@
             currentFileCID: null,     // Current file's short CID (v5.5.39)
             currentFileCIDFull: null,  // Current file's full CID (v5.5.39)
             currentKenvEntryId: null,  // Current KENV entry ID for session (v5.12.13)
-            // v5.9.0: File list management
-            fileList: [],             // List of files displayed in File tab
+            // v5.9.0: File selection management
             selectedFiles: new Set(),  // Set of selected file IDs
             
             // v5.11.16: Cost tracking system
@@ -6355,9 +6354,9 @@
                 FileState.fileList.push(fileEntry);
                 FileState.lastUpdate = new Date().toISOString();
                 
-                // Update File tab UI
-                if (typeof updateFileListUI === 'function') {
-                    updateFileListUI();
+                // Update File tab UI using KENV
+                if (typeof updateFileListFromKENV === 'function') {
+                    updateFileListFromKENV();
                 }
                 
                 this.showStatus('Fileタブに登録しました', 'success');
@@ -14212,9 +14211,9 @@
                         FileState.fileList.push(fileItem);
                     });
                     
-                    // Update File tab UI
-                    if (window.updateFileListUI) {
-                        window.updateFileListUI();
+                    // Update File tab UI using KENV
+                    if (window.updateFileListFromKENV) {
+                        window.updateFileListFromKENV();
                     }
                     
                     log(`[File] Added ${dirMetadata.entries.length} entries to File tab`, 'info');
@@ -17292,80 +17291,7 @@
             }
         };
         
-        // Add file to list
-        window.addFileToList = function(info) {
-            if (!info) return;
-            
-            // Parse the info
-            const parts = info.split(':');
-            let fileInfo = {
-                id: Date.now().toString(),
-                type: 'file',
-                name: 'Unknown',
-                size: '-',
-                cid: '-',
-                metaTxId: '-',
-                uploader: '-',
-                uploadDate: '-',
-                addedDate: new Date().toLocaleDateString('ja-JP')
-            };
-            
-            if (info.endsWith('.kaspa')) {
-                // .kaspa file
-                fileInfo.name = info.split('/').pop().replace('.kaspa', '');
-                fileInfo.cid = 'Qm' + fileInfo.name;
-            } else if (parts.length >= 2) {
-                // TxID:BlockID format
-                fileInfo.metaTxId = parts[0];
-                fileInfo.name = `File_${parts[0].substring(0, 8)}`;
-                
-                // Check if password is provided
-                if (parts.length === 2 || (parts.length === 3 && !parts[2])) {
-                    // No password - show dialog (UI only)
-                    showAddFilePasswordDialog(fileInfo, info);
-                    return;
-                }
-            }
-            
-            // Add to FileState
-            FileState.fileList.push(fileInfo);
-            
-            // Update UI
-            updateFileListUI();
-            log(`[File] Added to list: ${fileInfo.name}`, 'info');
-        };
-        
-        // Update file list UI
-        window.updateFileListUI = function() {
-            const tbody = document.getElementById('fileListBody');
-            if (!tbody) return;
-            
-            tbody.innerHTML = FileState.fileList.map(file => {
-                // v5.10.8: Support directory entries
-                const icon = file.type === 'directory' ? '📁' : '📄';
-                let sizeDisplay = '-';
-                
-                if (file.type === 'directory') {
-                    const fileCount = file.fileCount || 0;
-                    const dirCount = file.directoryCount || 0;
-                    const totalSize = file.totalSize || 0;
-                    sizeDisplay = `${fileCount}ファイル, ${dirCount}ディレクトリ, ${(totalSize/1024/1024).toFixed(1)}MB`;
-                } else {
-                    sizeDisplay = file.size ? `${(file.size/1024).toFixed(1)}KB` : '-';
-                }
-                
-                return `
-                    <tr data-file-id="${file.id}">
-                        <td><input type="checkbox" class="file-checkbox" data-id="${file.id}" onchange="updateFileActions()"></td>
-                        <td><span class="file-icon">${icon}</span></td>
-                        <td>${file.name}</td>
-                        <td>${sizeDisplay}</td>
-                        <td>${file.metaTxId}</td>
-                        <td>${file.uploadDate || '-'}</td>
-                    </tr>
-                `;
-            }).join('');
-        };
+        // Removed old functions (addFileToList and updateFileListUI) - now using KENV-based system
         
         // Toggle select all files
         window.toggleSelectAll = function() {
@@ -17508,7 +17434,7 @@
                 // Show empty state
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="9" style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                        <td colspan="6" style="text-align: center; padding: 40px; color: var(--text-secondary);">
                             <div style="font-size: 48px; margin-bottom: 10px;">📂</div>
                             <div>ファイルがありません</div>
                             <div style="margin-top: 10px;">
@@ -17565,13 +17491,10 @@
                 }
                 return '-';
             })();
-            const cid = entry.cid ? entry.cid.substring(0, 8) + '...' : '-';
             const metaTxId = entry.metaTxId ? entry.metaTxId.substring(0, 8) + '...' : '-';
-            const uploader = entry.uploadedBy ? shortenAddress(entry.uploadedBy) : '-';
             const uploadDate = entry.uploadDate ? formatDate(entry.uploadDate) : '-';
-            const addedDate = entry.created ? formatDate(entry.created) : '-';
             
-            // Add title attributes for tooltip display
+            // Add title attributes for tooltip display (6 columns)
             tr.innerHTML = `
                 <td><input type="checkbox" class="file-checkbox" data-id="${entry.id}" onchange="updateFileActions()"></td>
                 <td><span class="file-icon">${icon}</span></td>
@@ -17580,11 +17503,8 @@
                     <span style="margin-left: 5px; font-size: 0.8em;">${statusIcon}</span>
                 </td>
                 <td title="${size}">${size}</td>
-                <td class="hide-mobile" title="${entry.cid || '-'}">${cid}</td>
                 <td title="${entry.metaTxId || '-'}">${metaTxId}</td>
-                <td class="hide-mobile" title="${entry.uploadedBy || '-'}">${uploader}</td>
                 <td title="${uploadDate}">${uploadDate}</td>
-                <td class="hide-mobile" title="${addedDate}">${addedDate}</td>
             `;
             
             // Add click handler for row (excluding checkbox)
@@ -18129,7 +18049,7 @@
             const newName = prompt('新しいファイル名を入力:', file.name);
             if (newName && newName !== file.name) {
                 file.name = newName;
-                updateFileListUI();
+                updateFileListFromKENV();
                 log(`[File] Renamed to: ${newName}`, 'info');
             }
         };

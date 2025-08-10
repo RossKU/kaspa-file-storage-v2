@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.12.48 - REST API Killスイッチ全面対応</title>
+    <title>Kaspa P2P File Storage v5.12.49 - REST API設定UI改善</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -2257,13 +2257,12 @@
                         <span>REST API有効化</span>
                     </label>
                     <p style="margin: 10px 0 0 0; font-size: 0.9em; color: var(--text-secondary);">
-                        ⚠️ REST APIはサードパーティ製です。無効化するとWebSocketのみ使用されます。<br>
+                        ⚠️ REST APIはサードパーティ製です。無効化するとKaspa L1のみ使用されます。<br>
                         プライバシー重視の方は無効化を推奨します。
                     </p>
                 </div>
                 <div style="padding: 10px; background: var(--bg-secondary); border-radius: 5px;">
                     <div>状態: <span id="rest-api-global-status" style="font-weight: bold;">有効</span></div>
-                    <div>スキップ回数: <span id="rest-api-skip-count">0</span></div>
                 </div>
             </div>
             
@@ -2794,10 +2793,10 @@
             updateRestApiStats() {
                 const skipCountEl = document.getElementById('rest-api-kill-skip-count');
                 const lastSkipEl = document.getElementById('rest-api-last-skip');
-                const globalSkipCountEl = document.getElementById('rest-api-skip-count');
+                // const globalSkipCountEl = document.getElementById('rest-api-skip-count'); // 削除済み
                 
                 if (skipCountEl) skipCountEl.textContent = NetworkState.restApiControl.skipCount;
-                if (globalSkipCountEl) globalSkipCountEl.textContent = NetworkState.restApiControl.skipCount;
+                // if (globalSkipCountEl) globalSkipCountEl.textContent = NetworkState.restApiControl.skipCount; // 削除済み
                 if (lastSkipEl && NetworkState.restApiControl.lastSkipped) {
                     lastSkipEl.textContent = new Date(NetworkState.restApiControl.lastSkipped).toLocaleTimeString('ja-JP');
                 }

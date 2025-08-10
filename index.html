@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.12.40 - KENV統一6カラム表示</title>
+    <title>Kaspa P2P File Storage v5.12.41 - テーブル構造リセット方式</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -1538,15 +1538,93 @@
                 padding: 6px 12px;
                 font-size: 12px;
             }
-            /* All 6 columns are visible on mobile */
-            
-            /* Adjust font size and padding for mobile */
-            .file-table {
-                font-size: 11px;
+            /* RESET ALL TABLE STRUCTURE - Make it normal HTML */
+            .file-table,
+            .file-table tbody,
+            .file-table thead,
+            .file-table tr,
+            .file-table td,
+            .file-table th {
+                display: block !important;
             }
-            .file-table th,
-            .file-table td {
-                padding: 6px 2px;
+            
+            /* Hide header */
+            .file-table thead {
+                display: none !important;
+            }
+            
+            /* Transform rows into cards */
+            .file-table tbody tr {
+                display: block;
+                position: relative;
+                padding: 12px;
+                padding-left: 70px;
+                margin-bottom: 8px;
+                background: var(--bg-secondary);
+                border: 1px solid var(--border-color);
+                border-radius: 4px;
+            }
+            
+            /* Hide all td by default */
+            .file-table tbody td {
+                display: none;
+                border: none;
+                padding: 0;
+            }
+            
+            /* Checkbox - fixed left */
+            .file-table tbody td:nth-child(1) {
+                display: block;
+                position: absolute;
+                left: 12px;
+                top: 50%;
+                transform: translateY(-50%);
+            }
+            
+            /* Icon - fixed left */
+            .file-table tbody td:nth-child(2) {
+                display: block;
+                position: absolute;
+                left: 40px;
+                top: 50%;
+                transform: translateY(-50%);
+                font-size: 20px;
+            }
+            
+            /* File name - first row */
+            .file-table tbody td:nth-child(3) {
+                display: block;
+                margin-bottom: 4px;
+                font-size: 14px;
+            }
+            
+            /* Size - second row start */
+            .file-table tbody td:nth-child(4) {
+                display: inline;
+                font-size: 12px;
+                color: var(--text-secondary);
+            }
+            .file-table tbody td:nth-child(4)::after {
+                content: " • ";
+                color: var(--text-secondary);
+            }
+            
+            /* MetaTxID */
+            .file-table tbody td:nth-child(5) {
+                display: inline;
+                font-size: 12px;
+                color: var(--text-secondary);
+            }
+            .file-table tbody td:nth-child(5)::after {
+                content: " • ";
+                color: var(--text-secondary);
+            }
+            
+            /* Date */
+            .file-table tbody td:nth-child(6) {
+                display: inline;
+                font-size: 12px;
+                color: var(--text-secondary);
             }
         }
         

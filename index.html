@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.12.47 - 並列REST APIフォールバック追加</title>
+    <title>Kaspa P2P File Storage v5.12.48 - REST API Killスイッチ全面対応</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -9501,6 +9501,11 @@
                             
                             // Fallback to REST API if RPC failed
                             if (!payload) {
+                                // Kill switch check
+                                if (!NetworkState.restApiControl.globalEnabled || NetworkState.restApiControl.temporaryKilled) {
+                                    throw new Error('REST API is disabled');
+                                }
+                                
                                 const networkApiUrl = config.apiEndpoints[config.network];
                                 const url = `${networkApiUrl}/transactions/${txId}`;
                                 const response = await fetchWithTimeout(url, {}, 5000, 1);
@@ -9634,6 +9639,12 @@
                     // Fallback to Explorer API
                     if (!payload) {
                         log(`[DownloadManager] Explorer API経由でメタデータ取得`, 'info');
+                        
+                        // Kill switch check
+                        if (!NetworkState.restApiControl.globalEnabled || NetworkState.restApiControl.temporaryKilled) {
+                            throw new Error('REST API is disabled - cannot fetch metadata');
+                        }
+                        
                         const apiUrl = `${config.apiEndpoints[config.network]}/transactions/${metaTxId}`;
                         const response = await fetchWithTimeout(apiUrl, {}, 10000, 2);
                         
@@ -9731,6 +9742,11 @@
                     
                     // Fallback to REST API
                     try {
+                        // Kill switch check
+                        if (!NetworkState.restApiControl.globalEnabled || NetworkState.restApiControl.temporaryKilled) {
+                            throw new Error('REST API is disabled');
+                        }
+                        
                         const networkApiUrl = config.apiEndpoints[config.network];
                         const url = `${networkApiUrl}/transactions/${txId}`;
                         const response = await fetchWithTimeout(url, {}, 10000, 2);
@@ -9828,6 +9844,11 @@
                     
                     // Fallback to REST API
                     try {
+                        // Kill switch check
+                        if (!NetworkState.restApiControl.globalEnabled || NetworkState.restApiControl.temporaryKilled) {
+                            throw new Error('REST API is disabled');
+                        }
+                        
                         const networkApiUrl = config.apiEndpoints[config.network];
                         const url = `${networkApiUrl}/transactions/${txId}`;
                         const response = await fetchWithTimeout(url, {}, 10000, 2);
@@ -11800,6 +11821,12 @@
                 }
                 
                 // Fallback to Explorer API (v5.11.99)
+                // Kill switch check
+                if (!NetworkState.restApiControl.globalEnabled || NetworkState.restApiControl.temporaryKilled) {
+                    log(`[REST API] 無効化されているためスキップ`, 'debug');
+                    return false;
+                }
+                
                 const apiUrl = `${config.apiEndpoints[config.network]}/transactions/${txid}`;
                 const response = await fetchWithTimeout(apiUrl, {}, 10000, 2); // 10s timeout, 2 retries
                 if (response.ok) {
@@ -15099,6 +15126,11 @@
                                     // Fallback to REST API if BlockID failed or not available
                                     if (!intPayload) {
                                         log(`[SuperMeta] REST API経由で中間メタデータを取得中...`, 'info');
+                                        
+                                        // Kill switch check
+                                        if (!NetworkState.restApiControl.globalEnabled || NetworkState.restApiControl.temporaryKilled) {
+                                            throw new Error('REST API is disabled - cannot fetch intermediate metadata');
+                                        }
                                         
                                         const txResponse = await fetch(`${config.apiEndpoints[config.network]}/transactions/${intMetaTxId}`);
                                         if (!txResponse.ok) {

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.12.45 - ダークモード対応</title>
+    <title>Kaspa P2P File Storage v5.12.46 - REST APIフォールバック修正</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -14792,14 +14792,18 @@
                                     throw rpcError; // 元のエラーを再throw
                                 }
                             } else {
-                                log(`[RPC] 利用可能なアーカイブノードがありません`, 'warning');
-                                throw rpcError;
+                                log(`[RPC] 利用可能なアーカイブノードがありません。REST APIにフォールバックします`, 'warning');
+                                // throw rpcError; // REST APIフォールバックのため削除
                             }
                         } else {
-                            throw rpcError;
+                            // throw rpcError; // REST APIフォールバックのため削除
+                            log(`[RPC] エラー: ${rpcError.message}。REST APIにフォールバックします`, 'warning');
                         }
                     }
-                } else {
+                }
+                
+                // REST API fallback - RPCエラー時またはBlockIDなしの場合
+                if (!payload) {
                     // Fall back to REST API if no BlockID provided or REST API test mode
                     if (NetworkState.downloadManager && NetworkState.downloadManager.forceRestApi) {
                         log(`REST APIテストモード - RPCをスキップしてREST API経由で復元`, 'warning');

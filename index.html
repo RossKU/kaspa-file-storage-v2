@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.12.46 - REST APIフォールバック修正</title>
+    <title>Kaspa P2P File Storage v5.12.47 - 並列REST APIフォールバック追加</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -8424,9 +8424,54 @@
                             });
                         }
                         
-                    } catch (error) {
-                        log(`[ParallelDownloader] ペイロード${work.index}エラー: ${error.message}`, 'error');
-                        this.errors.set(work.index, error.message);
+                    } catch (rpcError) {
+                        // RPCエラー時、REST APIにフォールバック
+                        log(`[ParallelDownloader] ペイロード${work.index} RPC失敗、REST APIにフォールバック: ${rpcError.message}`, 'warning');
+                        
+                        try {
+                            // REST API Kill スイッチチェック
+                            if (!NetworkState.restApiControl.globalEnabled || NetworkState.restApiControl.temporaryKilled) {
+                                throw new Error('REST API is disabled');
+                            }
+                            
+                            const networkApiUrl = config.apiEndpoints[config.network];
+                            const url = `${networkApiUrl}/transactions/${work.txId}`;
+                            const response = await fetchWithTimeout(url, {}, 10000, 2);
+                            
+                            if (!response.ok) {
+                                throw new Error(`REST API error: ${response.status}`);
+                            }
+                            
+                            const data = await response.json();
+                            if (data.payload) {
+                                const payload = safeHexDecode(data.payload, 'payload from REST API');
+                                log(`[ParallelDownloader] REST API経由でペイロード${work.index}取得成功: ${payload.length} bytes`, 'success');
+                                
+                                // 成功したら結果を保存
+                                this.results.set(work.index, payload);
+                                this.completedCount++;
+                                this.totalBytes += payload.length;
+                                
+                                // Progress更新
+                                const elapsed = (Date.now() - this.startTime) / 1000;
+                                const speed = this.completedCount / elapsed;
+                                const throughput = (this.totalBytes / 1024 / 1024) / elapsed;
+                                
+                                if (progressCallback) {
+                                    progressCallback({
+                                        completed: this.completedCount,
+                                        total: this.totalChunks,
+                                        speed: speed,
+                                        throughput: throughput
+                                    });
+                                }
+                            } else {
+                                throw new Error('No payload in REST API response');
+                            }
+                        } catch (apiError) {
+                            log(`[ParallelDownloader] ペイロード${work.index} REST APIエラー: ${apiError.message}`, 'error');
+                            this.errors.set(work.index, apiError.message);
+                        }
                     } finally {
                         this.active--;
                     }

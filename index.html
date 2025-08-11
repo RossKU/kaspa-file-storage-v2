@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.12.51-hotfix - KENV重複チェック修正</title>
+    <title>Kaspa P2P File Storage v5.12.52 - KENV統合サマリー機能</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -5081,6 +5081,20 @@
             // データ統合
             async mergeTemporaryData(tempData) {
                 const newEntries = tempData.entries || [];
+                
+                // Phase 2: 10件以上の場合はサマリー表示
+                if (newEntries.length >= 10) {
+                    const analysis = this.analyzeEntries(newEntries);
+                    const userConfirmed = await this.showMergeSummary(analysis);
+                    
+                    if (!userConfirmed) {
+                        log('[KENV] 統合がキャンセルされました', 'info');
+                        return;
+                    }
+                    
+                    log('[KENV] ユーザーが統合を確認しました', 'info');
+                }
+                
                 let mergedCount = 0;
                 let skippedCount = 0;
                 const skipped = [];
@@ -5146,6 +5160,122 @@
                     await this.saveAll();
                     log(`[KENV] ${mergedCount}件のデータを統合しました`, 'success');
                 }
+            },
+            
+            // Phase 2: エントリー分析関数
+            analyzeEntries(newEntries) {
+                const analysis = {
+                    total: newEntries.length,
+                    identical: [],      // 完全重複（スキップ対象）
+                    similar: [],        // 類似（別セッション）
+                    newFiles: [],       // 完全新規
+                    byType: {
+                        'kaspa-file': 0,
+                        'kaspa-directory': 0
+                    }
+                };
+                
+                for (const entry of newEntries) {
+                    // タイプカウント
+                    if (entry.type === 'kaspa-directory') {
+                        analysis.byType['kaspa-directory']++;
+                    } else {
+                        analysis.byType['kaspa-file']++;
+                    }
+                    
+                    // 重複チェック（Phase 1のロジックを再利用）
+                    let foundIdentical = false;
+                    let foundSimilar = false;
+                    
+                    if (entry.type === 'kaspa-directory') {
+                        // ディレクトリの重複チェック
+                        const identical = this.entries.find(e => 
+                            e.type === 'kaspa-directory' &&
+                            e.name === entry.name &&
+                            (
+                                (entry.cid && e.cid === entry.cid && 
+                                 entry.metaTxId && e.metaTxId === entry.metaTxId) ||
+                                ((!entry.metaTxId || !e.metaTxId) &&
+                                 e.cid === entry.cid &&
+                                 e.fileCount === entry.fileCount &&
+                                 e.directoryCount === entry.directoryCount &&
+                                 e.uploadDate === entry.uploadDate)
+                            )
+                        );
+                        
+                        if (identical) {
+                            foundIdentical = true;
+                        } else {
+                            // 類似チェック（名前とCIDは同じだが他が異なる）
+                            const similar = this.entries.find(e =>
+                                e.type === 'kaspa-directory' &&
+                                e.name === entry.name &&
+                                e.cid === entry.cid
+                            );
+                            if (similar) foundSimilar = true;
+                        }
+                    } else {
+                        // ファイルの重複チェック
+                        const identical = this.entries.find(e => 
+                            e.type !== 'kaspa-directory' &&
+                            e.name === entry.name &&
+                            e.cid === entry.cid &&
+                            (
+                                (entry.metaTxId && e.metaTxId === entry.metaTxId) ||
+                                (!entry.metaTxId && !e.metaTxId &&
+                                 entry._chunks?.[0] && e._chunks?.[0] === entry._chunks[0])
+                            )
+                        );
+                        
+                        if (identical) {
+                            foundIdentical = true;
+                        } else {
+                            // 類似チェック（名前とCIDは同じだが他が異なる）
+                            const similar = this.entries.find(e =>
+                                e.type !== 'kaspa-directory' &&
+                                e.name === entry.name &&
+                                e.cid === entry.cid
+                            );
+                            if (similar) foundSimilar = true;
+                        }
+                    }
+                    
+                    // 分類
+                    if (foundIdentical) {
+                        analysis.identical.push(entry);
+                    } else if (foundSimilar) {
+                        analysis.similar.push(entry);
+                    } else {
+                        analysis.newFiles.push(entry);
+                    }
+                }
+                
+                return analysis;
+            },
+            
+            // Phase 2: サマリー表示関数
+            async showMergeSummary(analysis) {
+                const message = `
+📊 KENV統合サマリー
+━━━━━━━━━━━━━━━━━━━━━
+総エントリー数: ${analysis.total}件
+
+【内訳】
+✅ 新規エントリー: ${analysis.newFiles.length}件
+📁 類似（別セッション）: ${analysis.similar.length}件
+⚠️ 完全重複: ${analysis.identical.length}件
+
+【タイプ別】
+📄 ファイル: ${analysis.byType['kaspa-file']}件
+📁 ディレクトリ: ${analysis.byType['kaspa-directory']}件
+
+━━━━━━━━━━━━━━━━━━━━━
+推奨: 完全重複${analysis.identical.length}件をスキップ
+類似エントリーは履歴として保存
+
+続行しますか？`;
+                
+                return confirm(message);
             },
             
             // LocalStorageクリア

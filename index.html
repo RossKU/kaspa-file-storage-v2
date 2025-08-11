@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.12.51 - KENV重複チェック改善</title>
+    <title>Kaspa P2P File Storage v5.12.51-hotfix - KENV重複チェック修正</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -5086,18 +5086,40 @@
                 const skipped = [];
                 
                 for (const entry of newEntries) {
-                    // Phase 1: 完全同一チェック（IDとメタデータの組み合わせ）
-                    const isIdentical = this.entries.some(e => 
-                        e.id === entry.id || // 既存のIDチェック
-                        (
-                            // 完全同一の定義：名前+CID+MetaTxID+アップロード時間（5分以内）
+                    let isIdentical = false;
+                    
+                    if (entry.type === 'kaspa-directory') {
+                        // ディレクトリタイプの重複チェック
+                        isIdentical = this.entries.some(e => 
+                            e.type === 'kaspa-directory' &&
+                            e.name === entry.name &&
+                            (
+                                // CIDがある場合：名前+CID+TxID
+                                (entry.cid && e.cid === entry.cid && 
+                                 entry.metaTxId && e.metaTxId === entry.metaTxId) ||
+                                // CIDまたはTxIDがない場合：名前+CID+ファイル数+ディレクトリ数+作成日
+                                ((!entry.metaTxId || !e.metaTxId) &&
+                                 e.cid === entry.cid &&
+                                 e.fileCount === entry.fileCount &&
+                                 e.directoryCount === entry.directoryCount &&
+                                 e.uploadDate === entry.uploadDate)
+                            )
+                        );
+                    } else {
+                        // ファイルタイプの重複チェック（kaspa-fileなど）
+                        isIdentical = this.entries.some(e => 
+                            e.type !== 'kaspa-directory' &&
                             e.name === entry.name &&
                             e.cid === entry.cid &&
-                            e.metaTxId && e.metaTxId === entry.metaTxId &&
-                            entry.uploadDate && e.uploadDate &&
-                            Math.abs(new Date(e.uploadDate) - new Date(entry.uploadDate)) < 300000
-                        )
-                    );
+                            (
+                                // MetaTxIDがある場合：名前+CID+MetaTxID
+                                (entry.metaTxId && e.metaTxId === entry.metaTxId) ||
+                                // MetaTxIDがない場合：名前+CID+最初のチャンクTxID
+                                (!entry.metaTxId && !e.metaTxId &&
+                                 entry._chunks?.[0] && e._chunks?.[0] === entry._chunks[0])
+                            )
+                        );
+                    }
                     
                     if (isIdentical) {
                         skippedCount++;
@@ -5105,16 +5127,16 @@
                         continue;
                     }
                     
-                    // 同じ内容でも別セッションなら追加（履歴として重要）
+                    // 重複でなければ追加（履歴として保持）
                     this.entries.push(entry);
                     const lineNumber = this.entries.length - 1;
                     this.updateIndex(entry, lineNumber);
                     mergedCount++;
                 }
                 
-                // 簡易レポート
+                // レポート
                 if (skippedCount > 0) {
-                    log(`[KENV] ${skippedCount}件の完全重複をスキップ`, 'info');
+                    log(`[KENV] ${skippedCount}件の重複をスキップ`, 'info');
                     if (skippedCount <= 5) {
                         skipped.forEach(name => log(`  - ${name}`, 'debug'));
                     }

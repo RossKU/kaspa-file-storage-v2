@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.12.50 - ダウンロードエラー通知UI</title>
+    <title>Kaspa P2P File Storage v5.12.51 - KENV重複チェック改善</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -5082,15 +5082,41 @@
             async mergeTemporaryData(tempData) {
                 const newEntries = tempData.entries || [];
                 let mergedCount = 0;
+                let skippedCount = 0;
+                const skipped = [];
                 
                 for (const entry of newEntries) {
-                    // ID重複チェック
-                    const exists = this.entries.some(e => e.id === entry.id);
-                    if (!exists) {
-                        this.entries.push(entry);
-                        const lineNumber = this.entries.length - 1;
-                        this.updateIndex(entry, lineNumber);
-                        mergedCount++;
+                    // Phase 1: 完全同一チェック（IDとメタデータの組み合わせ）
+                    const isIdentical = this.entries.some(e => 
+                        e.id === entry.id || // 既存のIDチェック
+                        (
+                            // 完全同一の定義：名前+CID+MetaTxID+アップロード時間（5分以内）
+                            e.name === entry.name &&
+                            e.cid === entry.cid &&
+                            e.metaTxId && e.metaTxId === entry.metaTxId &&
+                            entry.uploadDate && e.uploadDate &&
+                            Math.abs(new Date(e.uploadDate) - new Date(entry.uploadDate)) < 300000
+                        )
+                    );
+                    
+                    if (isIdentical) {
+                        skippedCount++;
+                        skipped.push(entry.name);
+                        continue;
+                    }
+                    
+                    // 同じ内容でも別セッションなら追加（履歴として重要）
+                    this.entries.push(entry);
+                    const lineNumber = this.entries.length - 1;
+                    this.updateIndex(entry, lineNumber);
+                    mergedCount++;
+                }
+                
+                // 簡易レポート
+                if (skippedCount > 0) {
+                    log(`[KENV] ${skippedCount}件の完全重複をスキップ`, 'info');
+                    if (skippedCount <= 5) {
+                        skipped.forEach(name => log(`  - ${name}`, 'debug'));
                     }
                 }
                 

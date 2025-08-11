@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.12.49 - REST API設定UI改善</title>
+    <title>Kaspa P2P File Storage v5.12.50 - ダウンロードエラー通知UI</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -15668,8 +15668,77 @@
                 
                 log(`ダウンロード完了: ${FileState.kaspaMetadata.file.name}`, 'success');
                 
+                // 成功時のUI表示
+                const statusEl = document.getElementById('downloadStatus');
+                if (statusEl) {
+                    statusEl.innerHTML = `
+                        <div style="color: #4caf50; font-weight: bold;">
+                            ✅ ダウンロード完了！
+                        </div>
+                        <div style="color: #66bb6a; font-size: 0.9em; margin-top: 5px;">
+                            ${FileState.kaspaMetadata.file.name} を保存しました
+                        </div>
+                    `;
+                }
+                
+                // プログレスバーも緑に
+                const progressBar = document.getElementById('downloadProgressBar');
+                if (progressBar) {
+                    progressBar.style.backgroundColor = '#4caf50';
+                    progressBar.textContent = '完了';
+                }
+                
             } catch (error) {
-                log(`ダウンロードエラー: ${error.message}`, 'error');
+                const errorMsg = error.message || 'ダウンロード中にエラーが発生しました';
+                log(`ダウンロードエラー: ${errorMsg}`, 'error');
+                
+                // エラーメッセージをユーザーフレンドリーに変換
+                let userMessage = '❌ エラー: ';
+                let hint = '';
+                
+                // エラー種別を自動判定して適切なメッセージと対処法を表示
+                if (errorMsg.includes('パスワード')) {
+                    userMessage += 'パスワードが正しくありません';
+                    hint = '正しいパスワードを入力してください';
+                } else if (errorMsg.includes('初期化') || errorMsg.includes('RPC')) {
+                    userMessage += 'システムが接続されていません';
+                    hint = '設定タブで「システム初期化」をクリックしてください';
+                } else if (errorMsg.includes('ブロック') || errorMsg.includes('見つかりません')) {
+                    userMessage += 'データが見つかりません';
+                    hint = 'ファイルが削除されているか、ネットワークを確認してください';
+                } else if (errorMsg.includes('ネットワーク') || errorMsg.includes('timeout')) {
+                    userMessage += 'ネットワーク接続エラー';
+                    hint = '接続を確認して再試行してください';
+                } else if (errorMsg.includes('整合性') || errorMsg.includes('ハッシュ')) {
+                    userMessage += 'ファイルが破損しています';
+                    hint = '再度ダウンロードしてください';
+                } else if (errorMsg.includes('エラー率')) {
+                    userMessage += '多数のチャンクが取得できません';
+                    hint = 'しばらく待ってから再試行してください';
+                } else if (errorMsg.includes('REST API')) {
+                    userMessage += 'API接続エラー';
+                    hint = '設定タブでREST APIを有効にしてください';
+                } else {
+                    userMessage += errorMsg.substring(0, 50); // 長すぎる場合は切る
+                }
+                
+                // UI表示
+                const statusEl = document.getElementById('downloadStatus');
+                if (statusEl) {
+                    statusEl.innerHTML = `
+                        <div style="color: #f44336; font-weight: bold;">
+                            ${userMessage}
+                        </div>
+                        ${hint ? `<div style="color: #ff9800; font-size: 0.9em; margin-top: 5px;">💡 ${hint}</div>` : ''}
+                    `;
+                }
+                
+                // プログレスバーも赤く
+                const progressBar = document.getElementById('downloadProgressBar');
+                if (progressBar) {
+                    progressBar.style.backgroundColor = '#f44336';
+                    progressBar.textContent = 'エラー';
+                }
             }
         };
         

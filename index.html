@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.12.56 - 共有メニュー中央揃え</title>
+    <title>Kaspa P2P File Storage v5.12.57 - InfoボタンUI実装</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -686,6 +686,17 @@
             to {
                 opacity: 1;
                 transform: scale(1);
+            }
+        }
+        
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
             }
         }
 
@@ -1929,8 +1940,8 @@
                         <button class="share-option" onclick="shareAction('password')">🔑 Pass (パスワードのみ)</button>
                     </div>
                 </div>
-                <button class="file-action-btn" onclick="renameSelected()">
-                    ✏️ Rename
+                <button class="file-action-btn" onclick="showFileInfo()">
+                    Info
                 </button>
             </div>
         </div>
@@ -18451,23 +18462,142 @@
             cancelAddFile();
         };
         
-        // Rename selected file
-        window.renameSelected = function() {
+        // Show file info
+        window.showFileInfo = function() {
             const selectedIds = Array.from(FileState.selectedFiles);
             if (selectedIds.length !== 1) {
-                alert('リネームは1つのファイルのみ選択してください');
+                alert('情報表示は1つのファイルのみ選択してください');
                 return;
             }
             
             const file = FileState.fileList.find(f => f.id === selectedIds[0]);
             if (!file) return;
             
-            const newName = prompt('新しいファイル名を入力:', file.name);
-            if (newName && newName !== file.name) {
-                file.name = newName;
-                updateFileListFromKENV();
-                log(`[File] Renamed to: ${newName}`, 'info');
+            // Create info content
+            const formatDate = (date) => {
+                if (!date) return '不明';
+                const d = new Date(date);
+                return d.toLocaleDateString('ja-JP') + ' ' + d.toLocaleTimeString('ja-JP');
+            };
+            
+            const formatSize = (bytes) => {
+                if (!bytes) return '0 B';
+                const k = 1024;
+                const sizes = ['B', 'KB', 'MB', 'GB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return (bytes / Math.pow(k, i)).toFixed(2) + ' ' + sizes[i];
+            };
+            
+            let infoHtml = `
+                <h3 style="margin-top: 0; color: var(--text-primary);">📋 ファイル情報</h3>
+                <div style="display: grid; gap: 12px;">
+                    <div style="border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+                        <strong>ファイル名:</strong> ${file.name}<br>
+                        <strong>サイズ:</strong> ${formatSize(file.size)}<br>
+                        <strong>タイプ:</strong> ${file.type === 'directory' ? '📁 ディレクトリ' : '📄 ファイル'}
+                    </div>
+            `;
+            
+            if (file.cid) {
+                infoHtml += `
+                    <div style="border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+                        <strong>CID:</strong><br>
+                        <span style="font-family: monospace; font-size: 0.9em; word-break: break-all;">
+                            ${file.cid}
+                        </span>
+                    </div>
+                `;
             }
+            
+            if (file.metaTxId) {
+                infoHtml += `
+                    <div style="border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+                        <strong>MetaTxID:</strong><br>
+                        <span style="font-family: monospace; font-size: 0.9em; word-break: break-all;">
+                            ${file.metaTxId}
+                        </span>
+                    </div>
+                `;
+            }
+            
+            infoHtml += `
+                    <div>
+                        <strong>アップロード日:</strong> ${formatDate(file.uploadDate)}<br>
+                        <strong>登録日:</strong> ${formatDate(file.createdAt)}<br>
+                        ${file.network ? `<strong>ネットワーク:</strong> ${file.network}<br>` : ''}
+                        ${file.chunks ? `<strong>チャンク数:</strong> ${file.chunks}<br>` : ''}
+                        ${file.encrypted !== undefined ? `<strong>暗号化:</strong> ${file.encrypted ? 'あり' : 'なし'}<br>` : ''}
+                    </div>
+                </div>
+            `;
+            
+            // Show in modal
+            showModal('ファイル情報', infoHtml);
+            log(`[File] 情報表示: ${file.name}`, 'info');
+        };
+        
+        // Show modal helper function
+        window.showModal = function(title, content) {
+            // Remove existing modal if any
+            const existingModal = document.getElementById('infoModal');
+            if (existingModal) {
+                existingModal.remove();
+            }
+            
+            // Create modal
+            const modal = document.createElement('div');
+            modal.id = 'infoModal';
+            modal.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0, 0, 0, 0.7);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 10000;
+                animation: fadeIn 0.2s;
+            `;
+            
+            const modalContent = document.createElement('div');
+            modalContent.style.cssText = `
+                background: var(--bg-secondary);
+                border-radius: 12px;
+                padding: 24px;
+                max-width: 500px;
+                width: 90%;
+                max-height: 80vh;
+                overflow-y: auto;
+                box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+                animation: slideUp 0.3s;
+            `;
+            
+            modalContent.innerHTML = `
+                ${content}
+                <button onclick="document.getElementById('infoModal').remove()" style="
+                    margin-top: 20px;
+                    padding: 10px 20px;
+                    background: var(--accent-color);
+                    color: white;
+                    border: none;
+                    border-radius: 6px;
+                    cursor: pointer;
+                    font-size: 16px;
+                    width: 100%;
+                ">閉じる</button>
+            `;
+            
+            modal.appendChild(modalContent);
+            document.body.appendChild(modal);
+            
+            // Close on background click
+            modal.addEventListener('click', function(e) {
+                if (e.target === modal) {
+                    modal.remove();
+                }
+            });
         };
         
         // Initialize event handlers (v5.11.92 - moved config initialization to module script)

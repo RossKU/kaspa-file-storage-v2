@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.12.66</title>
+    <title>Kaspa P2P File Storage v5.12.67</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -2307,6 +2307,35 @@
                 </div>
             </div>
             
+            <!-- Transaction Amount Setting -->
+            <div class="metric-box">
+                <h3>💸 送金額設定</h3>
+                <div style="margin-bottom: 15px;">
+                    <label>トランザクション送金額 (KAS)</label>
+                    <div style="display: flex; align-items: center; gap: 10px; margin-top: 10px;">
+                        <input type="number" id="transactionAmountInput" 
+                               value="1" 
+                               min="0.001" 
+                               max="100" 
+                               step="0.001" 
+                               style="width: 120px; padding: 8px; border: 1px solid var(--border-color); border-radius: 5px;">
+                        <span style="color: var(--text-secondary); font-size: 0.9em;">KAS</span>
+                        <button onclick="AppState.updateTransactionAmount()" 
+                                style="padding: 8px 16px; background: var(--accent-color); color: var(--button-text-on-accent); border: none; border-radius: 5px; cursor: pointer;">
+                            更新
+                        </button>
+                    </div>
+                    <p style="margin: 10px 0 0 0; font-size: 0.9em; color: var(--text-secondary);">
+                        ⚠️ データ保存時に自分から自分に送金される金額です。<br>
+                        デフォルト: 1 KAS / 最小推奨: 0.001 KAS<br>
+                        実際の消費は手数料のみ（約0.0002 KAS）
+                    </p>
+                </div>
+                <div style="padding: 10px; background: var(--bg-secondary); border-radius: 5px;">
+                    <div>現在の設定: <span id="transaction-amount-display" style="font-weight: bold;">1 KAS</span></div>
+                </div>
+            </div>
+            
             <div class="metric-box" style="display: none;">
                 <!-- v5.11.116: WebSocket Block Statistics -->
                 <div id="wsBlockStats" style="margin-top: 10px; padding: 10px; border-radius: 5px; background: var(--upload-bg); display: none;">
@@ -2723,7 +2752,8 @@
         // Grouped application state for better organization
         const AppState = {
             settings: {
-                parallelDownloadEnabled: false   // Default OFF for v3.5.0 compatibility
+                parallelDownloadEnabled: false,   // Default OFF for v3.5.0 compatibility
+                transactionAmount: 100000000n    // Default 1 KAS (100000000 Sompi)
             },
             monitoring: {
                 wsMonitorTimeout: null  // WebSocket monitoring timeout
@@ -7141,6 +7171,24 @@
                     // Ensure all references are synchronized
                     parallelDownloadEnabled = AppState.settings.parallelDownloadEnabled;
                 }
+            },
+            
+            loadTransactionAmountSetting: function() {
+                const saved = localStorage.getItem('kaspaTransactionAmount');
+                if (saved !== null) {
+                    const amountInKas = parseFloat(saved);
+                    if (!isNaN(amountInKas) && amountInKas >= 0.001 && amountInKas <= 100) {
+                        AppState.settings.transactionAmount = BigInt(Math.floor(amountInKas * 100000000));
+                        const input = document.getElementById('transactionAmountInput');
+                        if (input) {
+                            input.value = amountInKas;
+                        }
+                        const display = document.getElementById('transaction-amount-display');
+                        if (display) {
+                            display.textContent = `${amountInKas} KAS`;
+                        }
+                    }
+                }
             }
         };
         
@@ -10880,6 +10928,26 @@
             log('ウォレット切断', 'info');
         };
         
+        AppState.updateTransactionAmount = function() {
+            const input = document.getElementById('transactionAmountInput');
+            const amountInKas = parseFloat(input.value);
+            
+            if (isNaN(amountInKas) || amountInKas < 0.001 || amountInKas > 100) {
+                alert('送金額は0.001 KAS以上、100 KAS以下で設定してください');
+                return;
+            }
+            
+            AppState.settings.transactionAmount = BigInt(Math.floor(amountInKas * 100000000));
+            localStorage.setItem('kaspaTransactionAmount', amountInKas.toString());
+            
+            const display = document.getElementById('transaction-amount-display');
+            if (display) {
+                display.textContent = `${amountInKas} KAS`;
+            }
+            
+            log(`送金額を ${amountInKas} KAS に更新しました`, 'success');
+        };
+        
         // Moved to SystemHandlers
         /*
         window.initializeSystem = async function() {
@@ -11428,7 +11496,7 @@
                 entries: formattedUtxos,
                 outputs: [{
                     address: UserState.address.toString(),
-                    amount: 100000000n // 1 KAS
+                    amount: AppState.settings.transactionAmount
                 }],
                 changeAddress: UserState.address.toString(),
                 priorityFee: 0n,  // v5.11.17: Priority Fee削除でコスト削減
@@ -12573,7 +12641,7 @@
                                     entries: formattedUtxos,
                                     outputs: [{
                                         address: UserState.address.toString(),
-                                        amount: 100000000n // 1 KAS
+                                        amount: AppState.settings.transactionAmount
                                     }],
                                     changeAddress: UserState.address.toString(),
                                     priorityFee: 0n,  // v5.11.17: Priority Fee削除でコスト削減
@@ -12951,7 +13019,7 @@
                                 entries: formattedUtxos,
                                 outputs: [{
                                     address: UserState.address.toString(),
-                                    amount: 100000000n // 1 KAS
+                                    amount: AppState.settings.transactionAmount
                                 }],
                                 changeAddress: UserState.address.toString(),
                                 priorityFee: 0n,  // v5.11.17: Priority Fee削除でコスト削減
@@ -13839,8 +13907,8 @@
                 
                 let result;
                 try {
-                    // Use same amount as regular chunks (1 KAS)
-                    const amount = 100000000n; // 1 KAS
+                    // Use same amount as regular chunks
+                    const amount = AppState.settings.transactionAmount;
                     
                     result = await NetworkState.kaspa.createTransactions({
                         entries: formattedUtxos,
@@ -14106,7 +14174,7 @@
                     entries: formattedUtxos,
                     outputs: [{
                         address: UserState.address.toString(),
-                        amount: 100000000n // 1 KAS
+                        amount: AppState.settings.transactionAmount
                     }],
                     changeAddress: UserState.address.toString(),
                     priorityFee: 0n,  // v5.11.17: Priority Fee削除でコスト削減
@@ -14290,7 +14358,7 @@
                     entries: formattedUtxos,
                     outputs: [{
                         address: UserState.address.toString(),
-                        amount: 100000000n // 1 KAS
+                        amount: AppState.settings.transactionAmount
                     }],
                     changeAddress: UserState.address.toString(),
                     priorityFee: 0n,  // v5.11.17: Priority Fee削除でコスト削減
@@ -16847,6 +16915,7 @@
             }
             
             window.loadParallelSetting(); // Load parallel download setting
+            UtilityHandlers.loadTransactionAmountSetting(); // Load transaction amount setting
             
             // v5.6.6: Initialize ConnectionManager after log function is available
             ConnectionManager.init();

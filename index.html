@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.12.57 - InfoボタンUI実装</title>
+    <title>Kaspa P2P File Storage v5.12.57-hotfix - Info表示エラー修正</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -18470,8 +18470,24 @@
                 return;
             }
             
-            const file = FileState.fileList.find(f => f.id === selectedIds[0]);
-            if (!file) return;
+            // Get file from KENV entries or fileList
+            let file = null;
+            
+            // First try to get from KENV entries
+            const kenvEntries = FileState.kenvManager.getEntries();
+            if (kenvEntries && kenvEntries.length > 0) {
+                file = kenvEntries.find(f => f.id === selectedIds[0]);
+            }
+            
+            // Fallback to fileList if available
+            if (!file && FileState.fileList) {
+                file = FileState.fileList.find(f => f.id === selectedIds[0]);
+            }
+            
+            if (!file) {
+                alert('ファイル情報が見つかりません');
+                return;
+            }
             
             // Create info content
             const formatDate = (date) => {

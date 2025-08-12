@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.12.62 - FileTabHandlers名前空間分離</title>
+    <title>Kaspa P2P File Storage v5.12.63 - モバイルアップロードボタン修正</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -1993,7 +1993,7 @@
             </div>
             
             <!-- v5.11.135: Always visible upload button (fixed initial state) -->
-            <button onclick="processAndUpload()" id="uploadBtn" disabled style="margin-top: 20px; width: 100%; padding: 15px; font-size: 18px; font-weight: bold; background: var(--text-secondary); color: var(--button-text-on-accent); border: none; border-radius: 8px; cursor: not-allowed; transition: all 0.3s; opacity: 0.6;">
+            <button id="uploadBtn" disabled style="margin-top: 20px; width: 100%; padding: 15px; font-size: 18px; font-weight: bold; background: var(--text-secondary); color: var(--button-text-on-accent); border: none; border-radius: 8px; cursor: not-allowed; transition: all 0.3s; opacity: 0.6;">
                 📤 アップロード
             </button>
             
@@ -16179,6 +16179,17 @@
             if (uploadPasswordInput) {
                 uploadPasswordInput.addEventListener('input', () => {
                     updateUploadButtonState();
+                });
+            }
+            
+            // v5.12.63: Add upload button event listener for mobile compatibility
+            const uploadBtn = document.getElementById('uploadBtn');
+            if (uploadBtn) {
+                uploadBtn.addEventListener('click', async (e) => {
+                    e.preventDefault();
+                    if (!uploadBtn.disabled && typeof processAndUpload === 'function') {
+                        await processAndUpload();
+                    }
                 });
             }
             

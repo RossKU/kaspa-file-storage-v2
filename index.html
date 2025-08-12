@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.12.63 - モバイルアップロードボタン修正</title>
+    <title>Kaspa P2P File Storage v5.12.64-hotfix - Dev Wallet同期修正</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -1792,22 +1792,23 @@
             
             <!-- v5.11.134: Workspace Folder moved to Settings tab -->
             
-            <!-- Wallet Settings -->
+            <!-- Wallet Status (Display Only) -->
             <div class="status-box">
-                <h3>💰 Wallet設定</h3>
-                <div style="margin-bottom: 12px;">
-                    <label>秘密鍵:</label>
-                    <input type="password" id="walletPrivateKey" placeholder="秘密鍵を入力" style="width: 100%; margin-top: 8px;">
+                <h3>💰 Wallet状態</h3>
+                <div class="status-row">
+                    <strong>ステータス:</strong>
+                    <span id="walletConnectionStatus">未接続</span>
                 </div>
-                <button id="walletConnectBtn" style="width: 100%; margin-bottom: 12px;">接続</button>
-                
                 <div class="status-row">
                     <strong>アドレス:</strong>
-                    <span id="walletAddress">-</span>
+                    <span id="walletAddress" style="font-family: monospace; font-size: 0.9em; word-break: break-all;">-</span>
                 </div>
                 <div class="status-row">
                     <strong>残高:</strong>
-                    <span id="walletBalance">-</span>
+                    <span id="walletBalance" style="font-weight: bold;">-</span>
+                </div>
+                <div style="margin-top: 12px; padding: 10px; background: var(--bg-primary); border-radius: 5px; text-align: center;">
+                    <small style="color: var(--text-secondary);">⚙️ Wallet接続は設定タブから行ってください</small>
                 </div>
             </div>
         </div>
@@ -2233,6 +2234,32 @@
                         <option value="light">☀️ ライト</option>
                         <option value="dark">🌙 ダーク</option>
                     </select>
+                </div>
+            </div>
+            
+            <!-- Wallet Connection -->
+            <div class="metric-box">
+                <h3>💰 Wallet接続</h3>
+                <div style="margin-top: 15px;">
+                    <label>秘密鍵</label>
+                    <input type="password" id="walletPrivateKey" placeholder="秘密鍵を入力してください" style="width: 100%; padding: 10px; margin-top: 8px; font-size: 14px; border: 1px solid var(--border-color); border-radius: 5px;">
+                </div>
+                <button id="walletConnectBtn" style="width: 100%; margin-top: 15px; padding: 12px; font-size: 16px; font-weight: bold; background: var(--accent-color); color: var(--button-text-on-accent); border: none; border-radius: 8px; cursor: pointer; transition: all 0.3s;">
+                    接続
+                </button>
+                <div style="margin-top: 15px; padding: 15px; background: var(--bg-primary); border-radius: 8px;">
+                    <div style="margin-bottom: 10px;">
+                        <strong>ステータス:</strong>
+                        <span id="settingsWalletStatus" style="margin-left: 10px;">未接続</span>
+                    </div>
+                    <div style="margin-bottom: 10px;">
+                        <strong>アドレス:</strong>
+                        <div id="settingsWalletAddress" style="font-family: monospace; font-size: 0.85em; word-break: break-all; margin-top: 5px; color: var(--text-secondary);">-</div>
+                    </div>
+                    <div>
+                        <strong>残高:</strong>
+                        <span id="settingsWalletBalance" style="margin-left: 10px; font-weight: bold; color: var(--success-color);">-</span>
+                    </div>
                 </div>
             </div>
             
@@ -3179,6 +3206,17 @@
                         log('[DEBUG] UserState.address set:', 'debug', UserState.address);
                         
                         log(`Dev Walletアドレス: ${UserState.address.toString()}`, 'success');
+                        
+                        // v5.12.64: Update status tab for Dev Wallet
+                        const addressString = UserState.address.toString();
+                        document.getElementById('walletAddress').textContent = addressString;
+                        document.getElementById('walletConnectionStatus').textContent = '接続中 (Dev Wallet)';
+                        document.getElementById('walletConnectionStatus').style.color = 'var(--warning-color)';
+                        
+                        // Update settings tab as well
+                        document.getElementById('settingsWalletAddress').textContent = addressString;
+                        document.getElementById('settingsWalletStatus').textContent = '接続中 (Dev Wallet)';
+                        document.getElementById('settingsWalletStatus').style.color = 'var(--warning-color)';
                     } else {
                         log('Dev Wallet無効 - 手動でウォレットを接続してください', 'warning');
                     }
@@ -3208,6 +3246,11 @@
                         const { entries } = await NetworkState.rpcClient.getUtxosByAddresses([UserState.address.toString()]);
                         balance = entries.reduce((sum, utxo) => sum + Number(utxo.amount), 0) / 1e8;
                         log(`残高: ${balance} KAS`, 'info');
+                        
+                        // v5.12.64: Update balance display in both tabs
+                        const balanceText = `${balance.toFixed(8)} KAS`;
+                        document.getElementById('walletBalance').textContent = balanceText;
+                        document.getElementById('settingsWalletBalance').textContent = balanceText;
                     }
                     
                     // Update UI
@@ -3225,12 +3268,14 @@
                         document.getElementById('initStatus').innerHTML = `
                             <p class="success">✅ システム初期化完了</p>
                             <p style="color: var(--warning-color);">⚠️ ウォレット未接続</p>
-                            <p>ステータスタブからウォレットを接続してください</p>
+                            <p>設定タブからウォレットを接続してください</p>
                         `;
                     }
                     
                     document.getElementById('testBtn').disabled = false;
-                    updateUploadButtonState(); // v5.11.135-fix: Check all 3 conditions
+                    
+                    // v5.12.64: Update upload button state after initialization
+                    updateUploadButtonState();
                     
                     updateNetworkStatus('online', 'オンライン');
                     
@@ -3308,19 +3353,34 @@
                     // Disable Dev Wallet when manually connecting
                     AppState.disableDevWallet();
                     
-                    // Update UI
-                    document.getElementById('walletAddress').textContent = UserState.address.toString();
+                    // Update UI - Both status tab and settings tab
+                    const addressString = UserState.address.toString();
+                    
+                    // Update status tab
+                    document.getElementById('walletAddress').textContent = addressString;
+                    document.getElementById('walletConnectionStatus').textContent = '接続中';
+                    document.getElementById('walletConnectionStatus').style.color = 'var(--success-color)';
+                    
+                    // Update settings tab
+                    document.getElementById('settingsWalletAddress').textContent = addressString;
+                    document.getElementById('settingsWalletStatus').textContent = '接続中';
+                    document.getElementById('settingsWalletStatus').style.color = 'var(--success-color)';
                     
                     // Get balance
                     if (NetworkState.rpcClient && NetworkState.rpcClient.isConnected) {
-                        const { entries } = await NetworkState.rpcClient.getUtxosByAddresses([UserState.address.toString()]);
+                        const { entries } = await NetworkState.rpcClient.getUtxosByAddresses([addressString]);
                         const balance = entries.reduce((sum, utxo) => sum + Number(utxo.amount), 0) / 1e8;
-                        document.getElementById('walletBalance').textContent = `${balance.toFixed(8)} KAS`;
+                        const balanceText = `${balance.toFixed(8)} KAS`;
+                        
+                        // Update both tabs
+                        document.getElementById('walletBalance').textContent = balanceText;
+                        document.getElementById('settingsWalletBalance').textContent = balanceText;
                         
                         // Update upload button state
                         updateUploadButtonState();
                     } else {
                         document.getElementById('walletBalance').textContent = 'RPC未接続';
+                        document.getElementById('settingsWalletBalance').textContent = 'RPC未接続';
                     }
                     
                     // Clear password input
@@ -10873,9 +10933,20 @@
             UserState.privateKey = null;
             UserState.address = null;
             
-            // Update UI
+            // Update UI - Both status tab and settings tab
+            // Status tab
             document.getElementById('walletAddress').textContent = '-';
             document.getElementById('walletBalance').textContent = '-';
+            document.getElementById('walletConnectionStatus').textContent = '未接続';
+            document.getElementById('walletConnectionStatus').style.color = 'var(--text-secondary)';
+            
+            // Settings tab
+            document.getElementById('settingsWalletAddress').textContent = '-';
+            document.getElementById('settingsWalletBalance').textContent = '-';
+            document.getElementById('settingsWalletStatus').textContent = '未接続';
+            document.getElementById('settingsWalletStatus').style.color = 'var(--text-secondary)';
+            
+            // Update button text
             document.getElementById('walletConnectBtn').textContent = '接続';
             
             // Update init status if visible

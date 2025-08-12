@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.12.57-hotfix2 - getEntriesエラー修正</title>
+    <title>Kaspa P2P File Storage v5.12.58 - フルCID保存修正</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -4699,10 +4699,14 @@
                         // オプショナルフィールド
                         if (values[7]) entry.metaTxId = values[7];
                         if (values[8]) entry.metaTxBlockId = values[8];
-                        if (values[15]) entry.fileSize = parseInt(values[15]) || null;
+                        if (values[15]) {
+                            entry.fileSize = parseInt(values[15]) || null;
+                            entry.size = entry.fileSize;  // v5.12.58: sizeプロパティも設定（互換性のため）
+                        }
                         if (values[10]) entry.uploadDate = values[10];
                         if (values[12]) entry.uploadedBy = values[12];
                         if (values[24]) entry.payloadSplit = values[24];  // v5.11.67: payloadSplitを明示的に読み込み
+                        if (values[25]) entry.cid = values[25];  // v5.12.58: CIDマッピング追加
                         if (values[41]) entry.password = values[41];
                         if (values[42]) entry.externalRef = values[42];
                         if (values[45]) entry.authWarning = values[45];
@@ -13377,7 +13381,7 @@
                     kenvEntry.sha256 = fileHash;
                     kenvEntry.encrypted = true;
                     kenvEntry.password = FileState.currentPassword || null;
-                    kenvEntry.cid = window.currentFileCID || '';
+                    kenvEntry.cid = window.currentFileCIDFull || window.currentFileCID || '';
                     kenvEntry.uploadCost = totalCost;
                     
                     // メタデータから追加情報を取得

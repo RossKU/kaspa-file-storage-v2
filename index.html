@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.12.65</title>
+    <title>Kaspa P2P File Storage v5.12.66</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -3268,18 +3268,19 @@
             
             connectWallet: async function() {
                 const privateKeyInput = document.getElementById('walletPrivateKey');
-                const privateKey = privateKeyInput.value.trim();
                 
-                if (!privateKey) {
-                    alert('秘密鍵を入力してください');
-                    return;
-                }
-                
-                // Check if already connected
+                // Check if already connected (for disconnect)
                 if (UserState.privateKey) {
                     // Disconnect current wallet
                     AppState.disconnectWallet();
                     privateKeyInput.value = '';
+                    return;
+                }
+                
+                // For new connection, check private key
+                const privateKey = privateKeyInput.value.trim();
+                if (!privateKey) {
+                    alert('秘密鍵を入力してください');
                     return;
                 }
                 

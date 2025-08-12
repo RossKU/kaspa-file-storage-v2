@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.12.61 - showFileInfo関数名衝突修正</title>
+    <title>Kaspa P2P File Storage v5.12.62 - FileTabHandlers名前空間分離</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -1940,7 +1940,7 @@
                         <button class="share-option" onclick="shareAction('password')">🔑 Pass (パスワードのみ)</button>
                     </div>
                 </div>
-                <button class="file-action-btn" onclick="showFileTabInfo()">
+                <button class="file-action-btn" onclick="FileTabHandlers.showSelectedFileDetails()">
                     Info
                 </button>
             </div>
@@ -8701,6 +8701,7 @@
                 const hasFile = FileState.currentFile !== null;
                 const passwordInput = document.getElementById('uploadPassword');
                 const hasPassword = passwordInput && passwordInput.value.length >= 8;
+                
                 
                 // All 3 conditions must be met
                 enabled = hasWallet && hasFile && hasPassword;
@@ -18463,8 +18464,10 @@
             cancelAddFile();
         };
         
-        // Show file tab info (renamed to avoid conflict with upload showFileInfo)
-        window.showFileTabInfo = function() {
+        // File tab handlers namespace to avoid conflicts
+        window.FileTabHandlers = {
+            // Show selected file details (completely separated from upload showFileInfo)
+            showSelectedFileDetails: function() {
             const selectedIds = Array.from(FileState.selectedFiles);
             if (selectedIds.length !== 1) {
                 alert('情報表示は1つのファイルのみ選択してください');
@@ -18549,8 +18552,9 @@
             `;
             
             // Show in modal
-            showModal('ファイル情報', infoHtml);
-            log(`[File] 情報表示: ${file.name}`, 'info');
+                showModal('ファイル情報', infoHtml);
+                log(`[File] 情報表示: ${file.name}`, 'info');
+            }
         };
         
         // Show modal helper function

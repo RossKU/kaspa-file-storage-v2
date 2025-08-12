@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.12.59 - Info表示のサイズ修正</title>
+    <title>Kaspa P2P File Storage v5.12.60 - fileSize統一</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -4699,10 +4699,7 @@
                         // オプショナルフィールド
                         if (values[7]) entry.metaTxId = values[7];
                         if (values[8]) entry.metaTxBlockId = values[8];
-                        if (values[15]) {
-                            entry.fileSize = parseInt(values[15]) || null;
-                            entry.size = entry.fileSize;  // v5.12.58: sizeプロパティも設定（互換性のため）
-                        }
+                        if (values[15]) entry.fileSize = parseInt(values[15]) || null;
                         if (values[10]) entry.uploadDate = values[10];
                         if (values[12]) entry.uploadedBy = values[12];
                         if (values[24]) entry.payloadSplit = values[24];  // v5.11.67: payloadSplitを明示的に読み込み
@@ -14558,7 +14555,7 @@
                             fileItem.totalSize = entry.totalSize || 0;
                         } else {
                             // Add file-specific fields
-                            fileItem.size = entry.size || 0;
+                            fileItem.size = entry.fileSize || entry.size || 0;  // v5.12.59: fileSizeを優先
                         }
                         
                         FileState.fileList.push(fileItem);
@@ -18513,7 +18510,7 @@
                 <div style="display: grid; gap: 12px;">
                     <div style="border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
                         <strong>ファイル名:</strong> ${file.name}<br>
-                        <strong>サイズ:</strong> ${formatSize(file.size || file.fileSize)}<br>
+                        <strong>サイズ:</strong> ${formatSize(file.fileSize)}<br>
                         <strong>タイプ:</strong> ${file.type === 'directory' ? '📁 ディレクトリ' : '📄 ファイル'}
                     </div>
             `;

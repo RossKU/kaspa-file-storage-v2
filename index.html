@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.12.64-hotfix - Dev Wallet同期修正</title>
+    <title>Kaspa P2P File Storage v5.12.65</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -2450,22 +2450,6 @@
         <div class="container">
             <h2>🔧 システム初期化</h2>
             
-            <!-- Dev Wallet Toggle -->
-            <div style="margin-bottom: 15px; padding: 10px; background: rgba(255,255,0,0.1); border: 1px solid rgba(255,255,0,0.3); border-radius: 5px;">
-                <div style="display: flex; align-items: center; justify-content: space-between;">
-                    <div>
-                        <strong>🔑 Dev Wallet</strong>
-                        <small style="display: block; color: var(--text-secondary); margin-top: 2px;">
-                            開発用ウォレット (b7e15162...)
-                        </small>
-                    </div>
-                    <label class="toggle-switch">
-                        <input type="checkbox" id="devWalletToggle" checked onchange="AppState.toggleDevWallet()">
-                        <span class="toggle-slider"></span>
-                    </label>
-                </div>
-            </div>
-            
             <!-- v5.11.134: Workspace settings consolidated here -->
             <div class="metric-box" style="margin-top: 20px;">
                 <h3>📁 作業フォルダ設定</h3>
@@ -2739,8 +2723,7 @@
         // Grouped application state for better organization
         const AppState = {
             settings: {
-                parallelDownloadEnabled: false,  // Default OFF for v3.5.0 compatibility
-                devWalletEnabled: true          // Dev wallet enabled by default
+                parallelDownloadEnabled: false   // Default OFF for v3.5.0 compatibility
             },
             monitoring: {
                 wsMonitorTimeout: null  // WebSocket monitoring timeout
@@ -3193,34 +3176,6 @@
                     }
                     log('すべての必要な関数を確認しました', 'success');
                     
-                    // Initialize wallet (only if Dev Wallet is enabled)
-                    if (AppState.settings.devWalletEnabled) {
-                        log('[DEBUG] Dev Wallet enabled, initializing with test key', 'debug');
-                        UserState.privateKey = new NetworkState.kaspa.PrivateKey(config.testPrivateKey);
-                        log('[DEBUG] UserState.privateKey set', 'debug');
-                        
-                        const publicKey = UserState.privateKey.toPublicKey();
-                        log('[DEBUG] Public key generated', 'debug');
-                        
-                        UserState.address = publicKey.toAddress(config.network);
-                        log('[DEBUG] UserState.address set:', 'debug', UserState.address);
-                        
-                        log(`Dev Walletアドレス: ${UserState.address.toString()}`, 'success');
-                        
-                        // v5.12.64: Update status tab for Dev Wallet
-                        const addressString = UserState.address.toString();
-                        document.getElementById('walletAddress').textContent = addressString;
-                        document.getElementById('walletConnectionStatus').textContent = '接続中 (Dev Wallet)';
-                        document.getElementById('walletConnectionStatus').style.color = 'var(--warning-color)';
-                        
-                        // Update settings tab as well
-                        document.getElementById('settingsWalletAddress').textContent = addressString;
-                        document.getElementById('settingsWalletStatus').textContent = '接続中 (Dev Wallet)';
-                        document.getElementById('settingsWalletStatus').style.color = 'var(--warning-color)';
-                    } else {
-                        log('Dev Wallet無効 - 手動でウォレットを接続してください', 'warning');
-                    }
-                    
                     // Create RPC client
                     NetworkState.rpcClient = new NetworkState.kaspa.RpcClient({
                         resolver: new NetworkState.kaspa.Resolver(),
@@ -3262,7 +3217,6 @@
                             <p class="success">✅ システム初期化完了</p>
                             <p>アドレス: ${UserState.address.toString()}</p>
                             <p>残高: ${balance} KAS</p>
-                            ${AppState.settings.devWalletEnabled ? '<p style="color: var(--warning-color);">⚠️ Dev Wallet使用中</p>' : ''}
                         `;
                     } else {
                         document.getElementById('initStatus').innerHTML = `
@@ -3323,16 +3277,10 @@
                 
                 // Check if already connected
                 if (UserState.privateKey) {
-                    // If connected with Dev Wallet, proceed to replace with manual connection
-                    const isDevWallet = UserState.privateKey.toString() === config.testPrivateKey;
-                    if (!isDevWallet) {
-                        // If not Dev Wallet, just disconnect and return
-                        AppState.disconnectWallet();
-                        privateKeyInput.value = '';
-                        return;
-                    }
-                    // If Dev Wallet, disconnect it and continue with manual connection
+                    // Disconnect current wallet
                     AppState.disconnectWallet();
+                    privateKeyInput.value = '';
+                    return;
                 }
                 
                 try {
@@ -3349,9 +3297,6 @@
                     UserState.address = publicKey.toAddress(config.network);
                     
                     log(`ウォレット接続: ${UserState.address.toString()}`, 'success');
-                    
-                    // Disable Dev Wallet when manually connecting
-                    AppState.disableDevWallet();
                     
                     // Update UI - Both status tab and settings tab
                     const addressString = UserState.address.toString();
@@ -4370,7 +4315,6 @@
                         settings: {
                             network: {
                                 parallelDownloadEnabled: AppState.settings.parallelDownloadEnabled,
-                                devWalletEnabled: AppState.settings.devWalletEnabled,
                                 customRpcEndpoint: "",
                                 archiveNodeThreshold: 50
                             },
@@ -8783,7 +8727,6 @@
             network: null, // v5.11.101: Will be initialized dynamically
             retryCount: 3,
             timeout: 300000,  // v5.11.118: Changed default from 30s to 300s (5 minutes)
-            testPrivateKey: 'b7e151628aed2a6abf7158809cf4f3c762e7160f38b4da56a784d9045190cfef',
             // Super metadata configuration (experimental)
             superMeta: {
                 enabled: true,
@@ -10904,31 +10847,6 @@
             }
         }
         
-        // ===== Dev Wallet Functions (AppState Methods) =====
-        AppState.toggleDevWallet = function() {
-            const enabled = document.getElementById('devWalletToggle').checked;
-            AppState.settings.devWalletEnabled = enabled;
-            localStorage.setItem('kaspaDevWalletEnabled', enabled.toString());
-            
-            if (enabled) {
-                log('Dev Wallet有効化', 'info');
-            } else {
-                log('Dev Wallet無効化 - 手動接続が必要です', 'warning');
-                // If wallet is currently using dev wallet, disconnect it
-                if (UserState.privateKey && UserState.privateKey.toString() === config.testPrivateKey) {
-                    AppState.disconnectWallet();
-                }
-            }
-        };
-        
-        AppState.loadDevWalletSetting = function() {
-            const saved = localStorage.getItem('kaspaDevWalletEnabled');
-            if (saved !== null) {
-                AppState.settings.devWalletEnabled = saved === 'true';
-                document.getElementById('devWalletToggle').checked = AppState.settings.devWalletEnabled;
-            }
-        };
-        
         AppState.disconnectWallet = function() {
             UserState.privateKey = null;
             UserState.address = null;
@@ -10961,16 +10879,6 @@
             log('ウォレット切断', 'info');
         };
         
-        // Disable Dev Wallet and update UI
-        AppState.disableDevWallet = function() {
-            if (AppState.settings.devWalletEnabled) {
-                AppState.settings.devWalletEnabled = false;
-                localStorage.setItem('kaspaDevWalletEnabled', 'false');
-                document.getElementById('devWalletToggle').checked = false;
-                log('Dev Wallet自動無効化 - 手動Wallet接続のため', 'info');
-            }
-};
-        
         // Moved to SystemHandlers
         /*
         window.initializeSystem = async function() {
@@ -10996,23 +10904,6 @@
                     }
                 }
                 log('すべての必要な関数を確認しました', 'success');
-                
-                // Initialize wallet (only if Dev Wallet is enabled)
-                if (AppState.settings.devWalletEnabled) {
-                    log('[DEBUG] Dev Wallet enabled, initializing with test key', 'debug');
-                    UserState.privateKey = new NetworkState.kaspa.PrivateKey(config.testPrivateKey);
-                    log('[DEBUG] UserState.privateKey set', 'debug');
-                    
-                    const publicKey = UserState.privateKey.toPublicKey();
-                    log('[DEBUG] Public key generated', 'debug');
-                    
-                    UserState.address = publicKey.toAddress(config.network);
-                    log('[DEBUG] UserState.address set:', 'debug', UserState.address);
-                    
-                    log(`Dev Walletアドレス: ${UserState.address.toString()}`, 'success');
-                } else {
-                    log('Dev Wallet無効 - 手動でウォレットを接続してください', 'warning');
-                }
                 
                 // Create RPC client
                 NetworkState.rpcClient = new NetworkState.kaspa.RpcClient({
@@ -11050,7 +10941,6 @@
                         <p class="success">✅ システム初期化完了</p>
                         <p>アドレス: ${UserState.address.toString()}</p>
                         <p>残高: ${balance} KAS</p>
-                        ${AppState.settings.devWalletEnabled ? '<p style="color: #ffcc66;">⚠️ Dev Wallet使用中</p>' : ''}
                     `;
                 } else {
                     document.getElementById('initStatus').innerHTML = `
@@ -16956,7 +16846,6 @@
             }
             
             window.loadParallelSetting(); // Load parallel download setting
-            AppState.loadDevWalletSetting(); // Load dev wallet setting
             
             // v5.6.6: Initialize ConnectionManager after log function is available
             ConnectionManager.init();
@@ -17610,16 +17499,10 @@
             
             // Check if already connected
             if (UserState.privateKey) {
-                // If connected with Dev Wallet, proceed to replace with manual connection
-                const isDevWallet = UserState.privateKey.toString() === config.testPrivateKey;
-                if (!isDevWallet) {
-                    // If not Dev Wallet, just disconnect and return
-                    AppState.disconnectWallet();
-                    privateKeyInput.value = '';
-                    return;
-                }
-                // If Dev Wallet, disconnect it and continue with manual connection
+                // Disconnect current wallet
                 AppState.disconnectWallet();
+                privateKeyInput.value = '';
+                return;
             }
             
             try {
@@ -17634,9 +17517,6 @@
                 UserState.address = publicKey.toAddress(config.network);
                 
                 log(`ウォレット接続: ${UserState.address.toString()}`, 'success');
-                
-                // Disable Dev Wallet when manually connecting
-                AppState.disableDevWallet();
                 
                 // Update UI
                 document.getElementById('walletAddress').textContent = UserState.address.toString();

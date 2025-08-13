@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.12.69</title>
+    <title>Kaspa P2P File Storage v5.12.70</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -10600,22 +10600,40 @@
                     
                     // Phase 2: KENV登録処理（ダウンロード成功時のみ）
                     if (FileState.kenvManager._initialized && metaTxId) {
-                        log('[KENV] ダウンロード完了エントリーを追加', 'info');
-                        
-                        const kenvEntry = FileState.kenvManager.addMinimalEntry(
-                            metadata.file?.name || 'download',
-                            'kaspa-file',
-                            'download'
+                        // Phase 3: 重複チェック
+                        let kenvEntry = FileState.kenvManager.entries.find(e => 
+                            e.metaTxId === metaTxId && 
+                            (!metaTxBlockId || e.metaTxBlockId === metaTxBlockId)
                         );
                         
-                        // ダウンロード情報を設定
-                        kenvEntry.metaTxId = metaTxId;
-                        kenvEntry.metaTxBlockId = metaTxBlockId || null;
-                        kenvEntry.password = password || null;
-                        kenvEntry.downloadDate = new Date().toISOString();
+                        if (kenvEntry) {
+                            // 既存エントリーを更新
+                            log('[KENV] 既存エントリーを更新', 'info');
+                            kenvEntry.downloadDate = new Date().toISOString();
+                            kenvEntry.lastAccessed = new Date().toISOString();
+                            // パスワードが変更された場合は更新
+                            if (password && kenvEntry.password !== password) {
+                                kenvEntry.password = password;
+                                log('[KENV] パスワードを更新しました', 'info');
+                            }
+                        } else {
+                            // 新規エントリーを作成
+                            log('[KENV] 新規ダウンロードエントリーを追加', 'info');
+                            kenvEntry = FileState.kenvManager.addMinimalEntry(
+                                metadata.file?.name || 'download',
+                                'kaspa-file',
+                                'download'
+                            );
+                            
+                            // ダウンロード情報を設定
+                            kenvEntry.metaTxId = metaTxId;
+                            kenvEntry.metaTxBlockId = metaTxBlockId || null;
+                            kenvEntry.password = password || null;
+                            kenvEntry.downloadDate = new Date().toISOString();
+                        }
                         
-                        // メタデータから情報を取得
-                        if (metadata) {
+                        // メタデータから情報を取得（新規・既存両方で更新）
+                        if (metadata && (!kenvEntry.cid || !kenvEntry.fileSize)) {
                             kenvEntry.fileSize = metadata.file?.size || null;
                             kenvEntry.cid = metadata.cid || null;
                             kenvEntry.uploadDate = metadata.created || metadata.metadata?.uploadDate || null;

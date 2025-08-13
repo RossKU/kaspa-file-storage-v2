@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.12.72</title>
+    <title>Kaspa P2P File Storage v5.12.73</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -1809,6 +1809,14 @@
                 </div>
                 <div style="margin-top: 12px; padding: 10px; background: var(--bg-primary); border-radius: 5px; text-align: center;">
                     <small style="color: var(--text-secondary);">⚙️ Wallet接続は設定タブから行ってください</small>
+                </div>
+            </div>
+            
+            <!-- Workspace Folder Status -->
+            <div class="status-box">
+                <h3>📁 作業フォルダ</h3>
+                <div class="status-row" id="workspaceStatusSimple">
+                    作業フォルダ: 未設定 (ブラウザ内保存)
                 </div>
             </div>
         </div>
@@ -9402,6 +9410,16 @@
                         <span onclick="alert('Kaspa P2P File Storage - 作業フォルダについて\\n\\n作業フォルダを設定すると：\\n✓ 進捗がファイルに自動保存されます\\n✓ ダウンロードファイルが整理されます\\n✓ ブラウザを閉じても進捗が残ります\\n\\n設定しない場合：\\n✓ ブラウザ内に進捗が保存されます\\n✓ ファイルの自動ダウンロードはありません\\n\\n※「作業フォルダ設定」ボタンで後から設定できます')" style="cursor: pointer; margin-left: 5px; color: var(--accent-color);">❓</span>
                     `;
                     status.style.color = 'var(--warning-color)';
+                }
+            }
+            
+            // Update simple status in Status tab
+            const simpleStatus = document.getElementById('workspaceStatusSimple');
+            if (simpleStatus) {
+                if (WorkspaceState.handle) {
+                    simpleStatus.textContent = `作業フォルダ: ${WorkspaceState.handle.name}`;
+                } else {
+                    simpleStatus.textContent = `作業フォルダ: 未設定 (ブラウザ内保存)`;
                 }
             }
             

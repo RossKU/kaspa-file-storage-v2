@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.12.71</title>
+    <title>Kaspa P2P File Storage v5.12.72</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -2419,6 +2419,15 @@
                             </div>
                             <span style="color: var(--text-secondary); font-size: 10px;">(0.864M = 1日分)</span>
                         </div>
+                        <!-- Consecutive non-archive limit settings -->
+                        <div style="display: flex; align-items: center; gap: 10px; margin-top: 4px;">
+                            <div style="display: flex; align-items: center; gap: 4px;">
+                                <label>連続失敗上限:</label>
+                                <input type="number" id="maxConsecutiveInput" value="100" min="10" max="1000" step="10" style="width: 60px; padding: 2px; font-size: 11px;" onchange="NetworkState.archiveHandlers.updateMaxConsecutive()">
+                                <span>回</span>
+                            </div>
+                            <span style="color: var(--text-secondary); font-size: 10px;">(非アーカイブノード連続検出で停止)</span>
+                        </div>
                     </div>
                     
                     <!-- Test Block Hash Input -->
@@ -3123,6 +3132,29 @@
                 
                 manager.saveThreshold(thresholdM);
                 updateArchiveNodeStatus();
+            },
+            
+            updateMaxConsecutive: function() {
+                const input = document.getElementById('maxConsecutiveInput');
+                const manager = NetworkState.archiveManager;
+                if (!manager) return;
+                
+                const maxConsecutive = parseInt(input.value);
+                if (isNaN(maxConsecutive) || maxConsecutive < 10 || maxConsecutive > 1000) {
+                    alert('無効な値です（10-1000の範囲で入力してください）');
+                    input.value = manager.maxConsecutiveNonArchive;
+                    return;
+                }
+                
+                manager.maxConsecutiveNonArchive = maxConsecutive;
+                log(`[Archive] 連続失敗上限を${maxConsecutive}回に設定しました`, 'info');
+                
+                // LocalStorageに保存
+                try {
+                    localStorage.setItem('archiveMaxConsecutive', maxConsecutive.toString());
+                } catch (e) {
+                    log('[Archive] 設定の保存に失敗しました', 'error');
+                }
             }
         };
         
@@ -3444,7 +3476,9 @@
                 
                 // v5.11.119 Phase 2: Track consecutive non-archive nodes
                 this.consecutiveNonArchive = 0;
-                this.maxConsecutiveNonArchive = 100;
+                // Load maxConsecutiveNonArchive from localStorage or use default
+                const savedMaxConsecutive = localStorage.getItem('archiveMaxConsecutive');
+                this.maxConsecutiveNonArchive = savedMaxConsecutive ? parseInt(savedMaxConsecutive) : 100;
             }
             
             
@@ -10918,8 +10952,12 @@
             
             // Set UI values from manager (v5.11.95 - archiveNetworkSelect removed)
             const thresholdInput = document.getElementById('archiveThresholdInput');
+            const maxConsecutiveInput = document.getElementById('maxConsecutiveInput');
             if (thresholdInput) {
                 thresholdInput.value = NetworkState.archiveManager.archiveThreshold / 1000000;
+            }
+            if (maxConsecutiveInput) {
+                maxConsecutiveInput.value = NetworkState.archiveManager.maxConsecutiveNonArchive;
             }
             
             // Start periodic status updates

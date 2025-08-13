@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.12.75</title>
+    <title>Kaspa P2P File Storage v5.12.76</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -2487,6 +2487,24 @@
                 </div>
             </div>
             
+            <!-- Kaspaシステム再起動 (Moved from Debug Tab) -->
+            <div class="metric-box" style="margin-top: 20px;">
+                <h3>🔄 Kaspaシステム再起動</h3>
+                <p style="font-size: 13px; color: var(--text-secondary); margin: 10px 0;">
+                    WASM SDKとKaspa core.jsを再起動してクリーンな状態にします。<br>
+                    接続エラーや動作不良時にお試しください。
+                </p>
+                <button id="systemRestartBtn" onclick="SystemHandlers.initializeSystem()" 
+                        style="width: 100%; padding: 12px; background: var(--warning-color); 
+                               color: white; border: none; border-radius: 5px; cursor: pointer;">
+                    システムを再起動
+                </button>
+                <div id="restartStatus" style="margin-top: 10px; padding: 10px; 
+                     background: var(--bg-secondary); border-radius: 5px; display: none;">
+                    <!-- ステータス表示エリア -->
+                </div>
+            </div>
+            
             <!-- v5.11.131: Upload Settings -->
             <div class="metric-box" style="margin-top: 20px;">
                 <h3>📤 アップロード設定</h3>
@@ -2573,18 +2591,7 @@
 
     <!-- Debug Tab -->
     <div id="debug-tab" class="tab-content">
-        <!-- System Initialization -->
-        <div class="container">
-            <h2>🔧 システム初期化</h2>
-            
-            <!-- v5.11.134: Workspace settings moved to Settings tab -->
-            
-            <div class="grid-2" style="margin-top: 20px;">
-                <button id="initBtn">システムを初期化</button>
-                <button id="testBtn" disabled>接続テスト</button>
-            </div>
-            <div id="initStatus" class="metric-box" style="display: none;"></div>
-        </div>
+        <!-- v5.12.76: System Initialization moved to Settings tab -->
         
         <!-- v5.11.137: Multi WebSocket Test -->
         <div class="container">
@@ -3231,7 +3238,7 @@
         const SystemHandlers = {
             initializeSystem: async function() {
                 try {
-                    log('システム初期化を開始...');
+                    log('Kaspaシステム再起動を開始...');
                     updateNetworkStatus('connecting', '初期化中...');
                     
                     // Import WASM SDK
@@ -3287,20 +3294,22 @@
                     
                     // Update UI
                     window.kaspa = NetworkState.kaspa;
-                    document.getElementById('initStatus').style.display = 'block';
-                    
-                    if (UserState.address) {
-                        document.getElementById('initStatus').innerHTML = `
-                            <p class="success">✅ システム初期化完了</p>
-                            <p>アドレス: ${UserState.address.toString()}</p>
-                            <p>残高: ${balance} KAS</p>
+                    // Update restart status display
+                    const restartStatus = document.getElementById('restartStatus');
+                    if (restartStatus) {
+                        restartStatus.style.display = 'block';
+                        restartStatus.innerHTML = `
+                            <div style="color: var(--success-color); font-weight: bold;">
+                                ✅ 再起動完了
+                            </div>
+                            <div style="font-size: 12px; color: var(--text-secondary); margin-top: 5px;">
+                                WASM SDKとKaspa core.jsが正常に再起動されました
+                            </div>
                         `;
-                    } else {
-                        document.getElementById('initStatus').innerHTML = `
-                            <p class="success">✅ システム初期化完了</p>
-                            <p style="color: var(--warning-color);">⚠️ ウォレット未接続</p>
-                            <p>設定タブからウォレットを接続してください</p>
-                        `;
+                        // Hide after 5 seconds
+                        setTimeout(() => {
+                            restartStatus.style.display = 'none';
+                        }, 5000);
                     }
                     
                     document.getElementById('testBtn').disabled = false;
@@ -3364,7 +3373,7 @@
                 try {
                     // Initialize wallet with SDK
                     if (!NetworkState.kaspa) {
-                        throw new Error('Kaspa SDK not initialized - システムを初期化してください');
+                        throw new Error('Kaspa SDK not initialized - システムを再起動してください');
                     }
                     
                     // Create wallet from private key (correct API usage)
@@ -3421,7 +3430,7 @@
                     if (errorMessage.includes('Invalid private key')) {
                         alert('エラー: 無効な秘密鍵です。正しい形式で入力してください。');
                     } else if (errorMessage.includes('not initialized')) {
-                        alert('エラー: システムが初期化されていません。先に「システムを初期化」を実行してください。');
+                        alert('エラー: システムが初期化されていません。設定タブから「Kaspaシステム再起動」を実行してください。');
                     } else {
                         alert(`エラー: ${errorMessage}`);
                     }
@@ -12371,7 +12380,7 @@
             }
             
             if (!NetworkState.rpcClient) {
-                log('先にシステムを初期化してください', 'error');
+                log('先にKaspaシステムを再起動してください', 'error');
                 return;
             }
             
@@ -15149,7 +15158,7 @@
             }
             
             if (!NetworkState.rpcClient) {
-                log('先にシステムを初期化してください', 'error');
+                log('先にKaspaシステムを再起動してください', 'error');
                 return;
             }
             
@@ -15707,7 +15716,7 @@
             }
             
             if (!NetworkState.rpcClient) {
-                log('先にシステムを初期化してください', 'error');
+                log('先にKaspaシステムを再起動してください', 'error');
                 return;
             }
             
@@ -16083,7 +16092,7 @@
                     hint = '正しいパスワードを入力してください';
                 } else if (errorMsg.includes('初期化') || errorMsg.includes('RPC')) {
                     userMessage += 'システムが接続されていません';
-                    hint = '設定タブで「システム初期化」をクリックしてください';
+                    hint = '設定タブで「Kaspaシステム再起動」をクリックしてください';
                 } else if (errorMsg.includes('ブロック') || errorMsg.includes('見つかりません')) {
                     userMessage += 'データが見つかりません';
                     hint = 'ファイルが削除されているか、ネットワークを確認してください';
@@ -16222,14 +16231,10 @@
                 walletConnectBtn.addEventListener('click', () => SystemHandlers.connectWallet());
             }
             
-            const initBtn = document.getElementById('initBtn');
-            if (initBtn) {
-                initBtn.addEventListener('click', () => SystemHandlers.initializeSystem());
-            }
-            
-            const testBtn = document.getElementById('testBtn');
-            if (testBtn) {
-                testBtn.addEventListener('click', () => SystemHandlers.testConnection());
+            // System restart button moved to Settings tab
+            const systemRestartBtn = document.getElementById('systemRestartBtn');
+            if (systemRestartBtn) {
+                systemRestartBtn.addEventListener('click', () => SystemHandlers.initializeSystem());
             }
             
             // Add document click event for closing sidebar on outside click
@@ -16405,7 +16410,7 @@
             log(`🚀 Kaspa P2P v${getAppVersion()} 準備完了！`, 'info');
             log(`📋 v${getAppVersion()}: ${getVersionDescription()}`, 'info');
             log('✨ 並列ダウンロード: ' + (AppState.settings.parallelDownloadEnabled ? '有効' : '無効'), 'info');
-            log('システムを初期化してください', 'info');
+            log('Kaspaシステムを再起動してください', 'info');
             
             // v5.10.0: Migration test log
             log('[v5.10.0] chunkBoundaries → segmentBoundaries 移行完了', 'success');
@@ -16483,7 +16488,7 @@
         // WebSocket monitoring (unified version with reconnection support)
         window.startMonitoring = async function() {
             if (!NetworkState.rpcClient) {
-                log('先にシステムを初期化してください', 'error');
+                log('先にKaspaシステムを再起動してください', 'error');
                 return;
             }
             
@@ -17132,7 +17137,7 @@
                     
                     // Kaspa WASM SDKチェック
                     if (!NetworkState.kaspa) {
-                        throw new Error('Kaspa WASM not initialized. Please run "システムを初期化" first.');
+                        throw new Error('Kaspa WASM not initialized. Please run "Kaspaシステム再起動" first.');
                     }
                     
                     if (!NetworkState.kaspa.PrivateKey) {

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.12.68</title>
+    <title>Kaspa P2P File Storage v5.12.69</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -10134,7 +10134,7 @@
             async executeDownload(metadata, password, options = {}) {
                 try {
                     this.isDownloading = true;
-                    const { onProgress, onComplete, folderStructure } = options;
+                    const { onProgress, onComplete, folderStructure, metaTxId, metaTxBlockId } = options;
                     
                     log(`[DownloadManager] ダウンロード開始: ${metadata.file?.name || 'unknown'}`, 'info');
                     log(`[DownloadManager DEBUG] chunks[0]: ${metadata.chunks[0]?.substring(0, 16)}...`, 'debug');
@@ -10596,6 +10596,70 @@
                         a.download = metadata.file?.name || 'download';
                         a.click();
                         URL.revokeObjectURL(url);
+                    }
+                    
+                    // Phase 2: KENV登録処理（ダウンロード成功時のみ）
+                    if (FileState.kenvManager._initialized && metaTxId) {
+                        log('[KENV] ダウンロード完了エントリーを追加', 'info');
+                        
+                        const kenvEntry = FileState.kenvManager.addMinimalEntry(
+                            metadata.file?.name || 'download',
+                            'kaspa-file',
+                            'download'
+                        );
+                        
+                        // ダウンロード情報を設定
+                        kenvEntry.metaTxId = metaTxId;
+                        kenvEntry.metaTxBlockId = metaTxBlockId || null;
+                        kenvEntry.password = password || null;
+                        kenvEntry.downloadDate = new Date().toISOString();
+                        
+                        // メタデータから情報を取得
+                        if (metadata) {
+                            kenvEntry.fileSize = metadata.file?.size || null;
+                            kenvEntry.cid = metadata.cid || null;
+                            kenvEntry.uploadDate = metadata.created || metadata.metadata?.uploadDate || null;
+                            kenvEntry.uploadedBy = metadata.metadata?.uploadedBy || null;
+                            kenvEntry.sha256 = metadata.file?.sha256 || null;
+                            kenvEntry.mimeType = metadata.file?.mimeType || null;
+                            kenvEntry.encrypted = true;
+                            kenvEntry.totalChunks = metadata.chunks?.length || metadata.recovery?.totalChunks || null;
+                            
+                            // 暗号化情報
+                            if (metadata.encryption?.pbkdf2?.salt) {
+                                kenvEntry.salt = metadata.encryption.pbkdf2.salt;
+                            }
+                            
+                            // 圧縮情報
+                            if (metadata.file?.compression) {
+                                const comp = metadata.file.compression;
+                                kenvEntry.compressionAlgorithm = comp.algorithm;
+                                kenvEntry.compressionEnabled = comp.enabled;
+                                kenvEntry.originalSize = comp.originalSize;
+                                kenvEntry.compressedSize = comp.compressedSize;
+                                kenvEntry.variableChunk = comp.variableChunk || false;
+                            }
+                            
+                            // PayloadSplit情報
+                            kenvEntry.payloadSplit = metadata.metadata?.payloadSplit || false;
+                        }
+                        
+                        // インデックスを更新
+                        const lineNumber = FileState.kenvManager.entries.indexOf(kenvEntry);
+                        FileState.kenvManager.updateIndex(kenvEntry, lineNumber);
+                        
+                        // ファイルを保存（非同期で実行）
+                        FileState.kenvManager.saveAll().then(() => {
+                            log('[KENV] ダウンロードエントリーを保存しました', 'success');
+                            
+                            // File Tabが開いている場合は更新
+                            const activeTab = document.querySelector('.tab-content.active');
+                            if (activeTab && activeTab.id === 'file-tab') {
+                                window.updateFileListFromKENV();
+                            }
+                        }).catch(error => {
+                            log(`[KENV] 保存エラー: ${error.message}`, 'error');
+                        });
                     }
                     
                     this.isDownloading = false;
@@ -15605,7 +15669,9 @@
                     kaspaMetadata,
                     password,
                     {
-                        onProgress: onProgress
+                        onProgress: onProgress,
+                        metaTxId: kaspaMetadata.metaTx?.txid || null,
+                        metaTxBlockId: kaspaMetadata.metaTx?.blockId || null
                     }
                 );
                 

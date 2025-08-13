@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.12.74</title>
+    <title>Kaspa P2P File Storage v5.12.75</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -2345,6 +2345,23 @@
                 </div>
             </div>
             
+            <!-- 作業フォルダ設定 (Moved from Debug Tab) -->
+            <div class="metric-box" style="margin-top: 20px;">
+                <h3>📁 作業フォルダ設定</h3>
+                <div id="workspaceStatus" style="margin-top: 15px; padding: 12px; background: var(--bg-secondary); border-radius: 5px;">
+                    <div id="workspaceDisplay" style="font-size: 14px; margin-bottom: 10px;">
+                        作業フォルダ: <span id="workspaceName" style="font-weight: bold;">未設定（ブラウザ内保存）</span>
+                        <span id="workspaceHelp" onclick="alert('Kaspa P2P File Storage - 作業フォルダについて\\n\\n作業フォルダを設定すると：\\n✓ 進捗がファイルに自動保存されます\\n✓ ダウンロードファイルが整理されます\\n✓ ブラウザを閉じても進捗が残ります\\n\\n設定しない場合：\\n✓ ブラウザ内に進捗が保存されます\\n✓ ファイルの自動ダウンロードはありません')" style="cursor: pointer; margin-left: 5px; color: var(--accent-color);">❓</span>
+                    </div>
+                    <button onclick="setupWorkspace()" id="workspaceBtn" style="width: 100%; padding: 10px; background: var(--accent-color); color: var(--button-text-on-accent); border: none; border-radius: 5px; cursor: pointer;">
+                        作業フォルダを選択
+                    </button>
+                </div>
+                <p style="font-size: 12px; color: var(--text-secondary); margin-top: 10px;">
+                    作業フォルダを設定すると、進捗ファイルが自動保存され、ブラウザを閉じても作業を継続できます。
+                </p>
+            </div>
+            
             <div class="metric-box" style="display: none;">
                 <!-- v5.11.116: WebSocket Block Statistics -->
                 <div id="wsBlockStats" style="margin-top: 10px; padding: 10px; border-radius: 5px; background: var(--upload-bg); display: none;">
@@ -2560,17 +2577,7 @@
         <div class="container">
             <h2>🔧 システム初期化</h2>
             
-            <!-- v5.11.134: Workspace settings consolidated here -->
-            <div class="metric-box" style="margin-top: 20px;">
-                <h3>📁 作業フォルダ設定</h3>
-                <div id="workspaceStatusDisplay" style="margin-top: 10px; padding: 10px; background: var(--background-light); border-radius: 5px; font-size: 14px;">
-                    作業フォルダ: 未設定 (ブラウザ内保存のみ)
-                </div>
-                <button onclick="setupWorkspace()" id="workspaceBtn" style="width: 100%; margin-top: 10px;">作業フォルダを選択</button>
-                <p style="font-size: 12px; color: var(--text-secondary); margin-top: 10px;">
-                    作業フォルダを設定すると、進捗ファイルが自動保存され、ブラウザを閉じても作業を継続できます。
-                </p>
-            </div>
+            <!-- v5.11.134: Workspace settings moved to Settings tab -->
             
             <div class="grid-2" style="margin-top: 20px;">
                 <button id="initBtn">システムを初期化</button>
@@ -9396,33 +9403,40 @@
         
         
         function showWorkspaceStatus() {
-            // v5.8.0: Update the new workspaceStatusDisplay element
-            const status = document.getElementById('workspaceStatusDisplay');
-            if (status) {
+            // Update Settings tab workspace display
+            const workspaceName = document.getElementById('workspaceName');
+            const workspaceBtn = document.getElementById('workspaceBtn');
+            const workspaceHelp = document.getElementById('workspaceHelp');
+            
+            if (workspaceName && workspaceBtn) {
                 if (WorkspaceState.handle) {
-                    status.innerHTML = `
-                        ✓ 作業フォルダ: ${WorkspaceState.handle.name}
-                        <button onclick="setupWorkspace()" style="margin-left: 10px; padding: 5px 10px; font-size: 12px;">変更</button>
-                        <span onclick="alert('Kaspa P2P File Storage - 作業フォルダについて\\n\\n作業フォルダを設定すると：\\n✓ 進捗がファイルに自動保存されます\\n✓ ダウンロードファイルが整理されます\\n✓ ブラウザを閉じても進捗が残ります\\n\\n設定しない場合：\\n✓ ブラウザ内に進捗が保存されます\\n✓ ファイルの自動ダウンロードはありません\\n\\n※「作業フォルダ設定」ボタンで後から設定できます')" style="cursor: pointer; margin-left: 5px; color: var(--accent-color);">❓</span>
-                    `;
-                    status.style.color = 'var(--success-color)';
+                    workspaceName.textContent = WorkspaceState.handle.name;
+                    workspaceName.style.color = 'var(--success-color)';
+                    workspaceBtn.textContent = '作業フォルダを変更';
+                    // Hide help icon when folder is set
+                    if (workspaceHelp) {
+                        workspaceHelp.style.display = 'none';
+                    }
                 } else {
-                    status.innerHTML = `
-                        作業フォルダ: 未設定 (ブラウザ内保存のみ)
-                        <button onclick="setupWorkspace()" style="margin-left: 10px; padding: 5px 10px; font-size: 12px;">設定</button>
-                        <span onclick="alert('Kaspa P2P File Storage - 作業フォルダについて\\n\\n作業フォルダを設定すると：\\n✓ 進捗がファイルに自動保存されます\\n✓ ダウンロードファイルが整理されます\\n✓ ブラウザを閉じても進捗が残ります\\n\\n設定しない場合：\\n✓ ブラウザ内に進捗が保存されます\\n✓ ファイルの自動ダウンロードはありません\\n\\n※「作業フォルダ設定」ボタンで後から設定できます')" style="cursor: pointer; margin-left: 5px; color: var(--accent-color);">❓</span>
-                    `;
-                    status.style.color = 'var(--warning-color)';
+                    workspaceName.textContent = '未設定（ブラウザ内保存）';
+                    workspaceName.style.color = 'var(--warning-color)';
+                    workspaceBtn.textContent = '作業フォルダを選択';
+                    // Show help icon when folder is not set
+                    if (workspaceHelp) {
+                        workspaceHelp.style.display = 'inline';
+                    }
                 }
             }
             
-            // Update simple status in Status tab
+            // Update Status tab simple display
             const simpleStatus = document.getElementById('workspaceStatusSimple');
             if (simpleStatus) {
                 if (WorkspaceState.handle) {
                     simpleStatus.textContent = `作業フォルダ: ${WorkspaceState.handle.name}`;
+                    simpleStatus.style.color = 'var(--success-color)';
                 } else {
-                    simpleStatus.textContent = `作業フォルダ: 未設定 (ブラウザ内保存)`;
+                    simpleStatus.textContent = '作業フォルダ: 未設定 (ブラウザ内保存)';
+                    simpleStatus.style.color = 'var(--text-secondary)';
                 }
             }
             
@@ -9430,9 +9444,9 @@
             const statusFolder = document.getElementById('workspaceFolderStatus');
             if (statusFolder) {
                 if (WorkspaceState.handle) {
-                    statusFolder.innerHTML = `<span>📁 ${WorkspaceState.handle.name}</span> <span onclick="alert('Kaspa P2P File Storage - 作業フォルダについて\\n\\n作業フォルダを設定すると：\\n✓ 進捗がファイルに自動保存されます\\n✓ ダウンロードファイルが整理されます\\n✓ ブラウザを閉じても進捗が残ります\\n\\n設定しない場合：\\n✓ ブラウザ内に進捗が保存されます\\n✓ ファイルの自動ダウンロードはありません\\n\\n※「作業フォルダ設定」ボタンで後から設定できます')" style="cursor: pointer; color: var(--accent-color);">❓</span>`;
+                    statusFolder.innerHTML = `<span>📁 ${WorkspaceState.handle.name}</span>`;
                 } else {
-                    statusFolder.innerHTML = `<span>📁 未設定</span> <span onclick="alert('Kaspa P2P File Storage - 作業フォルダについて\\n\\n作業フォルダを設定すると：\\n✓ 進捗がファイルに自動保存されます\\n✓ ダウンロードファイルが整理されます\\n✓ ブラウザを閉じても進捗が残ります\\n\\n設定しない場合：\\n✓ ブラウザ内に進捗が保存されます\\n✓ ファイルの自動ダウンロードはありません\\n\\n※「作業フォルダ設定」ボタンで後から設定できます')" style="cursor: pointer; color: var(--accent-color);">❓</span>`;
+                    statusFolder.innerHTML = `<span>📁 未設定</span>`;
                 }
             }
         }

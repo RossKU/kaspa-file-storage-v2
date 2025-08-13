@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.12.70</title>
+    <title>Kaspa P2P File Storage v5.12.71</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -2390,6 +2390,69 @@
                 </div>
             </div>
             
+            <!-- Archive Node Monitor (moved from Debug Tab) -->
+            <div class="metric-box" style="margin-top: 20px;">
+                <h3>🗄️ アーカイブノード探査</h3>
+                <div style="margin-top: 15px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                        <div style="font-size: 14px;">Archive Monitor | <span id="archiveNetwork">-</span> | <span id="archiveResolver">-</span></div>
+                        <div>
+                            <button onclick="NetworkState.archiveManager?.startDiscovery()" id="archiveStartBtn" style="padding: 4px 8px; font-size: 12px;">探索</button>
+                            <button onclick="NetworkState.archiveManager?.stop()" id="archiveStopBtn" style="padding: 4px 8px; font-size: 12px;">停止</button>
+                            <button onclick="NetworkState.archiveManager?.reset()" id="archiveResetBtn" style="padding: 4px 8px; font-size: 12px;">リセット</button>
+                            <button onclick="NetworkState.archiveManager?.testBlocks()" id="testBlockBtn" style="padding: 4px 8px; font-size: 12px;">テスト実行</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Network and Threshold Settings -->
+                    <div style="font-size: 11px; margin-bottom: 8px;">
+                        <!-- Network display -->
+                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 4px;">
+                            <span>ネットワーク: <strong id="archiveNetworkDisplay">-</strong></span>
+                        </div>
+                        <!-- Threshold settings -->
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <div style="display: flex; align-items: center; gap: 4px;">
+                                <label>閾値:</label>
+                                <input type="number" id="archiveThresholdInput" value="50" step="0.1" style="width: 50px; padding: 2px; font-size: 11px;" onchange="NetworkState.archiveHandlers.updateArchiveThreshold()">
+                                <span>M blocks</span>
+                            </div>
+                            <span style="color: var(--text-secondary); font-size: 10px;">(0.864M = 1日分)</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Test Block Hash Input -->
+                    <div style="font-size: 11px; margin-bottom: 8px;">
+                        <input type="text" id="testBlockHash" placeholder="テスト用ブロックハッシュ (任意)" style="width: 100%; padding: 4px; font-size: 11px;">
+                    </div>
+                    
+                    <!-- Compact Statistics -->
+                    <div style="font-size: 12px; line-height: 1.4; margin-bottom: 8px; font-family: monospace;">
+                        <div id="archiveStats">探索: 未開始</div>
+                        <div>接続: <span id="archiveHealthBar">[-----]</span> <span id="archiveConnectedNodes">0/5</span> | Avg: <span id="archiveAvgResponse">-</span></div>
+                        <div id="archiveCheckingStatus" style="color: var(--text-secondary);">チェック中: <span id="archiveCheckingNode">待機中</span></div>
+                    </div>
+                    
+                    <!-- Compact Node List -->
+                    <div id="archiveNodeDetails" style="font-size: 11px; font-family: monospace; line-height: 1.3; margin-bottom: 8px; max-height: 80px; overflow-y: auto;">
+                        <div style="color: var(--text-secondary);">接続待機中...</div>
+                    </div>
+                    
+                    <!-- Minimal Event Log -->
+                    <div style="border-top: 1px solid var(--border-color); padding-top: 6px; margin-top: 6px;">
+                        <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 4px;">最近のイベント:</div>
+                        <div id="archiveEventLog" style="font-size: 11px; font-family: monospace; line-height: 1.3; max-height: 80px; overflow-y: auto;">
+                            <div style="color: var(--text-secondary);">イベントなし</div>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-top: 8px; text-align: center;">
+                        <button onclick="NetworkState.archiveHandlers.testArchiveNodes()" disabled id="archiveTestBtn" style="padding: 4px 12px; font-size: 12px;">テスト実行</button>
+                        <button onclick="NetworkState.archiveHandlers.refreshArchiveStatus()" style="padding: 4px 12px; font-size: 12px;">更新</button>
+                    </div>
+                </div>
+            </div>
+            
             <!-- v5.11.131: Upload Settings -->
             <div class="metric-box" style="margin-top: 20px;">
                 <h3>📤 アップロード設定</h3>
@@ -2497,70 +2560,6 @@
                 <button id="testBtn" disabled>接続テスト</button>
             </div>
             <div id="initStatus" class="metric-box" style="display: none;"></div>
-        </div>
-        
-        <!-- Archive Node Monitor -->
-        <div class="container">
-            <h2>🗄️ アーカイブノードモニター</h2>
-            <div class="metric-box" style="padding: 12px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                    <h3 style="margin: 0; font-size: 14px;">🗄️ Archive Monitor | <span id="archiveNetwork">-</span> | <span id="archiveResolver">-</span></h3>
-                    <div>
-                        <button onclick="NetworkState.archiveManager?.startDiscovery()" id="archiveStartBtn" style="padding: 4px 8px; font-size: 12px;">探索</button>
-                        <button onclick="NetworkState.archiveManager?.stop()" id="archiveStopBtn" style="padding: 4px 8px; font-size: 12px;">停止</button>
-                        <button onclick="NetworkState.archiveManager?.reset()" id="archiveResetBtn" style="padding: 4px 8px; font-size: 12px;">リセット</button>
-                        <button onclick="NetworkState.archiveManager?.testBlocks()" id="testBlockBtn" style="padding: 4px 8px; font-size: 12px;">テスト実行</button>
-                    </div>
-                </div>
-                
-                <!-- Network and Threshold Settings -->
-                <div style="font-size: 11px; margin-bottom: 8px;">
-                    <!-- Network display (v5.11.94) -->
-                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 4px;">
-                        <span>ネットワーク: <strong id="archiveNetworkDisplay">-</strong></span>
-                        <span style="color: var(--text-secondary);">(設定タブで変更)</span>
-                    </div>
-                    <!-- Threshold settings -->
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <div style="display: flex; align-items: center; gap: 4px;">
-                            <label>閾値:</label>
-                            <input type="number" id="archiveThresholdInput" value="50" step="0.1" style="width: 50px; padding: 2px; font-size: 11px;" onchange="NetworkState.archiveHandlers.updateArchiveThreshold()">
-                            <span>M blocks</span>
-                        </div>
-                        <span style="color: var(--text-secondary); font-size: 10px;">(0.864M = 1日分)</span>
-                    </div>
-                </div>
-                
-                <!-- Test Block Hash Input -->
-                <div style="font-size: 11px; margin-bottom: 8px;">
-                    <input type="text" id="testBlockHash" placeholder="テスト用ブロックハッシュ (任意)" style="width: 100%; padding: 4px; font-size: 11px;">
-                </div>
-                
-                <!-- Compact Statistics -->
-                <div style="font-size: 12px; line-height: 1.4; margin-bottom: 8px; font-family: monospace;">
-                    <div id="archiveStats">探索: 未開始 (デバッグタブから開始してください)</div>
-                    <div>接続: <span id="archiveHealthBar">[-----]</span> <span id="archiveConnectedNodes">0/5</span> | Avg: <span id="archiveAvgResponse">-</span></div>
-                    <div id="archiveCheckingStatus" style="color: var(--text-secondary);">チェック中: <span id="archiveCheckingNode">待機中</span></div>
-                </div>
-                
-                <!-- Compact Node List -->
-                <div id="archiveNodeDetails" style="font-size: 11px; font-family: monospace; line-height: 1.3; margin-bottom: 8px; max-height: 80px; overflow-y: auto;">
-                    <div style="color: var(--text-secondary);">接続待機中...</div>
-                </div>
-                
-                <!-- Minimal Event Log -->
-                <div style="border-top: 1px solid var(--border-color); padding-top: 6px; margin-top: 6px;">
-                    <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 4px;">最近のイベント:</div>
-                    <div id="archiveEventLog" style="font-size: 11px; font-family: monospace; line-height: 1.3; max-height: 80px; overflow-y: auto;">
-                        <div style="color: var(--text-secondary);">イベントなし</div>
-                    </div>
-                </div>
-                
-                <div style="margin-top: 8px; text-align: center;">
-                    <button onclick="NetworkState.archiveHandlers.testArchiveNodes()" disabled id="archiveTestBtn" style="padding: 4px 12px; font-size: 12px;">テスト実行</button>
-                    <button onclick="NetworkState.archiveHandlers.refreshArchiveStatus()" style="padding: 4px 12px; font-size: 12px;">更新</button>
-                </div>
-            </div>
         </div>
         
         <!-- v5.11.137: Multi WebSocket Test -->
@@ -3816,7 +3815,7 @@
                 this.currentChecking = null;
                 
                 // Update UI to initial state
-                document.getElementById('archiveStats').textContent = '探索: 未開始 (デバッグタブから開始してください)';
+                document.getElementById('archiveStats').textContent = '探索: 未開始';
                 document.getElementById('archiveHealthBar').textContent = '[-----]';
                 document.getElementById('archiveConnectedNodes').textContent = '0/5';
                 document.getElementById('archiveAvgResponse').textContent = '-';

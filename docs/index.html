@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.0.1</title>
+    <title>Kaspa P2P File Storage v6.0.2</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -1844,21 +1844,21 @@
                     <select id="kenvSortSelect" onchange="handleSortSelectChange(this.value)" 
                             class="file-select">
                         <!-- 主要項目 -->
-                        <option value="name-asc">📝 名前 ↑</option>
-                        <option value="name-desc">📝 名前 ↓</option>
-                        <option value="size-desc">💾 サイズ ↓</option>
-                        <option value="size-asc">💾 サイズ ↑</option>
-                        <option value="date-desc">📅 UP日 ↓</option>
-                        <option value="date-asc">📅 UP日 ↑</option>
+                        <option value="name-asc">📝 Name ↑</option>
+                        <option value="name-desc">📝 Name ↓</option>
+                        <option value="size-desc">💾 Size ↓</option>
+                        <option value="size-asc">💾 Size ↑</option>
+                        <option value="date-desc">📅 Upload ↓</option>
+                        <option value="date-asc">📅 Upload ↑</option>
                         <!-- デスクトップ専用項目 -->
                         <option value="cid-asc" class="desktop-only">🔗 CID ↑</option>
                         <option value="cid-desc" class="desktop-only">🔗 CID ↓</option>
                         <option value="meta-asc" class="desktop-only">📋 MetaTxID ↑</option>
                         <option value="meta-desc" class="desktop-only">📋 MetaTxID ↓</option>
-                        <option value="uploader-asc" class="desktop-only">👤 アップローダー ↑</option>
-                        <option value="uploader-desc" class="desktop-only">👤 アップローダー ↓</option>
-                        <option value="created-desc" class="desktop-only">🕐 登録日 ↓</option>
-                        <option value="created-asc" class="desktop-only">🕐 登録日 ↑</option>
+                        <option value="uploader-asc" class="desktop-only">👤 Uploader ↑</option>
+                        <option value="uploader-desc" class="desktop-only">👤 Uploader ↓</option>
+                        <option value="created-desc" class="desktop-only">🕐 Created ↓</option>
+                        <option value="created-asc" class="desktop-only">🕐 Created ↑</option>
                     </select>
                     
                     <select id="kenvFilterSelect" onchange="filterKENVFiles(this.value)" 
@@ -2946,7 +2946,7 @@
             handleProgressFileSelect: async function(event) {
                 const file = event.target.files[0];
                 if (!file || !file.name.endsWith('.kprogress')) {
-                    log('有効な進捗ファイル（.kprogress）を選択してください', 'error');
+                    log('Please select a valid progress file (.kprogress)', 'error');
                     return;
                 }
                 
@@ -2970,7 +2970,7 @@
             cancelResume: function() {
                 window.pendingProgress = null;
                 document.getElementById('resumeInfo').style.display = 'none';
-                log('レジュームをキャンセルしました', 'info');
+                log('Resume cancelled', 'info');
             },
             
             checkAutoResumeProgress: async function(file) {
@@ -2995,11 +2995,11 @@
                         const calculatedCID = firstChunkHash.substring(0, 8);
                         
                         if (calculatedCID === progressInfo.cid) {
-                            log(`CID検証成功: ${calculatedCID}`, 'success');
+                            log(`CID verification successful: ${calculatedCID}`, 'success');
                             
                             // Check if already completed
                             if (progress.metadata.completedChunks >= progress.metadata.totalChunks) {
-                                log(`完了済みファイルを検出: ${file.name}`, 'info');
+                                log(`Completed file detected: ${file.name}`, 'info');
                                 return { completed: true };
                             }
                             
@@ -3007,7 +3007,7 @@
                             window.pendingProgress = progress;
                             return { autoResume: true, progress };
                         } else {
-                            log(`CID不一致: ${calculatedCID} != ${progressInfo.cid}`, 'warning');
+                            log(`CID mismatch: ${calculatedCID} != ${progressInfo.cid}`, 'warning');
                         }
                     } catch (err) {
                         log(`進捗ファイル読み込みエラー: ${err.message}`, 'error');
@@ -3243,7 +3243,7 @@
                         'PrivateKey', 'addressFromScriptPublicKey', 'Address'];
                     for (const func of requiredFunctions) {
                         if (typeof NetworkState.kaspa[func] !== 'function') {
-                            throw new Error(`必要な関数が見つかりません: ${func}`);
+                            throw new Error(`Required function not found: ${func}`);
                         }
                     }
                     log('すべての必要な関数を確認しました', 'success');
@@ -3368,7 +3368,7 @@
                 try {
                     // Initialize wallet with SDK
                     if (!NetworkState.kaspa) {
-                        throw new Error('Kaspa SDK not initialized - システムを再起動してください');
+                        throw new Error('Kaspa SDK not initialized - Please restart the system');
                     }
                     
                     // Create wallet from private key (correct API usage)
@@ -8329,7 +8329,7 @@
                             const errorMsg = Array.from(this.errors.entries())
                                 .map(([idx, err]) => `チャンク${idx}: ${err}`)
                                 .join(', ');
-                            throw new Error(`ダウンロードエラー率が高すぎます (${errorRate.toFixed(1)}%): ${errorMsg}`);
+                            throw new Error(`Download error rate too high (${errorRate.toFixed(1)}%): ${errorMsg}`);
                         }
                     }
                     
@@ -8337,9 +8337,9 @@
                     for (let i = 0; i < txIds.length; i++) {
                         if (!this.results.has(i)) {
                             if (this.errors.has(i)) {
-                                throw new Error(`チャンク${i}のダウンロードに失敗: ${this.errors.get(i)}`);
+                                throw new Error(`Failed to download chunk ${i}: ${this.errors.get(i)}`);
                             } else {
-                                throw new Error(`チャンク${i}が見つかりません`);
+                                throw new Error(`Chunk ${i} not found`);
                             }
                         }
                         sortedChunks.push(this.results.get(i));
@@ -8411,7 +8411,7 @@
                         
                         const block = response?.block?.block || response?.block;
                         if (!block) {
-                            throw new Error(`ブロックが見つかりません: ${blockId}`);
+                            throw new Error(`Block not found: ${blockId}`);
                         }
                         
                         let payload = null;
@@ -8426,7 +8426,7 @@
                         }
                         
                         if (!payload) {
-                            throw new Error(`ペイロードが見つかりません`);
+                            throw new Error(`Payload not found`);
                         }
                         
                         const decrypted = await decryptChunk(payload, key, index);
@@ -8505,7 +8505,7 @@
                         const errorMsg = Array.from(this.errors.entries())
                             .map(([idx, err]) => `ペイロード${idx}: ${err}`)
                             .join(', ');
-                        throw new Error(`ダウンロードエラー: ${errorMsg}`);
+                        throw new Error(`Download error: ${errorMsg}`);
                     }
                     
                     const sortedPayloads = [];
@@ -8560,7 +8560,7 @@
                         
                         const block = response?.block?.block || response?.block;
                         if (!block) {
-                            throw new Error(`ブロックが見つかりません: ${blockId}`);
+                            throw new Error(`Block not found: ${blockId}`);
                         }
                         
                         let payload = null;
@@ -8575,7 +8575,7 @@
                         }
                         
                         if (!payload) {
-                            throw new Error(`ペイロードが見つかりません`);
+                            throw new Error(`Payload not found`);
                         }
                         
                         this.results.set(index, payload);
@@ -9476,7 +9476,7 @@
         window.handleProgressFileSelect = async function(event) {
             const file = event.target.files[0];
             if (!file || !file.name.endsWith('.kprogress')) {
-                log('有効な進捗ファイル（.kprogress）を選択してください', 'error');
+                log('Please select a valid progress file (.kprogress)', 'error');
                 return;
             }
             
@@ -9504,7 +9504,7 @@
                 
                 // Validate progress format
                 if (!progress.version || (!progress.fileInfo && !progress.file) || !progress.chunks) {
-                    throw new Error('無効な進捗ファイル形式');
+                    throw new Error('Invalid progress file format');
                 }
                 
                 // Convert v2.1 format to v3.3 if needed
@@ -9565,7 +9565,7 @@
         window.cancelResume = function() {
             window.pendingProgress = null;
             document.getElementById('resumeInfo').style.display = 'none';
-            log('レジュームをキャンセルしました', 'info');
+            log('Resume cancelled', 'info');
         };
         */
 
@@ -9603,7 +9603,7 @@
                         const errorMsg = Array.from(this.errors.entries())
                             .map(([idx, err]) => `チャンク${idx}: ${err}`)
                             .join(', ');
-                        throw new Error(`ダウンロードエラー率が高すぎます (${errorRate.toFixed(1)}%): ${errorMsg}`);
+                        throw new Error(`Download error rate too high (${errorRate.toFixed(1)}%): ${errorMsg}`);
                     }
                 }
                 
@@ -9611,9 +9611,9 @@
                 for (let i = 0; i < this.totalChunks; i++) {
                     if (!this.results.has(i)) {
                         if (this.errors.has(i)) {
-                            throw new Error(`チャンク${i}のダウンロードに失敗: ${this.errors.get(i)}`);
+                            throw new Error(`Failed to download chunk ${i}: ${this.errors.get(i)}`);
                         } else {
-                            throw new Error(`チャンク${i}が見つかりません`);
+                            throw new Error(`Chunk ${i} not found`);
                         }
                     }
                     sortedChunks.push(this.results.get(i));
@@ -9808,7 +9808,7 @@
                         
                         const block = blockResponse?.block?.block || blockResponse?.block;
                         if (!block) {
-                            throw new Error(`ブロックが見つかりません: ${blockId}`);
+                            throw new Error(`Block not found: ${blockId}`);
                         }
                         
                         // Find the meta transaction in the block
@@ -9903,7 +9903,7 @@
                     
                     const block = blockResponse?.block?.block || blockResponse?.block;
                     if (!block) {
-                        throw new Error(`ブロックが見つかりません: ${blockId}`);
+                        throw new Error(`Block not found: ${blockId}`);
                     }
                     
                     // Find transaction
@@ -9987,7 +9987,7 @@
                     
                     const block = blockResponse?.block?.block || blockResponse?.block;
                     if (!block) {
-                        throw new Error(`ブロックが見つかりません: ${blockId}`);
+                        throw new Error(`Block not found: ${blockId}`);
                     }
                     
                     // Find transaction
@@ -11000,7 +11000,7 @@
                     'PrivateKey', 'addressFromScriptPublicKey', 'Address'];
                 for (const func of requiredFunctions) {
                     if (typeof NetworkState.kaspa[func] !== 'function') {
-                        throw new Error(`必要な関数が見つかりません: ${func}`);
+                        throw new Error(`Required function not found: ${func}`);
                     }
                 }
                 log('すべての必要な関数を確認しました', 'success');
@@ -11248,11 +11248,11 @@
                     const calculatedCID = firstChunkHash.substring(0, 8);
                     
                     if (calculatedCID === progressInfo.cid) {
-                        log(`CID検証成功: ${calculatedCID}`, 'success');
+                        log(`CID verification successful: ${calculatedCID}`, 'success');
                         
                         // Check if already completed
                         if (progress.metadata.completedChunks >= progress.metadata.totalChunks) {
-                            log(`完了済みファイルを検出: ${file.name}`, 'info');
+                            log(`Completed file detected: ${file.name}`, 'info');
                             return { completed: true };
                         }
                         
@@ -11272,7 +11272,7 @@
                             log('自動レジュームをキャンセルしました', 'info');
                         }
                     } else {
-                        log(`CID不一致: 期待=${progressInfo.cid}, 実際=${calculatedCID}`, 'warning');
+                        log(`CID mismatch: Expected=${progressInfo.cid}, Actual=${calculatedCID}`, 'warning');
                         log('異なるファイルの可能性があります', 'warning');
                     }
                 } catch (error) {
@@ -15082,7 +15082,7 @@
                         
                         const block = blockResponse?.block?.block || blockResponse?.block;
                         if (!block) {
-                            throw new Error(`ブロックが見つかりません: ${blockId}`);
+                            throw new Error(`Block not found: ${blockId}`);
                         }
                         
                         // Find the meta transaction in the block
@@ -15132,7 +15132,7 @@
                                 
                                 const block = blockResponse?.block?.block || blockResponse?.block;
                                 if (!block) {
-                                    throw new Error(`ブロックが見つかりません: ${blockId}`);
+                                    throw new Error(`Block not found: ${blockId}`);
                                 }
                                 
                                 // Find the meta transaction in the block
@@ -15756,7 +15756,7 @@
                         
                         if (!block) {
                             log(`Block not found in response structure`, 'error');
-                            throw new Error(`ブロックが見つかりません: ${blockId}`);
+                            throw new Error(`Block not found: ${blockId}`);
                         }
                         
                         // Find transaction with matching TxID
@@ -15866,7 +15866,7 @@
                             
                             if (!block) {
                                 log(`Block not found in response structure`, 'error');
-                                throw new Error(`ブロックが見つかりません: ${blockId}`);
+                                throw new Error(`Block not found: ${blockId}`);
                             }
                             
                             // Find transaction with matching TxID

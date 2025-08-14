@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.0.3</title>
+    <title>Kaspa P2P File Storage v6.0.4</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -2041,7 +2041,7 @@
             <!-- Unified input option -->
             <div class="section-divider" style="margin-top: 10px;">
                 <div style="padding: 10px; border-radius: 8px; background: var(--bg-secondary);">
-                    <input type="text" id="unifiedTxIdInput" placeholder="🔗 TxIDを入力（自動判別）" style="width: 100%; font-size: 14px; padding: 8px;">
+                    <input type="text" id="unifiedTxIdInput" placeholder="🔗 Enter TxID (auto-detect)" style="width: 100%; font-size: 14px; padding: 8px;">
                     <input type="password" id="unifiedPassword" placeholder="🔐 Password (if required)" style="width: 100%; margin-top: 8px; font-size: 14px; padding: 8px;">
                     <button onclick="loadFromUnifiedInput()" style="margin-top: 8px; width: 100%; padding: 10px; font-size: 14px;">
                         🔍 Verify
@@ -2059,7 +2059,7 @@
             <!-- Legacy Meta-TxID input (hidden by default) -->
             <div class="section-divider" style="display: none;">
                 <h3>🔗 メタTxIDから復元（旧）</h3>
-                <input type="text" id="metaTxIdInput" placeholder="メタTxID または TxID:BlockID を入力" style="width: 100%;">
+                <input type="text" id="metaTxIdInput" placeholder="Enter MetaTxID or TxID:BlockID" style="width: 100%;">
                 <input type="password" id="metaTxPassword" placeholder="パスワード" style="width: 100%; margin-top: 10px;">
                 <button onclick="loadFromMetaTxId()" style="margin-top: 10px;">メタTxIDから復元</button>
                 <div class="info" style="margin-top: 10px; font-size: 12px;">
@@ -2091,7 +2091,7 @@
                 
                 <div id="passwordSection">
                     <label>パスワード</label>
-                    <input type="password" id="downloadPassword" placeholder="パスワードを入力">
+                    <input type="password" id="downloadPassword" placeholder="Enter password">
                 </div>
                 
                 <button id="downloadBtn" onclick="downloadFile()">Download File</button>
@@ -2132,14 +2132,14 @@
                 <!-- Directory Name -->
                 <div style="margin-bottom: 15px;">
                     <label>ディレクトリ名:</label>
-                    <input type="text" id="dirbuilder-name" placeholder="ディレクトリ名を入力" style="width: 100%; padding: 8px;" oninput="DirectoryBuilderState.updatePreview(); DirectoryBuilderState.updateButtonStates()">
+                    <input type="text" id="dirbuilder-name" placeholder="Enter directory name" style="width: 100%; padding: 8px;" oninput="DirectoryBuilderState.updatePreview(); DirectoryBuilderState.updateButtonStates()">
                 </div>
 
                 <!-- TxID Input -->
                 <div style="margin-bottom: 15px;">
                     <label>Add Entry (TxID:BlockID:Password):</label>
                     <div style="display: flex; gap: 10px; margin-top: 5px;">
-                        <input type="text" id="dirbuilder-txid-input" placeholder="TxID:BlockID:Password を入力" style="flex: 1; padding: 8px;">
+                        <input type="text" id="dirbuilder-txid-input" placeholder="Enter TxID:BlockID:Password" style="flex: 1; padding: 8px;">
                         <button onclick="DirectoryBuilderState.addFromTxId()" class="button">
                             <span class="icon">➕</span> Add
                         </button>
@@ -2244,7 +2244,7 @@
                 <h3>💰 WalletConnect</h3>
                 <div style="margin-top: 15px;">
                     <label>秘密鍵</label>
-                    <input type="password" id="walletPrivateKey" placeholder="秘密鍵を入力してください" style="width: 100%; padding: 10px; margin-top: 8px; font-size: 14px; border: 1px solid var(--border-color); border-radius: 5px;">
+                    <input type="password" id="walletPrivateKey" placeholder="Please enter your private key" style="width: 100%; padding: 10px; margin-top: 8px; font-size: 14px; border: 1px solid var(--border-color); border-radius: 5px;">
                 </div>
                 <button id="walletConnectBtn" style="width: 100%; margin-top: 15px; padding: 12px; font-size: 16px; font-weight: bold; background: var(--accent-color); color: var(--button-text-on-accent); border: none; border-radius: 8px; cursor: pointer; transition: all 0.3s;">
                     Connect
@@ -2963,7 +2963,7 @@
                     
                     handleProgressLoad(progress);
                 } catch (error) {
-                    log(`進捗ファイル読み込みエラー: ${error.message}`, 'error');
+                    log(`Progress file read error: ${error.message}`, 'error');
                 }
             },
             
@@ -3010,7 +3010,7 @@
                             log(`CID mismatch: ${calculatedCID} != ${progressInfo.cid}`, 'warning');
                         }
                     } catch (err) {
-                        log(`進捗ファイル読み込みエラー: ${err.message}`, 'error');
+                        log(`Progress file read error: ${err.message}`, 'error');
                     }
                 }
                 return { autoResume: false };
@@ -3085,11 +3085,11 @@
             testArchiveNodes: async function() {
                 const manager = NetworkState.archiveManager;
                 if (!manager || manager.connections.size === 0) {
-                    log('テスト可能なアーカイブノードがありません', 'warning');
+                    log('No testable archive nodes available', 'warning');
                     return;
                 }
                 
-                log('アーカイブノード応答時間テストを開始...', 'info');
+                log('Starting archive node response time test...', 'info');
                 
                 for (const [nodeId, node] of manager.connections) {
                     if (!node.stats.isHealthy) continue;
@@ -3108,7 +3108,7 @@
                 }
                 
                 updateArchiveNodeStatus();
-                log('テスト完了', 'info');
+                log('Test complete', 'info');
             },
             
             updateArchiveNetwork: function() {
@@ -14441,7 +14441,7 @@
                     passwordSection.innerHTML = '<p>✅ パスワードがファイルに含まれています（自動入力）</p>' +
                         `<input type="hidden" id="downloadPassword" value="${savedPassword}">`;
                 } else {
-                    passwordSection.innerHTML = '<input type="password" id="downloadPassword" placeholder="パスワードを入力">';
+                    passwordSection.innerHTML = '<input type="password" id="downloadPassword" placeholder="Enter password">';
                 }
                 
                 // v4.7.9: ダウンロードボタンをフォルダ一括ダウンロード用に設定

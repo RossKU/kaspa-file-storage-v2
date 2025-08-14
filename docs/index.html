@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.0.2</title>
+    <title>Kaspa P2P File Storage v6.0.3</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -9472,31 +9472,6 @@
             return v33Progress;
         }
         
-        /*
-        window.handleProgressFileSelect = async function(event) {
-            const file = event.target.files[0];
-            if (!file || !file.name.endsWith('.kprogress')) {
-                log('Please select a valid progress file (.kprogress)', 'error');
-                return;
-            }
-            
-            try {
-                const content = await file.text();
-                const progress = JSON.parse(content);
-                
-                // Extract CID from filename if available
-                const match = file.name.match(/\.([a-z0-9]{8})\.kprogress$/);
-                if (match && match[1]) {
-                    window.currentFileCID = match[1];
-                    log(`進捗ファイルからCIDを取得: ${match[1]}`, 'info');
-                }
-                
-                handleProgressLoad(progress);
-            } catch (error) {
-                log(`進捗ファイル読み込みエラー: ${error.message}`, 'error');
-            }
-        };
-        */
         
         // Handle loaded progress
         function handleProgressLoad(progress) {
@@ -9561,13 +9536,6 @@
             }
         }
 
-        /*
-        window.cancelResume = function() {
-            window.pendingProgress = null;
-            document.getElementById('resumeInfo').style.display = 'none';
-            log('Resume cancelled', 'info');
-        };
-        */
 
         // Add new methods to ParallelDownloader prototype
         ParallelDownloader.prototype.downloadChunksRaw = async function(txIds, blockIds, progressCallback) {
@@ -11211,98 +11179,7 @@
 
         // ===== File Operation Helper Functions =====
         
-        // Check file size and show warning if needed - moved to UIHandlers
-        /*
-        window.checkFileSizeWarning = function checkFileSizeWarning(file) {
-            const MAX_SIZE_WITH_META = 550 * 1024 * 1024; // 550MB
-            if (file.size > MAX_SIZE_WITH_META) {
-                log(`⚠️ 警告: このファイルサイズ(${(file.size/1024/1024).toFixed(1)}MB)では、ブロックチェーン上のメタデータトランザクションが生成されない可能性があります`, 'warning');
-                log('.kaspaファイルは生成されますが、メタデータの共有が制限されます', 'warning');
-                return true;
-            }
-            return false;
-        }
-        */
         
-        // Check for auto-resume from progress file moved to WorkspaceHandlers
-        /*
-        window.checkAutoResumeProgress = async function checkAutoResumeProgress(file) {
-            if (!window.pendingProgress && WorkspaceState.progressFileMap.has(file.name)) {
-                const progressInfo = WorkspaceState.progressFileMap.get(file.name);
-                log(`進捗ファイルを自動検出: ${progressInfo.progressFilename}`, 'info');
-                
-                try {
-                    // Load the progress file
-                    const progressFile = await progressInfo.fileHandle.getFile();
-                    const content = await progressFile.text();
-                    const progress = JSON.parse(content);
-                    
-                    // Verify CID matches (calculate from first chunk)
-                    const chunkSize = parseInt(document.getElementById('chunkSize').value) * 1024;
-                    const actualChunkSize = calculateSafePayloadSize(chunkSize);
-                    const firstChunkEnd = Math.min(actualChunkSize, file.size);
-                    const firstChunkBlob = file.slice(0, firstChunkEnd);
-                    const firstChunkArrayBuffer = await firstChunkBlob.arrayBuffer();
-                    const firstChunkData = new Uint8Array(firstChunkArrayBuffer);
-                    const firstChunkHash = await sha256(firstChunkData);
-                    const calculatedCID = firstChunkHash.substring(0, 8);
-                    
-                    if (calculatedCID === progressInfo.cid) {
-                        log(`CID verification successful: ${calculatedCID}`, 'success');
-                        
-                        // Check if already completed
-                        if (progress.metadata.completedChunks >= progress.metadata.totalChunks) {
-                            log(`Completed file detected: ${file.name}`, 'info');
-                            return { completed: true };
-                        }
-                        
-                        const resumeConfirm = confirm(
-                            `進捗ファイルを自動検出しました！\n\n` +
-                            `ファイル: ${file.name}\n` +
-                            `進捗: ${progress.metadata.completedChunks}/${progress.metadata.totalChunks} チャンク\n` +
-                            `CID: ${progressInfo.cid}\n\n` +
-                            `レジュームしますか？`
-                        );
-                        
-                        if (resumeConfirm) {
-                            window.pendingProgress = progress;
-                            window.currentFileCID = progressInfo.cid;
-                            return { resume: true, progress: progress, cid: progressInfo.cid };
-                        } else {
-                            log('自動レジュームをキャンセルしました', 'info');
-                        }
-                    } else {
-                        log(`CID mismatch: Expected=${progressInfo.cid}, Actual=${calculatedCID}`, 'warning');
-                        log('異なるファイルの可能性があります', 'warning');
-                    }
-                } catch (error) {
-                    log(`進捗ファイル自動読み込みエラー: ${error.message}`, 'error');
-                }
-            }
-            return { resume: false };
-        }
-        */
-        
-        // Update file selection UI - moved to UIHandlers
-        /*
-        window.updateFileSelectionUI = function updateFileSelectionUI(file, isResume = false, resumeStats = null) {
-            const label = document.querySelector('.file-input-label');
-            if (isResume && resumeStats) {
-                label.innerHTML = `
-                    <strong>${file.name}</strong><br>
-                    ${(file.size/1024/1024).toFixed(2)}MB<br>
-                    <span class="success">レジューム: ${resumeStats.percentage}% 完了</span>
-                `;
-            } else {
-                label.innerHTML = `
-                    <strong>${file.name}</strong><br>
-                    ${(file.size/1024/1024).toFixed(2)}MB
-                `;
-            }
-            
-            // Upload dir tab has been removed in v5.11.22
-        }
-        */
 
         
         // Directory handling
@@ -13718,57 +13595,6 @@
         // Backward compatibility for processAndUpload
         window.processAndUpload = FileState.fileOperationHandlers.processAndUpload;
 
-        // Keeping for backward compatibility if needed
-        /* window.generateKaspaFile = function() {
-            if (!kaspaMetadata) {
-                log('.kaspaファイル生成データがありません', 'error');
-                return;
-            }
-            
-            try {
-                const includePassword = document.getElementById('includePassword').checked;
-                const kaspaData = JSON.parse(JSON.stringify(kaspaMetadata));
-                
-                if (includePassword && FileState.currentPassword) {
-                    kaspaData.auth = {
-                        passwordIncluded: true,
-                        password: FileState.currentPassword,
-                        warning: "パスワードは平文で保存されています。信頼できる相手とのみ共有してください。"
-                    };
-                    log('⚠️ パスワードが.kaspaファイルに含まれています', 'warning');
-                }
-                
-                const kaspaFileContent = JSON.stringify(kaspaData, null, 2);
-                const blob = new Blob([kaspaFileContent], { type: 'application/octet-stream' });
-                const url = URL.createObjectURL(blob);
-                
-                const a = document.createElement('a');
-                a.href = url;
-                // Use CID in filename if available
-                const cid = window.currentFileCID || generateRandomCID();
-                a.download = generateSafeFilename(currentFile.name, cid);
-                a.click();
-                
-                URL.revokeObjectURL(url);
-                
-                const kaspaResultElement = document.getElementById('kaspaResult');
-                if (kaspaResultElement) {
-                    kaspaResultElement.innerHTML = `
-                        <div class="metric-box">
-                            <h4 class="success">✅ .kaspaファイル生成完了</h4>
-                            <p>File Name: ${generateSafeFilename(currentFile.name, cid)}</p>
-                            <p>サイズ: ${(kaspaFileContent.length/1024).toFixed(1)}KB</p>
-                            ${includePassword ? '<p class="warning">⚠️ パスワードが含まれています</p>' : ''}
-                        </div>
-                    `;
-                }
-                
-                log('.kaspaDownload Fileしました', 'success');
-                
-            } catch (error) {
-                log(`.kaspaファイル生成エラー: ${error.message}`, 'error');
-            }
-        }; */
 
         // Create and upload meta transaction
         window.createAndUploadMetaTx = async function() {

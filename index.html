@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.12.78</title>
+    <title>Kaspa P2P File Storage v5.12.79</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -1806,6 +1806,7 @@
                 <div class="status-row">
                     <strong>残高:</strong>
                     <span id="walletBalance" style="font-weight: bold;">-</span>
+                    <span id="walletUtxoCount" style="margin-left: 10px; color: var(--text-secondary); font-size: 0.9em;"></span>
                 </div>
                 <div style="margin-top: 12px; padding: 10px; background: var(--bg-primary); border-radius: 5px; text-align: center;">
                     <small style="color: var(--text-secondary);">⚙️ Wallet接続は設定タブから行ってください</small>
@@ -2260,6 +2261,7 @@
                     <div>
                         <strong>残高:</strong>
                         <span id="settingsWalletBalance" style="margin-left: 10px; font-weight: bold; color: var(--success-color);">-</span>
+                        <span id="settingsWalletUtxoCount" style="margin-left: 10px; color: var(--text-secondary); font-size: 0.9em;"></span>
                     </div>
                 </div>
             </div>
@@ -3277,12 +3279,19 @@
                     if (UserState.address) {
                         const { entries } = await NetworkState.rpcClient.getUtxosByAddresses([UserState.address.toString()]);
                         balance = entries.reduce((sum, utxo) => sum + Number(utxo.amount), 0) / 1e8;
-                        log(`残高: ${balance} KAS`, 'info');
+                        const utxoCount = entries.length;
+                        log(`残高: ${balance} KAS (UTXOs: ${utxoCount})`, 'info');
                         
                         // v5.12.64: Update balance display in both tabs
                         const balanceText = `${balance.toFixed(8)} KAS`;
                         document.getElementById('walletBalance').textContent = balanceText;
                         document.getElementById('settingsWalletBalance').textContent = balanceText;
+                        
+                        // v5.12.79: Display UTXO count
+                        const utxoText = `(UTXOs: ${utxoCount})`;
+                        const utxoWarning = utxoCount > 40 ? ' ⚠️' : '';
+                        document.getElementById('walletUtxoCount').textContent = utxoText + utxoWarning;
+                        document.getElementById('settingsWalletUtxoCount').textContent = utxoText + utxoWarning;
                     }
                     
                     // Update UI
@@ -3395,11 +3404,18 @@
                     if (NetworkState.rpcClient && NetworkState.rpcClient.isConnected) {
                         const { entries } = await NetworkState.rpcClient.getUtxosByAddresses([addressString]);
                         const balance = entries.reduce((sum, utxo) => sum + Number(utxo.amount), 0) / 1e8;
+                        const utxoCount = entries.length;
                         const balanceText = `${balance.toFixed(8)} KAS`;
                         
                         // Update both tabs
                         document.getElementById('walletBalance').textContent = balanceText;
                         document.getElementById('settingsWalletBalance').textContent = balanceText;
+                        
+                        // v5.12.79: Display UTXO count
+                        const utxoText = `(UTXOs: ${utxoCount})`;
+                        const utxoWarning = utxoCount > 40 ? ' ⚠️' : '';
+                        document.getElementById('walletUtxoCount').textContent = utxoText + utxoWarning;
+                        document.getElementById('settingsWalletUtxoCount').textContent = utxoText + utxoWarning;
                         
                         // Update upload button state
                         updateUploadButtonState();
@@ -11061,12 +11077,14 @@
             // Status tab
             document.getElementById('walletAddress').textContent = '-';
             document.getElementById('walletBalance').textContent = '-';
+            document.getElementById('walletUtxoCount').textContent = '';
             document.getElementById('walletConnectionStatus').textContent = '未接続';
             document.getElementById('walletConnectionStatus').style.color = 'var(--text-secondary)';
             
             // Settings tab
             document.getElementById('settingsWalletAddress').textContent = '-';
             document.getElementById('settingsWalletBalance').textContent = '-';
+            document.getElementById('settingsWalletUtxoCount').textContent = '';
             document.getElementById('settingsWalletStatus').textContent = '未接続';
             document.getElementById('settingsWalletStatus').style.color = 'var(--text-secondary)';
             

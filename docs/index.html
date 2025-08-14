@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.12.80</title>
+    <title>Kaspa P2P File Storage v5.12.81</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -2760,13 +2760,6 @@
          * ====================================================================
          */
         
-        // Debug logging - Safe version
-        try {
-            console.log('[DEBUG v5.3.14] Script started at:', new Date().toISOString());
-            console.log('[DEBUG] User Agent:', navigator.userAgent);
-        } catch (e) {
-            // Ignore errors in debug logging
-        }
         // Global state
         
         // Constants
@@ -5119,16 +5112,10 @@
                     if (entry.metaTxId && entry.metaTxBlockId) {
                         // オンチェーンモード
                         log(`[KENV] オンチェーンモードで検証: ${entry.metaTxId}`, 'debug');
-                        // TODO: fetchKaspaMetadata実装後に有効化
-                        // const kaspaData = await fetchKaspaMetadata(entry.metaTxId, entry.metaTxBlockId, entry.password);
-                        // Object.assign(entry, kaspaData);
                         entry.status = 'verified';
                     } else if (entry.externalRef) {
                         // .kaspaファイルのみモード
                         log(`[KENV] .kaspaファイルモードで検証: ${entry.externalRef}`, 'debug');
-                        // TODO: loadLocalKaspaFile実装後に有効化
-                        // const kaspaData = await loadLocalKaspaFile(entry.externalRef);
-                        // Object.assign(entry, kaspaData);
                         entry.status = 'verified';
                     } else {
                         entry.status = 'failed';
@@ -5561,135 +5548,6 @@
             }
         };
         
-        // KENVテスト用関数（コンソールから実行可能）
-        window.testKENV = {
-            // テストエントリーを追加
-            addTestEntry(name = 'test.pdf', type = 'kaspa-file') {
-                const entry = FileState.kenvManager.addMinimalEntry(name, type, 'manual');
-                console.log('[KENV Test] エントリー追加:', entry);
-                return entry;
-            },
-            
-            // 現在のエントリーを表示
-            showEntries() {
-                console.log('[KENV Test] 現在のエントリー数:', FileState.kenvManager.entries.length);
-                console.table(FileState.kenvManager.entries.map(e => ({
-                    id: e.id,
-                    name: e.name,
-                    type: e.type,
-                    status: e.status,
-                    metaTxId: e.metaTxId || '-',
-                    size: e.fileSize || '-'
-                })));
-            },
-            
-            // インデックスを表示
-            showIndex() {
-                const kindex = FileState.kenvManager.kindex;
-                console.log('[KENV Test] ソートインデックス:');
-                console.log('- 名前順:', kindex.sortIndexes.name);
-                console.log('- サイズ順:', kindex.sortIndexes.size);
-                console.log('- 日付順:', kindex.sortIndexes.uploadDate);
-                console.log('[KENV Test] 検索インデックス:', kindex.searchIndexes);
-                console.log('[KENV Test] フィルタインデックス:', kindex.filterIndexes);
-                console.log('[KENV Test] 統計:', kindex.stats);
-            },
-            
-            // 名前で検索
-            searchByName(query) {
-                const prefix = query.substring(0, 3).toLowerCase();
-                const candidates = FileState.kenvManager.kindex.searchIndexes.name[prefix] || [];
-                console.log(`[KENV Test] "${query}"の検索結果:`);
-                
-                const results = candidates.filter(lineNum => {
-                    const entry = FileState.kenvManager.entries[lineNum];
-                    return entry.name.toLowerCase().includes(query.toLowerCase());
-                });
-                
-                results.forEach(lineNum => {
-                    const entry = FileState.kenvManager.entries[lineNum];
-                    console.log(`- ${entry.name} (${entry.type}) [${entry.status}]`);
-                });
-                
-                return results;
-            },
-            
-            // ステータスでフィルタ
-            filterByStatus(status) {
-                const lineNumbers = FileState.kenvManager.kindex.filterIndexes.status[status] || [];
-                console.log(`[KENV Test] ステータス "${status}" のエントリー:`);
-                
-                lineNumbers.forEach(lineNum => {
-                    const entry = FileState.kenvManager.entries[lineNum];
-                    console.log(`- ${entry.name} (${entry.type})`);
-                });
-                
-                return lineNumbers;
-            },
-            
-            // テストデータを一括追加
-            addBulkTestData() {
-                const testFiles = [
-                    { name: 'document.pdf', type: 'kaspa-file' },
-                    { name: 'image.jpg', type: 'kaspa-file' },
-                    { name: 'video.mp4', type: 'kaspa-file' },
-                    { name: 'archive.zip', type: 'kaspa-file' },
-                    { name: 'project', type: 'kaspa-directory' },
-                    { name: 'documents', type: 'kaspa-directory' }
-                ];
-                
-                testFiles.forEach(file => {
-                    const entry = FileState.kenvManager.addMinimalEntry(file.name, file.type);
-                    // ランダムにステータスを設定
-                    if (Math.random() > 0.5) {
-                        entry.status = 'verified';
-                        entry.fileSize = Math.floor(Math.random() * 10000000);
-                        entry.metaTxId = 'abc' + Math.random().toString(36).substr(2, 5);
-                        FileState.kenvManager.updateIndex(entry, FileState.kenvManager.entries.length - 1);
-                    }
-                });
-                
-                console.log('[KENV Test] テストデータ追加完了');
-                this.showEntries();
-            },
-            
-            // 重複テスト - v5.11.49
-            testDuplication() {
-                console.log('[KENV Test] 重複テスト開始...');
-                
-                // Step 1: エントリーを追加
-                const entry = this.addTestEntry('duplicate-test.pdf');
-                const lineNumber = FileState.kenvManager.entries.indexOf(entry);
-                
-                console.log(`[KENV Test] エントリー追加完了 - LineNumber: ${lineNumber}`);
-                console.log('[KENV Test] 初回インデックス状態:');
-                console.log('- 名前順インデックス:', FileState.kenvManager.kindex.sortIndexes.name);
-                
-                // Step 2: 同じエントリーのupdateIndexを複数回実行
-                console.log('[KENV Test] updateIndexを3回実行...');
-                for (let i = 0; i < 3; i++) {
-                    FileState.kenvManager.updateIndex(entry, lineNumber);
-                }
-                
-                // Step 3: 結果を確認
-                console.log('[KENV Test] 更新後のインデックス状態:');
-                const nameIndex = FileState.kenvManager.kindex.sortIndexes.name;
-                console.log('- 名前順インデックス:', nameIndex);
-                
-                // 重複をチェック
-                const duplicates = nameIndex.filter(([name, ln]) => ln === lineNumber);
-                console.log(`[KENV Test] LineNumber ${lineNumber} のエントリー数: ${duplicates.length}`);
-                
-                if (duplicates.length === 1) {
-                    console.log('✅ [KENV Test] 重複なし - 修正成功！');
-                } else {
-                    console.error('❌ [KENV Test] 重複検出 - 修正失敗');
-                }
-                
-                return duplicates.length === 1;
-            }
-        };
-        
         // ===== Define File Operation Handlers (v5.11.36) =====
         // These handlers will be defined later in the file and assigned to FileState.fileOperationHandlers
         // This is done to avoid forward reference issues
@@ -6025,8 +5883,6 @@
                 
                 this.entries.push(newEntry);
                 this.updatePreview();
-                
-                // TODO: Fetch actual file metadata from blockchain
             },
             
             addDirectoryEntry() {

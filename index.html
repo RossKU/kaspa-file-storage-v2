@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.0.0</title>
+    <title>Kaspa P2P File Storage v6.0.1</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -1836,7 +1836,7 @@
             
             <!-- KENV Search and Sort Controls - Responsive Layout -->
             <div class="file-controls" style="margin-bottom: 8px;">
-                <input type="text" id="kenvSearchInput" placeholder="🔍 検索..." 
+                <input type="text" id="kenvSearchInput" placeholder="🔍 Search..." 
                        class="file-search-input"
                        onkeyup="searchKENVFiles(this.value)">
                 
@@ -1993,13 +1993,13 @@
             <div id="resumeInfo" style="display: none;" class="metric-box">
                 <h4 class="success">✅ レジューム準備完了</h4>
                 <div id="resumeDetails"></div>
-                <button id="cancelResumeBtn" style="background: var(--text-secondary); margin-top: 10px;">キャンセル</button>
+                <button id="cancelResumeBtn" style="background: var(--text-secondary); margin-top: 10px;">Cancel</button>
             </div>
             
             <!-- v5.11.131: Simplified vertical layout -->
             <div style="margin-top: 20px;">
-                <label style="display: block; margin-bottom: 5px; font-weight: bold;">🔑 パスワード (8文字以上)</label>
-                <input type="password" id="uploadPassword" placeholder="強力なパスワードを入力" style="width: 100%; padding: 12px; font-size: 16px; border: 1px solid var(--border-color); border-radius: 5px; box-sizing: border-box;">
+                <label style="display: block; margin-bottom: 5px; font-weight: bold;">🔑 Password (8+ characters)<label>
+                <input type="password" id="uploadPassword" placeholder="Enter a strong password" style="width: 100%; padding: 12px; font-size: 16px; border: 1px solid var(--border-color); border-radius: 5px; box-sizing: border-box;">
             </div>
             
             <!-- v5.11.135: Always visible upload button (fixed initial state) -->
@@ -2016,11 +2016,11 @@
                 <div class="upload-status-container">
                     <div class="upload-status-message">
                         <span class="upload-status-icon" id="uploadStatusIcon">📦</span>
-                        <span id="uploadStatusText">準備中...</span>
+                        <span id="uploadStatusText">Preparing...</span>
                     </div>
                     <div class="upload-time-info">
-                        <span id="uploadElapsedTime">経過時間: 0秒</span>
-                        <span id="uploadRemainingTime">残り時間: 計算中...</span>
+                        <span id="uploadElapsedTime">Elapsed: 0s</span>
+                        <span id="uploadRemainingTime">Time remaining: Calculating...</span>
                     </div>
                     <div class="upload-details" id="uploadDetails" style="display: none;">
                         <!-- Technical details will be shown here -->
@@ -2042,7 +2042,7 @@
             <div class="section-divider" style="margin-top: 10px;">
                 <div style="padding: 10px; border-radius: 8px; background: var(--bg-secondary);">
                     <input type="text" id="unifiedTxIdInput" placeholder="🔗 TxIDを入力（自動判別）" style="width: 100%; font-size: 14px; padding: 8px;">
-                    <input type="password" id="unifiedPassword" placeholder="🔐 パスワード（必要な場合）" style="width: 100%; margin-top: 8px; font-size: 14px; padding: 8px;">
+                    <input type="password" id="unifiedPassword" placeholder="🔐 Password (if required)" style="width: 100%; margin-top: 8px; font-size: 14px; padding: 8px;">
                     <button onclick="loadFromUnifiedInput()" style="margin-top: 8px; width: 100%; padding: 10px; font-size: 14px;">
                         🔍 Verify
                     </button>
@@ -2477,7 +2477,7 @@
                     
                     <div style="margin-top: 8px; text-align: center;">
                         <button onclick="NetworkState.archiveHandlers.testArchiveNodes()" disabled id="archiveTestBtn" style="padding: 4px 12px; font-size: 12px;">Test</button>
-                        <button onclick="NetworkState.archiveHandlers.refreshArchiveStatus()" style="padding: 4px 12px; font-size: 12px;">更新</button>
+                        <button onclick="NetworkState.archiveHandlers.refreshArchiveStatus()" style="padding: 4px 12px; font-size: 12px;">Update</button>
                     </div>
                 </div>
             </div>
@@ -2698,7 +2698,7 @@
                 <button onclick="copyLog()">ログをコピー</button>
                 <button onclick="exportLogs()">ログをJSON形式でエクスポート</button>
                 <button onclick="exportLogsAsText()">ログをテキスト形式でエクスポート</button>
-                <button onclick="clearLog()">ログをクリア</button>
+                <button onclick="clearLog()">Clear Logs</button>
             </div>
         </div>
     </div>
@@ -2831,20 +2831,20 @@
                 NetworkState.restApiControl.globalEnabled = enabled;
                 const statusEl = document.getElementById('rest-api-global-status');
                 if (statusEl) {
-                    statusEl.textContent = enabled ? '有効' : '無効';
+                    statusEl.textContent = enabled ? 'Enabled' : 'Disabled';
                     statusEl.style.color = enabled ? 'var(--success-color)' : 'var(--error-color)';
                 }
                 log(`🔧 [REST API] グローバル設定: ${enabled ? '有効' : '無効'}`, 'info');
             },
             
             killRestApi() {
-                if (confirm('REST APIを一時的に無効化しますか？')) {
+                if (confirm('Temporarily disable REST API?')) {
                     NetworkState.restApiControl.temporaryKilled = true;
                     document.getElementById('rest-api-kill-btn').disabled = true;
                     document.getElementById('rest-api-revive-btn').disabled = false;
                     const statusEl = document.getElementById('rest-api-kill-status');
                     if (statusEl) {
-                        statusEl.textContent = '● 無効（Kill中）';
+                        statusEl.textContent = '● Disabled (Kill Active)';
                         statusEl.style.color = 'var(--error-color)';
                     }
                     log('🔪 [REST API Kill] REST API一時無効化', 'error');
@@ -2857,7 +2857,7 @@
                 document.getElementById('rest-api-revive-btn').disabled = true;
                 const statusEl = document.getElementById('rest-api-kill-status');
                 if (statusEl) {
-                    statusEl.textContent = '● 有効';
+                    statusEl.textContent = '● Enabled';
                     statusEl.style.color = 'var(--success-color)';
                 }
                 log('✅ [REST API Kill] REST API復活', 'success');
@@ -3135,7 +3135,7 @@
                 
                 const thresholdM = parseFloat(input.value);
                 if (isNaN(thresholdM) || thresholdM <= 0) {
-                    alert('無効な閾値です');
+                    alert('Invalid threshold');
                     input.value = manager.archiveThreshold / 1000000;
                     return;
                 }
@@ -3151,7 +3151,7 @@
                 
                 const maxConsecutive = parseInt(input.value);
                 if (isNaN(maxConsecutive) || maxConsecutive < 10 || maxConsecutive > 1000) {
-                    alert('無効な値です（10-1000の範囲で入力してください）');
+                    alert('Invalid value (Please enter between 10-1000)');
                     input.value = manager.maxConsecutiveNonArchive;
                     return;
                 }
@@ -3361,7 +3361,7 @@
                 // For new connection, check private key
                 const privateKey = privateKeyInput.value.trim();
                 if (!privateKey) {
-                    alert('秘密鍵を入力してください');
+                    alert('Please enter your private key');
                     return;
                 }
                 
@@ -3430,9 +3430,9 @@
                     
                     // More specific error messages for common issues
                     if (errorMessage.includes('Invalid private key')) {
-                        alert('エラー: 無効な秘密鍵です。正しい形式で入力してください。');
+                        alert('Error: Invalid private key. Please enter in correct format.');
                     } else if (errorMessage.includes('not initialized')) {
-                        alert('エラー: システムが初期化されていません。設定タブから「Kaspaシステム再起動」を実行してください。');
+                        alert('Error: System not initialized. Please run "Restart Kaspa System" from Settings tab.');
                     } else {
                         alert(`エラー: ${errorMessage}`);
                     }
@@ -3882,7 +3882,7 @@
                 document.getElementById('archiveHealthBar').textContent = '[-----]';
                 document.getElementById('archiveConnectedNodes').textContent = '0/5';
                 document.getElementById('archiveAvgResponse').textContent = '-';
-                document.getElementById('archiveCheckingNode').textContent = '待機中';
+                document.getElementById('archiveCheckingNode').textContent = 'Waiting';
                 document.getElementById('archiveEventLog').innerHTML = '<div class="archive-event-item">リセット完了 - 探索ボタンで再開始できます</div>';
                 
                 // Clear archive list
@@ -5774,7 +5774,7 @@
                 
                 const parts = txInfo.split(':');
                 if (parts.length < 2) {
-                    alert('形式が正しくありません。TxID:BlockID:Password形式で入力してください。');
+                    alert('Invalid format. Please enter in TxID:BlockID:Password format.');
                     return;
                 }
                 
@@ -5859,7 +5859,7 @@
                 
                 const parts = entry.split(':');
                 if (parts.length < 2) {
-                    alert('形式が正しくありません。TxID:BlockID:Password形式で入力してください。');
+                    alert('Invalid format. Please enter in TxID:BlockID:Password format.');
                     return;
                 }
                 
@@ -5928,7 +5928,7 @@
             },
             
             removeEntry(index) {
-                if (confirm('このエントリーを削除しますか？')) {
+                if (confirm('Delete this entry?')) {
                     this.entries.splice(index, 1);
                     this.updatePreview();
                     // v5.11.18-fix12: Update button states after removing entry
@@ -6310,7 +6310,7 @@
             },
             
             resetBuilder() {
-                if (confirm('すべての変更を破棄してリセットしますか？')) {
+                if (confirm('Discard all changes and reset?')) {
                     this.reset();
                     document.getElementById('dirbuilder-import-section').style.display = 'block';
                     document.getElementById('dirbuilder-edit-section').style.display = 'none';
@@ -7028,7 +7028,7 @@
                 const logContainer = document.getElementById('systemLog');
                 const monitorLogContainer = document.getElementById('monitorLog');
                 
-                if (confirm('すべてのログをクリアしますか？')) {
+                if (confirm('Clear all logs?')) {
                     AppState.history.systemLogs = [];
                     if (logContainer) {
                         logContainer.innerHTML = '';
@@ -8219,8 +8219,8 @@
                     }
                 } catch (error) {
                     // v4.7.25: Remove error log for progress save
-                    console.error(`進捗保存エラー: ${error.message}`);
-                    log(`[ERROR] 進捗保存エラー: ${error.message}`, 'error');
+                    console.error(`Progress save error: ${error.message}`);
+                    log(`[ERROR] Progress save error: ${error.message}`, 'error');
                     log(`[ERROR] エラー詳細: ${error.stack}`, 'error');
                 }
             }
@@ -9306,7 +9306,7 @@
             const simpleStatus = document.getElementById('workspaceStatusSimple');
             if (simpleStatus) {
                 if (WorkspaceState.handle) {
-                    simpleStatus.textContent = `作業フォルダ: ${WorkspaceState.handle.name}`;
+                    simpleStatus.textContent = `Workspace Folder: ${WorkspaceState.handle.name}`;
                     simpleStatus.style.color = 'var(--success-color)';
                 } else {
                     simpleStatus.textContent = 'Workspace: Not Set (Browser Storage)';
@@ -9537,7 +9537,7 @@
                     if (resumeDiv && !document.getElementById('exportProgressBtn')) {
                         const exportBtn = document.createElement('button');
                         exportBtn.id = 'exportProgressBtn';
-                        exportBtn.textContent = '進捗ファイルをエクスポート';
+                        exportBtn.textContent = 'Export Progress File';
                         exportBtn.style.marginTop = '10px';
                         exportBtn.onclick = () => {
                             if (window.pendingProgress) {
@@ -10773,7 +10773,7 @@
                     checkingSpan.style.color = 'var(--info-color)';
                 }
             } else {
-                checkingSpan.textContent = '待機中';
+                checkingSpan.textContent = 'Waiting';
                 checkingSpan.style.color = 'var(--text-secondary)';
             }
             
@@ -12196,7 +12196,7 @@
                             `残り時間: 約${minutes > 0 ? minutes + '分' : ''}${seconds}秒`;
                     }
                 } else {
-                    document.getElementById('uploadRemainingTime').textContent = '残り時間: 計算中...';
+                    document.getElementById('uploadRemainingTime').textContent = 'Time remaining: Calculating...';
                 }
             },
             
@@ -12633,7 +12633,7 @@
                         // Update status
                         const uploadingStatusElement = document.getElementById(`chunk-status-${i}`);
                         if (uploadingStatusElement) {
-                            uploadingStatusElement.innerHTML = '<span class="uploading">アップロード中...</span>';
+                            uploadingStatusElement.innerHTML = '<span class="uploading">Uploading...</span>';
                         } else {
                             log(`[ERROR] chunk-status-${i} 要素が見つかりません（アップロード開始時）`, 'error');
                         }
@@ -17630,7 +17630,7 @@
             const privateKey = privateKeyInput.value.trim();
             
             if (!privateKey) {
-                alert('秘密鍵を入力してください');
+                alert('Please enter your private key');
                 return;
             }
             
@@ -17711,7 +17711,7 @@
                            placeholder="TxID:BlockID:Pass (空の場合は空ディレクトリ)">
                 </div>
                 <div style="margin-top:15px;text-align:right">
-                    <button onclick="this.parentElement.parentElement.remove()">キャンセル</button>
+                    <button onclick="this.parentElement.parentElement.remove()">Cancel</button>
                     <button onclick="addEntryToList();this.parentElement.parentElement.remove()" style="margin-left:10px">追加</button>
                 </div>
             `;
@@ -18442,7 +18442,7 @@
                 <p>ファイルのパスワードを入力してください:</p>
                 <input type="password" id="filePassword" placeholder="パスワード">
                 <div class="password-dialog-buttons">
-                    <button onclick="closePasswordDialog()">キャンセル</button>
+                    <button onclick="closePasswordDialog()">Cancel</button>
                     <button onclick="submitPassword('${action}')">OK</button>
                 </div>
             `;
@@ -18515,7 +18515,7 @@
                 <p>パスワードが設定されていないようです。<br>パスワードを入力してリストへ登録しますか？</p>
                 <input type="password" id="addFilePassword" placeholder="パスワード（省略可）">
                 <div class="password-dialog-buttons">
-                    <button onclick="cancelAddFile()">キャンセル</button>
+                    <button onclick="cancelAddFile()">Cancel</button>
                     <button onclick="confirmAddFile('${fileInfo.id}', '${originalInfo}')">登録</button>
                 </div>
             `;

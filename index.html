@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.0.6</title>
+    <title>Kaspa P2P File Storage v6.0.7</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -2330,7 +2330,7 @@
                     </div>
                     <p style="margin: 10px 0 0 0; font-size: 0.9em; color: var(--text-secondary);">
                         ⚠️ ブロックチェーンにデータを記録するための送金額です。<br>
-                        推奨: 0.2～1 KAS（小さすぎるとエラーになります）<br>
+                        Recommended: 0.2-1 KAS (Too small will cause errors)<br>
                         実際のコスト: 手数料のみ（20KBあたり約0.0003 KAS）<br>
                         ※送金額は自分に戻るため、消費されるのは手数料だけです
                     </p>
@@ -2487,7 +2487,7 @@
                 <h3>🔄 Kaspaシステム再起動</h3>
                 <p style="font-size: 13px; color: var(--text-secondary); margin: 10px 0;">
                     Restart WASM SDK and Kaspa core.js for a clean state.<br>
-                    Connectエラーや動作不良時にお試しください。
+                    Try this when you have connection errors or malfunctions.
                 </p>
                 <button id="systemRestartBtn" 
                         style="width: 100%; padding: 12px; background: var(--warning-color); 
@@ -2930,7 +2930,7 @@
                         `進捗: ${metaInfo.completedChunks || '?'}/${metaInfo.totalChunks || '?'} チャンク\n` +
                         `最終更新: ${metaInfo.lastUpdate ? new Date(metaInfo.lastUpdate).toLocaleString() : '不明'}\n\n` +
                         'これを使用しますか？\n\n' +
-                        '「キャンセル」を選択するとファイルから読み込みます。'
+                        'Select "Cancel" to load from file.'
                     );
                     
                     if (useLocal) {
@@ -3103,7 +3103,7 @@
                         log(`Node ${nodeId}: ${duration}ms (${info.serverVersion})`, 'success');
                     } catch (error) {
                         manager.markUnhealthy(nodeId);
-                        log(`Node ${nodeId}: エラー - ${error.message}`, 'error');
+                        log(`Node ${nodeId}: Error - ${error.message}`, 'error');
                     }
                 }
                 
@@ -3318,8 +3318,8 @@
                     await initializeArchiveManager();
                     
                 } catch (error) {
-                    log(`初期化エラー: ${error.message}`, 'error');
-                    updateNetworkStatus('offline', 'エラー');
+                    log(`Initialization error: ${error.message}`, 'error');
+                    updateNetworkStatus('offline', 'Error');
                     updateRpcNodeInfo(); // Reset display
                 }
             },
@@ -3425,8 +3425,8 @@
                     
                 } catch (error) {
                     // v5.11.104: Improved error handling
-                    const errorMessage = error?.message || error?.toString() || '不明なエラーが発生しました';
-                    log(`ウォレットConnectエラー: ${errorMessage}`, 'error');
+                    const errorMessage = error?.message || error?.toString() || 'An unknown error occurred';
+                    log(`Wallet connection error: ${errorMessage}`, 'error');
                     
                     // More specific error messages for common issues
                     if (errorMessage.includes('Invalid private key')) {
@@ -3434,7 +3434,7 @@
                     } else if (errorMessage.includes('not initialized')) {
                         alert('Error: System not initialized. Please run "Restart Kaspa System" from Settings tab.');
                     } else {
-                        alert(`エラー: ${errorMessage}`);
+                        alert(`Error: ${errorMessage}`);
                     }
                 }
             }
@@ -4051,7 +4051,7 @@
                         this.lastUpdate = new Date();
                         return balance;
                     } catch (error) {
-                        log(`残高取得エラー: ${error.message}`, 'error');
+                        log(`Balance fetch error: ${error.message}`, 'error');
                         throw error;
                     }
                 },
@@ -4063,7 +4063,7 @@
                         log(`Balance before upload: ${this.initialBalance.toFixed(8)} KAS`, 'info');
                         return this.initialBalance;
                     } catch (error) {
-                        log(`初期残高記録エラー: ${error.message}`, 'warning');
+                        log(`Initial balance recording error: ${error.message}`, 'warning');
                         return 0;
                     }
                 },
@@ -4083,7 +4083,7 @@
                         
                         return this.actualCost;
                     } catch (error) {
-                        log(`最終コスト計算エラー: ${error.message}`, 'warning');
+                        log(`Final cost calculation error: ${error.message}`, 'warning');
                         return this.estimatedCost; // Fallback to estimated
                     }
                 },
@@ -4189,7 +4189,7 @@
             // 最小エントリー追加（5項目のみ）
             addMinimalEntry(name, type = 'kaspa-file', source = 'manual') {
                 const entry = {
-                    // 必須5項目
+                    // Required 5 fields
                     id: `${type}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
                     type: type,
                     version: null,
@@ -4453,7 +4453,7 @@
                     log(`[KENV] ${this.kenvFile}を保存しました`, 'success');
                     return true;
                 } catch (error) {
-                    log(`[KENV] ${this.kenvFile}保存エラー: ${error.message}`, 'error');
+                    log(`[KENV] ${this.kenvFile} save error: ${error.message}`, 'error');
                     return false;
                 }
             },
@@ -4474,7 +4474,7 @@
                     log(`[KENV] ${this.kindexFile}を保存しました`, 'success');
                     return true;
                 } catch (error) {
-                    log(`[KENV] ${this.kindexFile}保存エラー: ${error.message}`, 'error');
+                    log(`[KENV] ${this.kindexFile} save error: ${error.message}`, 'error');
                     return false;
                 }
             },
@@ -4610,7 +4610,7 @@
                     log(`[KENV] ${this.kentryFile}を保存しました (${this.entries.length}件)`, 'success');
                     return true;
                 } catch (error) {
-                    log(`[KENV] ${this.kentryFile}保存エラー: ${error.message}`, 'error');
+                    log(`[KENV] ${this.kentryFile} save error: ${error.message}`, 'error');
                     return false;
                 }
             },
@@ -4691,14 +4691,14 @@
                         return true;
                     } else {
                         if (result.error === 'quota_exceeded') {
-                            log('[KENV] LocalStorage容量不足 - ワークスペース設定を推奨', 'error');
+                            log('[KENV] LocalStorage capacity insufficient - Workspace setting recommended', 'error');
                         } else {
-                            log(`[KENV] LocalStorage保存エラー: ${result.error}`, 'error');
+                            log(`[KENV] LocalStorage save error: ${result.error}`, 'error');
                         }
                         return false;
                     }
                 } catch (error) {
-                    log(`[KENV] 保存処理エラー: ${error.message}`, 'error');
+                    log(`[KENV] Save process error: ${error.message}`, 'error');
                     return false;
                 }
             },
@@ -4725,9 +4725,9 @@
                     return kenvData;
                 } catch (error) {
                     if (error.name === 'NotFoundError') {
-                        log(`[KENV] ${this.kenvFile}が見つかりません`, 'info');
+                        log(`[KENV] ${this.kenvFile} not found`, 'info');
                     } else {
-                        log(`[KENV] ${this.kenvFile}読み込みエラー: ${error.message}`, 'error');
+                        log(`[KENV] ${this.kenvFile} read error: ${error.message}`, 'error');
                     }
                     return null;
                 }
@@ -4753,9 +4753,9 @@
                     return true;
                 } catch (error) {
                     if (error.name === 'NotFoundError') {
-                        log(`[KENV] ${this.kindexFile}が見つかりません`, 'info');
+                        log(`[KENV] ${this.kindexFile} not found`, 'info');
                     } else {
-                        log(`[KENV] ${this.kindexFile}読み込みエラー: ${error.message}`, 'error');
+                        log(`[KENV] ${this.kindexFile} read error: ${error.message}`, 'error');
                     }
                     return false;
                 }
@@ -4787,7 +4787,7 @@
                         const values = this.parseCSVLine(lines[i]);
                         const entry = {};
                         
-                        // 必須フィールドのマッピング
+                        // Required field mapping
                         entry.id = values[0];
                         entry.type = values[1] || 'kaspa-file';
                         entry.name = values[5];
@@ -4890,9 +4890,9 @@
                     return true;
                 } catch (error) {
                     if (error.name === 'NotFoundError') {
-                        log(`[KENV] ${this.kentryFile}が見つかりません`, 'info');
+                        log(`[KENV] ${this.kentryFile} not found`, 'info');
                     } else {
-                        log(`[KENV] ${this.kentryFile}読み込みエラー: ${error.message}`, 'error');
+                        log(`[KENV] ${this.kentryFile} read error: ${error.message}`, 'error');
                     }
                     return false;
                 }
@@ -4939,7 +4939,7 @@
                         .replace(/\//g, '_')
                         .replace(/=/g, '.');
                 } catch (error) {
-                    console.error('[KENV] directoryMetadata エンコードエラー:', error);
+                    console.error('[KENV] directoryMetadata encoding error:', error);
                     return '';
                 }
             },
@@ -4956,7 +4956,7 @@
                     const jsonStr = decodeURIComponent(atob(base64));
                     return JSON.parse(jsonStr);
                 } catch (error) {
-                    console.error('[KENV] directoryMetadata デコードエラー:', error);
+                    console.error('[KENV] directoryMetadata decoding error:', error);
                     return null;
                 }
             },
@@ -5048,7 +5048,7 @@
                     log('[KENV] 一部のファイルを読み込みました', 'warning');
                     return true;
                 } else {
-                    log('[KENV] KENVファイルが見つかりません', 'info');
+                    log('[KENV] KENV file not found', 'info');
                     return false;
                 }
             },
@@ -5092,7 +5092,7 @@
                     return true;
                     
                 } catch (error) {
-                    log(`[KENV] 初期化エラー: ${error.message}`, 'error');
+                    log(`[KENV] Initialization error: ${error.message}`, 'error');
                     // フォールバック：空で初期化
                     this.entries = [];
                     this.kindex = this.createEmptyIndex();
@@ -5137,7 +5137,7 @@
                     return data;
                 }
                 
-                log('[KENV] LocalStorageデータ検証失敗', 'error');
+                log('[KENV] LocalStorage data validation failed', 'error');
                 return null;
             },
             
@@ -5181,7 +5181,7 @@
                     `ワークスペース外で作成された${entryCount}件のKENVデータが見つかりました。\n\n` +
                     'このデータをワークスペースに統合しますか？\n\n' +
                     '「OK」: 統合する（推奨）\n' +
-                    '「キャンセル」: 破棄する'
+                    '"Cancel": Discard'
                 );
             },
             
@@ -5195,7 +5195,7 @@
                     const userConfirmed = await this.showMergeSummary(analysis);
                     
                     if (!userConfirmed) {
-                        log('[KENV] 統合がキャンセルされました', 'info');
+                        log('[KENV] Integration cancelled', 'info');
                         return;
                     }
                     
@@ -5400,7 +5400,7 @@
                 try {
                     const kenvEntry = this.entries.find(e => e.id === entryId);
                     if (!kenvEntry) {
-                        log('選択されたファイルの情報が見つかりません', 'error');
+                        log('Selected file information not found', 'error');
                         return;
                     }
                     
@@ -5542,7 +5542,7 @@
                         'パスワードなし.kaspaファイルを生成しました', 'success');
                         
                 } catch (error) {
-                    console.error('.kaspaファイル生成エラー:', error);
+                    console.error('.kaspa file generation error:', error);
                     log(`.kaspaファイル生成エラー: ${error.message}`, 'error');
                 }
             }
@@ -5942,7 +5942,7 @@
                 
                 const parts = input.split(':');
                 if (parts.length < 2) {
-                    this.showStatus('形式が正しくありません。TxID:BlockID:Password形式で入力してください。', 'error');
+                    this.showStatus('Invalid format. Please enter in TxID:BlockID:Password format.', 'error');
                     return;
                 }
                 
@@ -5955,7 +5955,7 @@
                     const result = await downloadFromTxId(txId, blockId, password || '');
                     
                     if (!result) {
-                        this.showStatus('メタデータの取得に失敗しました', 'error');
+                        this.showStatus('Failed to retrieve metadata', 'error');
                         return;
                     }
                     
@@ -7065,7 +7065,7 @@
                     return true;
                 } catch (error) {
                     if (typeof log !== 'undefined') {
-                        log(`クリップボードへのコピーに失敗しました: ${error.message}`, 'error');
+                        log(`Failed to copy to clipboard: ${error.message}`, 'error');
                     }
                     return false;
                 }
@@ -7080,7 +7080,7 @@
                 if (AppState.settings.parallelDownloadEnabled) {
                     log('並列ダウンロードを有効にしました（実験的機能）', 'warning');
                 } else {
-                    log('並列ダウンロードを無効にしました（安定モード）', 'success');
+                    log('Parallel download disabled (stable mode)', 'success');
                 }
             },
             
@@ -7235,7 +7235,7 @@
                                 }
                             } catch (error) {
                                 log(`Kaspaファイル読み込みエラー: ${error.message}`, 'error');
-                                alert('Kaspaファイルの読み込みに失敗しました');
+                                alert('Failed to load Kaspa file');
                             }
                         };
                         reader.readAsText(file);
@@ -8511,7 +8511,7 @@
                     const sortedPayloads = [];
                     for (let i = 0; i < txIds.length; i++) {
                         if (!this.results.has(i)) {
-                            throw new Error(`ペイロード${i}が見つかりません`);
+                            throw new Error(`Payload ${i} not found`);
                         }
                         sortedPayloads.push(this.results.get(i));
                     }
@@ -9685,7 +9685,7 @@
                     }
                     
                     if (!payload) {
-                        throw lastError || new Error('ペイロードが見つかりません');
+                        throw lastError || new Error('Payload not found');
                     }
                     
                     // 暗号化されたデータをそのまま返す（復号化は呼び出し側で行う）
@@ -9815,7 +9815,7 @@
                     }
                     
                     if (!payload) {
-                        throw new Error('メタデータのペイロードが見つかりません');
+                        throw new Error('Metadata payload not found');
                     }
                     
                     // Decrypt metadata
@@ -9888,7 +9888,7 @@
                     }
                     
                     if (!payload) {
-                        throw new Error(`ペイロード ${index + 1} が見つかりません`);
+                        throw new Error(`Payload ${index + 1} not found`);
                     }
                     
                     return payload;
@@ -9972,7 +9972,7 @@
                     }
                     
                     if (!payload) {
-                        throw new Error(`チャンク ${index + 1} のペイロードが見つかりません`);
+                        throw new Error(`Chunk ${index + 1} payload not found`);
                     }
                     
                     // v4.7.41: Enhanced debugging for variable chunk compression
@@ -10161,7 +10161,7 @@
                                     } catch (e) {
                                         log(`[DownloadManager] チャンク ${boundary.index} の復号化エラー: ${e.message}`, 'error');
                                         log(`[DownloadManager] チャンクバウンダリ: ${JSON.stringify(boundary)}`, 'error');
-                                        throw new Error(`チャンク ${boundary.index} の復号化に失敗しました`);
+                                        throw new Error(`Failed to decrypt chunk ${boundary.index}`);
                                     }
                                 }
                             }
@@ -10199,7 +10199,7 @@
                                         break;
                                     } catch (e) {
                                         log(`[DownloadManager] 復号化エラー at offset ${encryptOffset}: ${e.message}`, 'error');
-                                        throw new Error('データの復号化に失敗しました');
+                                        throw new Error('Failed to decrypt data');
                                     }
                                 }
                             }
@@ -10290,7 +10290,7 @@
                                         decryptedChunks.push(decryptedChunk);
                                     } catch (e) {
                                         log(`[DownloadManager] チャンク ${boundary.index} の復号化エラー: ${e.message}`, 'error');
-                                        throw new Error(`チャンク ${boundary.index} の復号化に失敗しました`);
+                                        throw new Error(`Failed to decrypt chunk ${boundary.index}`);
                                     }
                                 }
                             }
@@ -10487,7 +10487,7 @@
                             
                         } catch (error) {
                             if (error.name === 'AbortError') {
-                                log('[DownloadManager] フォルダ選択がキャンセルされました', 'warning');
+                                log('[DownloadManager] Folder selection cancelled', 'warning');
                             } else {
                                 log(`[DownloadManager] File System Access APIエラー: ${error.message}`, 'error');
                             }
@@ -12230,7 +12230,7 @@
                     // Verify existing chunks on blockchain
                     const verified = await verifyProgressChunks(FileState.progressManager.progress);
                     if (!verified) {
-                        log('チャンク検証に失敗したため、レジュームをキャンセルします', 'error');
+                        log('Resume cancelled due to chunk verification failure', 'error');
                         // v5.5.24: window.progressManager -> FileState.progressManager (4/11)
                         FileState.progressManager = null;  // Clear global reference
                         return;
@@ -12649,7 +12649,7 @@
                                     
                                     // User notification
                                     const errorMsg = `ネットワークが不安定です。\n\n` +
-                                                   `5分間BlockIDを取得できませんでした。\n` +
+                                                   `Could not obtain BlockID for 5 minutes.\n` +
                                                    `TxID: ${txid.substring(0, 16)}...\n\n` +
                                                    `進捗は自動保存されています。\n` +
                                                    `ネットワークが安定してから再開してください。`;
@@ -15834,7 +15834,7 @@
                     userMessage += 'ファイルが破損しています';
                     hint = '再度ダウンロードしてください';
                 } else if (errorMsg.includes('エラー率')) {
-                    userMessage += '多数のチャンクが取得できません';
+                    userMessage += 'Multiple chunks could not be retrieved';
                     hint = 'しばらく待ってから再試行してください';
                 } else if (errorMsg.includes('REST API')) {
                     userMessage += 'APIConnectエラー';

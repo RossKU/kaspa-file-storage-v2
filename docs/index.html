@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.0.4</title>
+    <title>Kaspa P2P File Storage v6.0.5</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -1863,11 +1863,11 @@
                     
                     <select id="kenvFilterSelect" onchange="filterKENVFiles(this.value)" 
                             class="file-select">
-                        <option value="all">すべて</option>
-                        <option value="file">📄</option>
-                        <option value="directory">📁</option>
-                        <option value="verified">✅</option>
-                        <option value="pending">⏸️</option>
+                        <option value="all">All</option>
+                        <option value="file">📄 File</option>
+                        <option value="directory">📁 Directory</option>
+                        <option value="verified">✅ Verified</option>
+                        <option value="pending">⏸️ Pending</option>
                     </select>
                 </div>
             </div>
@@ -1943,11 +1943,11 @@
                         🔗 Share ▼
                     </button>
                     <div class="share-menu" id="shareMenu">
-                        <button class="share-option" onclick="shareAction('kaspa-password')">🔐 .kaspa (パスワード付き)</button>
-                        <button class="share-option" onclick="shareAction('kaspa-no-password')">🔓 .kaspa (パスワードなし)</button>
-                        <button class="share-option" onclick="shareAction('txid-password')">🔐 TxID (パスワード付き)</button>
-                        <button class="share-option" onclick="shareAction('txid-no-password')">🔓 TxID (パスワードなし)</button>
-                        <button class="share-option" onclick="shareAction('password')">🔑 Pass (パスワードのみ)</button>
+                        <button class="share-option" onclick="shareAction('kaspa-password')">🔐 .kaspa (with password)</button>
+                        <button class="share-option" onclick="shareAction('kaspa-no-password')">🔓 .kaspa (no password)</button>
+                        <button class="share-option" onclick="shareAction('txid-password')">🔐 TxID (with password)</button>
+                        <button class="share-option" onclick="shareAction('txid-no-password')">🔓 TxID (no password)</button>
+                        <button class="share-option" onclick="shareAction('password')">🔑 Pass (password only)</button>
                     </div>
                 </div>
                 <button class="file-action-btn" onclick="FileTabHandlers.showSelectedFileDetails()">
@@ -2058,14 +2058,14 @@
             
             <!-- Legacy Meta-TxID input (hidden by default) -->
             <div class="section-divider" style="display: none;">
-                <h3>🔗 メタTxIDから復元（旧）</h3>
+                <h3>🔗 Restore from MetaTxID (Legacy)</h3>
                 <input type="text" id="metaTxIdInput" placeholder="Enter MetaTxID or TxID:BlockID" style="width: 100%;">
-                <input type="password" id="metaTxPassword" placeholder="パスワード" style="width: 100%; margin-top: 10px;">
-                <button onclick="loadFromMetaTxId()" style="margin-top: 10px;">メタTxIDから復元</button>
+                <input type="password" id="metaTxPassword" placeholder="Password" style="width: 100%; margin-top: 10px;">
+                <button onclick="loadFromMetaTxId()" style="margin-top: 10px;">Restore from MetaTxID</button>
                 <div class="info" style="margin-top: 10px; font-size: 12px;">
                     <p>📌 対応フォーマット:</p>
                     <ul style="margin: 5px 0; padding-left: 20px;">
-                        <li>TxID:BlockID:Password形式（パスワード自動入力）</li>
+                        <li>TxID:BlockID:Password format (password auto-filled)</li>
                         <li>TxID:BlockID形式（推奨、REST API不要）</li>
                         <li>TxIDのみ（REST API必要）</li>
                     </ul>
@@ -2090,7 +2090,7 @@
                 </div>
                 
                 <div id="passwordSection">
-                    <label>パスワード</label>
+                    <label>Password</label>
                     <input type="password" id="downloadPassword" placeholder="Enter password">
                 </div>
                 
@@ -2109,14 +2109,14 @@
     <!-- Directory Builder Tab -->
     <div id="dirbuilder-tab" class="tab-content">
         <div class="container">
-            <h2>🛠️ ディレクトリビルダー</h2>
+            <h2>🛠️ Directory Builder</h2>
             
             <!-- Phase 1: Import Section -->
             <div class="metric-box" id="dirbuilder-import-section">
                 <h3>📥 インポート</h3>
                 <div style="display: flex; gap: 10px; margin-bottom: 20px;">
                     <button onclick="DirectoryBuilderState.startNew()" class="button" style="flex: 1;">
-                        <span class="icon">🆕</span> 新規作成
+                        <span class="icon">🆕</span> Create New
                     </button>
                     <button onclick="DirectoryBuilderState.importFromTxId()" class="button" style="flex: 1;">
                         <span class="icon">🔗</span> TxIDから読込
@@ -2131,7 +2131,7 @@
             <div class="metric-box" id="dirbuilder-edit-section" style="display: none;">
                 <!-- Directory Name -->
                 <div style="margin-bottom: 15px;">
-                    <label>ディレクトリ名:</label>
+                    <label>Directory Name:</label>
                     <input type="text" id="dirbuilder-name" placeholder="Enter directory name" style="width: 100%; padding: 8px;" oninput="DirectoryBuilderState.updatePreview(); DirectoryBuilderState.updateButtonStates()">
                 </div>
 
@@ -2150,14 +2150,14 @@
                 <!-- Folder Creation -->
                 <div style="margin-bottom: 15px;">
                     <button onclick="DirectoryBuilderState.createEmptyFolder()" class="button" style="width: 100%;">
-                        <span class="icon">📁</span> 選択中の場所に新規フォルダを作成
+                        <span class="icon">📁</span> Create New Folder Here
                     </button>
                 </div>
 
                 <!-- Tree View -->
                 <div style="margin-bottom: 15px;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                        <label>ディレクトリ構造:</label>
+                        <label>Directory Structure:</label>
                         <!-- View Toggle Switch -->
                         <div style="display: flex; align-items: center; gap: 8px;">
                             <span style="font-size: 14px;">🌳</span>
@@ -2183,7 +2183,7 @@
                         <!-- Directory Stats -->
                         <div style="display: flex; gap: 20px; color: var(--text-secondary); font-size: 14px;">
                             <span>📄 Files: <strong id="visual-file-count">0</strong></span>
-                            <span>📁 ディレクトリ: <strong id="visual-dir-count">0</strong></span>
+                            <span>📁 Directories: <strong id="visual-dir-count">0</strong></span>
                             <span>💾 合計サイズ: <strong id="visual-total-size">0 MB</strong></span>
                         </div>
                     </div>
@@ -2195,8 +2195,8 @@
                 <!-- Password and Export Section -->
                 <div style="margin-bottom: 15px; padding: 15px; background: var(--bg-secondary); border-radius: 8px;">
                     <div style="margin-bottom: 15px;">
-                        <label for="dirbuilder-password">パスワード保護 (必須):</label>
-                        <input type="password" id="dirbuilder-password" placeholder="8文字以上のパスワード（必須）" style="width: 100%; padding: 8px; margin-top: 5px;" required oninput="DirectoryBuilderState.updateButtonStates()">
+                        <label for="dirbuilder-password">Password Protection (Required):</label>
+                        <input type="password" id="dirbuilder-password" placeholder="Password (8+ characters, required)" style="width: 100%; padding: 8px; margin-top: 5px;" required oninput="DirectoryBuilderState.updateButtonStates()">
                     </div>
                     
                     <!-- Action Buttons -->
@@ -2208,7 +2208,7 @@
                             <span class="icon">✓</span> Verify
                         </button>
                         <button id="dirbuilder-generate-btn" onclick="DirectoryBuilderState.generateOnly()" class="button" disabled>
-                            <span class="icon">🔧</span> 生成のみ
+                            <span class="icon">🔧</span> Generate Only
                         </button>
                         <button id="dirbuilder-upload-btn" onclick="DirectoryBuilderState.generateAndUpload()" class="button button-primary" disabled>
                             <span class="icon">📤</span> Generate and Upload
@@ -2270,7 +2270,7 @@
                 <h3>Network Settings</h3>
                 <label>ネットワーク</label>
                 <select id="networkSelect">
-                    <option value="testnet-10" selected>Testnet-10 (テスト用)</option>
+                    <option value="testnet-10" selected>Testnet-10 (for testing)</option>
                     <option value="mainnet">Mainnet (本番)</option>
                 </select>
                 
@@ -2325,7 +2325,7 @@
                         <span style="color: var(--text-secondary); font-size: 0.9em;">KAS</span>
                         <button onclick="AppState.updateTransactionAmount()" 
                                 style="padding: 8px 16px; background: var(--accent-color); color: var(--button-text-on-accent); border: none; border-radius: 5px; cursor: pointer;">
-                            更新
+                            Update
                         </button>
                     </div>
                     <p style="margin: 10px 0 0 0; font-size: 0.9em; color: var(--text-secondary);">
@@ -2377,10 +2377,10 @@
             </div>
             
             <div class="metric-box">
-                <h3>ダウンロード設定</h3>
+                <h3>Download Settings</h3>
                 <div class="setting-row">
                     <div class="setting-label">
-                        並列ダウンロード (実験的機能)<br>
+                        Parallel Download (Experimental)<br>
                         <small style="color: var(--text-secondary);">10チャンク以上のファイルで8並列Connectを使用</small>
                     </div>
                     <label class="toggle-switch">
@@ -2390,8 +2390,8 @@
                 </div>
                 <div class="setting-row">
                     <div class="setting-label">
-                        REST APIテストモード<br>
-                        <small style="color: var(--text-secondary);">RPCをスキップしてREST API経由でダウンロード</small>
+                        REST API Test Mode<br>
+                        <small style="color: var(--text-secondary);">Skip RPC and download via REST API</small>
                     </div>
                     <label class="toggle-switch">
                         <input type="checkbox" id="restApiTestToggle" onchange="toggleRestApiTest()">
@@ -2452,7 +2452,7 @@
                     
                     <!-- Test Block Hash Input -->
                     <div style="font-size: 11px; margin-bottom: 8px;">
-                        <input type="text" id="testBlockHash" placeholder="テスト用ブロックハッシュ (任意)" style="width: 100%; padding: 4px; font-size: 11px;">
+                        <input type="text" id="testBlockHash" placeholder="Test block hash (optional)" style="width: 100%; padding: 4px; font-size: 11px;">
                     </div>
                     
                     <!-- Compact Statistics -->
@@ -2530,7 +2530,7 @@
             <div class="metric-box" style="margin-top: 30px;">
                 <h3>🧪 Multi-Wallet Phase 1 Test</h3>
                 <p style="color: var(--text-secondary); font-size: 14px; margin-bottom: 15px;">
-                    実験的機能: マルチウォレットによる並列アップロード高速化のテスト
+                    Experimental: Multi-wallet parallel upload speed test
                 </p>
                 
                 <div style="margin: 15px 0;">
@@ -2590,10 +2590,10 @@
         
         <!-- v5.11.137: Multi WebSocket Test -->
         <div class="container">
-            <h2>🔌 複数WebSocketテスト (実験的)</h2>
+            <h2>🔌 Multiple WebSocket Test (Experimental)</h2>
             <div class="metric-box" style="padding: 15px;">
                 <p style="margin-bottom: 10px; color: var(--text-secondary);">
-                    複数ノードでBlock-addedイベントをリッスンして、BlockID検出速度を向上させるテスト機能
+                    Test feature to listen for Block-added events on multiple nodes to improve BlockID detection speed
                 </p>
                 
                 <div id="multiWsStatus" style="margin: 10px 0; padding: 10px; background: var(--background-light); border-radius: 5px;">
@@ -2823,7 +2823,7 @@
                 NetworkState.blockEventFilter.lastBlocked = null;
                 document.getElementById('filter-blocked-count').textContent = '0';
                 document.getElementById('filter-last-blocked').textContent = '-';
-                log('📊 [BlockFilter] 統計リセット', 'info');
+                log('📊 [BlockFilter] Statistics reset', 'info');
             },
             
             // v5.12.2: REST API Kill functions
@@ -3226,7 +3226,7 @@
         const SystemHandlers = {
             initializeSystem: async function() {
                 try {
-                    log('Kaspaシステム再起動を開始...');
+                    log('Starting Kaspa system restart...');
                     updateNetworkStatus('connecting', '初期化中...');
                     
                     // Import WASM SDK
@@ -3246,7 +3246,7 @@
                             throw new Error(`Required function not found: ${func}`);
                         }
                     }
-                    log('すべての必要な関数を確認しました', 'success');
+                    log('All required functions verified', 'success');
                     
                     // Create RPC client
                     NetworkState.rpcClient = new NetworkState.kaspa.RpcClient({
@@ -3326,7 +3326,7 @@
             
             testConnection: async function() {
                 try {
-                    log('Connectテストを実行中...');
+                    log('Running connection test...');
                     const startTime = Date.now();
                     
                     // Test RPC
@@ -3340,10 +3340,10 @@
                     const apiTime = Date.now() - apiStart;
                     log(`Explorer API応答時間: ${apiTime}ms`, 'success');
                     
-                    alert(`Connectテスト成功!\nRPC: ${rpcTime}ms\nAPI: ${apiTime}ms`);
+                    alert(`Connection test successful!\nRPC: ${rpcTime}ms\nAPI: ${apiTime}ms`);
                 } catch (error) {
-                    log(`Connectテストエラー: ${error.message}`, 'error');
-                    alert(`Connectテスト失敗: ${error.message}`);
+                    log(`Connection test error: ${error.message}`, 'error');
+                    alert(`Connection test failed: ${error.message}`);
                 }
             },
             
@@ -3883,7 +3883,7 @@
                 document.getElementById('archiveConnectedNodes').textContent = '0/5';
                 document.getElementById('archiveAvgResponse').textContent = '-';
                 document.getElementById('archiveCheckingNode').textContent = 'Waiting';
-                document.getElementById('archiveEventLog').innerHTML = '<div class="archive-event-item">リセット完了 - 探索ボタンで再開始できます</div>';
+                document.getElementById('archiveEventLog').innerHTML = '<div class="archive-event-item">Reset complete - You can restart with the search button</div>';
                 
                 // Clear archive list
                 const archiveList = document.getElementById('archiveList');
@@ -4060,7 +4060,7 @@
                 async recordInitialBalance() {
                     try {
                         this.initialBalance = await this.getCurrentBalance();
-                        log(`アップロード開始前残高: ${this.initialBalance.toFixed(8)} KAS`, 'info');
+                        log(`Balance before upload: ${this.initialBalance.toFixed(8)} KAS`, 'info');
                         return this.initialBalance;
                     } catch (error) {
                         log(`初期残高記録エラー: ${error.message}`, 'warning');
@@ -4617,7 +4617,7 @@
             
             // すべてのKENVファイルを保存
             async saveAll() {
-                log('[KENV] すべてのファイルを保存開始', 'info');
+                log('[KENV] Starting to save all files', 'info');
                 
                 // ワークスペースがある場合
                 if (WorkspaceState.handle) {
@@ -5032,7 +5032,7 @@
             
             // すべてのKENVファイルを読み込み
             async loadAll() {
-                log('[KENV] すべてのファイルを読み込み開始', 'info');
+                log('[KENV] Starting to load all files', 'info');
                 
                 // 設定ファイルを読み込み
                 const kenvData = await this.loadKenvFile();
@@ -5055,7 +5055,7 @@
             
             // 初期化処理
             async initialize() {
-                log('[KENV] 初期化開始', 'info');
+                log('[KENV] Initialization started', 'info');
                 
                 try {
                     // Step 1: LocalStorageから復元試行
@@ -6328,7 +6328,7 @@
                 }
                 
                 if (this.entries.length === 0) {
-                    this.showStatus('少なくとも1つのエントリーを追加してください', 'error');
+                    this.showStatus('Please add at least one entry', 'error');
                     return false;
                 }
                 
@@ -7036,7 +7036,7 @@
                     if (monitorLogContainer) {
                         monitorLogContainer.innerHTML = '';
                     }
-                    log('ログをクリアしました', 'info');
+                    log('Log cleared', 'info');
                 }
             },
             
@@ -7648,7 +7648,7 @@
                         log(`[ConnectionManager] RPCDisconnectエラー: ${disconnectError.message}`, 'debug');
                     }
                     NetworkState.rpcClient = null;
-                    log('[ConnectionManager] RPCクライアントをクリアしました', 'debug');
+                    log('[ConnectionManager] RPC client cleared', 'debug');
                 }
                 
                 // Mark as disconnected
@@ -9120,7 +9120,7 @@
             
             // Recently Deleted folders
             if (filePath.includes('Recently Deleted') || 
-                filePath.includes('最近削除した項目')) return true;
+                filePath.includes('Recently Deleted')) return true;
             
             // === Android patterns ===
             if (fileName.startsWith('.trashed-')) return true;
@@ -9747,7 +9747,7 @@
             // v4.7.14: Clear stored metadata
             clearMetadata() {
                 this.metadata = null;
-                log('[DownloadManager] メタデータをクリアしました', 'debug');
+                log('[DownloadManager] Metadata cleared', 'debug');
             }
             
             // v5.11.7: Toggle REST API test mode
@@ -10944,7 +10944,7 @@
                 display.textContent = `${amountInKas} KAS`;
             }
             
-            log(`送金額を ${amountInKas} KAS に更新しました`, 'success');
+            log(`Transaction amount updated to ${amountInKas} KAS`, 'success');
         };
         
         // Moved to SystemHandlers
@@ -13329,7 +13329,7 @@
                 if (FileState.progressManager && WorkspaceState.handle) {
                     try {
                         await WorkspaceState.handle.removeEntry(FileState.progressManager.progressFileName);
-                        log('.kprogressファイルを削除しました', 'info');
+                        log('.kprogress file deleted', 'info');
                     } catch (err) {
                         // File might not exist
                     }

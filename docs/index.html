@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.0.7</title>
+    <title>Kaspa P2P File Storage v6.0.8</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -1815,7 +1815,7 @@
             
             <!-- Workspace Folder Status -->
             <div class="status-box">
-                <h3>📁 作業フォルダ</h3>
+                <h3>📁 Workspace</h3>
                 <div class="status-row" id="workspaceStatusSimple">
                     Workspace: Not Set (Browser Storage)
                 </div>
@@ -2314,7 +2314,7 @@
             <div class="metric-box">
                 <h3>💸 Transaction Amount Settings</h3>
                 <div style="margin-bottom: 15px;">
-                    <label>トランザクション送金額 (KAS)</label>
+                    <label>Transaction Amount (KAS)</label>
                     <div style="display: flex; align-items: center; gap: 10px; margin-top: 10px;">
                         <input type="number" id="transactionAmountInput" 
                                value="1" 
@@ -2329,10 +2329,10 @@
                         </button>
                     </div>
                     <p style="margin: 10px 0 0 0; font-size: 0.9em; color: var(--text-secondary);">
-                        ⚠️ ブロックチェーンにデータを記録するための送金額です。<br>
+                        ⚠️ Amount for recording data on blockchain.<br>
                         Recommended: 0.2-1 KAS (Too small will cause errors)<br>
-                        実際のコスト: 手数料のみ（20KBあたり約0.0003 KAS）<br>
-                        ※送金額は自分に戻るため、消費されるのは手数料だけです
+                        Actual cost: Only fees (about 0.0003 KAS per 20KB)<br>
+                        ※ Amount returns to yourself, only fees are consumed
                     </p>
                 </div>
                 <div style="padding: 10px; background: var(--bg-secondary); border-radius: 5px;">
@@ -2342,14 +2342,14 @@
             
             <!-- 作業フォルダ設定 (Moved from Debug Tab) -->
             <div class="metric-box" style="margin-top: 20px;">
-                <h3>📁 作業フォルダ設定</h3>
+                <h3>📁 Workspace Settings</h3>
                 <div id="workspaceStatus" style="margin-top: 15px; padding: 12px; background: var(--bg-secondary); border-radius: 5px;">
                     <div id="workspaceDisplay" style="font-size: 14px; margin-bottom: 10px;">
                         Workspace: <span id="workspaceName" style="font-weight: bold;">Not Set (Browser Storage)</span>
-                        <span id="workspaceHelp" onclick="alert('Kaspa P2P File Storage - 作業フォルダについて\\n\\n作業フォルダを設定すると：\\n✓ 進捗がファイルに自動保存されます\\n✓ ダウンロードファイルが整理されます\\n✓ ブラウザを閉じても進捗が残ります\\n\\n設定しない場合：\\n✓ ブラウザ内に進捗が保存されます\\n✓ ファイルの自動ダウンロードはありません')" style="cursor: pointer; margin-left: 5px; color: var(--accent-color);">❓</span>
+                        <span id="workspaceHelp" onclick="alert('Kaspa P2P File Storage - About Workspace\\n\\nWhen you set a workspace:\\n✓ Progress is automatically saved to files\\n✓ Downloaded files are organized\\n✓ Progress remains even after closing browser\\n\\nWithout workspace setting:\\n✓ Progress is saved in browser\\n✓ No automatic file downloads')" style="cursor: pointer; margin-left: 5px; color: var(--accent-color);">❓</span>
                     </div>
                     <button onclick="setupWorkspace()" id="workspaceBtn" style="width: 100%; padding: 10px; background: var(--accent-color); color: var(--button-text-on-accent); border: none; border-radius: 5px; cursor: pointer;">
-                        作業フォルダを選択
+                        Select Workspace
                     </button>
                 </div>
                 <p style="font-size: 12px; color: var(--text-secondary); margin-top: 10px;">
@@ -2381,7 +2381,7 @@
                 <div class="setting-row">
                     <div class="setting-label">
                         Parallel Download (Experimental)<br>
-                        <small style="color: var(--text-secondary);">10チャンク以上のファイルで8並列Connectを使用</small>
+                        <small style="color: var(--text-secondary);">Use 8 parallel connections for files with 10+ chunks</small>
                     </div>
                     <label class="toggle-switch">
                         <input type="checkbox" id="parallelDownloadToggle" onchange="toggleParallelDownload()">
@@ -5367,20 +5367,20 @@
 ━━━━━━━━━━━━━━━━━━━━━
 総エントリー数: ${analysis.total}件
 
-【内訳】
-✅ 新規エントリー: ${analysis.newFiles.length}件
-📁 類似（別セッション）: ${analysis.similar.length}件
-⚠️ 完全重複: ${analysis.identical.length}件
+[Breakdown]
+✅ New entries: ${analysis.newFiles.length} items
+📁 Similar (different session): ${analysis.similar.length} items
+⚠️ Complete duplicates: ${analysis.identical.length} items
 
-【タイプ別】
-📄 ファイル: ${analysis.byType['kaspa-file']}件
-📁 ディレクトリ: ${analysis.byType['kaspa-directory']}件
+[By Type]
+📄 Files: ${analysis.byType['kaspa-file']} items
+📁 Directories: ${analysis.byType['kaspa-directory']} items
 
 ━━━━━━━━━━━━━━━━━━━━━
-推奨: 完全重複${analysis.identical.length}件をスキップ
-類似エントリーは履歴として保存
+Recommended: Skip ${analysis.identical.length} complete duplicates
+Similar entries will be saved as history
 
-続行しますか？`;
+Do you want to continue?`;
                 
                 return confirm(message);
             },
@@ -6464,7 +6464,7 @@
                         password: password
                     };
                     
-                    this.showStatus('ディレクトリメタデータを生成しました', 'success');
+                    this.showStatus('Directory metadata generated', 'success');
                     
                     // v5.11.109: Save to KENV instead of auto-exporting
                     await this.saveToKENV();
@@ -7078,7 +7078,7 @@
                 localStorage.setItem('kaspaParallelDownload', AppState.settings.parallelDownloadEnabled.toString());
                 
                 if (AppState.settings.parallelDownloadEnabled) {
-                    log('並列ダウンロードを有効にしました（実験的機能）', 'warning');
+                    log('Parallel download enabled (experimental feature)', 'warning');
                 } else {
                     log('Parallel download disabled (stable mode)', 'success');
                 }
@@ -7661,7 +7661,7 @@
                     // Save progress if needed
                     if (FileState.progressManager?.progress) {
                         await FileState.progressManager.saveProgress();
-                        log('[ConnectionManager] 進捗を自動保存しました', 'info');
+                        log('[ConnectionManager] Progress auto-saved', 'info');
                     }
                     
                     // Start reconnection attempts
@@ -8313,7 +8313,7 @@
                 this.totalBytes = 0;
                 this.totalChunks = txIds.length;
                 
-                log(`並列ダウンロード開始: ${txIds.length}チャンク, ${this.concurrency}並列`, 'info');
+                log(`Parallel download started: ${txIds.length} chunks, ${this.concurrency} parallel`, 'info');
                 
                 try {
                     const workers = [];
@@ -8347,11 +8347,11 @@
                     
                     const elapsed = (Date.now() - this.startTime) / 1000;
                     const throughput = (this.totalBytes / 1024 / 1024) / elapsed;
-                    log(`並列ダウンロード完了: ${elapsed.toFixed(1)}秒, ${throughput.toFixed(1)} MB/秒`, 'success');
+                    log(`Parallel download completed: ${elapsed.toFixed(1)} sec, ${throughput.toFixed(1)} MB/sec`, 'success');
                     
                     return sortedChunks;
                 } catch (error) {
-                    log(`並列ダウンロードエラー: ${error.message}`, 'error');
+                    log(`Parallel download error: ${error.message}`, 'error');
                     throw error;
                 }
             }
@@ -8491,7 +8491,7 @@
                 this.totalBytes = 0;
                 this.totalChunks = txIds.length;
                 
-                log(`[ParallelDownloader] ペイロード並列ダウンロード開始: ${txIds.length}個`, 'info');
+                log(`[ParallelDownloader] Payload parallel download started: ${txIds.length} items`, 'info');
                 
                 try {
                     const workers = [];
@@ -9224,10 +9224,10 @@
                     progress.metadata.completedChunks < progress.metadata.totalChunks) {
                     
                     const useExisting = confirm(
-                        '作業フォルダに未完了のアップロードが見つかりました。\n\n' +
+                        'Incomplete upload found in workspace.\n\n' +
                         `ファイル: ${progress.fileInfo.name}\n` +
-                        `進捗: ${progress.metadata.completedChunks}/${progress.metadata.totalChunks} チャンク\n\n` +
-                        'これを続行しますか？'
+                        `Progress: ${progress.metadata.completedChunks}/${progress.metadata.totalChunks} chunks\n\n` +
+                        'Do you want to continue this?'
                     );
                     
                     if (useExisting) {
@@ -9251,7 +9251,7 @@
                 });
                 
                 WorkspaceState.handle = dirHandle;
-                log(`作業フォルダを設定: ${dirHandle.name}`, 'success');
+                log(`Workspace set: ${dirHandle.name}`, 'success');
                 
                 // Scan for .kprogress files
                 await scanProgressFiles(dirHandle);
@@ -9269,7 +9269,7 @@
                 
             } catch (err) {
                 if (err.name !== 'AbortError') {
-                    log(`作業フォルダ設定エラー: ${err.message}`, 'error');
+                    log(`Workspace setting error: ${err.message}`, 'error');
                 }
                 return false;
             }
@@ -9286,7 +9286,7 @@
                 if (WorkspaceState.handle) {
                     workspaceName.textContent = WorkspaceState.handle.name;
                     workspaceName.style.color = 'var(--success-color)';
-                    workspaceBtn.textContent = '作業フォルダを変更';
+                    workspaceBtn.textContent = 'Change Workspace';
                     // Hide help icon when folder is set
                     if (workspaceHelp) {
                         workspaceHelp.style.display = 'none';
@@ -9552,7 +9552,7 @@
             this.totalBytes = 0;
             this.totalChunks = txIds.length;
             
-            log(`[ParallelDownloader] 暗号化チャンクの並列ダウンロード開始: ${txIds.length}チャンク, ${this.concurrency}並列`, 'info');
+            log(`[ParallelDownloader] Encrypted chunks parallel download started: ${txIds.length} chunks, ${this.concurrency} parallel`, 'info');
             log(`[DEBUG] ParallelDownloader - queue length: ${this.queue.length}`, 'debug');
             log(`[DEBUG] ParallelDownloader - active workers will be: ${this.concurrency}`, 'debug');
             
@@ -10418,7 +10418,7 @@
                     // v4.7.8: Handle folder structure if specified
                     if (folderStructure && folderStructure.enabled && 'showDirectoryPicker' in window) {
                         try {
-                            log('[DownloadManager] フォルダ構造を使用したダウンロードを開始', 'info');
+                            log('[DownloadManager] Starting download with folder structure', 'info');
                             
                             let targetHandle;
                             
@@ -10932,7 +10932,7 @@
             const amountInKas = parseFloat(input.value);
             
             if (isNaN(amountInKas) || amountInKas < 0.001 || amountInKas > 100) {
-                alert('送金額は0.001 KAS以上、100 KAS以下で設定してください');
+                alert('Please set transaction amount between 0.001 KAS and 100 KAS');
                 return;
             }
             
@@ -12017,8 +12017,8 @@
                 const continueUpload = confirm(
                     `一部のチャンクがブロックチェーン上で確認できません。\n` +
                     `確認済み: ${verifiedChunks.length}個\n` +
-                    `未確認: ${failedCount}個\n\n` +
-                    `続行しますか？（未確認チャンクは再アップロードされます）`
+                    `Unconfirmed: ${failedCount} items\n\n` +
+                    `Do you want to continue? (Unconfirmed chunks will be re-uploaded)`
                 );
                 return continueUpload;
             }
@@ -12316,7 +12316,7 @@
                         `最大サポート数の${MAX_CHUNKS_SUPPORTED.toLocaleString()}チャンクを超えています。\n\n` +
                         `ブロックチェーン上にメタデータトランザクションは生成されません。\n` +
                         `.kaspaファイル（ローカル）のみが生成されます。\n\n` +
-                        `続行しますか？`
+                        `Do you want to continue?`
                     );
                     
                     if (!continueUpload) {
@@ -12424,7 +12424,7 @@
                     confirmMessage += `\n合計トランザクション数: ${totalTxCount}\n`;
                     confirmMessage += `推定コスト: ${estimatedCost.toFixed(6)} KAS\n`;
                     confirmMessage += `推定時間: ${Math.ceil(estimatedTime)}秒 (${(estimatedTime / 60).toFixed(1)}分)\n\n`;
-                    confirmMessage += `続行しますか？`;
+                    confirmMessage += `Do you want to continue?`;
                     
                     // Show confirmation dialog
                     const confirmed = confirm(confirmMessage);
@@ -12735,7 +12735,7 @@
                                     const utxoCount = entries ? entries.length : 'unknown';
                                     const currentAmountKAS = Number(AppState.settings.transactionAmount) / 100000000;
                                     
-                                    // 推奨送金額を計算（UTXO数に応じて）
+                                    // Calculate recommended amount (based on UTXO count)
                                     const recommendedAmount = utxoCount > 80 ? 100 : 
                                                              utxoCount > 40 ? 50 : 
                                                              utxoCount > 20 ? 10 : 5;
@@ -12744,18 +12744,18 @@
                                     const userMessage = 
                                         `⚠️ トランザクションサイズ超過エラー\n\n` +
                                         `現在のUTXO数: ${utxoCount}個\n` +
-                                        `現在の送金額: ${currentAmountKAS.toFixed(1)} KAS\n\n` +
+                                        `Current amount: ${currentAmountKAS.toFixed(1)} KAS\n\n` +
                                         `【原因】\n` +
                                         `ウォレット内に小額のUTXOが${utxoCount}個蓄積しています。\n` +
                                         `これらを一度に使用するとサイズ制限を超えます。\n\n` +
                                         `【解決方法】\n` +
-                                        `送金額を ${recommendedAmount} KAS 以上に設定してください。\n` +
+                                        `Please set amount to ${recommendedAmount} KAS or more.\n` +
                                         `これによりUTXOが統合され、問題が解決します。\n\n` +
-                                        `設定タブから送金額を変更後、再度お試しください。`;
+                                        `Change amount in Settings tab and try again.`;
                                     
                                     // ログにも記録
                                     log(`❌ Storage mass超過: UTXO ${utxoCount}個 (ペイロード ${i + 1}/${FileState.payloadCount})`, 'error');
-                                    log(`💡 推奨: 送金額を ${recommendedAmount} KAS以上に設定`, 'warning');
+                                    log(`💡 Recommended: Set amount to ${recommendedAmount} KAS or more`, 'warning');
                                     
                                     // アラート表示
                                     alert(userMessage);
@@ -12870,7 +12870,7 @@
                     nextChunkIndex = FileState.progressManager.getNextChunkIndex();
                     while (nextChunkIndex >= 0) {
                     // Get fresh UTXOs for each chunk
-                    log(`チャンク ${nextChunkIndex + 1}/${totalChunks} の処理を開始...`);
+                    log(`Starting to process chunk ${nextChunkIndex + 1}/${totalChunks}...`);
                     const { entries } = await NetworkState.rpcClient.getUtxosByAddresses([UserState.address.toString()]);
                     if (!entries || entries.length === 0) {
                         throw new Error('利用可能なUTXOがありません');
@@ -13624,7 +13624,7 @@
                 }
                 
                 if (totalChunks > CHUNKS_PER_META) {
-                    log(`[SuperMeta] ${totalChunks}チャンク検出 - スーパーメタデータを生成します`, 'info');
+                    log(`[SuperMeta] ${totalChunks} chunks detected - Generating super metadata`, 'info');
                     
                     // Group chunks
                     const chunkGroups = [];
@@ -14168,7 +14168,7 @@
         // Create super meta-tx that references all intermediate meta-txs
         async function createSuperMetaTx(singleMetaTxs, fileMetadata, password) {
             try {
-                log(`[SuperMeta] スーパーメタデータを生成中...`, 'info');
+                log(`[SuperMeta] Generating super metadata...`, 'info');
                 
                 // Create super metadata
                 const superMetaTxData = {

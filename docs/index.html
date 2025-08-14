@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v5.12.79</title>
+    <title>Kaspa P2P File Storage v5.12.80</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -12991,6 +12991,44 @@
                                             break; // Success - exit retry loop
                                         }
                                     }
+                                }
+                                
+                                // v5.12.80: Storage mass超過エラーの専用処理
+                                if (errorMessage.includes('Storage mass exceeds') || 
+                                    errorMessage.includes('mass exceeds maximum') ||
+                                    errorMessage.includes('transaction mass')) {
+                                    
+                                    // UTXO数を取得（entriesは上のスコープで取得済み）
+                                    const utxoCount = entries ? entries.length : 'unknown';
+                                    const currentAmountKAS = Number(AppState.settings.transactionAmount) / 100000000;
+                                    
+                                    // 推奨送金額を計算（UTXO数に応じて）
+                                    const recommendedAmount = utxoCount > 80 ? 100 : 
+                                                             utxoCount > 40 ? 50 : 
+                                                             utxoCount > 20 ? 10 : 5;
+                                    
+                                    // ユーザー向けメッセージ
+                                    const userMessage = 
+                                        `⚠️ トランザクションサイズ超過エラー\n\n` +
+                                        `現在のUTXO数: ${utxoCount}個\n` +
+                                        `現在の送金額: ${currentAmountKAS.toFixed(1)} KAS\n\n` +
+                                        `【原因】\n` +
+                                        `ウォレット内に小額のUTXOが${utxoCount}個蓄積しています。\n` +
+                                        `これらを一度に使用するとサイズ制限を超えます。\n\n` +
+                                        `【解決方法】\n` +
+                                        `送金額を ${recommendedAmount} KAS 以上に設定してください。\n` +
+                                        `これによりUTXOが統合され、問題が解決します。\n\n` +
+                                        `設定タブから送金額を変更後、再度お試しください。`;
+                                    
+                                    // ログにも記録
+                                    log(`❌ Storage mass超過: UTXO ${utxoCount}個 (ペイロード ${i + 1}/${FileState.payloadCount})`, 'error');
+                                    log(`💡 推奨: 送金額を ${recommendedAmount} KAS以上に設定`, 'warning');
+                                    
+                                    // アラート表示
+                                    alert(userMessage);
+                                    
+                                    // リトライせずに即座に停止（進捗保存は不要）
+                                    throw new Error(`Storage mass exceeded with ${utxoCount} UTXOs - stopping upload`);
                                 }
                                 
                                 log(`ペイロード ${i + 1} エラー (試行 ${retries}/${config.retryCount}): ${errorMessage}`, 'error');

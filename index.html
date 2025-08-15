@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.0.10</title>
+    <title>Kaspa P2P File Storage v6.0.11</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -2795,7 +2795,7 @@
                 NetworkState.blockEventFilter.enabled = enabled;
                 const status = enabled ? 'Enabled' : 'Disabled';
                 const color = enabled ? 'var(--warning-color)' : 'var(--text-secondary)';
-                log(`🚫 [BlockFilter] フィルター${status}`, enabled ? 'warn' : 'info');
+                log(`🚫 [BlockFilter] Filter ${status}`, enabled ? 'warn' : 'info');
                 
                 // Update UI
                 const filterSection = document.querySelector('#block-filter-enabled').closest('.metric-box');
@@ -2815,7 +2815,7 @@
                 NetworkState.blockEventFilter.targetNodes = targets;
                 
                 const targetText = targets.length === 0 ? '全ノード' : targets.join(', ');
-                log(`🎯 [BlockFilter] 対象ノード: ${targetText}`, 'info');
+                log(`🎯 [BlockFilter] Target nodes: ${targetText}`, 'info');
             },
             
             resetFilterStats() {
@@ -2860,7 +2860,7 @@
                     statusEl.textContent = '● Enabled';
                     statusEl.style.color = 'var(--success-color)';
                 }
-                log('✅ [REST API Kill] REST API復活', 'success');
+                log('✅ [REST API Kill] REST API restored', 'success');
             },
             
             updateRestApiStats() {
@@ -2958,7 +2958,7 @@
                     const match = file.name.match(/\.([a-z0-9]{8})\.kprogress$/);
                     if (match && match[1]) {
                         window.currentFileCID = match[1];
-                        log(`進捗ファイルからCIDを取得: ${match[1]}`, 'info');
+                        log(`Got CID from progress file: ${match[1]}`, 'info');
                     }
                     
                     handleProgressLoad(progress);
@@ -2976,7 +2976,7 @@
             checkAutoResumeProgress: async function(file) {
                 if (!window.pendingProgress && WorkspaceState.progressFileMap.has(file.name)) {
                     const progressInfo = WorkspaceState.progressFileMap.get(file.name);
-                    log(`進捗ファイルを自動検出: ${progressInfo.progressFilename}`, 'info');
+                    log(`Progress file auto-detected: ${progressInfo.progressFilename}`, 'info');
                     
                     try {
                         // Load the progress file
@@ -3079,7 +3079,7 @@
         NetworkState.archiveHandlers = {
             refreshArchiveStatus: function() {
                 updateArchiveNodeStatus();
-                log('[UI] アーカイブノードステータスを更新しました', 'info');
+                log('[UI] Archive node status updated', 'info');
             },
             
             testArchiveNodes: async function() {
@@ -3231,12 +3231,12 @@
                     
                     // Import WASM SDK
                     NetworkState.kaspa = await import('./kaspa-core.js');
-                    log('kaspa-core.jsをインポートしました');
+                    log('kaspa-core.js imported');
                     
                     // Initialize WASM binary
                     // v5.7.13: Use new initialization format to avoid deprecated parameters warning
                     await NetworkState.kaspa.default({ module_or_path: './kaspa-core_bg.wasm' });
-                    log('WASMバイナリを初期化しました');
+                    log('WASM binary initialized');
                     
                     // Verify functions
                     const requiredFunctions = ['RpcClient', 'Resolver', 'createTransactions', 
@@ -3254,7 +3254,7 @@
                         networkId: config.network
                     });
                     
-                    log('RPCConnectを試行中...');
+                    log('Attempting RPC connection...');
                     await NetworkState.rpcClient.connect();
                     
                     // Test connection
@@ -3273,7 +3273,7 @@
                         const { entries } = await NetworkState.rpcClient.getUtxosByAddresses([UserState.address.toString()]);
                         balance = entries.reduce((sum, utxo) => sum + Number(utxo.amount), 0) / 1e8;
                         const utxoCount = entries.length;
-                        log(`残高: ${balance} KAS (UTXOs: ${utxoCount})`, 'info');
+                        log(`Balance: ${balance} KAS (UTXOs: ${utxoCount})`, 'info');
                         
                         // v5.12.64: Update balance display in both tabs
                         const balanceText = `${balance.toFixed(8)} KAS`;
@@ -3332,13 +3332,13 @@
                     // Test RPC
                     const info = await NetworkState.rpcClient.getServerInfo();
                     const rpcTime = Date.now() - startTime;
-                    log(`RPC応答時間: ${rpcTime}ms`, 'success');
+                    log(`RPC response time: ${rpcTime}ms`, 'success');
                     
                     // Test Explorer API
                     const apiStart = Date.now();
                     const response = await fetchWithTimeout(`${config.apiEndpoints[config.network]}/info/health`, {}, 5000, 1);
                     const apiTime = Date.now() - apiStart;
-                    log(`Explorer API応答時間: ${apiTime}ms`, 'success');
+                    log(`Explorer API response time: ${apiTime}ms`, 'success');
                     
                     alert(`Connection test successful!\nRPC: ${rpcTime}ms\nAPI: ${apiTime}ms`);
                 } catch (error) {
@@ -3373,12 +3373,12 @@
                     
                     // Create wallet from private key (correct API usage)
                     // v5.11.104: Add debug logging
-                    log(`秘密鍵の長さ: ${privateKey.length}文字`, 'debug');
+                    log(`Private key length: ${privateKey.length} characters`, 'debug');
                     UserState.privateKey = new NetworkState.kaspa.PrivateKey(privateKey);
                     const publicKey = UserState.privateKey.toPublicKey();
                     UserState.address = publicKey.toAddress(config.network);
                     
-                    log(`ウォレットConnect: ${UserState.address.toString()}`, 'success');
+                    log(`Wallet connected: ${UserState.address.toString()}`, 'success');
                     
                     // Update UI - Both status tab and settings tab
                     const addressString = UserState.address.toString();
@@ -4075,10 +4075,10 @@
                         this.actualCost = this.initialBalance - this.finalBalance;
                         
                         // Log comparison
-                        log(`実際のコスト: ${this.actualCost.toFixed(8)} KAS（推定: ${this.estimatedCost.toFixed(8)} KAS）`, 'info');
+                        log(`Actual cost: ${this.actualCost.toFixed(8)} KAS (Estimated: ${this.estimatedCost.toFixed(8)} KAS)`, 'info');
                         if (Math.abs(this.actualCost - this.estimatedCost) > 0.00001) {
                             const diff = this.actualCost - this.estimatedCost;
-                            log(`コスト差異: ${diff > 0 ? '+' : ''}${diff.toFixed(8)} KAS`, 'warning');
+                            log(`Cost difference: ${diff > 0 ? '+' : ''}${diff.toFixed(8)} KAS`, 'warning');
                         }
                         
                         return this.actualCost;
@@ -4249,7 +4249,7 @@
                 // 統計を更新
                 this.updateStats(entry);
                 
-                log(`[KENV] エントリー追加: ${entry.id} - ${entry.name}`, 'debug');
+                log(`[KENV] Entry added: ${entry.id} - ${entry.name}`, 'debug');
                 return entry;
             },
             
@@ -4388,7 +4388,7 @@
             // .kenvファイルの保存
             async saveKenvFile() {
                 if (!WorkspaceState.handle) {
-                    log('[KENV] ワークスペースが設定されていません', 'warning');
+                    log('[KENV] Workspace not configured', 'warning');
                     return false;
                 }
                 
@@ -4450,7 +4450,7 @@
                     await writable.write(JSON.stringify(kenvData, null, 2));
                     await writable.close();
                     
-                    log(`[KENV] ${this.kenvFile}を保存しました`, 'success');
+                    log(`[KENV] ${this.kenvFile} saved`, 'success');
                     return true;
                 } catch (error) {
                     log(`[KENV] ${this.kenvFile} save error: ${error.message}`, 'error');
@@ -4461,7 +4461,7 @@
             // .kindexファイルの保存
             async saveKindexFile() {
                 if (!WorkspaceState.handle) {
-                    log('[KENV] ワークスペースが設定されていません', 'warning');
+                    log('[KENV] Workspace not configured', 'warning');
                     return false;
                 }
                 
@@ -4471,7 +4471,7 @@
                     await writable.write(JSON.stringify(this.kindex, null, 2));
                     await writable.close();
                     
-                    log(`[KENV] ${this.kindexFile}を保存しました`, 'success');
+                    log(`[KENV] ${this.kindexFile} saved`, 'success');
                     return true;
                 } catch (error) {
                     log(`[KENV] ${this.kindexFile} save error: ${error.message}`, 'error');
@@ -4482,7 +4482,7 @@
             // .kentryファイルの保存
             async saveKentryFile() {
                 if (!WorkspaceState.handle) {
-                    log('[KENV] ワークスペースが設定されていません', 'warning');
+                    log('[KENV] Workspace not configured', 'warning');
                     return false;
                 }
                 
@@ -4607,7 +4607,7 @@
                     await writable.write(csvContent);
                     await writable.close();
                     
-                    log(`[KENV] ${this.kentryFile}を保存しました (${this.entries.length}件)`, 'success');
+                    log(`[KENV] ${this.kentryFile} saved (${this.entries.length} items)`, 'success');
                     return true;
                 } catch (error) {
                     log(`[KENV] ${this.kentryFile} save error: ${error.message}`, 'error');
@@ -4628,7 +4628,7 @@
                     ]);
                     
                     if (results.every(r => r)) {
-                        log('[KENV] すべてのファイルを保存しました', 'success');
+                        log('[KENV] All files saved', 'success');
                         return true;
                     } else {
                         log('[KENV] Some files failed to save', 'warning');
@@ -4653,7 +4653,7 @@
                     if (entriesToSave.length > MAX_ENTRIES_IN_LOCALSTORAGE) {
                         entriesToSave = this.entries.slice(-MAX_ENTRIES_IN_LOCALSTORAGE);
                         truncated = true;
-                        log(`[KENV] エントリー数制限: ${this.entries.length}件中${MAX_ENTRIES_IN_LOCALSTORAGE}件のみ保存`, 'warning');
+                        log(`[KENV] Entry limit: Only ${MAX_ENTRIES_IN_LOCALSTORAGE} of ${this.entries.length} items saved`, 'warning');
                     }
                     
                     // Step 2: Data preparation
@@ -4706,7 +4706,7 @@
             // .kenvファイルの読み込み
             async loadKenvFile() {
                 if (!WorkspaceState.handle) {
-                    log('[KENV] ワークスペースが設定されていません', 'warning');
+                    log('[KENV] Workspace not configured', 'warning');
                     return false;
                 }
                 
@@ -4736,7 +4736,7 @@
             // .kindexファイルの読み込み
             async loadKindexFile() {
                 if (!WorkspaceState.handle) {
-                    log('[KENV] ワークスペースが設定されていません', 'warning');
+                    log('[KENV] Workspace not configured', 'warning');
                     return false;
                 }
                 
@@ -4764,7 +4764,7 @@
             // .kentryファイルの読み込み
             async loadKentryFile() {
                 if (!WorkspaceState.handle) {
-                    log('[KENV] ワークスペースが設定されていません', 'warning');
+                    log('[KENV] Workspace not configured', 'warning');
                     return false;
                 }
                 
@@ -14508,7 +14508,7 @@ Do you want to continue?`;
             
             // Check workspace handle
             if (!WorkspaceState.handle) {
-                log('作業フォルダが設定されていません。先に設定してください。', 'error');
+                log('Workspace not configured. Please configure it first.', 'error');
                 alert('Workspace is not set.\nPlease select a workspace from the "Settings" button at the top of the screen.');
                 await setupWorkspace();
                 return;
@@ -18251,7 +18251,7 @@ Do you want to continue?`;
                         log(`不明なアクション: ${action}`, 'error');
                 }
             } catch (error) {
-                log(`共有エラー: ${error.message}`, 'error');
+                log(`Share error: ${error.message}`, 'error');
             }
         };
         
@@ -18478,7 +18478,7 @@ Do you want to continue?`;
             
             // Show in modal
                 showModal('File Information', infoHtml);
-                log(`[File] 情報表示: ${file.name}`, 'info');
+                log(`[File] Show info: ${file.name}`, 'info');
             }
         };
         
@@ -18551,9 +18551,9 @@ Do you want to continue?`;
             // v5.11.48: Initialize KENV on page load
             FileState.kenvManager.initialize().then(() => {
                 FileState.kenvManager._initialized = true;
-                log('[KENV] 初期化完了', 'success');
+                log('[KENV] Initialization complete', 'success');
             }).catch(error => {
-                log(`[KENV] 初期化エラー: ${error.message}`, 'error');
+                log(`[KENV] Initialization error: ${error.message}`, 'error');
             });
         });
         
@@ -18567,11 +18567,11 @@ Do you want to continue?`;
             
             async start() {
                 if (this.isActive) {
-                    this.log('既に実行中です');
+                    this.log('Already running');
                     return;
                 }
                 
-                this.log('複数WebSocketテストを開始...');
+                this.log('Starting multiple WebSocket test...');
                 document.getElementById('multiWsStartBtn').disabled = true;
                 document.getElementById('multiWsStopBtn').disabled = false;
                 document.getElementById('multiWsStatusText').textContent = 'Connected...';
@@ -18579,7 +18579,7 @@ Do you want to continue?`;
                 try {
                     // ArchiveNodeManagerから利用可能なノードを取得
                     if (!NetworkState.archiveManager || NetworkState.archiveManager.connections.size === 0) {
-                        this.log('アーカイブノードが見つかりません。先にアーカイブノード探索を実行してください。');
+                        this.log('Archive nodes not found. Please run archive node discovery first.');
                         document.getElementById('multiWsStatusText').textContent = '失敗';
                         this.reset();
                         return;
@@ -18587,7 +18587,7 @@ Do you want to continue?`;
                     
                     // 最大3つのノードを選択
                     const nodes = Array.from(NetworkState.archiveManager.connections.entries()).slice(0, 3);
-                    this.log(`${nodes.length}個のノードにConnectを試みます`);
+                    this.log(`Attempting to connect to ${nodes.length} nodes`);
                     
                     // 各ノードの既存RPCClientConnectを利用してBlock-addedをリッスン
                     for (const [nodeId, nodeData] of nodes) {
@@ -18595,7 +18595,7 @@ Do you want to continue?`;
                             // 既存のRPCClientを使用（既にConnect済み）
                             const rpcClient = nodeData.client;
                             if (!rpcClient || !rpcClient.isConnected) {
-                                this.log(`❌ ノードDisconnected: ${nodeId}`);
+                                this.log(`❌ Node disconnected: ${nodeId}`);
                                 continue;
                             }
                             
@@ -18606,7 +18606,7 @@ Do you want to continue?`;
                             // addEventListenerでイベントを受信
                             rpcClient.addEventListener('block-added', (event) => {
                                 // デバッグログ
-                                this.log(`🔔 Block-addedイベント受信 from ${nodeId}`, 'debug');
+                                this.log(`🔔 Block-added event received from ${nodeId}`, 'debug');
                                 
                                 // event.data.blockでブロックデータを取得（メインと同じ構造）
                                 const block = event.data?.block;
@@ -18620,7 +18620,7 @@ Do you want to continue?`;
                                     };
                                     this.handleBlockAdded(blockEvent, nodeId);
                                 } else {
-                                    this.log(`⚠️ Block-addedイベントにblockデータがありません: ${nodeId}`, 'warn');
+                                    this.log(`⚠️ Block-added event missing block data: ${nodeId}`, 'warn');
                                 }
                             });
                             
@@ -18630,30 +18630,30 @@ Do you want to continue?`;
                                 stats: nodeData.stats
                             });
                             
-                            this.log(`✅ リスナー追加成功: ${nodeId}`);
+                            this.log(`✅ Listener added successfully: ${nodeId}`);
                             this.updateConnectionDisplay();
                             
                         } catch (err) {
-                            this.log(`❌ リスナー追加失敗: ${nodeId} - ${err.message}`);
+                            this.log(`❌ Failed to add listener: ${nodeId} - ${err.message}`);
                         }
                     }
                     
                     if (this.auxConnections.length > 0) {
                         this.isActive = true;
                         document.getElementById('multiWsStatusText').textContent = `${this.auxConnections.length}個のノードでリッスン中`;
-                        this.log(`${this.auxConnections.length}個のノードでBlock-addedイベントをリッスン開始`);
+                        this.log(`Listening for Block-added events on ${this.auxConnections.length} nodes`);
                         
                         // v5.11.137-fix: 統計情報を定期的に表示
                         this.statsInterval = setInterval(() => {
                             this.showStats();
                         }, 10000); // 10秒ごと
                     } else {
-                        this.log('Connectできるノードがありませんでした');
+                        this.log('No connectable nodes found');
                         this.reset();
                     }
                     
                 } catch (error) {
-                    this.log(`エラー: ${error.message}`);
+                    this.log(`Error: ${error.message}`);
                     this.reset();
                 }
             },
@@ -18661,7 +18661,7 @@ Do you want to continue?`;
             async stop() {
                 if (!this.isActive) return;
                 
-                this.log('複数WebSocketテストを停止中...');
+                this.log('Stopping multiple WebSocket test...');
                 
                 // 全ての補助Connectのリスナーを解除
                 for (const conn of this.auxConnections) {
@@ -18670,14 +18670,14 @@ Do you want to continue?`;
                         conn.rpc.removeAllEventListeners();
                         await conn.rpc.unsubscribeBlockAdded();
                         // 注意: RPCClient自体はDisconnectしない（アーカイブノード探索で使用中の可能性）
-                        this.log(`リスナー解除: ${conn.nodeId}`);
+                        this.log(`Listener removed: ${conn.nodeId}`);
                     } catch (err) {
-                        this.log(`リスナー解除エラー: ${conn.nodeId} - ${err.message}`);
+                        this.log(`Error removing listener: ${conn.nodeId} - ${err.message}`);
                     }
                 }
                 
                 this.reset();
-                this.log('複数WebSocketテストを停止しました');
+                this.log('Multiple WebSocket test stopped');
             },
             
             handleBlockAdded(event, nodeId) {
@@ -18700,7 +18700,7 @@ Do you want to continue?`;
                         timestamp: timestamp,
                         count: 1
                     });
-                    this.log(`🆕 新ブロック検出: ${shortHash}... (from ${nodeId})`, 'success');
+                    this.log(`🆕 New block detected: ${shortHash}... (from ${nodeId})`, 'success');
                     
                     // 監視中のトランザクションをチェック
                     if (NetworkState.ws.monitoredTransactions && NetworkState.ws.monitoredTransactions.size > 0) {
@@ -18711,7 +18711,7 @@ Do you want to continue?`;
                     const blockInfo = this.detectedBlocks.get(blockHash);
                     blockInfo.count++;
                     const delay = timestamp - blockInfo.timestamp;
-                    this.log(`♻️ ブロック再検出: ${shortHash}... (from ${nodeId}, ${delay}ms遅延)`, 'debug');
+                    this.log(`♻️ Block re-detected: ${shortHash}... (from ${nodeId}, ${delay}ms delay)`, 'debug');
                 }
                 
                 // 古いエントリーをクリーンアップ（1分以上前）
@@ -18729,14 +18729,14 @@ Do you want to continue?`;
                     for (const txId of event.verboseData.transactionIds) {
                         if (NetworkState.ws.monitoredTransactions.has(txId)) {
                             const blockHash = event.blockHash || event.hash;
-                            this.log(`🎯 監視中のTxを検出！ TxID: ${txId.substring(0, 16)}... BlockID: ${blockHash.substring(0, 16)}...`, 'success');
+                            this.log(`🎯 Monitored Tx detected! TxID: ${txId.substring(0, 16)}... BlockID: ${blockHash.substring(0, 16)}...`, 'success');
                             
                             // メインの監視リストを更新
                             const monitorData = NetworkState.ws.monitoredTransactions.get(txId);
                             if (!monitorData.blockId) {
                                 monitorData.blockId = blockHash;
                                 monitorData.blockTime = new Date();
-                                this.log(`✅ BlockID更新完了: ${txId.substring(0, 16)}...`);
+                                this.log(`✅ BlockID updated: ${txId.substring(0, 16)}...`);
                             }
                         }
                     }
@@ -18810,7 +18810,7 @@ Do you want to continue?`;
                 if (logDiv) {
                     logDiv.innerHTML = '';
                 }
-                this.log('ログをクリアしました');
+                this.log('Log cleared');
             }
         };
     </script>

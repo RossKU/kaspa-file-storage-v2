@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.0.9</title>
+    <title>Kaspa P2P File Storage v6.0.10</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -5769,7 +5769,7 @@ Do you want to continue?`;
             },
             
             async importFromTxId() {
-                const txInfo = prompt('TxID:BlockID:Password形式で入力してください:');
+                const txInfo = prompt('Enter in TxID:BlockID:Password format:');
                 if (!txInfo) return;
                 
                 const parts = txInfo.split(':');
@@ -5854,7 +5854,7 @@ Do you want to continue?`;
             },
             
             addFileEntry() {
-                const entry = prompt('ファイルエントリーのTxID:BlockID:Password形式で入力してください:');
+                const entry = prompt('Enter file entry in TxID:BlockID:Password format:');
                 if (!entry) return;
                 
                 const parts = entry.split(':');
@@ -5866,8 +5866,8 @@ Do you want to continue?`;
                 const [txId, blockId, password] = parts;
                 
                 // Ask for file details
-                const fileName = prompt('File Nameを入力してください:') || 'untitled';
-                const filePath = prompt('パス (省略可能、例: folder1/folder2):') || '';
+                const fileName = prompt('Enter file name:') || 'untitled';
+                const filePath = prompt('Path (optional, e.g.: folder1/folder2):') || '';
                 
                 // Create new file entry
                 const newEntry = {
@@ -5886,18 +5886,18 @@ Do you want to continue?`;
             },
             
             addDirectoryEntry() {
-                const name = prompt('ディレクトリ名を入力してください:');
+                const name = prompt('Enter directory name:');
                 if (!name) return;
                 
-                const path = prompt('親ディレクトリパス (省略可能、例: parent/folder):') || '';
+                const path = prompt('Parent directory path (optional, e.g.: parent/folder):') || '';
                 
                 // Ask if this should reference an existing directory metadata
-                const hasTxId = confirm('既存のディレクトリメタデータを参照しますか？');
+                const hasTxId = confirm('Do you want to reference existing directory metadata?');
                 let metaTxId = null;
                 let blockId = null;
                 
                 if (hasTxId) {
-                    const txInfo = prompt('ディレクトリのTxID:BlockID形式で入力してください:');
+                    const txInfo = prompt('Enter directory TxID:BlockID format:');
                     if (txInfo) {
                         const parts = txInfo.split(':');
                         if (parts.length >= 2) {
@@ -5999,7 +5999,7 @@ Do you want to continue?`;
                         this.updateButtonStates();
                         
                         // Optionally expand directory contents
-                        if (result.entries && confirm(`ディレクトリ「${newEntry.name}」の中身も展開しますか？`)) {
+                        if (result.entries && confirm(`Do you want to expand the contents of directory "${newEntry.name}"?`)) {
                             const dirPath = this.currentPath ? `${this.currentPath}/${newEntry.name}` : newEntry.name;
                             result.entries.forEach(entry => {
                                 this.entries.push({
@@ -6144,7 +6144,7 @@ Do you want to continue?`;
             },
             
             createEmptyFolder() {
-                const folderName = prompt('新規フォルダ名を入力してください:');
+                const folderName = prompt('Enter new folder name:');
                 if (!folderName) return;
                 
                 // Check if folder already exists
@@ -7046,7 +7046,7 @@ Do you want to continue?`;
                 ).join('\n');
                 
                 navigator.clipboard.writeText(logText).then(() => {
-                    alert('ログをクリップボードにコピーしました');
+                    alert('Log copied to clipboard');
                 });
             },
             
@@ -7228,10 +7228,10 @@ Do you want to continue?`;
                                     if (typeof displayDirectoryContents === 'function') {
                                         displayDirectoryContents(kaspaData);
                                     } else {
-                                        alert('ディレクトリ表示機能が利用できません');
+                                        alert('Directory display function is not available');
                                     }
                                 } else {
-                                    alert('未対応のKaspaファイル形式です');
+                                    alert('Unsupported Kaspa file format');
                                 }
                             } catch (error) {
                                 log(`Kaspaファイル読み込みエラー: ${error.message}`, 'error');
@@ -7241,7 +7241,7 @@ Do you want to continue?`;
                         reader.readAsText(file);
                     } else {
                         log('.kaspa ファイルではありません', 'warning');
-                        alert('.kaspaファイルをドロップしてください');
+                        alert('Please drop a .kaspa file');
                     }
                 } else {
                     log('ドロップされたファイルは.kaspaファイルではありません', 'error');
@@ -7278,7 +7278,7 @@ Do you want to continue?`;
                         if (fileSize) {
                             fileSize.innerHTML = `${(file.size / 1024 / 1024).toFixed(2)} MB<br>
                                 <span style="color: var(--success-color); font-size: 0.85em;">
-                                    レジューム: ${resumeStats.completed}/${resumeStats.total} チャンク (${resumeStats.percentage || Math.round(resumeStats.completed/resumeStats.total*100)}%)
+                                    Resume: ${resumeStats.completed}/${resumeStats.total} chunks (${resumeStats.percentage || Math.round(resumeStats.completed/resumeStats.total*100)}%)
                                 </span>`;
                         }
                     }
@@ -9499,7 +9499,7 @@ Do you want to continue?`;
                     <p><strong>サイズ:</strong> ${(fileInfo.size / 1024 / 1024).toFixed(2)} MB</p>
                     <p><strong>進捗:</strong> ${completedChunks}/${totalChunks} チャンク (${(completedChunks / totalChunks * 100).toFixed(1)}%)</p>
                     <p><strong>最終更新:</strong> ${new Date(lastUpdate).toLocaleString()}</p>
-                    <p class="warning">⚠️ 同じファイルを選択してアップロードを続行してください</p>
+                    <p class="warning">⚠️ Please select the same file to continue uploading</p>
                 `;
                 
                 // Store progress for later use
@@ -12407,23 +12407,23 @@ Do you want to continue?`;
                     const estimatedTime = totalTxCount * timePerTx;
                     
                     // Build confirmation message
-                    let confirmMessage = `📊 アップロード見積もり\n\n`;
+                    let confirmMessage = `📊 Upload Estimate\n\n`;
                     confirmMessage += `File Name: ${currentFile.name}\n`;
-                    confirmMessage += `ファイルサイズ: ${(currentFile.size / 1024 / 1024).toFixed(2)} MB\n\n`;
-                    confirmMessage += `ペイロード数: ${payloadCount}チャンク\n`;
+                    confirmMessage += `File Size: ${(currentFile.size / 1024 / 1024).toFixed(2)} MB\n\n`;
+                    confirmMessage += `Payloads: ${payloadCount} chunks\n`;
                     
                     if (useMetaTx) {
                         if (metaTxCount > 0 && superMetaTxCount === 0) {
-                            confirmMessage += `メタトランザクション: ${metaTxCount}\n`;
+                            confirmMessage += `Meta Transactions: ${metaTxCount}\n`;
                         } else if (metaTxCount > 0 && superMetaTxCount > 0) {
-                            confirmMessage += `メタトランザクション: ${metaTxCount}\n`;
-                            confirmMessage += `スーパーメタトランザクション: ${superMetaTxCount}\n`;
+                            confirmMessage += `Meta Transactions: ${metaTxCount}\n`;
+                            confirmMessage += `Super Meta Transactions: ${superMetaTxCount}\n`;
                         }
                     }
                     
-                    confirmMessage += `\n合計トランザクション数: ${totalTxCount}\n`;
-                    confirmMessage += `推定コスト: ${estimatedCost.toFixed(6)} KAS\n`;
-                    confirmMessage += `推定時間: ${Math.ceil(estimatedTime)}秒 (${(estimatedTime / 60).toFixed(1)}分)\n\n`;
+                    confirmMessage += `\nTotal Transactions: ${totalTxCount}\n`;
+                    confirmMessage += `Estimated Cost: ${estimatedCost.toFixed(6)} KAS\n`;
+                    confirmMessage += `Estimated Time: ${Math.ceil(estimatedTime)} seconds (${(estimatedTime / 60).toFixed(1)} minutes)\n\n`;
                     confirmMessage += `Do you want to continue?`;
                     
                     // Show confirmation dialog
@@ -14509,7 +14509,7 @@ Do you want to continue?`;
             // Check workspace handle
             if (!WorkspaceState.handle) {
                 log('作業フォルダが設定されていません。先に設定してください。', 'error');
-                alert('作業フォルダが設定されていません。\n画面上部の「設定」ボタンから作業フォルダを選択してください。');
+                alert('Workspace is not set.\nPlease select a workspace from the "Settings" button at the top of the screen.');
                 await setupWorkspace();
                 return;
             }
@@ -14653,7 +14653,7 @@ Do you want to continue?`;
             try {
                 // パスワード確認
                 if (!password || password.length < 8) {
-                    password = prompt('パスワードを入力してください（8文字以上）:');
+                    password = prompt('Enter password (8 characters or more):');
                     if (!password || password.length < 8) {
                         log('パスワードは8文字以上必要です', 'error');
                         return;
@@ -17376,7 +17376,7 @@ Do you want to continue?`;
                                 <p><strong>完了率:</strong> ${((progress._progress.completedChunks / progress.recovery.totalChunks) * 100).toFixed(1)}%</p>
                             `;
                             document.getElementById('resumeInfo').style.display = 'block';
-                            log(`📂 レジューム可能な進捗を検出: ${progress._progress.completedChunks}/${progress.recovery.totalChunks} チャンク完了`, 'info');
+                            log(`📂 Resumable progress detected: ${progress._progress.completedChunks}/${progress.recovery.totalChunks} chunks completed`, 'info');
                         }
                     }
                 } catch (error) {
@@ -17404,7 +17404,7 @@ Do you want to continue?`;
                     const stats = FileState.progressManager.getStats();
                     UIHandlers.updateFileSelectionUI(file, true, stats);
                     
-                    log(`レジューム準備完了: ${stats.completed}/${stats.total} チャンク完了`, 'success');
+                    log(`Resume ready: ${stats.completed}/${stats.total} chunks completed`, 'success');
                     
                     // Clear pending progress
                     window.pendingProgress = null;
@@ -17504,7 +17504,7 @@ Do you want to continue?`;
                 
             } catch (error) {
                 log(`ウォレットConnectエラー: ${error.message}`, 'error');
-                alert(`エラー: ${error.message}`);
+                alert(`Error: ${error.message}`);
             }
         };
         */
@@ -17711,7 +17711,7 @@ Do you want to continue?`;
             const selectedIds = Array.from(FileState.selectedFiles);
             if (selectedIds.length === 0) return;
             
-            if (confirm(`${selectedIds.length}個のファイルをリストから削除しますか？`)) {
+            if (confirm(`Remove ${selectedIds.length} file(s) from the list?`)) {
                 // KENVエントリーから削除（後ろから削除して、インデックスのずれを防ぐ）
                 const entriesToDelete = [];
                 for (const id of selectedIds) {
@@ -18342,7 +18342,7 @@ Do you want to continue?`;
                 <input type="password" id="addFilePassword" placeholder="パスワード（省略可）">
                 <div class="password-dialog-buttons">
                     <button onclick="cancelAddFile()">Cancel</button>
-                    <button onclick="confirmAddFile('${fileInfo.id}', '${originalInfo}')">登録</button>
+                    <button onclick="confirmAddFile('${fileInfo.id}', '${originalInfo}')">Register</button>
                 </div>
             `;
             
@@ -18395,7 +18395,7 @@ Do you want to continue?`;
             showSelectedFileDetails: function() {
             const selectedIds = Array.from(FileState.selectedFiles);
             if (selectedIds.length !== 1) {
-                alert('情報表示は1つのファイルのみ選択してください');
+                alert('Please select only one file for information display');
                 return;
             }
             

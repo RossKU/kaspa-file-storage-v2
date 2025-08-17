@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.1.2</title>
+    <title>Kaspa P2P File Storage v6.1.3</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -5408,7 +5408,7 @@ Do you want to continue?`;
                     if (kenvEntry.type === 'kaspa-directory') {
                         // ディレクトリの場合、directoryMetadataが必要
                         if (!kenvEntry.directoryMetadata) {
-                            log('ディレクトリメタデータがありません', 'error');
+                            log('Directory metadata not found', 'error');
                             return;
                         }
                         
@@ -6155,7 +6155,7 @@ Do you want to continue?`;
                 });
                 
                 if (exists) {
-                    this.showStatus('同名のフォルダが既に存在します', 'error');
+                    this.showStatus('Folder with same name already exists', 'error');
                     return;
                 }
                 
@@ -6323,7 +6323,7 @@ Do you want to continue?`;
             
             async validate() {
                 if (!this.name) {
-                    this.showStatus('ディレクトリ名を入力してください', 'error');
+                    this.showStatus('Please enter directory name', 'error');
                     return false;
                 }
                 
@@ -6366,7 +6366,7 @@ Do you want to continue?`;
             exportAsKaspa() {
                 // v5.11.18-fix8: Check if name is valid
                 if (!this.name || this.name === '未設定') {
-                    this.showStatus('ディレクトリ名を入力してください', 'error');
+                    this.showStatus('Please enter directory name', 'error');
                     return;
                 }
                 
@@ -6392,7 +6392,7 @@ Do you want to continue?`;
             // v5.11.109: Save generated directory metadata to KENV
             async saveToKENV() {
                 if (!this.generatedMetadata) {
-                    this.showStatus('生成されたメタデータがありません', 'error');
+                    this.showStatus('No generated metadata found', 'error');
                     return;
                 }
                 
@@ -6444,7 +6444,7 @@ Do you want to continue?`;
                     const password = document.getElementById('dirbuilder-password').value;
                     // v5.11.18-fix11: Make password mandatory
                     if (!password) {
-                        this.showStatus('パスワードを入力してください', 'error');
+                        this.showStatus('Please enter password', 'error');
                         return;
                     }
                     if (password.length < 8) {
@@ -6484,7 +6484,7 @@ Do you want to continue?`;
                     const password = document.getElementById('dirbuilder-password').value;
                     // v5.11.18-fix11: Make password mandatory
                     if (!password) {
-                        this.showStatus('パスワードを入力してください', 'error');
+                        this.showStatus('Please enter password', 'error');
                         return;
                     }
                     if (password.length < 8) {
@@ -7244,7 +7244,7 @@ Do you want to continue?`;
                         alert('Please drop a .kaspa file');
                     }
                 } else {
-                    log('ドロップされたファイルは.kaspaファイルではありません', 'error');
+                    log('Dropped file is not a .kaspa file', 'error');
                 }
             },
             
@@ -11007,14 +11007,14 @@ Do you want to continue?`;
                 if (UserState.address) {
                     document.getElementById('initStatus').innerHTML = `
                         <p class="success">✅ システム初期化完了</p>
-                        <p>アドレス: ${UserState.address.toString()}</p>
-                        <p>残高: ${balance} KAS</p>
+                        <p>Address: ${UserState.address.toString()}</p>
+                        <p>Balance: ${balance} KAS</p>
                     `;
                 } else {
                     document.getElementById('initStatus').innerHTML = `
                         <p class="success">✅ システム初期化完了</p>
                         <p style="color: #ffcc66;">⚠️ ウォレットDisconnected</p>
-                        <p>ステータスタブからウォレットをConnectしてください</p>
+                        <p>Please connect wallet from Status tab</p>
                     `;
                 }
                 
@@ -12113,18 +12113,18 @@ Do you want to continue?`;
             // v5.11.127: Removed directory mode check - feature moved to DirectoryBuilder
             
             if (!FileState.currentFile) {
-                log('ファイルが選択されていません', 'error');
+                log('No file selected', 'error');
                 return;
             }
             
             const password = document.getElementById('uploadPassword').value;
             if (password.length < 8) {
-                log('パスワードは8文字以上必要です', 'error');
+                log('Password must be at least 8 characters', 'error');
                 return;
             }
             
             if (!NetworkState.rpcClient) {
-                log('先にKaspaシステムを再起動してください', 'error');
+                log('Please restart Kaspa system first', 'error');
                 return;
             }
             
@@ -14655,7 +14655,7 @@ Do you want to continue?`;
                 if (!password || password.length < 8) {
                     password = prompt('Enter password (8 characters or more):');
                     if (!password || password.length < 8) {
-                        log('パスワードは8文字以上必要です', 'error');
+                        log('Password must be at least 8 characters', 'error');
                         return;
                     }
                 }
@@ -14889,7 +14889,7 @@ Do you want to continue?`;
             }
             
             if (!NetworkState.rpcClient) {
-                log('先にKaspaシステムを再起動してください', 'error');
+                log('Please restart Kaspa system first', 'error');
                 return;
             }
             
@@ -15447,7 +15447,7 @@ Do you want to continue?`;
             }
             
             if (!NetworkState.rpcClient) {
-                log('先にKaspaシステムを再起動してください', 'error');
+                log('Please restart Kaspa system first', 'error');
                 return;
             }
             
@@ -16219,7 +16219,7 @@ Do you want to continue?`;
         // WebSocket monitoring (unified version with reconnection support)
         window.startMonitoring = async function() {
             if (!NetworkState.rpcClient) {
-                log('先にKaspaシステムを再起動してください', 'error');
+                log('Please restart Kaspa system first', 'error');
                 return;
             }
             
@@ -17372,7 +17372,7 @@ Do you want to continue?`;
                             resumeDetails.innerHTML = `
                                 <p><strong>ファイル:</strong> ${file.name}</p>
                                 <p><strong>CID:</strong> ${progress.cid}</p>
-                                <p><strong>進捗:</strong> ${progress._progress.completedChunks}/${progress.recovery.totalChunks} チャンク</p>
+                                <p><strong>Progress:</strong> ${progress._progress.completedChunks}/${progress.recovery.totalChunks} chunks</p>
                                 <p><strong>Completion Rate:</strong> ${((progress._progress.completedChunks / progress.recovery.totalChunks) * 100).toFixed(1)}%</p>
                             `;
                             document.getElementById('resumeInfo').style.display = 'block';
@@ -17515,7 +17515,7 @@ Do you want to continue?`;
             const dialog = document.createElement('div');
             dialog.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--bg-secondary);padding:20px;border-radius:8px;z-index:1000;width:450px';
             dialog.innerHTML = `
-                <h3>エントリーを追加</h3>
+                <h3>Add Entry</h3>
                 <div style="margin-bottom:15px">
                     <label style="display:block;margin-bottom:5px">タイプ:</label>
                     <select id="addEntryType" onchange="updateAddEntryForm()" style="width:100%;padding:8px">
@@ -17531,7 +17531,7 @@ Do you want to continue?`;
                 <div id="directoryEntryForm" style="display:none">
                     <label style="display:block;margin-bottom:5px">ディレクトリ名:</label>
                     <input id="addDirName" type="text" style="width:100%;padding:8px;margin-bottom:10px" 
-                           placeholder="ディレクトリ名">
+                           placeholder="Directory Name">
                     <label style="display:block;margin-bottom:5px">ディレクトリメタデータ (オプション):</label>
                     <input id="addDirMeta" type="text" style="width:100%;padding:8px;margin-bottom:10px" 
                            placeholder="TxID:BlockID:Pass (空の場合は空ディレクトリ)">
@@ -18295,9 +18295,9 @@ Do you want to continue?`;
             const dialog = document.createElement('div');
             dialog.className = 'password-dialog';
             dialog.innerHTML = `
-                <h3>パスワード入力</h3>
-                <p>ファイルのパスワードを入力してください:</p>
-                <input type="password" id="filePassword" placeholder="パスワード">
+                <h3>Enter Password</h3>
+                <p>Please enter file password:</p>
+                <input type="password" id="filePassword" placeholder="Password">
                 <div class="password-dialog-buttons">
                     <button onclick="closePasswordDialog()">Cancel</button>
                     <button onclick="submitPassword('${action}')">OK</button>
@@ -18368,9 +18368,9 @@ Do you want to continue?`;
             const dialog = document.createElement('div');
             dialog.className = 'password-dialog';
             dialog.innerHTML = `
-                <h3>パスワード入力</h3>
+                <h3>Enter Password</h3>
                 <p>パスワードが設定されていないようです。<br>パスワードを入力してリストへ登録しますか？</p>
-                <input type="password" id="addFilePassword" placeholder="パスワード（省略可）">
+                <input type="password" id="addFilePassword" placeholder="Password (optional)">
                 <div class="password-dialog-buttons">
                     <button onclick="cancelAddFile()">Cancel</button>
                     <button onclick="confirmAddFile('${fileInfo.id}', '${originalInfo}')">Register</button>
@@ -18445,7 +18445,7 @@ Do you want to continue?`;
             }
             
             if (!file) {
-                alert('File Informationが見つかりません');
+                alert('File information not found');
                 return;
             }
             

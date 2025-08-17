@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.1.1</title>
+    <title>Kaspa P2P File Storage v6.1.2</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -17717,9 +17717,14 @@ Do you want to continue?`;
             log(`[File] Download info: ${txId}:${blockId ? blockId.substring(0, 8) + '...' : ''}`, 'info');
             
             // Switch to Download tab
-            const downloadTab = document.querySelector('[data-tab="download"]');
-            if (downloadTab) {
-                downloadTab.click();
+            if (typeof UIHandlers !== 'undefined' && UIHandlers.switchTab) {
+                UIHandlers.switchTab('download');
+            } else {
+                // Fallback: find and click the download tab element
+                const downloadTab = document.querySelector('.nav-item[onclick*="download"]');
+                if (downloadTab) {
+                    downloadTab.click();
+                }
             }
             
             // Set the unified input field value

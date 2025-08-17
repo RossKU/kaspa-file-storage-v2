@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.1.3</title>
+    <title>Kaspa P2P File Storage v6.1.4</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -6550,7 +6550,7 @@ Do you want to continue?`;
                             kenvEntry.network = config.network;
                             
                             // Save to localStorage
-                            FileState.kenvManager.saveToStorage();
+                            await FileState.kenvManager.saveAll();
                             log('[KENV] ディレクトリエントリー保存完了', 'info');
                             
                             // Update file tab if needed
@@ -13297,7 +13297,7 @@ Do you want to continue?`;
                         metaTxBlockId: null,
                         uploadDate: new Date().toISOString(),
                         blockTime: null,
-                        uploadedBy: UserState.address.toString(),
+                        uploadedBy: UserState.address?.toString() || null,
                         payloadSplit: useNewApproach, // Flag for new approach
                         // v5.5.28: Fixed local variable reference - use FileState.progressManager
                         segmentBoundaries: useNewApproach ? FileState.progressManager.progress.metadata.segmentBoundaries : undefined

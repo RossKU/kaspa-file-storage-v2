@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.1.6</title>
+    <title>Kaspa P2P File Storage v6.1.7</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -3261,8 +3261,12 @@
                     const info = await NetworkState.rpcClient.getServerInfo();
                     log(`Connected successfully! Server: ${info.serverVersion}`, 'success');
                     
-                    // Update RPC node info display
-                    updateRpcNodeInfo(info, config.network, config.nodeType, config.currentEndpoint);
+                    // v6.1.7: Get RPC connection URL
+                    const rpcUrl = NetworkState.rpcClient.url || config.currentEndpoint || '';
+                    log(`RPC URL: ${rpcUrl}`);
+                    
+                    // Update RPC node info display with URL
+                    updateRpcNodeInfo(info, config.network, config.nodeType, rpcUrl);
                     
                     // Check REST API health
                     checkRestApiHealth();
@@ -8854,6 +8858,7 @@ Do you want to continue?`;
         }
 
         // Update RPC node information display
+        // v6.1.7: endpoint parameter now contains the actual RPC URL
         function updateRpcNodeInfo(info = null, network = null, nodeType = null, endpoint = null) {
             const rpcStatus = document.getElementById('rpcStatus');
             const rpcNode = document.getElementById('rpcNode');
@@ -8895,8 +8900,25 @@ Do you want to continue?`;
             // Check if pruned node
             const prunedStatus = info.hasUtxoIndex === false ? ' • Pruned' : '';
             
+            // v6.1.7: Extract IP address from URL if available
+            let ipDisplay = '';
+            if (endpoint) {
+                try {
+                    // Parse URL to extract hostname/IP
+                    const urlMatch = endpoint.match(/wss?:\/\/([^:\/]+)(:\d+)?/);
+                    if (urlMatch) {
+                        ipDisplay = ` • ${urlMatch[1]}`;
+                        if (urlMatch[2]) {
+                            ipDisplay += urlMatch[2]; // Include port if present
+                        }
+                    }
+                } catch (e) {
+                    console.log('Could not parse URL:', e);
+                }
+            }
+            
             // Combine all information
-            const nodeInfo = `Node: ${networkDisplay} • ${info.serverVersion}${syncStatus}${prunedStatus}${nodeTypeDisplay}`;
+            const nodeInfo = `Node: ${networkDisplay} • ${info.serverVersion}${ipDisplay}${syncStatus}${prunedStatus}${nodeTypeDisplay}`;
             rpcNode.textContent = nodeInfo;
         }
 

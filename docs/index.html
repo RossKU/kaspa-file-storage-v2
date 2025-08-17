@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.1.5</title>
+    <title>Kaspa P2P File Storage v6.1.6</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -9794,7 +9794,7 @@ Do you want to continue?`;
                             }
                             }
                         } catch (rpcError) {
-                            log(`[DownloadManager] RPC error: ${rpcError.message} - falling back to REST API`, 'warning');
+                            log(`[DownloadManager] RPCエラー: ${rpcError.message} - REST APIにフォールバックします`, 'warning');
                             // Don't throw, proceed to REST API fallback
                         }
                     }
@@ -9805,7 +9805,7 @@ Do you want to continue?`;
                         
                         // Kill switch check
                         if (!NetworkState.restApiControl.globalEnabled || NetworkState.restApiControl.temporaryKilled) {
-                            throw new Error('REST API is disabled - cannot fetch metadata');
+                            throw new Error('ブロックデータが見つかりません（RPC）\nREST APIは無効化されています（プライバシー設定）\n→ アーカイブノードに接続するか、REST APIを一時的に有効化してください');
                         }
                         
                         const apiUrl = `${config.apiEndpoints[config.network]}/transactions/${metaTxId}`;

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.1.8</title>
+    <title>Kaspa P2P File Storage v6.1.9</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -2775,7 +2775,8 @@
                 transactionAmount: 100000000n    // Default 1 KAS (100000000 Sompi)
             },
             monitoring: {
-                wsMonitorTimeout: null  // WebSocket monitoring timeout
+                wsMonitorTimeout: null,  // WebSocket monitoring timeout
+                directoryStopTimeout: null  // v6.1.9: Directory upload stop delay timeout
             },
             history: {
                 systemLogs: []         // System log entries
@@ -15911,28 +15912,52 @@ Do you want to continue?`;
             
             // v3.6.3 fix: Check overall upload status
             // v6.1.8: Add directory upload completion check
+            // v6.1.9: Add 10-second delay for directory upload stop
             if (FileState.uploadingDirMeta === false && FileState.uploadingChunksCount === -1) {
                 // Directory upload completed (chunks=-1 is specific to directory)
-                log(`[DEBUG] Directory upload complete - stopping monitoring`, 'debug');
-                await stopMonitoring();
-                // Stop auxiliary RPCs
-                if (NetworkState.auxRpcClients) {
-                    NetworkState.auxRpcClients.forEach(client => {
-                        if (client && client.client) {
-                            try {
-                                client.client.removeAllEventListeners();
-                            } catch (e) {
-                                // Ignore errors
-                            }
+                // Clear any existing directory stop timeout
+                if (AppState.monitoring.directoryStopTimeout) {
+                    clearTimeout(AppState.monitoring.directoryStopTimeout);
+                    AppState.monitoring.directoryStopTimeout = null;
+                }
+                
+                log(`[DEBUG] Directory upload complete - scheduling stop in 10 seconds`, 'debug');
+                
+                // Schedule stop after 10 seconds
+                AppState.monitoring.directoryStopTimeout = setTimeout(async () => {
+                    log(`[DEBUG] Stopping monitoring after 10 second delay`, 'debug');
+                    
+                    // Check if still eligible to stop (no new uploads started)
+                    if (FileState.uploadingChunksCount <= 0 && !FileState.uploadingMetaTx && !FileState.uploadingDirMeta && !FileState.isUploadingFile) {
+                        await stopMonitoring();
+                        
+                        // Stop auxiliary RPCs
+                        if (NetworkState.auxRpcClients) {
+                            NetworkState.auxRpcClients.forEach(client => {
+                                if (client && client.client) {
+                                    try {
+                                        client.client.removeAllEventListeners();
+                                    } catch (e) {
+                                        // Ignore errors
+                                    }
+                                }
+                            });
                         }
-                    });
-                }
-                // Clear 5-minute timer
-                if (AppState.monitoring.wsMonitorTimeout) {
-                    log(`[DEBUG] 5分タイマーをクリアしました`, 'debug');
-                    clearTimeout(AppState.monitoring.wsMonitorTimeout);
-                    AppState.monitoring.wsMonitorTimeout = null;
-                }
+                        
+                        // Clear 5-minute timer
+                        if (AppState.monitoring.wsMonitorTimeout) {
+                            log(`[DEBUG] 5分タイマーをクリアしました`, 'debug');
+                            clearTimeout(AppState.monitoring.wsMonitorTimeout);
+                            AppState.monitoring.wsMonitorTimeout = null;
+                        }
+                    } else {
+                        log(`[DEBUG] New upload detected during delay - cancelling stop`, 'debug');
+                    }
+                    
+                    AppState.monitoring.directoryStopTimeout = null;
+                }, 10000); // 10 second delay
+                
+                return; // Don't check other conditions during delay
             } else if (FileState.uploadingChunksCount === 0 && !FileState.uploadingMetaTx && !FileState.uploadingDirMeta && !FileState.isUploadingFile) { // v5.5.34, v5.5.36 & v5.5.37: Using FileState
                 log(`[DEBUG] WebSocket監視: 残り0件 - 自動停止します`, 'debug');
                 await stopMonitoring();

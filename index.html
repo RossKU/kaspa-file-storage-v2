@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.1.9</title>
+    <title>Kaspa P2P File Storage v6.2.0</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -2197,6 +2197,14 @@
                     <div style="margin-bottom: 15px;">
                         <label for="dirbuilder-password">Password Protection (Required):</label>
                         <input type="password" id="dirbuilder-password" placeholder="Password (8+ characters, required)" style="width: 100%; padding: 8px; margin-top: 5px;" required oninput="DirectoryBuilderState.updateButtonStates()">
+                    </div>
+                    
+                    <!-- Status Message Area (v6.2.0) -->
+                    <div id="dirbuilder-status-container" class="upload-status-container" style="display: none; margin-bottom: 15px; margin-top: 15px;">
+                        <div class="upload-status-message">
+                            <span class="upload-status-icon" id="dirbuilder-status-icon">📁</span>
+                            <span id="dirbuilder-status-text">Ready</span>
+                        </div>
                     </div>
                     
                     <!-- Action Buttons -->
@@ -5718,7 +5726,7 @@ Do you want to continue?`;
             currentPath: '', // Currently selected path in tree
             selectedNode: null, // Currently selected node
             
-            // v5.11.18-fix3: showStatus helper for DirectoryBuilderState
+            // v5.11.18-fix3 / v6.2.0: showStatus helper with UI display
             showStatus(message, type = 'info') {
                 // Console log with appropriate level
                 if (type === 'error') {
@@ -5732,6 +5740,40 @@ Do you want to continue?`;
                 // Use global log function if available
                 if (typeof log === 'function') {
                     log(message, type);
+                }
+                
+                // v6.2.0: Display in UI
+                const container = document.getElementById('dirbuilder-status-container');
+                const icon = document.getElementById('dirbuilder-status-icon');
+                const text = document.getElementById('dirbuilder-status-text');
+                
+                if (container && icon && text) {
+                    // Set icon based on type (same as file upload)
+                    if (type === 'success') {
+                        icon.textContent = '✅';
+                    } else if (type === 'error') {
+                        icon.textContent = '❌';
+                    } else if (type === 'warning') {
+                        icon.textContent = '⚠️';
+                    } else if (message.includes('Uploading') || message.includes('uploading')) {
+                        icon.textContent = '📤';
+                    } else if (message.includes('Preparing') || message.includes('preparing')) {
+                        icon.textContent = '📁';
+                    } else {
+                        icon.textContent = '📁';
+                    }
+                    
+                    text.textContent = message;
+                    container.style.display = 'block';
+                    
+                    // Auto-hide success messages after 10 seconds
+                    if (type === 'success') {
+                        setTimeout(() => {
+                            if (container.style.display === 'block' && text.textContent === message) {
+                                container.style.display = 'none';
+                            }
+                        }, 10000);
+                    }
                 }
             },
             
@@ -5798,12 +5840,12 @@ Do you want to continue?`;
                         this.mode = 'edit';
                         this.showEditSection();
                         this.updatePreview();
-                        this.showStatus('ディレクトリメタデータを読み込みました', 'success');
+                        this.showStatus('Directory metadata loaded successfully', 'success');
                     } else {
-                        this.showStatus('指定されたTxIDはディレクトリメタデータではありません', 'error');
+                        this.showStatus('The specified TxID is not directory metadata', 'error');
                     }
                 } catch (error) {
-                    this.showStatus(`読み込みエラー: ${error.message}`, 'error');
+                    this.showStatus(`Loading error: ${error.message}`, 'error');
                 }
             },
             
@@ -6022,7 +6064,7 @@ Do you want to continue?`;
                     this.updateButtonStates();
                     
                 } catch (error) {
-                    this.showStatus(`エラー: ${error.message}`, 'error');
+                    this.showStatus(`Error: ${error.message}`, 'error');
                     console.error('addFromTxId error:', error);
                 }
             },
@@ -6509,7 +6551,7 @@ Do you want to continue?`;
                         await window.startMonitoring();
                     }
                     
-                    this.showStatus('Uploading directory metadata to blockchain...', 'info');
+                    this.showStatus('Uploading to blockchain...', 'info');
                     
                     // Upload to blockchain
                     const result = await uploadDirectoryMetadata(metadata, password);
@@ -6564,16 +6606,18 @@ Do you want to continue?`;
                             }
                         }
                         
-                        this.showStatus(`Upload complete: TxID ${result.txid}`, 'success');
+                        // v6.2.0: Use same message as file upload
+                        this.showStatus('Upload complete! Please check the File tab', 'success');
                         
                         // Show copy button for TxID
                         const txInfo = `${result.txid}:${result.blockId}${password ? ':' + password : ''}`;
-                        this.showStatus(`📋 ダウンロード情報: ${txInfo}`, 'info');
+                        // v6.2.0: Show download info in log
+                        log(`📋 Download info: ${txInfo}`, 'info');
                     } else {
-                        this.showStatus(`アップロードエラー: ${result.error}`, 'error');
+                        this.showStatus(`Upload error: ${result.error}`, 'error');
                     }
                 } catch (error) {
-                    this.showStatus(`エラー: ${error.message}`, 'error');
+                    this.showStatus(`Error: ${error.message}`, 'error');
                 }
             },
             

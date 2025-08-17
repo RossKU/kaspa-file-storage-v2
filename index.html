@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.1.7</title>
+    <title>Kaspa P2P File Storage v6.1.8</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -15910,7 +15910,30 @@ Do you want to continue?`;
             }
             
             // v3.6.3 fix: Check overall upload status
-            if (FileState.uploadingChunksCount === 0 && !FileState.uploadingMetaTx && !FileState.uploadingDirMeta && !FileState.isUploadingFile) { // v5.5.34, v5.5.36 & v5.5.37: Using FileState
+            // v6.1.8: Add directory upload completion check
+            if (FileState.uploadingDirMeta === false && FileState.uploadingChunksCount === -1) {
+                // Directory upload completed (chunks=-1 is specific to directory)
+                log(`[DEBUG] Directory upload complete - stopping monitoring`, 'debug');
+                await stopMonitoring();
+                // Stop auxiliary RPCs
+                if (NetworkState.auxRpcClients) {
+                    NetworkState.auxRpcClients.forEach(client => {
+                        if (client && client.client) {
+                            try {
+                                client.client.removeAllEventListeners();
+                            } catch (e) {
+                                // Ignore errors
+                            }
+                        }
+                    });
+                }
+                // Clear 5-minute timer
+                if (AppState.monitoring.wsMonitorTimeout) {
+                    log(`[DEBUG] 5分タイマーをクリアしました`, 'debug');
+                    clearTimeout(AppState.monitoring.wsMonitorTimeout);
+                    AppState.monitoring.wsMonitorTimeout = null;
+                }
+            } else if (FileState.uploadingChunksCount === 0 && !FileState.uploadingMetaTx && !FileState.uploadingDirMeta && !FileState.isUploadingFile) { // v5.5.34, v5.5.36 & v5.5.37: Using FileState
                 log(`[DEBUG] WebSocket監視: 残り0件 - 自動停止します`, 'debug');
                 await stopMonitoring();
             } else {

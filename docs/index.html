@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.1.4</title>
+    <title>Kaspa P2P File Storage v6.1.5</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -9767,28 +9767,35 @@ Do you want to continue?`;
                     
                     // If we have BlockID, use RPC directly (unless REST API test mode)
                     if (blockId && rpcClient && !this.forceRestApi) {
-                        log(`[DownloadManager] BlockID経由でメタデータ取得: ${blockId.substring(0, 16)}...`, 'info');
-                        
-                        const blockResponse = await NetworkState.rpcClient.getBlock({
-                            hash: blockId,
-                            includeTransactions: true
-                        });
-                        
-                        const block = blockResponse?.block?.block || blockResponse?.block;
-                        if (!block) {
-                            throw new Error(`Block not found: ${blockId}`);
-                        }
-                        
-                        // Find the meta transaction in the block
-                        for (const tx of block.transactions || []) {
-                            const txId = tx.verboseData?.transactionId || tx.id || tx.transactionId;
-                            if (txId === metaTxId) {
-                                if (tx.payload && tx.payload !== '') {
-                                    payload = safeHexDecode(tx.payload, 'meta-tx payload');
-                                    log(`[DownloadManager] メタデータ取得成功: ${payload.length} bytes`, 'success');
-                                    break;
+                        try {
+                            log(`[DownloadManager] BlockID経由でメタデータ取得: ${blockId.substring(0, 16)}...`, 'info');
+                            
+                            const blockResponse = await NetworkState.rpcClient.getBlock({
+                                hash: blockId,
+                                includeTransactions: true
+                            });
+                            
+                            const block = blockResponse?.block?.block || blockResponse?.block;
+                            if (!block) {
+                                log(`[DownloadManager] Block not found via RPC: ${blockId.substring(0, 16)}... - falling back to REST API`, 'warning');
+                                // Don't throw, let it fall through to REST API
+                            } else {
+                            
+                            // Find the meta transaction in the block
+                            for (const tx of block.transactions || []) {
+                                const txId = tx.verboseData?.transactionId || tx.id || tx.transactionId;
+                                if (txId === metaTxId) {
+                                    if (tx.payload && tx.payload !== '') {
+                                        payload = safeHexDecode(tx.payload, 'meta-tx payload');
+                                        log(`[DownloadManager] メタデータ取得成功: ${payload.length} bytes`, 'success');
+                                        break;
+                                    }
                                 }
                             }
+                            }
+                        } catch (rpcError) {
+                            log(`[DownloadManager] RPC error: ${rpcError.message} - falling back to REST API`, 'warning');
+                            // Don't throw, proceed to REST API fallback
                         }
                     }
                     

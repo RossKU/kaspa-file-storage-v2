@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.1.0</title>
+    <title>Kaspa P2P File Storage v6.1.1</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -17677,32 +17677,58 @@ Do you want to continue?`;
         // Download selected files
         window.downloadSelected = async function() {
             const selectedIds = Array.from(FileState.selectedFiles);
-            if (selectedIds.length === 0) return;
+            if (selectedIds.length === 0) {
+                log('Please select a file to download', 'warning');
+                return;
+            }
             
-            log(`[File] Downloading ${selectedIds.length} items...`, 'info');
+            if (selectedIds.length > 1) {
+                log('Please select only one file for download', 'warning');
+                return;
+            }
             
-            for (const id of selectedIds) {
-                const item = FileState.fileList.find(f => f.id === id);
-                if (item && item.metaTxId !== '-') {
-                    try {
-                        // v5.10.8: Support directory downloads
-                        if (item.type === 'directory') {
-                            log(`[File] Downloading directory: ${item.name}`, 'info');
-                            // Set download info and trigger download
-                            const info = `${item.metaTxId}:${item.blockId}:${item.password || ''}`;
-                            document.getElementById('downloadInfo').value = info;
-                            await downloadFileWithRetry();
-                        } else {
-                            log(`[File] Downloading file: ${item.name}`, 'info');
-                            // Set download info and trigger download
-                            const info = `${item.metaTxId}:${item.blockId}:${item.password || ''}`;
-                            document.getElementById('downloadInfo').value = info;
-                            await downloadFileWithRetry();
-                        }
-                    } catch (error) {
-                        log(`[File] Download error for ${item.name}: ${error.message}`, 'error');
-                    }
-                }
+            // Fixed: Use kenvManager.entries instead of fileList
+            const id = selectedIds[0];
+            const item = FileState.kenvManager.entries.find(f => f.id === id);
+            
+            if (!item) {
+                log('Selected file not found', 'error');
+                return;
+            }
+            
+            if (!item.metaTxId || item.metaTxId === '-') {
+                log('No MetaTxID available for this file', 'error');
+                return;
+            }
+            
+            // Prepare download information
+            const txId = item.metaTxId || '';
+            const blockId = item.metaTxBlockId || item.blockId || '';
+            const password = item.password || '';
+            
+            // Format: TxID:BlockID:Password
+            const downloadInfo = password ? 
+                `${txId}:${blockId}:${password}` :
+                blockId ? 
+                    `${txId}:${blockId}` :
+                    txId;
+            
+            log(`[File] Preparing download for: ${item.name}`, 'info');
+            log(`[File] Download info: ${txId}:${blockId ? blockId.substring(0, 8) + '...' : ''}`, 'info');
+            
+            // Switch to Download tab
+            const downloadTab = document.querySelector('[data-tab="download"]');
+            if (downloadTab) {
+                downloadTab.click();
+            }
+            
+            // Set the unified input field value
+            const unifiedInput = document.getElementById('unifiedTxIdInput');
+            if (unifiedInput) {
+                unifiedInput.value = downloadInfo;
+                log('Download information has been set. Please click "Verify" to proceed.', 'success');
+            } else {
+                log('Error: Download input field not found', 'error');
             }
         };
         

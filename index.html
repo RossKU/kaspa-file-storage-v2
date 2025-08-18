@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.11</title>
+    <title>Kaspa P2P File Storage v6.2.12</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -12779,8 +12779,9 @@ Do you want to continue?`;
                     uploadStatusUI.totalChunks = payloads.length;
                     uploadStatusUI.updateStatus('⬆️', 'Sending to blockchain...', 3);
                     
-                    // Upload each payload
-                    for (let i = 0; i < payloads.length; i++) {
+                    try {
+                        // Upload each payload
+                        for (let i = 0; i < payloads.length; i++) {
                         // Check if already uploaded
                         if (FileState.progressManager.isChunkCompleted(i)) {
                             log(`ペイロード ${i + 1}/${payloads.length} は既にアップロード済み`);

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.12</title>
+    <title>Kaspa P2P File Storage v6.2.13</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -12723,8 +12723,25 @@ Do you want to continue?`;
                     
                     confirmMessage += `\nTotal Transactions: ${totalTxCount}\n`;
                     confirmMessage += `Estimated Cost: ${estimatedCost.toFixed(6)} KAS\n`;
-                    confirmMessage += `Estimated Time: ${Math.ceil(estimatedTime)} seconds (${(estimatedTime / 60).toFixed(1)} minutes)\n\n`;
-                    confirmMessage += `Do you want to continue?`;
+                    confirmMessage += `Estimated Time: ${Math.ceil(estimatedTime)} seconds (${(estimatedTime / 60).toFixed(1)} minutes)\n`;
+                    
+                    // v6.2.13: Check UTXO count for warning
+                    try {
+                        const { entries } = await NetworkState.rpcClient.getUtxosByAddresses([UserState.address.toString()]);
+                        const utxoCount = entries.length;
+                        
+                        if (utxoCount > 40) {
+                            confirmMessage += `\n⚠️ WARNING: High UTXO count detected!\n`;
+                            confirmMessage += `Current UTXOs: ${utxoCount}\n`;
+                            confirmMessage += `This may cause "Storage mass exceeded" errors.\n`;
+                            confirmMessage += `Recommended: Consolidate UTXOs first (Debug tab → UTXO Management)\n`;
+                        }
+                    } catch (utxoError) {
+                        // Ignore UTXO check errors, proceed with upload
+                        log('Could not check UTXO count', 'debug');
+                    }
+                    
+                    confirmMessage += `\nDo you want to continue?`;
                     
                     // v6.2.9: Skip confirmation dialog for resume
                     let confirmed = true;

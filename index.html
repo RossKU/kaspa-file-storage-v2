@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.2</title>
+    <title>Kaspa P2P File Storage v6.2.3</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -2933,7 +2933,7 @@
                     // Calculate total balance
                     let totalBalance = 0n;
                     for (const entry of entries) {
-                        totalBalance += entry.utxoEntry.amount;
+                        totalBalance += BigInt(entry.amount);
                     }
                     
                     // Update UI
@@ -2985,12 +2985,44 @@
                     
                     log('🔄 Starting UTXO consolidation...', 'info');
                     
-                    // Create empty transaction (no payload) for consolidation
+                    // Get UTXOs
+                    const { entries } = await NetworkState.rpcClient.getUtxosByAddresses([UserState.address.toString()]);
+                    if (!entries || entries.length === 0) {
+                        throw new Error('No UTXOs available');
+                    }
+                    
+                    // Calculate total balance (for self-send)
+                    let totalBalance = 0n;
+                    for (const utxo of entries) {
+                        totalBalance += BigInt(utxo.amount);
+                    }
+                    
+                    // Format UTXOs for transaction
+                    const formattedUtxos = entries.map(utxo => ({
+                        address: UserState.address.toString(),
+                        outpoint: {
+                            transactionId: utxo.outpoint.transactionId,
+                            index: utxo.outpoint.index
+                        },
+                        scriptPublicKey: utxo.scriptPublicKey,
+                        amount: BigInt(utxo.amount),
+                        isCoinbase: utxo.isCoinbase || false,
+                        blockDaaScore: BigInt(utxo.blockDaaScore)
+                    }));
+                    
+                    // Create consolidation transaction (send all to self minus fee)
+                    const fee = 10000n; // 0.0001 KAS
+                    const consolidatedAmount = totalBalance - fee;
+                    
                     const result = await NetworkState.kaspa.createTransactions({
-                        entries: [],  // Empty entries for consolidation
-                        outputs: [],  // Will be filled by SDK
+                        entries: formattedUtxos,
+                        outputs: [{
+                            address: UserState.address.toString(),
+                            amount: consolidatedAmount
+                        }],
                         changeAddress: UserState.address.toString(),
-                        fee: 10000n,  // 0.0001 KAS fee
+                        priorityFee: 0n,
+                        networkId: config.network,
                         payload: null // No payload for consolidation
                     });
                     

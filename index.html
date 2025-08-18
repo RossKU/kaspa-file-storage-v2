@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.8</title>
+    <title>Kaspa P2P File Storage v6.2.9</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -12661,16 +12661,41 @@ Do you want to continue?`;
                 if (useNewApproach) {
                     log('🚀 新方式: 暗号化後ペイロード分割を使用', 'info');
                     
-                    // v5.11.126: Update status
-                    uploadStatusUI.updateStatus('📦', 'データを最適化しています...', 2);
+                    // v6.2.9: Check if this is a resume (has progress)
+                    const isResuming = FileState.progressManager?.progress?._progress?.completedChunks > 0;
                     
-                    try {
-                        // Process entire file and split into payloads
-                        const { payloads, key: encKey, salt: encSalt, segmentBoundaries } = await processFileWithPayloadSplit(
+                    let payloads, encKey, encSalt, segmentBoundaries;
+                    
+                    if (isResuming) {
+                        // Resume: Skip payload split and restore from existing progress
+                        log('📂 Resuming upload - restoring from existing progress', 'info');
+                        
+                        // Restore payloads from ProgressManager
+                        const recovery = FileState.progressManager.progress.recovery;
+                        const metadata = FileState.progressManager.progress.metadata;
+                        
+                        payloads = recovery.payloads || [];
+                        encKey = metadata.key;
+                        encSalt = metadata.salt;
+                        segmentBoundaries = metadata.segmentBoundaries || metadata.chunkBoundaries;
+                        
+                        log(`✅ Restored ${payloads.length} payloads from progress (${FileState.progressManager.progress._progress.completedChunks} completed)`, 'success');
+                    } else {
+                        // New upload: Process file and split into payloads
+                        // v5.11.126: Update status
+                        uploadStatusUI.updateStatus('📦', 'データを最適化しています...', 2);
+                        
+                        const result = await processFileWithPayloadSplit(
                             currentFile, 
                             password, 
                             useCompression
                         );
+                        
+                        payloads = result.payloads;
+                        encKey = result.key;
+                        encSalt = result.salt;
+                        segmentBoundaries = result.segmentBoundaries;
+                    }
                     
                     // v5.11.18: Cost estimation and confirmation
                     const payloadCount = payloads.length;
@@ -12718,41 +12743,48 @@ Do you want to continue?`;
                     confirmMessage += `Estimated Time: ${Math.ceil(estimatedTime)} seconds (${(estimatedTime / 60).toFixed(1)} minutes)\n\n`;
                     confirmMessage += `Do you want to continue?`;
                     
-                    // Show confirmation dialog
-                    const confirmed = confirm(confirmMessage);
-                    
-                    if (!confirmed) {
-                        // User cancelled - cleanup
-                        log('Upload cancelled', 'info');
+                    // v6.2.9: Skip confirmation dialog for resume
+                    let confirmed = true;
+                    if (!isResuming) {
+                        // Show confirmation dialog only for new uploads
+                        confirmed = confirm(confirmMessage);
                         
-                        // Store payloads for potential future use
-                        FileState.preparedPayloads = {
-                            payloads,
-                            key: encKey,
-                            salt: encSalt,
-                            segmentBoundaries,
-                            timestamp: Date.now()
-                        };
+                        if (!confirmed) {
+                            // User cancelled - cleanup
+                            log('Upload cancelled', 'info');
+                            
+                            // Store payloads for potential future use
+                            FileState.preparedPayloads = {
+                                payloads,
+                                key: encKey,
+                                salt: encSalt,
+                                segmentBoundaries,
+                                timestamp: Date.now()
+                            };
+                            
+                            // Reset UI state
+                            updateUploadButtonState();
+                            document.getElementById('uploadProgress').style.display = 'none';
+                            
+                            // Keep progress manager for resume capability
+                            // Do not reset FileState.progressManager
+                            
+                            // Reset upload flags
+                            FileState.isUploadingFile = false;
+                            FileState.uploadSessionActive = false;
+                            
+                            return;
+                        }
                         
-                        // Reset UI state
-                        updateUploadButtonState();
-                        document.getElementById('uploadProgress').style.display = 'none';
+                        // User confirmed - clear any previously prepared payloads
+                        FileState.preparedPayloads = null;
                         
-                        // Keep progress manager for resume capability
-                        // Do not reset FileState.progressManager
-                        
-                        // Reset upload flags
-                        FileState.isUploadingFile = false;
-                        FileState.uploadSessionActive = false;
-                        
-                        return;
+                        // Log estimation
+                        log(`📊 見積もり承認済み: ${totalTxCount}トランザクション, ${estimatedCost.toFixed(6)} KAS`, 'info');
+                    } else {
+                        // Resume: Log without confirmation
+                        log(`🔄 Resuming: ${totalTxCount}トランザクション (${FileState.progressManager.progress._progress.completedChunks}/${payloadCount} completed)`, 'info');
                     }
-                    
-                    // User confirmed - clear any previously prepared payloads
-                    FileState.preparedPayloads = null;
-                    
-                    // Log estimation
-                    log(`📊 見積もり承認済み: ${totalTxCount}トランザクション, ${estimatedCost.toFixed(6)} KAS`, 'info');
                     
                     // Start WebSocket monitoring after confirmation
                     if (!NetworkState.ws.monitorActive) {

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.6</title>
+    <title>Kaspa P2P File Storage v6.2.7</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -3010,8 +3010,9 @@
                         blockDaaScore: BigInt(utxo.blockDaaScore)
                     }));
                     
-                    // Create consolidation transaction - send all to self
-                    log(`📊 UTXO consolidation details: ${entries.length} UTXOs, Total: ${(Number(totalBalance) / 100000000).toFixed(8)} KAS`, 'info');
+                    // Create consolidation transaction - send 99% to self (1% for fees)
+                    const consolidatedAmount = totalBalance * 99n / 100n;  // 99% of balance
+                    log(`📊 UTXO consolidation details: ${entries.length} UTXOs, Total: ${(Number(totalBalance) / 100000000).toFixed(8)} KAS, Sending: ${(Number(consolidatedAmount) / 100000000).toFixed(8)} KAS (99%)`, 'info');
                     
                     let result;
                     try {
@@ -3019,7 +3020,7 @@
                             entries: formattedUtxos,
                             outputs: [{
                                 address: UserState.address.toString(),
-                                amount: totalBalance  // Send full amount, SDK handles fee
+                                amount: consolidatedAmount  // Send 99%, leave 1% for fee
                             }],
                             changeAddress: UserState.address.toString(),
                             priorityFee: 0n,

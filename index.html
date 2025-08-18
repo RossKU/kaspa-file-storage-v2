@@ -3005,8 +3005,44 @@
                     log(`✅ UTXO consolidation successful. TxID: ${txid}`, 'success');
                     
                     // Refresh UTXO status after a delay
-                    setTimeout(() => {
-                        this.checkUTXOStatus();
+                    setTimeout(async () => {
+                        // v6.2.14-hotfix: Update UTXO display directly (checkUTXOStatus removed)
+                        try {
+                            const { entries } = await NetworkState.rpcClient.getUtxosByAddresses([UserState.address.toString()]);
+                            const utxoCount = entries.length;
+                            const balance = entries.reduce((sum, utxo) => sum + Number(utxo.amount), 0) / 1e8;
+                            
+                            // Update balance displays
+                            const balanceText = `${balance.toFixed(8)} KAS`;
+                            document.getElementById('walletBalance').textContent = balanceText;
+                            document.getElementById('settingsWalletBalance').textContent = balanceText;
+                            
+                            // Update UTXO count displays
+                            const utxoText = `(UTXOs: ${utxoCount})`;
+                            const utxoWarning = utxoCount > 40 ? ' ⚠️' : '';
+                            document.getElementById('walletUtxoCount').textContent = utxoText + utxoWarning;
+                            document.getElementById('settingsWalletUtxoCount').textContent = utxoText + utxoWarning;
+                            
+                            // Update consolidation button
+                            const consolidateBtn = document.getElementById('utxoConsolidateBtn');
+                            if (consolidateBtn) {
+                                consolidateBtn.disabled = (utxoCount <= 1);
+                                if (utxoCount > 40) {
+                                    consolidateBtn.style.background = 'var(--warning-color)';
+                                    consolidateBtn.textContent = `⚠️ Consolidate ${utxoCount} UTXOs`;
+                                } else if (utxoCount > 1) {
+                                    consolidateBtn.style.background = '#2A6F65';
+                                    consolidateBtn.textContent = `Consolidate ${utxoCount} UTXOs`;
+                                } else {
+                                    consolidateBtn.textContent = 'Consolidation not needed';
+                                }
+                            }
+                            
+                            log(`✅ UTXO status refreshed: ${utxoCount} UTXOs`, 'info');
+                        } catch (error) {
+                            log(`Failed to refresh UTXO status: ${error.message}`, 'error');
+                        }
+                        
                         resultDiv.style.display = 'none';
                     }, 5000);
                     

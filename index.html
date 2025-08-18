@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.5</title>
+    <title>Kaspa P2P File Storage v6.2.6</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -3010,17 +3010,8 @@
                         blockDaaScore: BigInt(utxo.blockDaaScore)
                     }));
                     
-                    // Create consolidation transaction
-                    // Estimate fee generously to avoid insufficient funds (0.001 KAS = 100000 sompi)
-                    const estimatedFee = 100000n; // 0.001 KAS (10x typical fee for safety)
-                    const consolidatedAmount = totalBalance - estimatedFee;
-                    
-                    // Ensure we're not sending negative or zero amount
-                    if (consolidatedAmount <= 0n) {
-                        throw new Error(`Balance too low for consolidation. Balance: ${(Number(totalBalance) / 100000000).toFixed(8)} KAS, Estimated fee: 0.001 KAS`);
-                    }
-                    
-                    log(`📊 UTXO consolidation details: ${entries.length} UTXOs, Total: ${(Number(totalBalance) / 100000000).toFixed(8)} KAS, Sending: ${(Number(consolidatedAmount) / 100000000).toFixed(8)} KAS`, 'info');
+                    // Create consolidation transaction - send all to self
+                    log(`📊 UTXO consolidation details: ${entries.length} UTXOs, Total: ${(Number(totalBalance) / 100000000).toFixed(8)} KAS`, 'info');
                     
                     let result;
                     try {
@@ -3028,7 +3019,7 @@
                             entries: formattedUtxos,
                             outputs: [{
                                 address: UserState.address.toString(),
-                                amount: consolidatedAmount
+                                amount: totalBalance  // Send full amount, SDK handles fee
                             }],
                             changeAddress: UserState.address.toString(),
                             priorityFee: 0n,
@@ -3044,7 +3035,7 @@
                         if (txErrorMsg.includes('mass') || txErrorMsg.includes('Mass')) {
                             throw new Error(`Storage mass exceeded with ${entries.length} UTXOs. Try consolidating fewer UTXOs at once.`);
                         } else if (txErrorMsg.includes('insufficient') || txErrorMsg.includes('Insufficient')) {
-                            throw new Error(`Insufficient balance. Total: ${(Number(totalBalance) / 100000000).toFixed(8)} KAS, Trying to send: ${(Number(consolidatedAmount) / 100000000).toFixed(8)} KAS. Try reducing the amount.`);
+                            throw new Error(`Insufficient balance. Total: ${(Number(totalBalance) / 100000000).toFixed(8)} KAS`);
                         } else {
                             throw new Error(`Transaction creation failed: ${txErrorMsg}`);
                         }

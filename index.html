@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.13</title>
+    <title>Kaspa P2P File Storage v6.2.14</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -2247,9 +2247,9 @@
                 </div>
             </div>
             
-            <!-- Wallet Connection -->
+            <!-- Wallet & UTXO Management (v6.2.14: Consolidated) -->
             <div class="metric-box">
-                <h3>💰 WalletConnect</h3>
+                <h3>💰 Wallet & UTXO Management</h3>
                 <div style="margin-top: 15px;">
                     <label>Private Key</label>
                     <input type="password" id="walletPrivateKey" placeholder="Please enter your private key" style="width: 100%; padding: 10px; margin-top: 8px; font-size: 14px; border: 1px solid var(--border-color); border-radius: 5px;">
@@ -2266,10 +2266,30 @@
                         <strong>Address:</strong>
                         <div id="settingsWalletAddress" style="font-family: monospace; font-size: 0.85em; word-break: break-all; margin-top: 5px; color: var(--text-secondary);">-</div>
                     </div>
-                    <div>
+                    <div style="margin-bottom: 10px;">
                         <strong>Balance:</strong>
                         <span id="settingsWalletBalance" style="margin-left: 10px; font-weight: bold; color: var(--success-color);">-</span>
                         <span id="settingsWalletUtxoCount" style="margin-left: 10px; color: var(--text-secondary); font-size: 0.9em;"></span>
+                    </div>
+                    
+                    <!-- UTXO Consolidation (moved from Debug tab) -->
+                    <div id="utxoConsolidationSection" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border-color); display: none;">
+                        <button onclick="consolidateUTXOs()" id="utxoConsolidateBtn" 
+                                style="width: 100%; padding: 12px; background: #2A6F65; color: white; 
+                                       border: none; border-radius: 6px; cursor: pointer; font-weight: bold;"
+                                disabled>
+                            Consolidate UTXOs
+                        </button>
+                        <p style="font-size: 12px; color: var(--text-secondary); margin-top: 8px; line-height: 1.5;">
+                            <strong>Why consolidate?</strong><br>
+                            • Too many UTXOs (>40) cause "Storage mass exceeded" errors<br>
+                            • Consolidation merges multiple small UTXOs into one large UTXO<br>
+                            • Essential for large file uploads (>550MB)<br>
+                            • Cost: Only network fees (~0.0003 KAS)
+                        </p>
+                        <div id="utxoConsolidationResult" style="margin-top: 10px; padding: 10px; background: var(--bg-secondary); border-radius: 5px; display: none;">
+                            <div id="consolidationMessage"></div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -2698,37 +2718,6 @@
             </div>
         </div>
         
-        <!-- v6.2.2: UTXO Management (Phase 1) -->
-        <div class="container">
-            <h2>💰 UTXO Management</h2>
-            <div class="metric-box" style="padding: 15px;">
-                <p style="margin-bottom: 10px; color: var(--text-secondary);">
-                    Consolidate multiple UTXOs to prevent Storage mass exceeded errors
-                </p>
-                
-                <div id="utxoStatus" style="margin: 10px 0; padding: 10px; background: var(--background-light); border-radius: 5px;">
-                    <div><strong>Current UTXOs:</strong> <span id="utxoCount">-</span></div>
-                    <div><strong>Total Balance:</strong> <span id="utxoBalance">-</span> KAS</div>
-                    <div id="utxoWarning" style="color: var(--warning-color); margin-top: 5px; display: none;">
-                        ⚠️ High UTXO count detected. Consider consolidation.
-                    </div>
-                </div>
-                
-                <div style="margin: 15px 0;">
-                    <button onclick="checkUTXOStatus()" id="utxoCheckBtn" style="padding: 10px 20px; margin-right: 10px;">
-                        Check UTXO Status
-                    </button>
-                    <button onclick="consolidateUTXOs()" id="utxoConsolidateBtn" style="padding: 10px 20px; background: var(--accent-color); color: white;" disabled>
-                        Consolidate UTXOs
-                    </button>
-                </div>
-                
-                <div id="utxoConsolidationResult" style="margin-top: 15px; padding: 10px; background: var(--bg-secondary); border-radius: 5px; display: none;">
-                    <div id="consolidationMessage"></div>
-                </div>
-            </div>
-        </div>
-        
         <!-- Debug Log -->
         <div class="container">
             <h2>🐛 Debug Log</h2>
@@ -2915,52 +2904,7 @@
                 }
             },
             
-            // v6.2.2: UTXO Management functions
-            async checkUTXOStatus() {
-                const btn = document.getElementById('utxoCheckBtn');
-                if (btn) btn.disabled = true;
-                
-                try {
-                    // Check wallet connection
-                    if (!UserState.address) {
-                        throw new Error('Wallet not connected');
-                    }
-                    
-                    // Get UTXOs
-                    const { entries } = await NetworkState.rpcClient.getUtxosByAddresses([UserState.address.toString()]);
-                    const utxoCount = entries.length;
-                    
-                    // Calculate total balance
-                    let totalBalance = 0n;
-                    for (const entry of entries) {
-                        totalBalance += BigInt(entry.amount);
-                    }
-                    
-                    // Update UI
-                    document.getElementById('utxoCount').textContent = utxoCount;
-                    document.getElementById('utxoBalance').textContent = (Number(totalBalance) / 100000000).toFixed(8);
-                    
-                    // Show warning if needed
-                    const warningEl = document.getElementById('utxoWarning');
-                    if (utxoCount > 40) {
-                        warningEl.style.display = 'block';
-                    } else {
-                        warningEl.style.display = 'none';
-                    }
-                    
-                    // Enable consolidation button if more than 1 UTXO
-                    document.getElementById('utxoConsolidateBtn').disabled = (utxoCount <= 1);
-                    
-                    log(`✅ UTXO Status: ${utxoCount} UTXOs, Balance: ${(Number(totalBalance) / 100000000).toFixed(8)} KAS`, 'success');
-                    
-                } catch (error) {
-                    log(`❌ Failed to check UTXO status: ${error.message}`, 'error');
-                    document.getElementById('utxoCount').textContent = 'Error';
-                    document.getElementById('utxoBalance').textContent = 'Error';
-                } finally {
-                    if (btn) btn.disabled = false;
-                }
-            },
+            // v6.2.14: UTXO Management function (checkUTXOStatus removed - now automatic)
             
             async consolidateUTXOs() {
                 const btn = document.getElementById('utxoConsolidateBtn');
@@ -3089,8 +3033,7 @@
         // Expose DebugHandlers for UI access
         window.DebugHandlers = DebugHandlers;
         
-        // Expose UTXO functions to window for onclick handlers
-        window.checkUTXOStatus = () => DebugHandlers.checkUTXOStatus();
+        // v6.2.14: Expose only consolidateUTXOs to window (checkUTXOStatus removed)
         window.consolidateUTXOs = () => DebugHandlers.consolidateUTXOs();
         
         // ===== Phase 2: User State Refactoring (v5.4.30) =====
@@ -3627,6 +3570,25 @@
                         const utxoWarning = utxoCount > 40 ? ' ⚠️' : '';
                         document.getElementById('walletUtxoCount').textContent = utxoText + utxoWarning;
                         document.getElementById('settingsWalletUtxoCount').textContent = utxoText + utxoWarning;
+                        
+                        // v6.2.14: Show/hide and enable/disable consolidation based on UTXO count
+                        const consolidationSection = document.getElementById('utxoConsolidationSection');
+                        const consolidateBtn = document.getElementById('utxoConsolidateBtn');
+                        if (consolidationSection) {
+                            consolidationSection.style.display = 'block';
+                            if (consolidateBtn) {
+                                consolidateBtn.disabled = (utxoCount <= 1);
+                                if (utxoCount > 40) {
+                                    consolidateBtn.style.background = 'var(--warning-color)';
+                                    consolidateBtn.textContent = `⚠️ Consolidate ${utxoCount} UTXOs`;
+                                } else if (utxoCount > 1) {
+                                    consolidateBtn.style.background = '#2A6F65';
+                                    consolidateBtn.textContent = `Consolidate ${utxoCount} UTXOs`;
+                                } else {
+                                    consolidateBtn.textContent = 'Consolidation not needed';
+                                }
+                            }
+                        }
                         
                         // Update upload button state
                         updateUploadButtonState();
@@ -11204,6 +11166,12 @@ Do you want to continue?`;
             document.getElementById('settingsWalletStatus').textContent = 'Disconnected';
             document.getElementById('settingsWalletStatus').style.color = 'var(--text-secondary)';
             
+            // v6.2.14: Hide consolidation section when disconnected
+            const consolidationSection = document.getElementById('utxoConsolidationSection');
+            if (consolidationSection) {
+                consolidationSection.style.display = 'none';
+            }
+            
             // Update button text
             document.getElementById('walletConnectBtn').textContent = 'Connect';
             
@@ -12734,7 +12702,7 @@ Do you want to continue?`;
                             confirmMessage += `\n⚠️ WARNING: High UTXO count detected!\n`;
                             confirmMessage += `Current UTXOs: ${utxoCount}\n`;
                             confirmMessage += `This may cause "Storage mass exceeded" errors.\n`;
-                            confirmMessage += `Recommended: Consolidate UTXOs first (Debug tab → UTXO Management)\n`;
+                            confirmMessage += `Recommended: Consolidate UTXOs first (Settings tab → Wallet & UTXO Management)\n`;
                         }
                     } catch (utxoError) {
                         // Ignore UTXO check errors, proceed with upload

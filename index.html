@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.9</title>
+    <title>Kaspa P2P File Storage v6.2.10</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -12666,36 +12666,37 @@ Do you want to continue?`;
                     
                     let payloads, encKey, encSalt, segmentBoundaries;
                     
-                    if (isResuming) {
-                        // Resume: Skip payload split and restore from existing progress
-                        log('📂 Resuming upload - restoring from existing progress', 'info');
-                        
-                        // Restore payloads from ProgressManager
-                        const recovery = FileState.progressManager.progress.recovery;
-                        const metadata = FileState.progressManager.progress.metadata;
-                        
-                        payloads = recovery.payloads || [];
-                        encKey = metadata.key;
-                        encSalt = metadata.salt;
-                        segmentBoundaries = metadata.segmentBoundaries || metadata.chunkBoundaries;
-                        
-                        log(`✅ Restored ${payloads.length} payloads from progress (${FileState.progressManager.progress._progress.completedChunks} completed)`, 'success');
-                    } else {
-                        // New upload: Process file and split into payloads
-                        // v5.11.126: Update status
-                        uploadStatusUI.updateStatus('📦', 'データを最適化しています...', 2);
-                        
-                        const result = await processFileWithPayloadSplit(
-                            currentFile, 
-                            password, 
-                            useCompression
-                        );
-                        
-                        payloads = result.payloads;
-                        encKey = result.key;
-                        encSalt = result.salt;
-                        segmentBoundaries = result.segmentBoundaries;
-                    }
+                    try {
+                        if (isResuming) {
+                            // Resume: Skip payload split and restore from existing progress
+                            log('📂 Resuming upload - restoring from existing progress', 'info');
+                            
+                            // Restore payloads from ProgressManager
+                            const recovery = FileState.progressManager.progress.recovery;
+                            const metadata = FileState.progressManager.progress.metadata;
+                            
+                            payloads = recovery.payloads || [];
+                            encKey = metadata.key;
+                            encSalt = metadata.salt;
+                            segmentBoundaries = metadata.segmentBoundaries || metadata.chunkBoundaries;
+                            
+                            log(`✅ Restored ${payloads.length} payloads from progress (${FileState.progressManager.progress._progress.completedChunks} completed)`, 'success');
+                        } else {
+                            // New upload: Process file and split into payloads
+                            // v5.11.126: Update status
+                            uploadStatusUI.updateStatus('📦', 'データを最適化しています...', 2);
+                            
+                            const result = await processFileWithPayloadSplit(
+                                currentFile, 
+                                password, 
+                                useCompression
+                            );
+                            
+                            payloads = result.payloads;
+                            encKey = result.key;
+                            encSalt = result.salt;
+                            segmentBoundaries = result.segmentBoundaries;
+                        }
                     
                     // v5.11.18: Cost estimation and confirmation
                     const payloadCount = payloads.length;

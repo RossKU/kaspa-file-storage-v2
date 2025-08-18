@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.0</title>
+    <title>Kaspa P2P File Storage v6.2.1</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -6495,7 +6495,7 @@ Do you want to continue?`;
                         return;
                     }
                     if (password.length < 8) {
-                        this.showStatus('パスワードは8文字以上で入力してください', 'error');
+                        this.showStatus('Password must be at least 8 characters', 'error');
                         return;
                     }
                     
@@ -6516,7 +6516,7 @@ Do you want to continue?`;
                     // v5.11.109: Save to KENV instead of auto-exporting
                     await this.saveToKENV();
                 } catch (error) {
-                    this.showStatus(`生成エラー: ${error.message}`, 'error');
+                    this.showStatus(`Generation error: ${error.message}`, 'error');
                 }
             },
             
@@ -6524,6 +6524,19 @@ Do you want to continue?`;
                 // Validate first
                 const valid = await this.validate();
                 if (!valid) {
+                    return;
+                }
+                
+                // v6.2.1: Pre-upload checks
+                // Check wallet connection
+                if (!UserState.address || !UserState.privateKey) {
+                    this.showStatus('Wallet not connected', 'error');
+                    return;
+                }
+                
+                // Check network connection
+                if (!NetworkState.rpcClient || !NetworkState.kaspa) {
+                    this.showStatus('Network not connected', 'error');
                     return;
                 }
                 
@@ -6535,7 +6548,7 @@ Do you want to continue?`;
                         return;
                     }
                     if (password.length < 8) {
-                        this.showStatus('パスワードは8文字以上で入力してください', 'error');
+                        this.showStatus('Password must be at least 8 characters', 'error');
                         return;
                     }
                     
@@ -11359,18 +11372,18 @@ Do you want to continue?`;
                 // Size check (20KB safety margin)
                 const sizeKB = metadataBytes.length / 1024;
                 if (metadataBytes.length > 20 * 1024) {
-                    log(`⚠️ ディレクトリメタデータが大きすぎます（${sizeKB.toFixed(1)}KB）`, 'warning');
-                    log('💡 ヒント: ファイル数を減らすか、サブディレクトリに分割してください', 'info');
-                    log('📝 将来のバージョンでチャンク化をサポート予定です', 'info');
+                    log(`⚠️ Directory metadata too large (${sizeKB.toFixed(1)}KB)`, 'warning');
+                    log('💡 Hint: Reduce file count or split into subdirectories', 'info');
+                    log('📝 Chunking support planned for future version', 'info');
                     
                     // Calculate approximate file limit
                     const approxFilesLimit = Math.floor((20 * 1024) / 150); // ~150 bytes per entry
-                    log(`📊 現在の制限: 約${approxFilesLimit}ファイルまで`, 'info');
+                    log(`📊 Current limit: approximately ${approxFilesLimit} files`, 'info');
                     
-                    throw new Error(`ディレクトリメタデータが20KBを超えています（${sizeKB.toFixed(1)}KB）`);
+                    throw new Error(`Directory metadata exceeds 20KB (${sizeKB.toFixed(1)}KB)`);
                 }
                 
-                log(`ディレクトリメタデータサイズ: ${sizeKB.toFixed(2)}KB`, 'info');
+                log(`Directory metadata size: ${sizeKB.toFixed(2)}KB`, 'info');
                 
                 // TODO: Future v4.7.0 - Implement directory chunking for large metadata
                 // if (metadataBytes.length > 20 * 1024) {
@@ -11434,7 +11447,7 @@ Do you want to continue?`;
                 };
                 
             } catch (error) {
-                log(`ディレクトリメタデータアップロードエラー: ${error.message}`, 'error');
+                log(`Directory metadata upload error: ${error.message}`, 'error');
                 // Clean up on error
                 uploadingDirMeta = false; // v5.5.38-phase2: Proxy will handle FileState update
                 log(`[DEBUG v5.5.38] uploadingDirMeta set to false on error via proxy`, 'debug');
@@ -11454,7 +11467,7 @@ Do you want to continue?`;
             // Get UTXOs
             const { entries } = await NetworkState.rpcClient.getUtxosByAddresses([UserState.address.toString()]);
             if (!entries || entries.length === 0) {
-                throw new Error('利用可能なUTXOがありません');
+                throw new Error('No available UTXOs');
             }
             
             // Format UTXOs
@@ -11487,7 +11500,7 @@ Do you want to continue?`;
             });
             
             if (!result.transactions || result.transactions.length === 0) {
-                throw new Error('トランザクションの作成に失敗しました');
+                throw new Error('Failed to create transaction');
             }
             
             return result.transactions[0];

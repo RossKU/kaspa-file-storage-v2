@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.1</title>
+    <title>Kaspa P2P File Storage v6.2.2</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -2698,6 +2698,37 @@
             </div>
         </div>
         
+        <!-- v6.2.2: UTXO Management (Phase 1) -->
+        <div class="container">
+            <h2>💰 UTXO Management</h2>
+            <div class="metric-box" style="padding: 15px;">
+                <p style="margin-bottom: 10px; color: var(--text-secondary);">
+                    Consolidate multiple UTXOs to prevent Storage mass exceeded errors
+                </p>
+                
+                <div id="utxoStatus" style="margin: 10px 0; padding: 10px; background: var(--background-light); border-radius: 5px;">
+                    <div><strong>Current UTXOs:</strong> <span id="utxoCount">-</span></div>
+                    <div><strong>Total Balance:</strong> <span id="utxoBalance">-</span> KAS</div>
+                    <div id="utxoWarning" style="color: var(--warning-color); margin-top: 5px; display: none;">
+                        ⚠️ High UTXO count detected. Consider consolidation.
+                    </div>
+                </div>
+                
+                <div style="margin: 15px 0;">
+                    <button onclick="checkUTXOStatus()" id="utxoCheckBtn" style="padding: 10px 20px; margin-right: 10px;">
+                        Check UTXO Status
+                    </button>
+                    <button onclick="consolidateUTXOs()" id="utxoConsolidateBtn" style="padding: 10px 20px; background: var(--accent-color); color: white;" disabled>
+                        Consolidate UTXOs
+                    </button>
+                </div>
+                
+                <div id="utxoConsolidationResult" style="margin-top: 15px; padding: 10px; background: var(--bg-secondary); border-radius: 5px; display: none;">
+                    <div id="consolidationMessage"></div>
+                </div>
+            </div>
+        </div>
+        
         <!-- Debug Log -->
         <div class="container">
             <h2>🐛 Debug Log</h2>
@@ -2882,11 +2913,129 @@
                 if (lastSkipEl && NetworkState.restApiControl.lastSkipped) {
                     lastSkipEl.textContent = new Date(NetworkState.restApiControl.lastSkipped).toLocaleTimeString('ja-JP');
                 }
+            },
+            
+            // v6.2.2: UTXO Management functions
+            async checkUTXOStatus() {
+                const btn = document.getElementById('utxoCheckBtn');
+                if (btn) btn.disabled = true;
+                
+                try {
+                    // Check wallet connection
+                    if (!UserState.address) {
+                        throw new Error('Wallet not connected');
+                    }
+                    
+                    // Get UTXOs
+                    const { entries } = await NetworkState.rpcClient.getUtxosByAddresses([UserState.address.toString()]);
+                    const utxoCount = entries.length;
+                    
+                    // Calculate total balance
+                    let totalBalance = 0n;
+                    for (const entry of entries) {
+                        totalBalance += entry.utxoEntry.amount;
+                    }
+                    
+                    // Update UI
+                    document.getElementById('utxoCount').textContent = utxoCount;
+                    document.getElementById('utxoBalance').textContent = (Number(totalBalance) / 100000000).toFixed(8);
+                    
+                    // Show warning if needed
+                    const warningEl = document.getElementById('utxoWarning');
+                    if (utxoCount > 40) {
+                        warningEl.style.display = 'block';
+                        document.getElementById('utxoConsolidateBtn').disabled = false;
+                    } else {
+                        warningEl.style.display = 'none';
+                        document.getElementById('utxoConsolidateBtn').disabled = true;
+                    }
+                    
+                    log(`✅ UTXO Status: ${utxoCount} UTXOs, Balance: ${(Number(totalBalance) / 100000000).toFixed(8)} KAS`, 'success');
+                    
+                } catch (error) {
+                    log(`❌ Failed to check UTXO status: ${error.message}`, 'error');
+                    document.getElementById('utxoCount').textContent = 'Error';
+                    document.getElementById('utxoBalance').textContent = 'Error';
+                } finally {
+                    if (btn) btn.disabled = false;
+                }
+            },
+            
+            async consolidateUTXOs() {
+                const btn = document.getElementById('utxoConsolidateBtn');
+                if (btn) btn.disabled = true;
+                
+                const resultDiv = document.getElementById('utxoConsolidationResult');
+                const messageDiv = document.getElementById('consolidationMessage');
+                
+                try {
+                    // Check wallet connection
+                    if (!UserState.address || !UserState.privateKey) {
+                        throw new Error('Wallet not connected');
+                    }
+                    
+                    // Check network connection
+                    if (!NetworkState.kaspa || !NetworkState.rpcClient) {
+                        throw new Error('Network not connected');
+                    }
+                    
+                    // Show processing message
+                    resultDiv.style.display = 'block';
+                    messageDiv.innerHTML = '⏳ Processing UTXO consolidation...';
+                    
+                    log('🔄 Starting UTXO consolidation...', 'info');
+                    
+                    // Create empty transaction (no payload) for consolidation
+                    const result = await NetworkState.kaspa.createTransactions({
+                        entries: [],  // Empty entries for consolidation
+                        outputs: [],  // Will be filled by SDK
+                        changeAddress: UserState.address.toString(),
+                        fee: 10000n,  // 0.0001 KAS fee
+                        payload: null // No payload for consolidation
+                    });
+                    
+                    if (!result.transactions || result.transactions.length === 0) {
+                        throw new Error('Failed to create consolidation transaction');
+                    }
+                    
+                    // Sign and send transaction
+                    const tx = result.transactions[0];
+                    await tx.sign([UserState.privateKey]);
+                    const txid = await tx.submit(NetworkState.rpcClient);
+                    
+                    if (!txid) {
+                        throw new Error('Failed to submit consolidation transaction');
+                    }
+                    
+                    // Success message
+                    messageDiv.innerHTML = `✅ Consolidation successful!<br>TxID: ${txid.substring(0, 16)}...`;
+                    log(`✅ UTXO consolidation successful. TxID: ${txid}`, 'success');
+                    
+                    // Refresh UTXO status after a delay
+                    setTimeout(() => {
+                        this.checkUTXOStatus();
+                        resultDiv.style.display = 'none';
+                    }, 5000);
+                    
+                } catch (error) {
+                    messageDiv.innerHTML = `❌ Consolidation failed: ${error.message}`;
+                    log(`❌ UTXO consolidation failed: ${error.message}`, 'error');
+                    
+                    setTimeout(() => {
+                        resultDiv.style.display = 'none';
+                    }, 5000);
+                } finally {
+                    if (btn) btn.disabled = false;
+                }
             }
         };
         
         // Expose DebugHandlers for UI access
         window.DebugHandlers = DebugHandlers;
+        
+        // Expose UTXO functions to window for onclick handlers
+        window.checkUTXOStatus = () => DebugHandlers.checkUTXOStatus();
+        window.consolidateUTXOs = () => DebugHandlers.consolidateUTXOs();
         
         // ===== Phase 2: User State Refactoring (v5.4.30) =====
         const UserState = {

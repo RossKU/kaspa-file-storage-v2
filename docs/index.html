@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.3</title>
+    <title>Kaspa P2P File Storage v6.2.4</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -3014,17 +3014,35 @@
                     const fee = 10000n; // 0.0001 KAS
                     const consolidatedAmount = totalBalance - fee;
                     
-                    const result = await NetworkState.kaspa.createTransactions({
-                        entries: formattedUtxos,
-                        outputs: [{
-                            address: UserState.address.toString(),
-                            amount: consolidatedAmount
-                        }],
-                        changeAddress: UserState.address.toString(),
-                        priorityFee: 0n,
-                        networkId: config.network,
-                        payload: null // No payload for consolidation
-                    });
+                    log(`📊 UTXO consolidation details: ${entries.length} UTXOs, Total: ${(Number(totalBalance) / 100000000).toFixed(8)} KAS, Fee: 0.0001 KAS`, 'info');
+                    
+                    let result;
+                    try {
+                        result = await NetworkState.kaspa.createTransactions({
+                            entries: formattedUtxos,
+                            outputs: [{
+                                address: UserState.address.toString(),
+                                amount: consolidatedAmount
+                            }],
+                            changeAddress: UserState.address.toString(),
+                            priorityFee: 0n,
+                            networkId: config.network,
+                            payload: null // No payload for consolidation
+                        });
+                    } catch (txError) {
+                        // Enhanced error logging for transaction creation
+                        const txErrorMsg = txError?.message || txError?.toString() || JSON.stringify(txError);
+                        log(`❌ Transaction creation error: ${txErrorMsg}`, 'error');
+                        
+                        // Check for specific error types
+                        if (txErrorMsg.includes('mass') || txErrorMsg.includes('Mass')) {
+                            throw new Error(`Storage mass exceeded with ${entries.length} UTXOs. Try consolidating fewer UTXOs at once.`);
+                        } else if (txErrorMsg.includes('insufficient') || txErrorMsg.includes('Insufficient')) {
+                            throw new Error(`Insufficient balance after fee. Balance: ${(Number(totalBalance) / 100000000).toFixed(8)} KAS, Fee: 0.0001 KAS`);
+                        } else {
+                            throw new Error(`Transaction creation failed: ${txErrorMsg}`);
+                        }
+                    }
                     
                     if (!result.transactions || result.transactions.length === 0) {
                         throw new Error('Failed to create consolidation transaction');
@@ -3050,12 +3068,19 @@
                     }, 5000);
                     
                 } catch (error) {
-                    messageDiv.innerHTML = `❌ Consolidation failed: ${error.message}`;
-                    log(`❌ UTXO consolidation failed: ${error.message}`, 'error');
+                    // Enhanced error handling
+                    const errorMsg = error?.message || error?.toString() || JSON.stringify(error) || 'Unknown error';
+                    messageDiv.innerHTML = `❌ Consolidation failed: ${errorMsg}`;
+                    log(`❌ UTXO consolidation failed: ${errorMsg}`, 'error');
+                    
+                    // Log additional error details if available
+                    if (error?.stack) {
+                        log(`Stack trace: ${error.stack}`, 'debug');
+                    }
                     
                     setTimeout(() => {
                         resultDiv.style.display = 'none';
-                    }, 5000);
+                    }, 10000); // Extended to 10 seconds for reading error message
                 } finally {
                     if (btn) btn.disabled = false;
                 }

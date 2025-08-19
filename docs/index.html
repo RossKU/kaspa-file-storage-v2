@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.19</title>
+    <title>Kaspa P2P File Storage v6.2.20</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -18854,8 +18854,8 @@ Do you want to continue?`;
                 <div style="display: grid; gap: 12px;">
                     <div style="border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
                         <strong>File Name:</strong> ${file.name}<br>
-                        <strong>サイズ:</strong> ${formatSize(file.fileSize)}<br>
-                        <strong>タイプ:</strong> ${file.type === 'directory' ? '📁 ディレクトリ' : '📄 ファイル'}
+                        <strong>Size:</strong> ${formatSize(file.fileSize)}<br>
+                        <strong>Type:</strong> ${file.type === 'kaspa-directory' ? '📁 Directory' : '📄 File'}
                     </div>
             `;
             
@@ -18881,13 +18881,48 @@ Do you want to continue?`;
                 `;
             }
             
+            // Add directory-specific information
+            if (file.type === 'kaspa-directory' && file.directoryMetadata) {
+                const metadata = file.directoryMetadata;
+                const fileCount = metadata.entries ? metadata.entries.filter(e => !e.type || e.type === 'file').length : 0;
+                const dirCount = metadata.entries ? metadata.entries.filter(e => e.type === 'directory').length : 0;
+                const totalSize = metadata.entries ? metadata.entries.reduce((sum, e) => sum + (e.size || 0), 0) : 0;
+                
+                infoHtml += `
+                    <div style="border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+                        <strong>Directory Contents:</strong><br>
+                        Files: ${fileCount}<br>
+                        Subdirectories: ${dirCount}<br>
+                        Total Size: ${formatSize(totalSize)}
+                    </div>
+                `;
+                
+                // Show directory entries list if available
+                if (metadata.entries && metadata.entries.length > 0) {
+                    infoHtml += `
+                        <div style="border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+                            <strong>Contents:</strong><br>
+                            <div style="max-height: 150px; overflow-y: auto; font-size: 0.9em; padding-left: 10px;">
+                    `;
+                    metadata.entries.forEach(item => {
+                        const itemIcon = item.type === 'directory' ? '📁' : '📄';
+                        const itemSize = item.type === 'directory' ? '' : ` (${formatSize(item.size)})`;
+                        infoHtml += `${itemIcon} ${item.name}${itemSize}<br>`;
+                    });
+                    infoHtml += `
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+            
             infoHtml += `
                     <div>
-                        <strong>アップロード日:</strong> ${formatDate(file.uploadDate)}<br>
-                        <strong>登録日:</strong> ${formatDate(file.createdAt)}<br>
-                        ${file.network ? `<strong>ネットワーク:</strong> ${file.network}<br>` : ''}
-                        ${file.chunks ? `<strong>チャンク数:</strong> ${file.chunks}<br>` : ''}
-                        ${file.encrypted !== undefined ? `<strong>暗号化:</strong> ${file.encrypted ? 'あり' : 'なし'}<br>` : ''}
+                        <strong>Upload Date:</strong> ${formatDate(file.uploadDate)}<br>
+                        <strong>Created Date:</strong> ${formatDate(file.createdAt)}<br>
+                        ${file.network ? `<strong>Network:</strong> ${file.network}<br>` : ''}
+                        ${file.chunks ? `<strong>Chunks:</strong> ${file.chunks}<br>` : ''}
+                        ${file.encrypted !== undefined ? `<strong>Encrypted:</strong> ${file.encrypted ? 'Yes' : 'No'}<br>` : ''}
                     </div>
                 </div>
             `;

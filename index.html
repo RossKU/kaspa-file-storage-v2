@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.24</title>
+    <title>Kaspa P2P File Storage v6.2.25</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -5329,7 +5329,55 @@
                     if (entry.metaTxId && entry.metaTxBlockId) {
                         // オンチェーンモード
                         log(`[KENV] Verifying in on-chain mode: ${entry.metaTxId}`, 'debug');
-                        entry.status = 'verified';
+                        
+                        try {
+                            // NetworkStateがあるか確認
+                            if (!NetworkState?.downloadManager) {
+                                log('[KENV] DownloadManager not available, marking as verified', 'warning');
+                                entry.status = 'verified';
+                                return;
+                            }
+                            
+                            // メタデータを取得
+                            log(`[KENV] Fetching metadata for: ${entry.metaTxId.substring(0, 16)}...`, 'info');
+                            const metadata = await NetworkState.downloadManager.fetchMetadata(
+                                entry.metaTxId, 
+                                entry.metaTxBlockId, 
+                                entry.password || ''
+                            );
+                            
+                            if (metadata) {
+                                // 基本情報のみを抽出して保存（可変カラムの前まで）
+                                entry.name = metadata.file?.name || 
+                                            metadata.directory?.name || 
+                                            entry.name;
+                                entry.size = metadata.file?.size || 0;
+                                entry.type = metadata.type || 'kaspa-file';
+                                entry.created = metadata.created || entry.created;
+                                entry.network = metadata.network || config.network;
+                                
+                                // ディレクトリの場合は追加情報
+                                if (metadata.type === 'kaspa-directory') {
+                                    entry.fileCount = metadata.directory?.fileCount || 0;
+                                    entry.directoryCount = metadata.directory?.directoryCount || 0;
+                                }
+                                
+                                entry.status = 'verified';
+                                log(`[KENV] Entry verified: ${entry.name}`, 'success');
+                                
+                                // UIを自動更新
+                                if (typeof updateFileListFromKENV === 'function') {
+                                    updateFileListFromKENV();
+                                }
+                            } else {
+                                throw new Error('Failed to fetch metadata');
+                            }
+                        } catch (error) {
+                            log(`[KENV] Metadata fetch failed: ${error.message}`, 'error');
+                            // フォールバック: メタデータ取得に失敗しても基本的な検証は成功とする
+                            entry.status = 'verified';
+                            entry.authWarning = `Metadata unavailable: ${error.message}`;
+                        }
                     } else if (entry.externalRef) {
                         // .kaspaファイルのみモード
                         log(`[KENV] Verifying in .kaspa file mode: ${entry.externalRef}`, 'debug');

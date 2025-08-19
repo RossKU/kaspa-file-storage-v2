@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.18</title>
+    <title>Kaspa P2P File Storage v6.2.19</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -18229,6 +18229,10 @@ Do you want to continue?`;
             const tr = document.createElement('tr');
             
             // Determine icon and status
+            // v6.2.19: Debug log for type checking
+            if (entry.name.includes('test') || entry.type === 'kaspa-directory') {
+                console.log(`[FileTab] Entry: ${entry.name}, Type: ${entry.type}`);
+            }
             const icon = entry.type === 'kaspa-directory' ? '📁' : 
                         getFileIcon(entry.name);
             const statusIcon = entry.status === 'verified' ? '✅' : 
@@ -18242,8 +18246,7 @@ Do you want to continue?`;
                 if (entry.type === 'kaspa-directory') {
                     if (entry.directoryMetadata && entry.directoryMetadata.entries) {
                         const fileCount = entry.directoryMetadata.entries.filter(e => !e.type || e.type === 'file').length;
-                        const dirCount = entry.directoryMetadata.entries.filter(e => e.type === 'directory').length;
-                        return `${fileCount} files${dirCount > 0 ? `, ${dirCount} dirs` : ''}`;
+                        return `${fileCount} files`;
                     }
                     return 'Directory';
                 }
@@ -18264,7 +18267,7 @@ Do you want to continue?`;
             // Add title attributes for tooltip display (6 columns)
             tr.innerHTML = `
                 <td><input type="checkbox" class="file-checkbox" data-id="${entry.id}" onchange="updateFileActions()"></td>
-                <td><span class="file-icon">${icon}</span></td>
+                <td title="Type: ${entry.type}"><span class="file-icon">${icon}</span></td>
                 <td title="${entry.name}">
                     <span>${entry.name}</span>
                     <span style="margin-left: 5px; font-size: 0.8em;">${statusIcon}</span>

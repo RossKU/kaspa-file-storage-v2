@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.21</title>
+    <title>Kaspa P2P File Storage v6.2.22</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -15729,12 +15729,12 @@ Do you want to continue?`;
                         
                         document.getElementById('fileInfo').textContent = 
                             `File Name: ${FileState.kaspaMetadata.file.name}\n` +
-                            `サイズ: ${(FileState.kaspaMetadata.file.size / 1024).toFixed(1)} KB\n` +
-                            `チャンク数: ${totalChunks} (${metaType === 'super' ? 'スーパーメタデータ' : '通常'})\n` +
-                            `暗号化: ${FileState.kaspaMetadata.encryption.algorithm}\n` +
-                            `圧縮: ${FileState.kaspaMetadata.file?.compression?.enabled ? FileState.kaspaMetadata.file.compression.algorithm : 'なし'}\n` +
-                            `作成日時: ${new Date(FileState.kaspaMetadata.created || FileState.kaspaMetadata.metadata?.createdAt).toLocaleString()}\n` +
-                            `メタTxID: ${metaTxId.substring(0, 16)}...`;
+                            `Size: ${(FileState.kaspaMetadata.file.size / 1024).toFixed(1)} KB\n` +
+                            `Chunks: ${totalChunks} (${metaType === 'super' ? 'Super Metadata' : 'Normal'})\n` +
+                            `Encryption: ${FileState.kaspaMetadata.encryption.algorithm}\n` +
+                            `Compression: ${FileState.kaspaMetadata.file?.compression?.enabled ? FileState.kaspaMetadata.file.compression.algorithm : 'None'}\n` +
+                            `Created Date: ${new Date(FileState.kaspaMetadata.created || FileState.kaspaMetadata.metadata?.createdAt).toLocaleString()}\n` +
+                            `Meta TxID: ${metaTxId.substring(0, 16)}...`;
                         
                         // Set password for download
                         document.getElementById('downloadPassword').value = password;
@@ -15743,14 +15743,14 @@ Do you want to continue?`;
                         // Show download section
                         document.getElementById('downloadSection').style.display = 'block';
                         
-                        log('メタTxIDからの復元準備完了！ダウンロードボタンをクリックしてください。', 'success');
+                        log('Ready to download! Click the Download button to start.', 'success');
                         
                     } else {
-                        throw new Error('これは有効なメタトランザクションではありません');
+                        throw new Error('This is not a valid meta transaction');
                     }
                     
                 } catch (error) {
-                    log(`復号化エラー: ${error.message}`, 'error');
+                    log(`Decryption error: ${error.message}`, 'error');
                     throw error;
                 }
                 

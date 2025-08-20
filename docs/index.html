@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.32</title>
+    <title>Kaspa P2P File Storage v6.2.33</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -2044,6 +2044,12 @@
                 <div style="padding: 10px; border-radius: 8px; background: var(--bg-secondary);">
                     <input type="text" id="unifiedTxIdInput" placeholder="Enter download info (TxID:BlockID:Password)" style="width: 100%; font-size: 14px; padding: 8px;">
                     <input type="password" id="unifiedPassword" placeholder="🔐 Password (if required)" style="width: 100%; margin-top: 8px; font-size: 14px; padding: 8px;">
+                    <div style="margin-top: 8px; display: flex; align-items: center;">
+                        <input type="checkbox" id="addToListOnly" style="margin-right: 8px;">
+                        <label for="addToListOnly" style="font-size: 13px; color: var(--text-secondary); cursor: pointer;">
+                            📋 Add to File List only (without downloading)
+                        </label>
+                    </div>
                     <button onclick="loadFromUnifiedInput()" style="margin-top: 8px; width: 100%; padding: 10px; font-size: 14px;">
                         🔍 Verify
                     </button>
@@ -10432,27 +10438,31 @@ Do you want to continue?`;
             async executeDownload(metadata, password, options = {}) {
                 try {
                     this.isDownloading = true;
-                    const { onProgress, onComplete, folderStructure, metaTxId, metaTxBlockId } = options;
+                    const { onProgress, onComplete, folderStructure, metaTxId, metaTxBlockId, addToListOnly = false } = options;
                     
-                    log(`[DownloadManager] ダウンロード開始: ${metadata.file?.name || 'unknown'}`, 'info');
-                    log(`[DownloadManager DEBUG] chunks[0]: ${metadata.chunks[0]?.substring(0, 16)}...`, 'debug');
-                    log(`[DownloadManager DEBUG] chunks配列長: ${metadata.chunks?.length}`, 'debug');
-                    log(`[DownloadManager DEBUG] chunkStructure.type: ${metadata.chunkStructure?.type}`, 'debug');
+                    log(`[DownloadManager] ${addToListOnly ? 'File List追加' : 'ダウンロード'}開始: ${metadata.file?.name || 'unknown'}`, 'info');
                     
-                    // v5.3.16: Debug logs
-                    log(`[DownloadManager v5.3.16] parallelDownloadEnabled: ${AppState.settings.parallelDownloadEnabled}`, 'debug');
-                    log(`[DownloadManager v5.3.16] metadata.metadata?.payloadSplit: ${metadata.metadata?.payloadSplit}`, 'debug');
+                    // v6.2.33: Skip download if addToListOnly is true
+                    let blob = null;
+                    if (!addToListOnly) {
+                        log(`[DownloadManager DEBUG] chunks[0]: ${metadata.chunks[0]?.substring(0, 16)}...`, 'debug');
+                        log(`[DownloadManager DEBUG] chunks配列長: ${metadata.chunks?.length}`, 'debug');
+                        log(`[DownloadManager DEBUG] chunkStructure.type: ${metadata.chunkStructure?.type}`, 'debug');
+                        
+                        // v5.3.16: Debug logs
+                        log(`[DownloadManager v5.3.16] parallelDownloadEnabled: ${AppState.settings.parallelDownloadEnabled}`, 'debug');
+                        log(`[DownloadManager v5.3.16] metadata.metadata?.payloadSplit: ${metadata.metadata?.payloadSplit}`, 'debug');
+                        
+                        // Derive encryption key
+                        const salt = fromBase64(metadata.encryption.pbkdf2.salt);
+                        const iterations = metadata.encryption.pbkdf2.iterations || 
+                            (metadata.version === "3.0" ? 10000 : 100000);
+                        const key = await deriveKey(password, salt, iterations);
                     
-                    // Derive encryption key
-                    const salt = fromBase64(metadata.encryption.pbkdf2.salt);
-                    const iterations = metadata.encryption.pbkdf2.iterations || 
-                        (metadata.version === "3.0" ? 10000 : 100000);
-                    const key = await deriveKey(password, salt, iterations);
+                        // Check if using new payload split approach
+                        let combined;
                     
-                    // Check if using new payload split approach
-                    let combined;
-                    
-                    if (metadata.metadata?.payloadSplit) {
+                        if (metadata.metadata?.payloadSplit) {
                         // New approach: download payloads and reconstruct
                         log('[DownloadManager] 新方式: ペイロード分割ダウンロードを使用', 'info');
                         
@@ -10883,20 +10893,23 @@ Do you want to continue?`;
                         }
                     }
                     
-                    // Default behavior or fallback
-                    if (onComplete) {
-                        onComplete(blob, metadata.file?.name);
-                    } else {
-                        // Default download behavior
-                        const url = URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = metadata.file?.name || 'download';
-                        a.click();
-                        URL.revokeObjectURL(url);
+                        // Default behavior or fallback (v6.2.33: Skip if addToListOnly)
+                    if (!addToListOnly && blob) {
+                        if (onComplete) {
+                            onComplete(blob, metadata.file?.name);
+                        } else {
+                            // Default download behavior
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = metadata.file?.name || 'download';
+                            a.click();
+                            URL.revokeObjectURL(url);
+                        }
                     }
+                    } // v6.2.33: End of if (!addToListOnly) block
                     
-                    // Phase 2: KENV登録処理（ダウンロード成功時のみ）
+                    // Phase 2: KENV登録処理（ダウンロード成功時またはaddToListOnly時）
                     if (FileState.kenvManager._initialized && metaTxId) {
                         // Phase 3: 重複チェック
                         let kenvEntry = FileState.kenvManager.entries.find(e => 
@@ -15114,6 +15127,7 @@ Do you want to continue?`;
                 
                 // ダウンロード実行
                 await NetworkState.downloadManager.executeDownload(metadata, password, {
+                    addToListOnly: window.tempAddToListOnly || false, // v6.2.33
                     onProgress: (progress) => {
                         document.getElementById('downloadProgressBar').style.width = progress.percent + '%';
                         document.getElementById('downloadProgressBar').textContent = progress.percent + '%';
@@ -15127,6 +15141,15 @@ Do you want to continue?`;
                     },
                     folderStructure: folderStructureOption
                 });
+                
+                // v6.2.33: Switch to File tab if addToListOnly
+                if (window.tempAddToListOnly) {
+                    log('[DownloadManager] File List追加完了 - Fileタブに切り替え', 'success');
+                    const fileTab = document.querySelector('[onclick*="switchTab(\'file\')"]');
+                    if (fileTab) {
+                        fileTab.click();
+                    }
+                }
                 
             } catch (error) {
                 log(`[DownloadManager] エラー: ${error.message}`, 'error');
@@ -15247,13 +15270,14 @@ Do you want to continue?`;
         window.loadFromUnifiedInput = async function() {
             const txIdInput = document.getElementById('unifiedTxIdInput').value.trim();
             const password = document.getElementById('unifiedPassword').value;
+            const addToListOnly = document.getElementById('addToListOnly').checked; // v6.2.33
             
             if (!txIdInput) {
                 log('TxIDを入力してください', 'error');
                 return;
             }
             
-            log(`統一入力から復元開始: ${txIdInput.substring(0, 20)}...`, 'info');
+            log(`${addToListOnly ? 'File List追加' : '統一入力から復元'}開始: ${txIdInput.substring(0, 20)}...`, 'info');
             
             // v4.7.14: Clear previous metadata in DownloadManager
             if (NetworkState.downloadManager) {
@@ -15263,7 +15287,10 @@ Do you want to continue?`;
             // Use existing loadFromMetaTxId logic
             document.getElementById('metaTxIdInput').value = txIdInput;
             document.getElementById('metaTxPassword').value = password;
+            // v6.2.33: Pass addToListOnly flag via temporary global
+            window.tempAddToListOnly = addToListOnly;
             await loadFromMetaTxId();
+            delete window.tempAddToListOnly;
         };
 
         window.loadFromMetaTxId = async function() {

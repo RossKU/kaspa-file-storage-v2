@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.30</title>
+    <title>Kaspa P2P File Storage v6.2.31</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -5733,7 +5733,9 @@ Do you want to continue?`;
                         
                         const a = document.createElement('a');
                         a.href = url;
-                        const filename = `${kenvEntry.name}.${kenvEntry.cid || 'dir'}.kaspa`;
+                        const cidFull = kenvEntry.cid || 'dir';
+                        const cidShort = cidFull.length > 8 ? cidFull.slice(0, 8) : cidFull;
+                        const filename = `${kenvEntry.name}.${cidShort}.kaspa`;
                         a.download = filename;
                         a.click();
                         
@@ -5826,8 +5828,9 @@ Do you want to continue?`;
                     // JSON文字列に変換
                     const jsonString = JSON.stringify(kaspaMetadata, null, 2);
                     
-                    // File Nameを生成（CIDを使用）
-                    const cid = kenvEntry.cid || 'unknown';
+                    // File Nameを生成（CIDの最初の8文字を使用）
+                    const cidFull = kenvEntry.cid || 'unknown';
+                    const cid = cidFull.length > 8 ? cidFull.slice(0, 8) : cidFull;
                     const filename = `${kenvEntry.name}.${cid}.kaspa`;
                     
                     // Blobを作成してダウンロード
@@ -13778,7 +13781,7 @@ Do you want to continue?`;
                     kenvEntry.sha256 = fileHash;
                     kenvEntry.encrypted = true;
                     kenvEntry.password = FileState.currentPassword || null;
-                    kenvEntry.cid = window.currentFileCID || window.currentFileCIDFull?.slice(0, 8) || '';
+                    kenvEntry.cid = window.currentFileCIDFull || window.currentFileCID || '';
                     kenvEntry.uploadCost = totalCost;
                     
                     // メタデータから追加情報を取得

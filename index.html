@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.25</title>
+    <title>Kaspa P2P File Storage v6.2.26</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -5347,19 +5347,55 @@
                             );
                             
                             if (metadata) {
-                                // 基本情報のみを抽出して保存（可変カラムの前まで）
-                                entry.name = metadata.file?.name || 
-                                            metadata.directory?.name || 
-                                            entry.name;
-                                entry.size = metadata.file?.size || 0;
+                                // メタデータのすべての基本情報を保存（chunks配列などの大きなデータは除く）
+                                
+                                // 基本メタデータ情報
                                 entry.type = metadata.type || 'kaspa-file';
+                                entry.version = metadata.version;
                                 entry.created = metadata.created || entry.created;
                                 entry.network = metadata.network || config.network;
+                                entry.cid = metadata.cid;
                                 
-                                // ディレクトリの場合は追加情報
-                                if (metadata.type === 'kaspa-directory') {
-                                    entry.fileCount = metadata.directory?.fileCount || 0;
-                                    entry.directoryCount = metadata.directory?.directoryCount || 0;
+                                // ファイル情報（kaspa-fileの場合）
+                                if (metadata.file) {
+                                    entry.name = metadata.file.name || entry.name;
+                                    entry.fileSize = metadata.file.size || 0;  // fileSizeとして保存（表示で使用）
+                                    entry.mimeType = metadata.file.mimeType;
+                                    entry.sha256 = metadata.file.sha256;
+                                    entry.encrypted = metadata.file.encrypted;
+                                    
+                                    // 圧縮情報
+                                    if (metadata.file.compression) {
+                                        entry.compressionAlgorithm = metadata.file.compression.algorithm;
+                                        entry.compressionEnabled = metadata.file.compression.enabled;
+                                        entry.originalSize = metadata.file.compression.originalSize;
+                                        entry.compressedSize = metadata.file.compression.compressedSize;
+                                    }
+                                }
+                                
+                                // ディレクトリ情報（kaspa-directoryの場合）
+                                if (metadata.directory) {
+                                    entry.name = metadata.directory.name || entry.name;
+                                    entry.totalSize = metadata.directory.totalSize;
+                                    entry.fileCount = metadata.directory.fileCount || 0;
+                                    entry.directoryCount = metadata.directory.directoryCount || 0;
+                                }
+                                
+                                // 暗号化情報
+                                if (metadata.encryption) {
+                                    entry.encryptionAlgorithm = metadata.encryption.algorithm;
+                                    if (metadata.encryption.pbkdf2) {
+                                        entry.pbkdf2Salt = metadata.encryption.pbkdf2.salt;
+                                        entry.pbkdf2Iterations = metadata.encryption.pbkdf2.iterations;
+                                    }
+                                }
+                                
+                                // リカバリー情報
+                                if (metadata.recovery) {
+                                    entry.totalChunks = metadata.recovery.totalChunks;
+                                    entry.chunkSize = metadata.recovery.chunkSize;
+                                    entry.checksum = metadata.recovery.checksum;
+                                    entry.uploadCost = metadata.recovery.uploadCost;
                                 }
                                 
                                 entry.status = 'verified';

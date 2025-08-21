@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.39</title>
+    <title>Kaspa P2P File Storage v6.2.40</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -1830,9 +1830,18 @@
             <!-- Title row with Add File button -->
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                 <h3 style="margin: 0; font-size: 16px; font-weight: 600;">📂 File Management</h3>
-                <button onclick="addFile()" class="add-file-btn" style="padding: 6px 16px; font-size: 14px; background: var(--accent-color); color: white; border: none; border-radius: 4px; cursor: pointer;">
-                    ➕ Add File
-                </button>
+                <div style="display: flex; gap: 8px;">
+                    <button onclick="addFile()" class="add-file-btn" style="padding: 6px 16px; font-size: 14px; background: var(--accent-color); color: white; border: none; border-radius: 4px; cursor: pointer;">
+                        ➕ Add File
+                    </button>
+                    <button onclick="exportKENV()" style="padding: 6px 16px; font-size: 14px; background: var(--button-bg); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 4px; cursor: pointer;">
+                        📤 Export
+                    </button>
+                    <button onclick="document.getElementById('kenvImportInput').click()" style="padding: 6px 16px; font-size: 14px; background: var(--button-bg); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 4px; cursor: pointer;">
+                        📥 Import
+                    </button>
+                    <input type="file" id="kenvImportInput" accept=".csv,.kentry" style="display: none;" onchange="importKENV(event)">
+                </div>
             </div>
             
             <!-- KENV Search and Sort Controls - Responsive Layout -->
@@ -5716,7 +5725,7 @@ Do you want to continue?`;
                         return;
                     }
                     
-                    // v6.2.39: Check if chunks exist for non-directory files
+                    // v6.2.40: Check if chunks exist for non-directory files
                     if (kenvEntry.type !== 'kaspa-directory' && (!kenvEntry._chunks || kenvEntry._chunks.length === 0)) {
                         log('Cannot generate .kaspa file: No chunk data available. Use TxID sharing instead.', 'error');
                         return;
@@ -10918,7 +10927,7 @@ Do you want to continue?`;
                     
                     // Phase 2: KENV登録処理（ダウンロード成功時またはaddToListOnly時）
                     if (FileState.kenvManager._initialized) {
-                        // Phase 3: 重複チェック（v6.2.39: metaTxIdがなくても処理）
+                        // Phase 3: 重複チェック（v6.2.40: metaTxIdがなくても処理）
                         let kenvEntry = null;
                         
                         if (metaTxId) {
@@ -10958,7 +10967,7 @@ Do you want to continue?`;
                             kenvEntry.password = password || null;
                             kenvEntry.downloadDate = new Date().toISOString();
                             
-                            // v6.2.39: chunks[0]を保存（metaTxIdがない場合の識別子）
+                            // v6.2.40: chunks[0]を保存（metaTxIdがない場合の識別子）
                             if (metadata.chunks && metadata.chunks.length > 0) {
                                 kenvEntry.firstChunkTxId = metadata.chunks[0];
                             }
@@ -10994,7 +11003,7 @@ Do you want to continue?`;
                             kenvEntry.payloadSplit = metadata.metadata?.payloadSplit || false;
                         }
                         
-                        // v6.2.39: .kaspaファイルの場合は全情報を保存
+                        // v6.2.40: .kaspaファイルの場合は全情報を保存
                         if (!metadata.metaTx?.loadedAt) {
                             // chunks情報を保存
                             if (metadata.chunks) {
@@ -18103,6 +18112,356 @@ Do you want to continue?`;
         };
         */
         
+        // ===== v6.2.40: KENV Export/Import Functions =====
+        // Export KENV data as CSV (.kentry format)
+        window.exportKENV = function() {
+            try {
+                const entries = FileState.kenvManager.entries;
+                
+                if (entries.length === 0) {
+                    log('No entries to export', 'warning');
+                    return;
+                }
+                
+                // CSVヘッダー（v5.11.67: 47カラム - saltを追加）
+                const headers = 'id,type,version,created,network,name,path,metaTxId,metaTxBlockId,firstChunkTxId,uploadDate,blockTime,uploadedBy,source,status,fileSize,originalSize,compressedSize,mimeType,sha256,encrypted,compressionAlgorithm,compressionEnabled,variableChunk,payloadSplit,cid,totalChunks,chunkCount,chunkSize,segmentCount,totalFiles,fileCount,directoryCount,entryCount,checksum,uploadCost,uploadDuration,chunkStructureType,chunkLevel,totalGroups,passwordIncluded,password,externalRef,tags,notes,authWarning,salt';
+                
+                let csvContent = headers + '\n';
+                
+                // エントリーをCSV形式に変換（saveKentryFileと同じロジック）
+                entries.forEach(entry => {
+                    const row = [
+                        entry.id || '',
+                        entry.type || '',
+                        entry.version || '',
+                        entry.created || '',
+                        entry.network || '',
+                        entry.name || '',
+                        entry.path || '',
+                        entry.metaTxId || '',
+                        entry.metaTxBlockId || '',
+                        entry.firstChunkTxId || '',
+                        entry.uploadDate || '',
+                        entry.blockTime || '',
+                        entry.uploadedBy || '',
+                        entry.source || '',
+                        entry.status || '',
+                        entry.fileSize || '',
+                        entry.originalSize || '',
+                        entry.compressedSize || '',
+                        entry.mimeType || '',
+                        entry.sha256 || '',
+                        entry.encrypted || '',
+                        entry.compressionAlgorithm || '',
+                        entry.compressionEnabled || '',
+                        entry.variableChunk || '',
+                        entry.payloadSplit || '',
+                        entry.cid || '',
+                        entry.totalChunks || '',
+                        entry.chunkCount || '',
+                        entry.chunkSize || '',
+                        entry.segmentCount || '',
+                        entry.totalFiles || '',
+                        entry.fileCount || '',
+                        entry.directoryCount || '',
+                        entry.entryCount || '',
+                        entry.checksum || '',
+                        entry.uploadCost || '',
+                        entry.uploadDuration || '',
+                        entry.chunkStructureType || '',
+                        entry.chunkLevel || '',
+                        entry.totalGroups || '',
+                        entry.passwordIncluded || '',
+                        entry.password || '',
+                        entry.externalRef || '',
+                        entry.tags || '',
+                        entry.notes || '',
+                        entry.authWarning || '',
+                        entry.salt || ''
+                    ].map(val => {
+                        // CSV用にエスケープ
+                        const str = String(val);
+                        if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+                            return `"${str.replace(/"/g, '""')}"`;
+                        }
+                        return str;
+                    });
+                    
+                    // 固定47カラムの後に可変カラムを追加
+                    csvContent += row.join(',');
+                    
+                    // チャンクペア追加（tx1,blk1,tx2,blk2,...）
+                    if (entry._chunks && entry._chunkBlockIds) {
+                        for (let i = 0; i < entry._chunks.length; i++) {
+                            csvContent += ',' + (entry._chunks[i] || '');
+                            csvContent += ',' + (entry._chunkBlockIds[i] || '');
+                        }
+                    }
+                    
+                    // セグメントバウンダリー追加
+                    if (entry._segmentBoundaries && entry._segmentBoundaries.length > 0) {
+                        for (const boundary of entry._segmentBoundaries) {
+                            csvContent += ',seg';  // マーカー
+                            csvContent += ',' + (boundary.index || '');
+                            csvContent += ',' + (boundary.offset || '');
+                            csvContent += ',' + (boundary.size || '');
+                            csvContent += ',' + (boundary.originalSize || '');
+                            csvContent += ',' + (boundary.compressedSize || '');
+                            csvContent += ',' + (boundary.payloadIndex || '');
+                        }
+                    }
+                    
+                    // ディレクトリメタデータ追加
+                    if (entry.directoryMetadata && entry.type === 'kaspa-directory') {
+                        const dirMeta = entry.directoryMetadata;
+                        if (dirMeta.entries && Array.isArray(dirMeta.entries)) {
+                            const fileCount = dirMeta.entries.filter(e => !e.type || e.type === 'file').length;
+                            const dirCount = dirMeta.entries.filter(e => e.type === 'directory').length;
+                            csvContent += ',entries,' + fileCount + ',' + dirCount;
+                            
+                            dirMeta.entries.forEach(e => {
+                                const type = (!e.type || e.type === 'file') ? 'f' : 'd';
+                                csvContent += ',' + type;
+                                csvContent += ',' + (e.name || '');
+                                csvContent += ',' + (e.path || '');
+                                csvContent += ',' + (e.size || 0);
+                                csvContent += ',' + (e.metaTxId || '');
+                                csvContent += ',' + (e.blockId || '');
+                                csvContent += ',' + (e.password || '');
+                            });
+                        }
+                    }
+                    
+                    csvContent += '\n';
+                });
+                
+                // Create filename with timestamp
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+                const filename = `workspace-kentry-${timestamp}.csv`;
+                
+                // Create download
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                log(`Exported ${entries.length} entries to ${filename}`, 'success');
+            } catch (error) {
+                console.error('Export error:', error);
+                log(`Export failed: ${error.message}`, 'error');
+            }
+        };
+        
+        // Import KENV data from CSV (.kentry format)
+        window.importKENV = async function(event) {
+            try {
+                const file = event.target.files[0];
+                if (!file) return;
+                
+                // Read file content
+                const content = await file.text();
+                const lines = content.trim().split('\n');
+                
+                if (lines.length < 2) {
+                    throw new Error('File is empty or has no data');
+                }
+                
+                // Skip header line
+                const importedEntries = [];
+                
+                for (let i = 1; i < lines.length; i++) {
+                    const values = FileState.kenvManager.parseCSVLine(lines[i]);
+                    if (values.length < 5) continue; // Skip invalid lines
+                    
+                    const entry = {};
+                    
+                    // Map fixed columns (0-46)
+                    entry.id = values[0];
+                    entry.type = values[1] || 'kaspa-file';
+                    entry.version = values[2];
+                    entry.created = values[3];
+                    entry.network = values[4];
+                    entry.name = values[5];
+                    entry.path = values[6];
+                    entry.metaTxId = values[7];
+                    entry.metaTxBlockId = values[8];
+                    entry.firstChunkTxId = values[9];
+                    entry.uploadDate = values[10];
+                    entry.blockTime = values[11];
+                    entry.uploadedBy = values[12];
+                    entry.source = values[13];
+                    entry.status = values[14];
+                    entry.fileSize = values[15];
+                    entry.originalSize = values[16];
+                    entry.compressedSize = values[17];
+                    entry.mimeType = values[18];
+                    entry.sha256 = values[19];
+                    entry.encrypted = values[20];
+                    entry.compressionAlgorithm = values[21];
+                    entry.compressionEnabled = values[22];
+                    entry.variableChunk = values[23];
+                    entry.payloadSplit = values[24];
+                    entry.cid = values[25];
+                    entry.totalChunks = values[26];
+                    entry.chunkCount = values[27];
+                    entry.chunkSize = values[28];
+                    entry.segmentCount = values[29];
+                    entry.totalFiles = values[30];
+                    entry.fileCount = values[31];
+                    entry.directoryCount = values[32];
+                    entry.entryCount = values[33];
+                    entry.checksum = values[34];
+                    entry.uploadCost = values[35];
+                    entry.uploadDuration = values[36];
+                    entry.chunkStructureType = values[37];
+                    entry.chunkLevel = values[38];
+                    entry.totalGroups = values[39];
+                    entry.passwordIncluded = values[40];
+                    entry.password = values[41];
+                    entry.externalRef = values[42];
+                    entry.tags = values[43];
+                    entry.notes = values[44];
+                    entry.authWarning = values[45];
+                    entry.salt = values[46];
+                    
+                    // Process variable columns (47+)
+                    if (values.length > 47) {
+                        const chunks = [];
+                        const chunkBlockIds = [];
+                        const segmentBoundaries = [];
+                        
+                        let j = 47;
+                        while (j < values.length) {
+                            if (values[j] === 'seg') {
+                                // Segment boundary (7 columns)
+                                if (j + 6 < values.length) {
+                                    segmentBoundaries.push({
+                                        index: parseInt(values[j + 1]),
+                                        offset: parseInt(values[j + 2]),
+                                        size: parseInt(values[j + 3]),
+                                        originalSize: parseInt(values[j + 4]),
+                                        compressedSize: parseInt(values[j + 5]),
+                                        payloadIndex: parseInt(values[j + 6])
+                                    });
+                                    j += 7;
+                                } else {
+                                    break;
+                                }
+                            } else if (values[j] === 'entries' && values[j + 1] && values[j + 2]) {
+                                // Directory entries
+                                const fileCount = parseInt(values[j + 1]) || 0;
+                                const dirCount = parseInt(values[j + 2]) || 0;
+                                const totalEntries = fileCount + dirCount;
+                                const dirEntries = [];
+                                
+                                let k = j + 3;
+                                for (let m = 0; m < totalEntries && k + 6 < values.length; m++) {
+                                    dirEntries.push({
+                                        type: values[k] === 'f' ? 'file' : 'directory',
+                                        name: values[k + 1],
+                                        path: values[k + 2] || '',
+                                        size: parseInt(values[k + 3]) || 0,
+                                        metaTxId: values[k + 4] || null,
+                                        blockId: values[k + 5] || null,
+                                        password: values[k + 6] || null,
+                                        verified: true
+                                    });
+                                    k += 7;
+                                }
+                                
+                                // Reconstruct directoryMetadata
+                                entry.directoryMetadata = {
+                                    entries: dirEntries
+                                };
+                                j = k;
+                            } else if (values[j] && values[j + 1]) {
+                                // Chunk pair (2 columns)
+                                chunks.push(values[j]);
+                                chunkBlockIds.push(values[j + 1]);
+                                j += 2;
+                            } else {
+                                break;
+                            }
+                        }
+                        
+                        if (chunks.length > 0) {
+                            entry._chunks = chunks;
+                            entry._chunkBlockIds = chunkBlockIds;
+                        }
+                        
+                        if (segmentBoundaries.length > 0) {
+                            entry._segmentBoundaries = segmentBoundaries;
+                        }
+                    }
+                    
+                    // Clean up empty fields
+                    Object.keys(entry).forEach(key => {
+                        if (entry[key] === '' || entry[key] === null || entry[key] === undefined) {
+                            delete entry[key];
+                        }
+                    });
+                    
+                    importedEntries.push(entry);
+                }
+                
+                // Check for duplicates and merge
+                let addedCount = 0;
+                let skippedCount = 0;
+                
+                for (const entry of importedEntries) {
+                    // Check for existing entry
+                    const exists = FileState.kenvManager.entries.find(e => {
+                        if (e.metaTxId && entry.metaTxId) {
+                            return e.metaTxId === entry.metaTxId;
+                        }
+                        if (e.cid && entry.cid) {
+                            return e.cid === entry.cid && e.name === entry.name;
+                        }
+                        if (e.firstChunkTxId && entry.firstChunkTxId) {
+                            return e.firstChunkTxId === entry.firstChunkTxId;
+                        }
+                        return false;
+                    });
+                    
+                    if (!exists) {
+                        // Generate new ID if needed
+                        if (!entry.id) {
+                            entry.id = `${entry.type || 'kaspa-file'}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+                        }
+                        FileState.kenvManager.entries.push(entry);
+                        addedCount++;
+                    } else {
+                        skippedCount++;
+                    }
+                }
+                
+                // Save to LocalStorage
+                await FileState.kenvManager.saveAll();
+                
+                // Update UI
+                if (typeof updateFileList === 'function') {
+                    updateFileList();
+                }
+                
+                // Report results
+                const message = `Import complete: ${addedCount} added, ${skippedCount} skipped (duplicates)`;
+                log(message, 'success');
+                
+                // Reset file input
+                event.target.value = '';
+                
+            } catch (error) {
+                console.error('Import error:', error);
+                log(`Import failed: ${error.message}`, 'error');
+                event.target.value = '';
+            }
+        };
+        
         // ===== v5.9.0: File Tab Functions =====
         // Add file dialog handler
         window.addFile = async function() {
@@ -18787,7 +19146,7 @@ Do you want to continue?`;
             const shareMenu = document.getElementById('shareMenu');
             shareMenu.classList.toggle('show');
             
-            // v6.2.39: Control .kaspa buttons based on chunk availability
+            // v6.2.40: Control .kaspa buttons based on chunk availability
             if (shareMenu.classList.contains('show')) {
                 // Get selected file's KENV entry
                 const selectedIds = Array.from(FileState.selectedFiles);

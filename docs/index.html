@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.34</title>
+    <title>Kaspa P2P File Storage v6.2.35</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -16344,6 +16344,8 @@ Do you want to continue?`;
                 // Call executeDownload with addToListOnly flag
                 await NetworkState.downloadManager.executeDownload(metadata, password, {
                     addToListOnly: true,
+                    metaTxId: metadata.metaTx?.txid || null,
+                    metaTxBlockId: metadata.metaTx?.blockId || null,
                     onProgress: (progress) => {
                         // Progress is not shown for list-only mode
                     }

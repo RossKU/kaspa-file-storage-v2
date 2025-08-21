@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.41</title>
+    <title>Kaspa P2P File Storage v6.2.42</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -5725,7 +5725,7 @@ Do you want to continue?`;
                         return;
                     }
                     
-                    // v6.2.41: Check if chunks exist for non-directory files
+                    // v6.2.42: Check if chunks exist for non-directory files
                     if (kenvEntry.type !== 'kaspa-directory' && (!kenvEntry._chunks || kenvEntry._chunks.length === 0)) {
                         log('Cannot generate .kaspa file: No chunk data available. Use TxID sharing instead.', 'error');
                         return;
@@ -10927,7 +10927,7 @@ Do you want to continue?`;
                     
                     // Phase 2: KENV登録処理（ダウンロード成功時またはaddToListOnly時）
                     if (FileState.kenvManager._initialized) {
-                        // Phase 3: 重複チェック（v6.2.41: metaTxIdがなくても処理）
+                        // Phase 3: 重複チェック（v6.2.42: metaTxIdがなくても処理）
                         let kenvEntry = null;
                         
                         if (metaTxId) {
@@ -10967,7 +10967,7 @@ Do you want to continue?`;
                             kenvEntry.password = password || null;
                             kenvEntry.downloadDate = new Date().toISOString();
                             
-                            // v6.2.41: chunks[0]を保存（metaTxIdがない場合の識別子）
+                            // v6.2.42: chunks[0]を保存（metaTxIdがない場合の識別子）
                             if (metadata.chunks && metadata.chunks.length > 0) {
                                 kenvEntry.firstChunkTxId = metadata.chunks[0];
                             }
@@ -11003,7 +11003,7 @@ Do you want to continue?`;
                             kenvEntry.payloadSplit = metadata.metadata?.payloadSplit || false;
                         }
                         
-                        // v6.2.41: .kaspaファイルの場合は全情報を保存
+                        // v6.2.42: .kaspaファイルの場合は全情報を保存
                         if (!metadata.metaTx?.loadedAt) {
                             // chunks情報を保存
                             if (metadata.chunks) {
@@ -18112,7 +18112,7 @@ Do you want to continue?`;
         };
         */
         
-        // ===== v6.2.41: KENV Export/Import Functions =====
+        // ===== v6.2.42: KENV Export/Import Functions =====
         // Export KENV data as CSV (.kentry format)
         window.exportKENV = function() {
             try {
@@ -18246,8 +18246,8 @@ Do you want to continue?`;
                     now.getSeconds().toString().padStart(2, '0');
                 const filename = `${timestamp}-workspace.kentry`;
                 
-                // Create download
-                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                // Create download (.kentry file, not .csv)
+                const blob = new Blob([csvContent], { type: 'application/octet-stream' });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
@@ -19153,7 +19153,7 @@ Do you want to continue?`;
             const shareMenu = document.getElementById('shareMenu');
             shareMenu.classList.toggle('show');
             
-            // v6.2.41: Control .kaspa buttons based on chunk availability
+            // v6.2.42: Control .kaspa buttons based on chunk availability
             if (shareMenu.classList.contains('show')) {
                 // Get selected file's KENV entry
                 const selectedIds = Array.from(FileState.selectedFiles);

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.36</title>
+    <title>Kaspa P2P File Storage v6.2.37</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -10974,10 +10974,20 @@ Do you want to continue?`;
                             kenvEntry.payloadSplit = metadata.metadata?.payloadSplit || false;
                         }
                         
-                        // v6.2.36: addToListOnlyの場合は検証済みステータスに設定
+                        // v6.2.37: ステータスを適切に設定
                         if (addToListOnly) {
+                            // Verify経由（ブロックチェーンから取得）の場合のみverified
+                            if (metadata.metaTx?.loadedAt) {
+                                kenvEntry.status = 'verified';
+                                log('[KENV] Entry marked as verified (blockchain-fetched via Verify)', 'info');
+                            } else {
+                                kenvEntry.status = 'pending';
+                                log('[KENV] Entry marked as pending (.kaspa file source, not verified)', 'info');
+                            }
+                        } else {
+                            // ダウンロード実行した場合は常にverified（成功=検証済み）
                             kenvEntry.status = 'verified';
-                            log('[KENV] Entry marked as verified (already fetched metadata)', 'info');
+                            log('[KENV] Entry marked as verified (download completed successfully)', 'info');
                         }
                         
                         // インデックスを更新

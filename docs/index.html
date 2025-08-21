@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.37</title>
+    <title>Kaspa P2P File Storage v6.2.38</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -10911,12 +10911,21 @@ Do you want to continue?`;
                     } // v6.2.33: End of if (!addToListOnly) block
                     
                     // Phase 2: KENV登録処理（ダウンロード成功時またはaddToListOnly時）
-                    if (FileState.kenvManager._initialized && metaTxId) {
-                        // Phase 3: 重複チェック
-                        let kenvEntry = FileState.kenvManager.entries.find(e => 
-                            e.metaTxId === metaTxId && 
-                            (!metaTxBlockId || e.metaTxBlockId === metaTxBlockId)
-                        );
+                    if (FileState.kenvManager._initialized) {
+                        // Phase 3: 重複チェック（v6.2.38: metaTxIdがなくても処理）
+                        let kenvEntry = null;
+                        
+                        if (metaTxId) {
+                            // metaTxIdベースの重複チェック（BlockIDチェックは削除）
+                            kenvEntry = FileState.kenvManager.entries.find(e => 
+                                e.metaTxId === metaTxId
+                            );
+                        } else if (metadata.chunks && metadata.chunks.length > 0) {
+                            // chunks[0]ベースの重複チェック（metaTxIdがない場合）
+                            kenvEntry = FileState.kenvManager.entries.find(e => 
+                                e.firstChunkTxId === metadata.chunks[0]
+                            );
+                        }
                         
                         if (kenvEntry) {
                             // 既存エントリーを更新
@@ -10938,10 +10947,15 @@ Do you want to continue?`;
                             );
                             
                             // ダウンロード情報を設定
-                            kenvEntry.metaTxId = metaTxId;
+                            kenvEntry.metaTxId = metaTxId || null;
                             kenvEntry.metaTxBlockId = metaTxBlockId || null;
                             kenvEntry.password = password || null;
                             kenvEntry.downloadDate = new Date().toISOString();
+                            
+                            // v6.2.38: chunks[0]を保存（metaTxIdがない場合の識別子）
+                            if (metadata.chunks && metadata.chunks.length > 0) {
+                                kenvEntry.firstChunkTxId = metadata.chunks[0];
+                            }
                         }
                         
                         // メタデータから情報を取得（新規・既存両方で更新）
@@ -10972,6 +10986,20 @@ Do you want to continue?`;
                             
                             // PayloadSplit情報
                             kenvEntry.payloadSplit = metadata.metadata?.payloadSplit || false;
+                        }
+                        
+                        // v6.2.38: .kaspaファイルの場合は全情報を保存
+                        if (!metadata.metaTx?.loadedAt) {
+                            // chunks情報を保存
+                            if (metadata.chunks) {
+                                kenvEntry._chunks = metadata.chunks;
+                            }
+                            if (metadata.chunkBlockIds) {
+                                kenvEntry._chunkBlockIds = metadata.chunkBlockIds;
+                            }
+                            if (metadata.metadata?.segmentBoundaries) {
+                                kenvEntry._segmentBoundaries = metadata.metadata.segmentBoundaries;
+                            }
                         }
                         
                         // v6.2.37: ステータスを適切に設定
@@ -16360,8 +16388,8 @@ Do you want to continue?`;
                 // Call executeDownload with addToListOnly flag
                 await NetworkState.downloadManager.executeDownload(metadata, password, {
                     addToListOnly: true,
-                    metaTxId: metadata.metaTx?.txid || null,
-                    metaTxBlockId: metadata.metaTx?.blockId || null,
+                    metaTxId: metadata.metaTx?.txid || metadata.metadata?.metaTxId || null,
+                    metaTxBlockId: metadata.metaTx?.blockId || metadata.metadata?.metaTxBlockId || null,
                     onProgress: (progress) => {
                         // Progress is not shown for list-only mode
                     }

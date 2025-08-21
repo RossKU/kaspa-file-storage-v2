@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.35</title>
+    <title>Kaspa P2P File Storage v6.2.36</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -10972,6 +10972,12 @@ Do you want to continue?`;
                             
                             // PayloadSplit情報
                             kenvEntry.payloadSplit = metadata.metadata?.payloadSplit || false;
+                        }
+                        
+                        // v6.2.36: addToListOnlyの場合は検証済みステータスに設定
+                        if (addToListOnly) {
+                            kenvEntry.status = 'verified';
+                            log('[KENV] Entry marked as verified (already fetched metadata)', 'info');
                         }
                         
                         // インデックスを更新

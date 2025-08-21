@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.38</title>
+    <title>Kaspa P2P File Storage v6.2.39</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -5716,6 +5716,12 @@ Do you want to continue?`;
                         return;
                     }
                     
+                    // v6.2.39: Check if chunks exist for non-directory files
+                    if (kenvEntry.type !== 'kaspa-directory' && (!kenvEntry._chunks || kenvEntry._chunks.length === 0)) {
+                        log('Cannot generate .kaspa file: No chunk data available. Use TxID sharing instead.', 'error');
+                        return;
+                    }
+                    
                     // v5.11.111: ディレクトリタイプのサポート
                     if (kenvEntry.type === 'kaspa-directory') {
                         // ディレクトリの場合、directoryMetadataが必要
@@ -10912,7 +10918,7 @@ Do you want to continue?`;
                     
                     // Phase 2: KENV登録処理（ダウンロード成功時またはaddToListOnly時）
                     if (FileState.kenvManager._initialized) {
-                        // Phase 3: 重複チェック（v6.2.38: metaTxIdがなくても処理）
+                        // Phase 3: 重複チェック（v6.2.39: metaTxIdがなくても処理）
                         let kenvEntry = null;
                         
                         if (metaTxId) {
@@ -10952,7 +10958,7 @@ Do you want to continue?`;
                             kenvEntry.password = password || null;
                             kenvEntry.downloadDate = new Date().toISOString();
                             
-                            // v6.2.38: chunks[0]を保存（metaTxIdがない場合の識別子）
+                            // v6.2.39: chunks[0]を保存（metaTxIdがない場合の識別子）
                             if (metadata.chunks && metadata.chunks.length > 0) {
                                 kenvEntry.firstChunkTxId = metadata.chunks[0];
                             }
@@ -10988,7 +10994,7 @@ Do you want to continue?`;
                             kenvEntry.payloadSplit = metadata.metadata?.payloadSplit || false;
                         }
                         
-                        // v6.2.38: .kaspaファイルの場合は全情報を保存
+                        // v6.2.39: .kaspaファイルの場合は全情報を保存
                         if (!metadata.metaTx?.loadedAt) {
                             // chunks情報を保存
                             if (metadata.chunks) {
@@ -18781,8 +18787,34 @@ Do you want to continue?`;
             const shareMenu = document.getElementById('shareMenu');
             shareMenu.classList.toggle('show');
             
-            // Close menu when clicking outside
+            // v6.2.39: Control .kaspa buttons based on chunk availability
             if (shareMenu.classList.contains('show')) {
+                // Get selected file's KENV entry
+                const selectedIds = Array.from(FileState.selectedFiles);
+                if (selectedIds.length === 1) {
+                    const kenvEntry = FileState.kenvManager.entries.find(e => e.id === selectedIds[0]);
+                    const hasChunks = kenvEntry && kenvEntry._chunks && kenvEntry._chunks.length > 0;
+                    const isDirectory = kenvEntry && kenvEntry.type === 'kaspa-directory';
+                    
+                    // Control .kaspa button enable/disable
+                    document.querySelectorAll('.share-option[onclick*="kaspa"]').forEach(btn => {
+                        if (isDirectory) {
+                            // Directories can always generate .kaspa
+                            btn.disabled = false;
+                            btn.style.opacity = '1';
+                            btn.style.cursor = 'pointer';
+                            btn.title = '';
+                        } else {
+                            // Files only if chunks exist
+                            btn.disabled = !hasChunks;
+                            btn.style.opacity = hasChunks ? '1' : '0.5';
+                            btn.style.cursor = hasChunks ? 'pointer' : 'not-allowed';
+                            btn.title = hasChunks ? '' : 'No chunk data available - use TxID sharing instead';
+                        }
+                    });
+                }
+                
+                // Close menu when clicking outside
                 setTimeout(() => {
                     document.addEventListener('click', closeShareMenu);
                 }, 100);

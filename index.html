@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.33</title>
+    <title>Kaspa P2P File Storage v6.2.34</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -2044,12 +2044,6 @@
                 <div style="padding: 10px; border-radius: 8px; background: var(--bg-secondary);">
                     <input type="text" id="unifiedTxIdInput" placeholder="Enter download info (TxID:BlockID:Password)" style="width: 100%; font-size: 14px; padding: 8px;">
                     <input type="password" id="unifiedPassword" placeholder="🔐 Password (if required)" style="width: 100%; margin-top: 8px; font-size: 14px; padding: 8px;">
-                    <div style="margin-top: 8px; display: flex; align-items: center;">
-                        <input type="checkbox" id="addToListOnly" style="margin-right: 8px;">
-                        <label for="addToListOnly" style="font-size: 13px; color: var(--text-secondary); cursor: pointer;">
-                            📋 Add to File List only (without downloading)
-                        </label>
-                    </div>
                     <button onclick="loadFromUnifiedInput()" style="margin-top: 8px; width: 100%; padding: 10px; font-size: 14px;">
                         🔍 Verify
                     </button>
@@ -2104,7 +2098,14 @@
                     <input type="password" id="downloadPassword" placeholder="Enter password">
                 </div>
                 
-                <button id="downloadBtn" onclick="downloadFile()">Download File</button>
+                <div style="display: flex; gap: 10px; margin-top: 10px;">
+                    <button id="downloadBtn" onclick="downloadFile()" style="flex: 1; padding: 10px; font-size: 14px;">
+                        💾 Download File
+                    </button>
+                    <button id="addToListBtn" onclick="addToFileListOnly()" style="flex: 1; padding: 10px; font-size: 14px;">
+                        📋 Add to File List only
+                    </button>
+                </div>
                 
                 <div id="downloadProgress" style="display: none;">
                     <div class="progress-bar">
@@ -15270,14 +15271,13 @@ Do you want to continue?`;
         window.loadFromUnifiedInput = async function() {
             const txIdInput = document.getElementById('unifiedTxIdInput').value.trim();
             const password = document.getElementById('unifiedPassword').value;
-            const addToListOnly = document.getElementById('addToListOnly').checked; // v6.2.33
             
             if (!txIdInput) {
                 log('TxIDを入力してください', 'error');
                 return;
             }
             
-            log(`${addToListOnly ? 'File List追加' : '統一入力から復元'}開始: ${txIdInput.substring(0, 20)}...`, 'info');
+            log(`統一入力から復元開始: ${txIdInput.substring(0, 20)}...`, 'info');
             
             // v4.7.14: Clear previous metadata in DownloadManager
             if (NetworkState.downloadManager) {
@@ -15287,10 +15287,7 @@ Do you want to continue?`;
             // Use existing loadFromMetaTxId logic
             document.getElementById('metaTxIdInput').value = txIdInput;
             document.getElementById('metaTxPassword').value = password;
-            // v6.2.33: Pass addToListOnly flag via temporary global
-            window.tempAddToListOnly = addToListOnly;
             await loadFromMetaTxId();
-            delete window.tempAddToListOnly;
         };
 
         window.loadFromMetaTxId = async function() {
@@ -16319,6 +16316,50 @@ Do you want to continue?`;
         
         // Backward compatibility for downloadFile
         window.downloadFile = FileState.fileOperationHandlers.downloadFile;
+
+        // v6.2.34: Add to File List only function
+        window.addToFileListOnly = async function() {
+            if (!FileState.kaspaMetadata && !FileState.directoryMetadata) {
+                log('メタデータが読み込まれていません。まずVerifyボタンをクリックしてください。', 'error');
+                return;
+            }
+
+            const metadata = FileState.kaspaMetadata || FileState.directoryMetadata;
+            const fileName = metadata.file?.name || metadata.directory?.name || 'unknown';
+            
+            log(`[File List] ${fileName} をリストに追加中...`, 'info');
+
+            try {
+                // Get password
+                let password = document.getElementById('downloadPassword').value;
+                if (metadata.auth?.passwordIncluded && metadata.auth?.password) {
+                    password = metadata.auth.password;
+                }
+                
+                if (!password) {
+                    log('パスワードを入力してください', 'error');
+                    return;
+                }
+
+                // Call executeDownload with addToListOnly flag
+                await NetworkState.downloadManager.executeDownload(metadata, password, {
+                    addToListOnly: true,
+                    onProgress: (progress) => {
+                        // Progress is not shown for list-only mode
+                    }
+                });
+
+                log(`[File List] ${fileName} をFile Listに追加しました`, 'success');
+                
+                // Switch to File tab
+                const fileTab = document.querySelector('[onclick*="switchTab(\'file\')"]');
+                if (fileTab) {
+                    fileTab.click();
+                }
+            } catch (error) {
+                log(`[File List] エラー: ${error.message}`, 'error');
+            }
+        };
 
         // Check if monitoring should stop
         async function checkMonitoringStop() {

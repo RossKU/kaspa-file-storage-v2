@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.43</title>
+    <title>Kaspa P2P File Storage v6.2.44</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -18440,7 +18440,10 @@ Do you want to continue?`;
                         if (!entry.id) {
                             entry.id = `${entry.type || 'kaspa-file'}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
                         }
+                        const lineNumber = FileState.kenvManager.entries.length;
                         FileState.kenvManager.entries.push(entry);
+                        // Update index for proper display
+                        FileState.kenvManager.updateIndex(entry, lineNumber);
                         addedCount++;
                     } else {
                         skippedCount++;
@@ -18451,8 +18454,8 @@ Do you want to continue?`;
                 await FileState.kenvManager.saveAll();
                 
                 // Update UI
-                if (typeof updateFileList === 'function') {
-                    updateFileList();
+                if (typeof updateFileListFromKENV === 'function') {
+                    updateFileListFromKENV();
                 }
                 
                 // Report results

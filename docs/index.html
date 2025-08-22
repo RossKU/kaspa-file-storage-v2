@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.44</title>
+    <title>Kaspa P2P File Storage v6.2.45</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -1668,7 +1668,7 @@
         <!-- Sidebar Navigation -->
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-header">
-                <h2>Kaspa Storage</h2>
+                <h2>Kaspa File Storage</h2>
             </div>
             
             <nav class="sidebar-nav">
@@ -3440,7 +3440,7 @@
             initializeSystem: async function() {
                 try {
                     log('Starting Kaspa system restart...');
-                    updateNetworkStatus('connecting', '初期化中...');
+                    updateNetworkStatus('connecting', 'Initializing...');
                     
                     // Import WASM SDK
                     NetworkState.kaspa = await import('./kaspa-core.js');
@@ -3529,7 +3529,7 @@
                     // v5.12.64: Update upload button state after initialization
                     updateUploadButtonState();
                     
-                    updateNetworkStatus('online', 'オンライン');
+                    updateNetworkStatus('online', 'Online');
                     
                     // Initialize Archive Manager
                     await initializeArchiveManager();
@@ -8040,7 +8040,7 @@ Do you want to continue?`;
                 if (this.isConnected) {
                     this.isConnected = false;
                     this.lastError = error;
-                    updateNetworkStatus('offline', 'ネットワークエラー');
+                    updateNetworkStatus('offline', 'Network Error');
                     updateRpcNodeInfo(); // Reset display
                     
                     // Save progress if needed
@@ -11495,7 +11495,7 @@ Do you want to continue?`;
                 
             } catch (error) {
                 log(`初期化エラー: ${error.message}`, 'error');
-                updateNetworkStatus('offline', 'エラー');
+                updateNetworkStatus('offline', 'Error');
                 updateRpcNodeInfo(); // Reset display
             }
         };
@@ -11583,7 +11583,7 @@ Do you want to continue?`;
                 
             } catch (error) {
                 log(`RPC初期化エラー: ${error.message}`, 'error');
-                updateNetworkStatus('offline', 'エラー');
+                updateNetworkStatus('offline', 'Error');
                 updateRpcNodeInfo(); // Reset display
                 return false;
             }
@@ -16756,15 +16756,13 @@ Do you want to continue?`;
             const subtitleElement = document.getElementById('appSubtitle');
             
             if (titleElement) {
-                // Extract the subtitle from the document title
-                const fullTitle = document.title;
-                const titleParts = fullTitle.match(/v[\d.]+\s*-\s*(.+)$/);
-                const subtitle = titleParts ? titleParts[1] : 'No LocalStorage Cache';
-                titleElement.textContent = `Kaspa Storage v${version} - ${subtitle}`;
+                // Just display the app name and version
+                titleElement.textContent = `Kaspa File Storage v${version}`;
             }
             
             if (subtitleElement) {
-                subtitleElement.textContent = `📋 v${version}: No LocalStorage Cache`;
+                // Just display the version
+                subtitleElement.textContent = `v${version}`;
             }
             
             // Initialize workspace prompt

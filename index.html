@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.47</title>
+    <title>Kaspa P2P File Storage v6.2.48</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -6165,6 +6165,10 @@ Do you want to continue?`;
                     if (result && result.type === 'directory') {
                         // Load metadata into builder
                         this.entries = result.entries || [];
+                        
+                        // v6.2.48: Rebuild intermediate folders that may have been optimized out
+                        this.rebuildIntermediateFolders();
+                        
                         this.name = result.directory?.name || '';
                         this.mode = 'edit';
                         this.showEditSection();
@@ -6197,6 +6201,10 @@ Do you want to continue?`;
                         }
                         
                         self.entries = metadata.entries || [];
+                        
+                        // v6.2.48: Rebuild intermediate folders  
+                        self.rebuildIntermediateFolders();
+                        
                         self.name = metadata.directory?.name || file.name.replace('.kaspa', '');
                         self.mode = 'edit';
                         
@@ -6583,6 +6591,76 @@ Do you want to continue?`;
                 });
                 
                 return optimized;
+            },
+            
+            // v6.2.48: Rebuild intermediate folders - A approach (Entry restoration)
+            rebuildIntermediateFolders() {
+                console.log('[DirectoryBuilder] Rebuilding intermediate folders...');
+                const startCount = this.entries.length;
+                
+                // Collect all paths that should exist
+                const requiredPaths = new Set();
+                
+                // Analyze each entry to find required parent paths
+                this.entries.forEach(entry => {
+                    if (entry.path) {
+                        // This entry requires all parent folders to exist
+                        const parts = entry.path.split('/');
+                        let currentPath = '';
+                        
+                        parts.forEach(part => {
+                            currentPath = currentPath ? `${currentPath}/${part}` : part;
+                            requiredPaths.add(currentPath);
+                        });
+                    }
+                });
+                
+                console.log(`[DirectoryBuilder] Found ${requiredPaths.size} required paths`);
+                
+                // Check which paths are missing and add them as virtual folders
+                const addedFolders = [];
+                requiredPaths.forEach(path => {
+                    // Check if this path exists as an entry
+                    const exists = this.entries.some(entry => {
+                        if (entry.type !== 'directory') return false;
+                        const entryPath = entry.path ? `${entry.path}/${entry.name}` : entry.name;
+                        return entryPath === path;
+                    });
+                    
+                    if (!exists) {
+                        // Create virtual folder entry
+                        const parts = path.split('/');
+                        const name = parts.pop();
+                        const parentPath = parts.join('/');
+                        
+                        const virtualFolder = {
+                            type: 'directory',
+                            name: name,
+                            path: parentPath,
+                            size: 0,
+                            metaTxId: null,
+                            blockId: null,
+                            cid: null,
+                            fileCount: 0,
+                            totalSize: 0,
+                            password: null,
+                            virtual: true  // Mark as virtual/intermediate folder
+                        };
+                        
+                        this.entries.push(virtualFolder);
+                        addedFolders.push(path);
+                        console.log(`[DirectoryBuilder] Added virtual folder: ${path}`);
+                    }
+                });
+                
+                const endCount = this.entries.length;
+                console.log(`[DirectoryBuilder] Rebuild complete. Added ${endCount - startCount} intermediate folders`);
+                
+                if (addedFolders.length > 0) {
+                    console.log('[DirectoryBuilder] Added folders:', addedFolders);
+                }
+                
+                return addedFolders.length;
             },
             
             updatePreview() {

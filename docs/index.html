@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.45</title>
+    <title>Kaspa P2P File Storage v6.2.46</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -1657,6 +1657,26 @@
         }
         .switch input:checked + span span {
             transform: translateX(26px);
+        }
+        
+        /* File List Table Row Clickable Styles */
+        #fileListBody tr {
+            cursor: pointer;
+            transition: background-color 0.2s;
+            user-select: none;
+        }
+        
+        #fileListBody tr:hover {
+            background-color: rgba(42, 111, 101, 0.1);
+        }
+        
+        #fileListBody tr:active {
+            background-color: rgba(42, 111, 101, 0.2);
+        }
+        
+        /* Checked row highlight */
+        #fileListBody tr:has(.file-checkbox:checked) {
+            background-color: rgba(42, 111, 101, 0.15);
         }
     </style>
 </head>
@@ -18856,9 +18876,24 @@ Do you want to continue?`;
                 <td title="${uploadDate}">${uploadDate}</td>
             `;
             
-            // Add click handler for row (excluding checkbox)
+            // Add click handler for row selection
             tr.addEventListener('click', (e) => {
-                if (e.target.type !== 'checkbox') {
+                // Don't toggle if clicking on checkbox itself or buttons
+                if (e.target.type === 'checkbox' || e.target.tagName === 'BUTTON' || e.target.closest('button')) {
+                    return;
+                }
+                
+                // Toggle the checkbox
+                const checkbox = tr.querySelector('.file-checkbox');
+                if (checkbox) {
+                    checkbox.checked = !checkbox.checked;
+                    updateFileActions();
+                }
+            });
+            
+            // Add double-click handler for details view
+            tr.addEventListener('dblclick', (e) => {
+                if (e.target.type !== 'checkbox' && e.target.tagName !== 'BUTTON') {
                     showEntryDetails(entry);
                 }
             });

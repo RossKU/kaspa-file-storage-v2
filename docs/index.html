@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.46</title>
+    <title>Kaspa P2P File Storage v6.2.47</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -1873,22 +1873,14 @@
                 <div class="file-selects">
                     <select id="kenvSortSelect" onchange="handleSortSelectChange(this.value)" 
                             class="file-select">
-                        <!-- 主要項目 -->
                         <option value="name-asc">📝 Name ↑</option>
                         <option value="name-desc">📝 Name ↓</option>
                         <option value="size-desc">💾 Size ↓</option>
                         <option value="size-asc">💾 Size ↑</option>
-                        <option value="date-desc">📅 Upload ↓</option>
-                        <option value="date-asc">📅 Upload ↑</option>
-                        <!-- デスクトップ専用項目 -->
-                        <option value="cid-asc" class="desktop-only">🔗 CID ↑</option>
-                        <option value="cid-desc" class="desktop-only">🔗 CID ↓</option>
-                        <option value="meta-asc" class="desktop-only">📋 MetaTxID ↑</option>
-                        <option value="meta-desc" class="desktop-only">📋 MetaTxID ↓</option>
-                        <option value="uploader-asc" class="desktop-only">👤 Uploader ↑</option>
-                        <option value="uploader-desc" class="desktop-only">👤 Uploader ↓</option>
-                        <option value="created-desc" class="desktop-only">🕐 Created ↓</option>
-                        <option value="created-asc" class="desktop-only">🕐 Created ↑</option>
+                        <option value="date-desc">📅 Upload Date ↓</option>
+                        <option value="date-asc">📅 Upload Date ↑</option>
+                        <option value="meta-asc">📋 MetaTxID ↑</option>
+                        <option value="meta-desc">📋 MetaTxID ↓</option>
                     </select>
                     
                     <select id="kenvFilterSelect" onchange="filterKENVFiles(this.value)" 
@@ -19091,37 +19083,10 @@ Do you want to continue?`;
                         sortedEntries.reverse();
                     }
                     break;
-                case 'cid':
-                    // Sort by CID
-                    sortedEntries = Object.values(FileState.kenvManager.entries)
-                        .sort((a, b) => (a.cid || '').localeCompare(b.cid || ''))
-                        .map((entry, index) => [entry.name, index, entry.type[0]]);
-                    if (!sortState.ascending) {
-                        sortedEntries.reverse();
-                    }
-                    break;
                 case 'meta':
                     // Sort by MetaTxID
                     sortedEntries = Object.values(FileState.kenvManager.entries)
                         .sort((a, b) => (a.metaTxId || '').localeCompare(b.metaTxId || ''))
-                        .map((entry, index) => [entry.name, index, entry.type[0]]);
-                    if (!sortState.ascending) {
-                        sortedEntries.reverse();
-                    }
-                    break;
-                case 'uploader':
-                    // Sort by uploader address
-                    sortedEntries = Object.values(FileState.kenvManager.entries)
-                        .sort((a, b) => (a.uploaderId || '').localeCompare(b.uploaderId || ''))
-                        .map((entry, index) => [entry.name, index, entry.type[0]]);
-                    if (!sortState.ascending) {
-                        sortedEntries.reverse();
-                    }
-                    break;
-                case 'created':
-                    // Sort by creation date
-                    sortedEntries = Object.values(FileState.kenvManager.entries)
-                        .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0))
                         .map((entry, index) => [entry.name, index, entry.type[0]]);
                     if (!sortState.ascending) {
                         sortedEntries.reverse();

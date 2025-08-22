@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.48</title>
+    <title>Kaspa P2P File Storage v6.2.49</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -7077,6 +7077,69 @@ Do you want to continue?`;
                 
                 // Reset builder
                 this.resetBuilder();
+            },
+            
+            // v6.2.49: Remove entry with cascade deletion
+            removeEntry(index) {
+                if (index < 0 || index >= this.entries.length) {
+                    console.warn(`[DirectoryBuilder] Invalid index: ${index}`);
+                    return;
+                }
+                
+                const targetEntry = this.entries[index];
+                const targetPath = targetEntry.path ? `${targetEntry.path}/${targetEntry.name}` : targetEntry.name;
+                const targetType = targetEntry.type;
+                
+                console.log(`[DirectoryBuilder] Removing ${targetType}: ${targetPath}`);
+                
+                // If it's a directory, we need to remove all children
+                if (targetType === 'directory' || targetType === 'folder') {
+                    // Find all entries that are children of this directory
+                    const toRemove = [];
+                    
+                    this.entries.forEach((entry, idx) => {
+                        // Skip the target entry itself
+                        if (idx === index) {
+                            toRemove.push(idx);
+                            return;
+                        }
+                        
+                        // Check if entry is a child of the target directory
+                        const entryFullPath = entry.path ? `${entry.path}/${entry.name}` : entry.name;
+                        
+                        // If entry's path starts with targetPath, it's a child
+                        if (entry.path && entry.path.startsWith(targetPath)) {
+                            toRemove.push(idx);
+                            console.log(`[DirectoryBuilder] - Also removing child: ${entryFullPath}`);
+                        }
+                        // Also check if the entry's full path starts with targetPath
+                        else if (entryFullPath.startsWith(targetPath + '/')) {
+                            toRemove.push(idx);
+                            console.log(`[DirectoryBuilder] - Also removing nested: ${entryFullPath}`);
+                        }
+                    });
+                    
+                    // Sort indices in descending order to remove from end to start
+                    toRemove.sort((a, b) => b - a);
+                    
+                    console.log(`[DirectoryBuilder] Removing ${toRemove.length} entries total`);
+                    
+                    // Remove all marked entries
+                    toRemove.forEach(idx => {
+                        this.entries.splice(idx, 1);
+                    });
+                    
+                    this.showStatus(`Deleted folder "${targetEntry.name}" and ${toRemove.length - 1} children`, 'success');
+                } else {
+                    // Simple file removal
+                    this.entries.splice(index, 1);
+                    this.showStatus(`Deleted file "${targetEntry.name}"`, 'success');
+                }
+                
+                // Update the tree view and preview
+                this.updatePreview();
+                this.updateButtonStates();
+                console.log(`[DirectoryBuilder] Removal complete. Remaining entries: ${this.entries.length}`);
             }
         };
         

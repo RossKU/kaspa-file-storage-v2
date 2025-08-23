@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.49</title>
+    <title>Kaspa P2P File Storage v6.2.51</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -6008,16 +6008,19 @@ Do you want to continue?`;
                             const btnId = `btns_${node.metaTxId.substring(0, 8)}_${Date.now()}`;
                             html += ` <span id="${btnId}" style="margin-left: auto;"></span>`;
                             
-                            // Store button data for later rendering
+                            // Store button data for later rendering - v6.2.51: Fix duplicate buttons
                             if (!window.pendingTreeButtons) window.pendingTreeButtons = [];
-                            window.pendingTreeButtons.push({
-                                id: btnId,
-                                metaTxId: node.metaTxId,
-                                blockId: node.blockId || '',
-                                fileName: node.name,
-                                password: node.password || password,
-                                path: node.path
-                            });
+                            // Check if this button ID already exists to prevent duplicates
+                            if (!window.pendingTreeButtons.find(btn => btn.id === btnId)) {
+                                window.pendingTreeButtons.push({
+                                    id: btnId,
+                                    metaTxId: node.metaTxId,
+                                    blockId: node.blockId || '',
+                                    fileName: node.name,
+                                    password: node.password || password,
+                                    path: node.path
+                                });
+                            }
                         }
                         
                         html += '</div>';
@@ -14998,6 +15001,9 @@ Do you want to continue?`;
                     let fileListHtml = '<br><strong>📊 Hierarchy:</strong><br>';
                     fileListHtml += '<div style="border: 1px solid var(--border-dark); padding: 10px; margin-top: 10px; font-family: monospace; background: var(--background-light);">';
                     
+                    // v6.2.51: Clear pending buttons before rendering new tree
+                    window.pendingTreeButtons = [];
+                    
                     // Build tree structure
                     const tree = window.SharedTreeBuilder.buildTreeStructure(dirMetadata.entries, dirMetadata.directory.name);
                     const treeHtml = window.SharedTreeBuilder.renderTreeReadOnly(tree, dirMetadata.auth?.password || '');
@@ -15027,12 +15033,12 @@ Do you want to continue?`;
                         if (window.pendingTreeButtons && window.pendingTreeButtons.length > 0) {
                             window.pendingTreeButtons.forEach((btnData) => {
                                 const placeholder = document.getElementById(btnData.id);
-                                if (placeholder) {
+                                if (placeholder && placeholder.children.length === 0) {  // Check if buttons already added
                                     // Create copy button
                                     const copyBtn = document.createElement('button');
                                     copyBtn.className = 'small-button';
                                     copyBtn.textContent = '📋';
-                                    copyBtn.title = 'TxID:BlockIDをコピー';
+                                    copyBtn.title = 'Copy TxID:BlockID';
                                     copyBtn.onclick = () => {
                                         copyToClipboard(`${btnData.metaTxId}:${btnData.blockId}`);
                                     };
@@ -15043,7 +15049,7 @@ Do you want to continue?`;
                                     dlBtn.className = 'small-button';
                                     dlBtn.style.marginLeft = '5px';
                                     dlBtn.textContent = '📥';
-                                    dlBtn.title = 'ダウンロード';
+                                    dlBtn.title = 'Download';
                                     dlBtn.onclick = () => {
                                         downloadFileFromDirectory(
                                             btnData.metaTxId,

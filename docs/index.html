@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.54</title>
+    <title>Kaspa P2P File Storage v6.2.55</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -2966,9 +2966,10 @@
                         throw new Error('Network not connected');
                     }
                     
-                    // Show processing message
+                    // Show processing message - XSS fix: Use safe DOM manipulation
                     resultDiv.style.display = 'block';
-                    messageDiv.innerHTML = '⏳ Processing UTXO consolidation...';
+                    messageDiv.innerHTML = ''; // Clear existing content
+                    messageDiv.appendChild(document.createTextNode('⏳ Processing UTXO consolidation...'));
                     
                     log('🔄 Starting UTXO consolidation...', 'info');
                     
@@ -3042,8 +3043,11 @@
                         throw new Error('Failed to submit consolidation transaction');
                     }
                     
-                    // Success message
-                    messageDiv.innerHTML = `✅ Consolidation successful!<br>TxID: ${txid.substring(0, 16)}...`;
+                    // Success message - XSS fix: Use safe DOM manipulation
+                    messageDiv.innerHTML = ''; // Clear existing content
+                    messageDiv.appendChild(document.createTextNode('✅ Consolidation successful!'));
+                    messageDiv.appendChild(document.createElement('br'));
+                    messageDiv.appendChild(document.createTextNode(`TxID: ${txid.substring(0, 16)}...`));
                     log(`✅ UTXO consolidation successful. TxID: ${txid}`, 'success');
                     
                     // Refresh UTXO status after a delay
@@ -3091,7 +3095,9 @@
                 } catch (error) {
                     // Enhanced error handling
                     const errorMsg = error?.message || error?.toString() || JSON.stringify(error) || 'Unknown error';
-                    messageDiv.innerHTML = `❌ Consolidation failed: ${errorMsg}`;
+                    // XSS fix: Use safe DOM manipulation for error message
+                    messageDiv.innerHTML = ''; // Clear existing content
+                    messageDiv.appendChild(document.createTextNode(`❌ Consolidation failed: ${errorMsg}`));
                     log(`❌ UTXO consolidation failed: ${errorMsg}`, 'error');
                     
                     // Log additional error details if available
@@ -9968,11 +9974,15 @@ Do you want to continue?`;
             // v5.9.0: Also update the status tab workspace folder
             const statusFolder = document.getElementById('workspaceFolderStatus');
             if (statusFolder) {
+                // XSS fix: Use safe DOM manipulation
+                statusFolder.innerHTML = ''; // Clear existing content
+                const span = document.createElement('span');
                 if (WorkspaceState.handle) {
-                    statusFolder.innerHTML = `<span>📁 ${WorkspaceState.handle.name}</span>`;
+                    span.textContent = `📁 ${WorkspaceState.handle.name}`;
                 } else {
-                    statusFolder.innerHTML = `<span>📁 Not set</span>`;
+                    span.textContent = '📁 Not set';
                 }
+                statusFolder.appendChild(span);
             }
         }
         

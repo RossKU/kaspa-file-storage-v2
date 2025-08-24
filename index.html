@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.57</title>
+    <title>Kaspa P2P File Storage v6.2.58</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -14247,7 +14247,16 @@ Do you want to continue?`;
                     kenvEntry.uploadedBy = UserState.address?.toString() || null;
                     kenvEntry.sha256 = fileHash;
                     kenvEntry.encrypted = true;
-                    kenvEntry.password = FileState.currentPassword || null;
+                    
+                    // v6.2.57: Check password save setting
+                    const savePasswords = localStorage.getItem('savePasswordEnabled') !== 'false';
+                    if (savePasswords) {
+                        kenvEntry.password = FileState.currentPassword || null;
+                    } else {
+                        kenvEntry.password = null;
+                        kenvEntry.hasPassword = !!FileState.currentPassword;  // Flag that password exists
+                    }
+                    
                     kenvEntry.cid = window.currentFileCIDFull || window.currentFileCID || '';
                     kenvEntry.uploadCost = totalCost;
                     
@@ -19092,7 +19101,17 @@ Do you want to continue?`;
             // Prepare download information
             const txId = item.metaTxId || '';
             const blockId = item.metaTxBlockId || item.blockId || '';
-            const password = item.password || '';
+            
+            // v6.2.57: Check if password is needed
+            let password = item.password || '';
+            if (!password && item.hasPassword) {
+                // Password exists but not saved - prompt user
+                password = prompt(`Enter password for "${item.name}":`);
+                if (!password) {
+                    log('Download cancelled - no password provided', 'warning');
+                    return;
+                }
+            }
             
             // Format: TxID:BlockID:Password
             const downloadInfo = password ? 
@@ -19241,6 +19260,17 @@ Do you want to continue?`;
             }
             const icon = entry.type === 'kaspa-directory' ? '📁' : 
                         getFileIcon(entry.name);
+            
+            // v6.2.57: Add password status icon
+            let passwordIcon = '';
+            if (entry.encrypted || entry.hasPassword || entry.password) {
+                if (entry.password) {
+                    passwordIcon = '🔓';  // Password saved (unlocked)
+                } else if (entry.hasPassword) {
+                    passwordIcon = '🔒';  // Password required (locked)
+                }
+            }
+            
             const statusIcon = entry.status === 'verified' ? '✅' : 
                               entry.status === 'verifying' ? '⏳' : 
                               entry.status === 'failed' ? '❌' : 
@@ -19273,7 +19303,10 @@ Do you want to continue?`;
             // Add title attributes for tooltip display (6 columns)
             tr.innerHTML = `
                 <td><input type="checkbox" class="file-checkbox" data-id="${entry.id}" onchange="updateFileActions()"></td>
-                <td title="Type: ${entry.type}"><span class="file-icon">${icon}</span></td>
+                <td title="Type: ${entry.type}${passwordIcon ? '\nPassword: ' + (entry.password ? 'Saved' : 'Required') : ''}">
+                    <span class="file-icon">${icon}</span>
+                    ${passwordIcon ? `<span style="font-size: 0.8em; vertical-align: super;">${passwordIcon}</span>` : ''}
+                </td>
                 <td title="${entry.name}">
                     <span>${entry.name}</span>
                     <span style="margin-left: 5px; font-size: 0.8em;">${statusIcon}</span>

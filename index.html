@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.55</title>
+    <title>Kaspa P2P File Storage v6.2.56</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -6076,7 +6076,7 @@ Do you want to continue?`;
                     if (node.type === 'root' && level === 0) {
                         // Show root directory
                         html += `<div style="padding: 4px 2px; display: flex; align-items: center;">`;
-                        html += `${icon} ${node.name}`;
+                        html += `${icon} ${escapeHtml(node.name)}`;
                         html += '</div>';
                     } else if (node.type !== 'root') {
                         // Calculate tree prefix
@@ -6089,7 +6089,7 @@ Do you want to continue?`;
                             html += `<span style="font-family: monospace; white-space: pre; color: var(--text-secondary);">${prefix}</span>`;
                         }
                         
-                        html += `${icon} ${node.name}`;
+                        html += `${icon} ${escapeHtml(node.name)}`;
                         
                         // Add verification checkmark
                         if (node.verified) {
@@ -6147,6 +6147,17 @@ Do you want to continue?`;
             }
         };
         
+        // ===== XSS Protection: HTML escape function =====
+        function escapeHtml(unsafe) {
+            if (unsafe === null || unsafe === undefined) return '';
+            return String(unsafe)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
         // ===== Directory Builder State (v5.10.11) =====
         const DirectoryBuilderState = {
             entries: [],
@@ -6531,21 +6542,21 @@ Do you want to continue?`;
                         // Show root directory
                         html += `<div style="padding: 4px 2px; cursor: pointer; display: flex; align-items: center; ${isSelected ? 'background: var(--accent-light);' : ''}" 
                                      onclick="DirectoryBuilderState.selectNode('', 'root')">`;
-                        html += `${icon} ${node.name}`;
+                        html += `${icon} ${escapeHtml(node.name)}`;
                         html += '</div>';
                     } else if (node.type !== 'root') {
                         // Calculate tree prefix
                         const prefix = level === 0 ? '' : parentPrefix + (isLast ? '└─ ' : '├─ ');
                         
                         html += `<div style="padding: 4px 2px; cursor: pointer; display: flex; align-items: center; ${isSelected ? 'background: var(--accent-light);' : ''}" 
-                                     onclick="DirectoryBuilderState.selectNode('${node.fullPath || ''}', '${node.type}')">`;
+                                     onclick="DirectoryBuilderState.selectNode('${escapeHtml(node.fullPath || '')}', '${escapeHtml(node.type)}')">`;
                         
                         // Add padding and prefix
                         if (level > 0) {
                             html += `<span style="font-family: monospace; white-space: pre; color: var(--text-secondary);">${prefix}</span>`;
                         }
                         
-                        html += `${icon} ${node.name}`;
+                        html += `${icon} ${escapeHtml(node.name)}`;
                         
                         // Add verification checkmark
                         if (node.verified) {

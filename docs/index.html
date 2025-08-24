@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.56</title>
+    <title>Kaspa P2P File Storage v6.2.57</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -2377,6 +2377,35 @@
                 </div>
                 <div style="padding: 10px; background: var(--bg-secondary); border-radius: 5px;">
                     <div>Status: <span id="rest-api-global-status" style="font-weight: bold;">Enabled</span></div>
+                </div>
+            </div>
+            
+            <!-- Privacy Settings (v6.2.57) -->
+            <div class="metric-box">
+                <h3>🔐 Privacy Settings</h3>
+                <div style="margin-bottom: 15px;">
+                    <label style="display: flex; align-items: center; gap: 10px;">
+                        <input type="checkbox" id="savePasswordEnabled" checked>
+                        <span>Save passwords for automatic download</span>
+                    </label>
+                    <p style="margin: 10px 0 0 0; font-size: 0.9em; color: var(--text-secondary);">
+                        When disabled, you'll need to enter the password each time you download a file.
+                        This provides better security but less convenience.
+                    </p>
+                </div>
+                
+                <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border-color);">
+                    <button id="removeAllPasswords" 
+                            style="padding: 10px 20px; background: var(--error-color); color: white; 
+                                   border: none; border-radius: 5px; cursor: pointer; font-weight: bold;
+                                   transition: all 0.3s;"
+                            onmouseover="this.style.opacity='0.9'" 
+                            onmouseout="this.style.opacity='1'">
+                        🗑️ Remove All Saved Passwords
+                    </button>
+                    <p style="margin: 10px 0 0 0; font-size: 0.85em; color: var(--warning-color);">
+                        ⚠️ This will permanently remove all saved passwords from all entries. This action cannot be undone.
+                    </p>
                 </div>
             </div>
             
@@ -11899,6 +11928,60 @@ Do you want to continue?`;
             }
         }
 
+        // v6.2.57: Handle password removal from all entries
+        async function handlePasswordRemoval() {
+            // Double confirmation for safety
+            if (!confirm('⚠️ Remove all saved passwords?\n\nThis action cannot be undone!')) {
+                return;
+            }
+            
+            if (!confirm('Are you absolutely sure?\n\nAll saved passwords will be permanently deleted.')) {
+                return;
+            }
+            
+            try {
+                let removedCount = 0;
+                
+                // Remove passwords from all entries in memory
+                FileState.kenvManager.entries.forEach(entry => {
+                    if (entry.password) {
+                        entry.password = null;
+                        entry.hasPassword = true;  // Keep flag to show password was set
+                        removedCount++;
+                    }
+                });
+                
+                // Save changes to storage (LocalStorage or workspace folder)
+                await FileState.kenvManager.saveAll();
+                
+                // Update UI
+                if (typeof updateFileTable === 'function') {
+                    updateFileTable();
+                }
+                
+                // Show result
+                if (removedCount > 0) {
+                    alert(`✅ Successfully removed passwords from ${removedCount} entries.\n\nYou will need to enter passwords manually when downloading files.`);
+                    log(`Removed passwords from ${removedCount} entries`, 'success');
+                } else {
+                    alert('No saved passwords found.');
+                    log('No passwords to remove', 'info');
+                }
+                
+                // Update checkbox state to unchecked
+                const checkbox = document.getElementById('savePasswordEnabled');
+                if (checkbox) {
+                    checkbox.checked = false;
+                    localStorage.setItem('savePasswordEnabled', 'false');
+                }
+                
+            } catch (error) {
+                console.error('Error removing passwords:', error);
+                alert(`❌ Failed to remove passwords: ${error.message}`);
+                log(`Password removal failed: ${error.message}`, 'error');
+            }
+        }
+
         // Network error handler (v5.6.0 - Phase 2a)
         async function handleNetworkError(error, source) {
             const reconnection = NetworkState.reconnection;
@@ -16882,6 +16965,37 @@ Do you want to continue?`;
             const systemRestartBtn = document.getElementById('systemRestartBtn');
             if (systemRestartBtn) {
                 systemRestartBtn.addEventListener('click', () => SystemHandlers.initializeSystem());
+            }
+            
+            // v6.2.57: Privacy Settings handlers
+            const savePasswordCheckbox = document.getElementById('savePasswordEnabled');
+            if (savePasswordCheckbox) {
+                // Load saved setting
+                const savedSetting = localStorage.getItem('savePasswordEnabled');
+                savePasswordCheckbox.checked = savedSetting !== 'false';
+                
+                // Handle change event
+                savePasswordCheckbox.addEventListener('change', (e) => {
+                    const enabled = e.target.checked;
+                    localStorage.setItem('savePasswordEnabled', enabled);
+                    
+                    if (!enabled) {
+                        // When disabling, ask if user wants to remove existing passwords
+                        if (confirm('Do you want to remove all currently saved passwords?\n\nThis will improve security but you\'ll need to enter passwords manually for each download.')) {
+                            handlePasswordRemoval();
+                        }
+                    }
+                    
+                    log(`Password saving ${enabled ? 'enabled' : 'disabled'}`, 'info');
+                });
+            }
+            
+            // Remove all passwords button
+            const removePasswordsBtn = document.getElementById('removeAllPasswords');
+            if (removePasswordsBtn) {
+                removePasswordsBtn.addEventListener('click', () => {
+                    handlePasswordRemoval();
+                });
             }
             
             // Add document click event for closing sidebar on outside click

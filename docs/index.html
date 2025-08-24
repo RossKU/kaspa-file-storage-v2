@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.53</title>
+    <title>Kaspa P2P File Storage v6.2.54</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -10145,13 +10145,48 @@ Do you want to continue?`;
                 const lastUpdate = progress._progress?.lastUpdateAt || progress.metadata?.lastUpdateAt || Date.now();
                 
                 document.getElementById('resumeInfo').style.display = 'block';
-                document.getElementById('resumeDetails').innerHTML = `
-                    <p><strong>File:</strong> ${fileInfo.name}</p>
-                    <p><strong>Size:</strong> ${(fileInfo.size / 1024 / 1024).toFixed(2)} MB</p>
-                    <p><strong>Progress:</strong> ${completedChunks}/${totalChunks} chunks (${(completedChunks / totalChunks * 100).toFixed(1)}%)</p>
-                    <p><strong>Last Update:</strong> ${new Date(lastUpdate).toLocaleString()}</p>
-                    <p class="warning">⚠️ Please select the same file to continue uploading</p>
-                `;
+                
+                // XSS fix: Use safe DOM manipulation instead of innerHTML
+                const resumeDetails = document.getElementById('resumeDetails');
+                resumeDetails.innerHTML = ''; // Clear existing content
+                
+                // Create file info paragraph
+                const fileP = document.createElement('p');
+                const fileStrong = document.createElement('strong');
+                fileStrong.textContent = 'File:';
+                fileP.appendChild(fileStrong);
+                fileP.appendChild(document.createTextNode(' ' + fileInfo.name)); // Safe text content
+                resumeDetails.appendChild(fileP);
+                
+                // Create size paragraph
+                const sizeP = document.createElement('p');
+                const sizeStrong = document.createElement('strong');
+                sizeStrong.textContent = 'Size:';
+                sizeP.appendChild(sizeStrong);
+                sizeP.appendChild(document.createTextNode(' ' + (fileInfo.size / 1024 / 1024).toFixed(2) + ' MB'));
+                resumeDetails.appendChild(sizeP);
+                
+                // Create progress paragraph
+                const progressP = document.createElement('p');
+                const progressStrong = document.createElement('strong');
+                progressStrong.textContent = 'Progress:';
+                progressP.appendChild(progressStrong);
+                progressP.appendChild(document.createTextNode(' ' + completedChunks + '/' + totalChunks + ' chunks (' + (completedChunks / totalChunks * 100).toFixed(1) + '%)'));
+                resumeDetails.appendChild(progressP);
+                
+                // Create last update paragraph
+                const updateP = document.createElement('p');
+                const updateStrong = document.createElement('strong');
+                updateStrong.textContent = 'Last Update:';
+                updateP.appendChild(updateStrong);
+                updateP.appendChild(document.createTextNode(' ' + new Date(lastUpdate).toLocaleString()));
+                resumeDetails.appendChild(updateP);
+                
+                // Create warning paragraph
+                const warningP = document.createElement('p');
+                warningP.className = 'warning';
+                warningP.textContent = '⚠️ Please select the same file to continue uploading';
+                resumeDetails.appendChild(warningP);
                 
                 // Store progress for later use
                 window.pendingProgress = progress;

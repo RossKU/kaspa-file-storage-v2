@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.51</title>
+    <title>Kaspa P2P File Storage v6.2.52</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -2298,10 +2298,20 @@
                         <strong>Address:</strong>
                         <div id="settingsWalletAddress" style="font-family: monospace; font-size: 0.85em; word-break: break-all; margin-top: 5px; color: var(--text-secondary);">-</div>
                     </div>
-                    <div style="margin-bottom: 10px;">
-                        <strong>Balance:</strong>
-                        <span id="settingsWalletBalance" style="margin-left: 10px; font-weight: bold; color: var(--success-color);">-</span>
-                        <span id="settingsWalletUtxoCount" style="margin-left: 10px; color: var(--text-secondary); font-size: 0.9em;"></span>
+                    <div style="margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between;">
+                        <div>
+                            <strong>Balance:</strong>
+                            <span id="settingsWalletBalance" style="margin-left: 10px; font-weight: bold; color: var(--success-color);">-</span>
+                            <span id="settingsWalletUtxoCount" style="margin-left: 10px; color: var(--text-secondary); font-size: 0.9em;"></span>
+                        </div>
+                        <button id="refreshBalanceBtn" onclick="refreshWalletBalance()" 
+                                style="padding: 6px 12px; background: transparent; color: var(--accent-color); 
+                                       border: 1px solid var(--accent-color); border-radius: 4px; 
+                                       cursor: pointer; font-size: 13px; transition: all 0.2s;
+                                       display: none;" 
+                                title="Refresh Balance">
+                            🔄 Refresh
+                        </button>
                     </div>
                     
                     <!-- UTXO Consolidation (moved from Debug tab) -->
@@ -3104,6 +3114,82 @@
         // v6.2.14: Expose only consolidateUTXOs to window (checkUTXOStatus removed)
         window.consolidateUTXOs = () => DebugHandlers.consolidateUTXOs();
         
+        // v6.2.52: Refresh wallet balance function
+        window.refreshWalletBalance = async function() {
+            const refreshBtn = document.getElementById('refreshBalanceBtn');
+            if (!refreshBtn) return;
+            
+            // Check wallet connection
+            if (!UserState.address || !UserState.privateKey) {
+                log('Wallet not connected', 'warning');
+                return;
+            }
+            
+            // Check network connection
+            if (!NetworkState.kaspa || !NetworkState.rpcClient) {
+                log('Network not connected', 'warning');
+                return;
+            }
+            
+            // Disable button and show loading state
+            const originalText = refreshBtn.textContent;
+            refreshBtn.disabled = true;
+            refreshBtn.textContent = '⏳ Loading...';
+            
+            try {
+                // Get UTXOs
+                const { entries } = await NetworkState.rpcClient.getUtxosByAddresses([UserState.address.toString()]);
+                const utxoCount = entries.length;
+                const balance = entries.reduce((sum, utxo) => sum + Number(utxo.amount), 0) / 1e8;
+                
+                // Update balance displays
+                const balanceText = `${balance.toFixed(8)} KAS`;
+                document.getElementById('walletBalance').textContent = balanceText;
+                document.getElementById('settingsWalletBalance').textContent = balanceText;
+                
+                // Update UTXO count displays
+                const utxoText = `(UTXOs: ${utxoCount})`;
+                const utxoWarning = utxoCount > 40 ? ' ⚠️' : '';
+                document.getElementById('walletUtxoCount').textContent = utxoText + utxoWarning;
+                document.getElementById('settingsWalletUtxoCount').textContent = utxoText + utxoWarning;
+                
+                // Update consolidation button
+                const consolidateBtn = document.getElementById('utxoConsolidateBtn');
+                if (consolidateBtn) {
+                    consolidateBtn.disabled = (utxoCount <= 1);
+                    if (utxoCount > 40) {
+                        consolidateBtn.style.background = 'var(--warning-color)';
+                        consolidateBtn.textContent = `⚠️ Consolidate ${utxoCount} UTXOs`;
+                    } else if (utxoCount > 1) {
+                        consolidateBtn.style.background = 'var(--accent-color)';
+                        consolidateBtn.textContent = `Consolidate ${utxoCount} UTXOs`;
+                    } else {
+                        consolidateBtn.textContent = 'Consolidation not needed';
+                    }
+                }
+                
+                // Show success feedback
+                refreshBtn.textContent = '✅ Updated';
+                log(`✅ Balance refreshed: ${balanceText}, ${utxoCount} UTXOs`, 'info');
+                
+                // Reset button after delay
+                setTimeout(() => {
+                    refreshBtn.textContent = originalText;
+                    refreshBtn.disabled = false;
+                }, 2000);
+                
+            } catch (error) {
+                log(`Failed to refresh balance: ${error.message}`, 'error');
+                refreshBtn.textContent = '❌ Error';
+                
+                // Reset button after delay
+                setTimeout(() => {
+                    refreshBtn.textContent = originalText;
+                    refreshBtn.disabled = false;
+                }, 2000);
+            }
+        };
+        
         // ===== Phase 2: User State Refactoring (v5.4.30) =====
         const UserState = {
             privateKey: null,
@@ -3656,6 +3742,12 @@
                                     consolidateBtn.textContent = 'Consolidation not needed';
                                 }
                             }
+                        }
+                        
+                        // v6.2.52: Show refresh balance button
+                        const refreshBtn = document.getElementById('refreshBalanceBtn');
+                        if (refreshBtn) {
+                            refreshBtn.style.display = 'inline-block';
                         }
                         
                         // Update upload button state
@@ -11533,6 +11625,12 @@ Do you want to continue?`;
             const consolidationSection = document.getElementById('utxoConsolidationSection');
             if (consolidationSection) {
                 consolidationSection.style.display = 'none';
+            }
+            
+            // v6.2.52: Hide refresh balance button when disconnected
+            const refreshBtn = document.getElementById('refreshBalanceBtn');
+            if (refreshBtn) {
+                refreshBtn.style.display = 'none';
             }
             
             // Update button text

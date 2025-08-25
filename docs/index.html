@@ -14759,7 +14759,7 @@ Do you want to continue?`;
                 log(`メタトランザクションのBlockIDを待機中...`);
                 let metaBlockId = null;
                 let waitTime = 0;
-                const maxWaitTime = config.restApiWaitTime || 10000; // v6.2.60: Use config.restApiWaitTime for meta TX
+                const maxWaitTime = config.timeout || 300000; // v6.2.61: Use config.timeout (5 minutes) like regular chunks
                 
                 while (!metaBlockId && waitTime < maxWaitTime) {
                     // Phase 0-O-2: Check both ConnectionManager and WebSocket status
@@ -14769,6 +14769,7 @@ Do you want to continue?`;
                         // throw new Error('Network disconnected while waiting for meta BlockID');
                     }
                     
+                    // Check WebSocket monitor first
                     if (NetworkState.ws.monitoredTransactions.has(metaTxId)) {
                         const monitorData = NetworkState.ws.monitoredTransactions.get(metaTxId);
                         if (monitorData.blockId) {
@@ -14781,6 +14782,28 @@ Do you want to continue?`;
                             break;
                         }
                     }
+                    
+                    // v6.2.61: After 10 seconds, try RPC (same as regular chunks)
+                    if (waitTime >= config.restApiWaitTime && NetworkState.rpcClient) {
+                        try {
+                            log(`${config.restApiWaitTime/1000}秒経過 - RPCでメタTx確認を試みます...`);
+                            const txInfo = await NetworkState.rpcClient.getTransaction({
+                                transactionId: metaTxId,
+                                includeBlockInfo: true
+                            });
+                            
+                            if (txInfo && txInfo.blockHash) {
+                                metaBlockId = txInfo.blockHash;
+                                log(`RPC経由でメタTx BlockID取得: ${metaBlockId.substring(0, 16)}...`);
+                                FileState.uploadingMetaTx = false;
+                                break;
+                            }
+                        } catch (err) {
+                            // Transaction might not be confirmed yet
+                            log(`RPC確認エラー: ${err.message}`, 'debug');
+                        }
+                    }
+                    
                     await new Promise(resolve => setTimeout(resolve, 500));
                     waitTime += 500;
                 }
@@ -15029,10 +15052,10 @@ Do you want to continue?`;
                     window.addTransactionToMonitor(metaTxId, '中間メタトランザクション');
                 }
                 
-                // Wait for BlockID using WebSocket monitoring (same pattern as regular meta-tx)
+                // Wait for BlockID using WebSocket monitoring (same pattern as regular chunk)
                 let metaBlockId = null;
                 let waitTime = 0;
-                const maxWaitTime = config.restApiWaitTime || 10000; // v6.2.60: Use config.restApiWaitTime for meta TX
+                const maxWaitTime = config.timeout || 300000; // v6.2.61: Use config.timeout (5 minutes) like regular chunks
                 
                 while (!metaBlockId && waitTime < maxWaitTime) {
                     // Phase 0-O-2: Check both ConnectionManager and WebSocket status
@@ -15042,6 +15065,7 @@ Do you want to continue?`;
                         // throw new Error('Network disconnected while waiting for meta BlockID');
                     }
                     
+                    // Check WebSocket monitor first
                     if (NetworkState.ws.monitoredTransactions.has(metaTxId)) {
                         const monitorData = NetworkState.ws.monitoredTransactions.get(metaTxId);
                         if (monitorData.blockId) {
@@ -15053,6 +15077,27 @@ Do you want to continue?`;
                             break;
                         }
                     }
+                    
+                    // v6.2.61: After 10 seconds, try RPC (same as regular chunks)
+                    if (waitTime >= config.restApiWaitTime && NetworkState.rpcClient) {
+                        try {
+                            log(`[SuperMeta] ${config.restApiWaitTime/1000}秒経過 - RPCで中間メタ確認を試みます...`);
+                            const txInfo = await NetworkState.rpcClient.getTransaction({
+                                transactionId: metaTxId,
+                                includeBlockInfo: true
+                            });
+                            
+                            if (txInfo && txInfo.blockHash) {
+                                metaBlockId = txInfo.blockHash;
+                                log(`[SuperMeta] RPC経由で中間メタBlockID取得: ${metaBlockId.substring(0, 16)}...`);
+                                break;
+                            }
+                        } catch (err) {
+                            // Transaction might not be confirmed yet
+                            log(`[SuperMeta] RPC確認エラー: ${err.message}`, 'debug');
+                        }
+                    }
+                    
                     await new Promise(resolve => setTimeout(resolve, 500));
                     waitTime += 500;
                 }
@@ -15190,7 +15235,7 @@ Do you want to continue?`;
                 let superMetaBlockId = null;
                 let superMetaBlockTime = null;
                 let waitTime = 0;
-                while (!superMetaBlockId && waitTime < (config.restApiWaitTime || 10000)) {
+                while (!superMetaBlockId && waitTime < (config.timeout || 300000)) {
                     // Phase 0-O-2: Check both ConnectionManager and WebSocket status
                     if (!ConnectionManager.isConnected || !NetworkState.ws.connected) {
                         log(`[DEBUG] ネットワークDisconnectを検出 - スーパーメタBlockID待機を継続してREST APIフォールバックを許可`, 'warning');
@@ -15198,6 +15243,7 @@ Do you want to continue?`;
                         // throw new Error('Network disconnected while waiting for super meta BlockID');
                     }
                     
+                    // Check WebSocket monitor first
                     if (NetworkState.ws.monitoredTransactions.has(superMetaTxId)) {
                         const monitorData = NetworkState.ws.monitoredTransactions.get(superMetaTxId);
                         if (monitorData.blockId) {
@@ -15210,6 +15256,28 @@ Do you want to continue?`;
                             break;
                         }
                     }
+                    
+                    // v6.2.61: After 10 seconds, try RPC (same as regular chunks)
+                    if (waitTime >= config.restApiWaitTime && NetworkState.rpcClient) {
+                        try {
+                            log(`[SuperMeta] ${config.restApiWaitTime/1000}秒経過 - RPCでスーパーメタ確認を試みます...`);
+                            const txInfo = await NetworkState.rpcClient.getTransaction({
+                                transactionId: superMetaTxId,
+                                includeBlockInfo: true
+                            });
+                            
+                            if (txInfo && txInfo.blockHash) {
+                                superMetaBlockId = txInfo.blockHash;
+                                superMetaBlockTime = Date.now();
+                                log(`[SuperMeta] RPC経由でスーパーメタBlockID取得: ${superMetaBlockId.substring(0, 16)}...`);
+                                break;
+                            }
+                        } catch (err) {
+                            // Transaction might not be confirmed yet
+                            log(`[SuperMeta] RPC確認エラー: ${err.message}`, 'debug');
+                        }
+                    }
+                    
                     await new Promise(resolve => setTimeout(resolve, 500));
                     waitTime += 500;
                 }

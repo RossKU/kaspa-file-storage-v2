@@ -15233,10 +15233,11 @@ Do you want to continue?`;
                 const fileCount = dirMetadata.directory?.fileCount || 0;
                 const dirCount = dirMetadata.directory?.directoryCount || 0;
                 
+                // XSS fix: Escape directory name (user input)
                 document.getElementById('fileInfo').innerHTML = 
-                    `<strong>📁 Directory: ${dirMetadata.directory.name}</strong><br>` +
-                    `Type: ${dirMetadata.type}<br>` +
-                    `Version: ${dirMetadata.version}<br>` +
+                    `<strong>📁 Directory: ${escapeHtml(dirMetadata.directory.name)}</strong><br>` +
+                    `Type: ${escapeHtml(dirMetadata.type)}<br>` +
+                    `Version: ${escapeHtml(dirMetadata.version)}<br>` +
                     `Files: ${fileCount}<br>` +
                     `Directories: ${dirCount}<br>` +
                     `Total Size: ${(totalSize/1024/1024).toFixed(2)}MB<br>` +
@@ -15343,8 +15344,9 @@ Do you want to continue?`;
                     
                     // パスワード値を保持しながらUIを更新
                     const savedPassword = dirMetadata.auth.password;
+                    // XSS fix: Escape password value in HTML attribute
                     passwordSection.innerHTML = '<p>✅ Password included in file (auto-filled)</p>' +
-                        `<input type="hidden" id="downloadPassword" value="${savedPassword}">`;
+                        `<input type="hidden" id="downloadPassword" value="${escapeHtml(savedPassword)}">`;
                 } else {
                     passwordSection.innerHTML = '<input type="password" id="downloadPassword" placeholder="Enter password">';
                 }
@@ -18406,9 +18408,10 @@ Do you want to continue?`;
                         } else {
                             window.pendingProgress = progress;
                             const resumeDetails = document.getElementById('resumeDetails');
+                            // XSS fix: Escape file name
                             resumeDetails.innerHTML = `
-                                <p><strong>ファイル:</strong> ${file.name}</p>
-                                <p><strong>CID:</strong> ${progress.cid}</p>
+                                <p><strong>File:</strong> ${escapeHtml(file.name)}</p>
+                                <p><strong>CID:</strong> ${escapeHtml(progress.cid)}</p>
                                 <p><strong>Progress:</strong> ${progress._progress.completedChunks}/${progress.recovery.totalChunks} chunks</p>
                                 <p><strong>Completion Rate:</strong> ${((progress._progress.completedChunks / progress.recovery.totalChunks) * 100).toFixed(1)}%</p>
                             `;
@@ -19301,18 +19304,19 @@ Do you want to continue?`;
             const uploadDate = entry.created ? formatDate(entry.created) : '-';
             
             // Add title attributes for tooltip display (6 columns)
+            // XSS fix: Escape user-controlled data only, keep emojis intact
             tr.innerHTML = `
-                <td><input type="checkbox" class="file-checkbox" data-id="${entry.id}" onchange="updateFileActions()"></td>
-                <td title="Type: ${entry.type}${passwordIcon ? '\nPassword: ' + (entry.password ? 'Saved' : 'Required') : ''}">
+                <td><input type="checkbox" class="file-checkbox" data-id="${escapeHtml(entry.id)}" onchange="updateFileActions()"></td>
+                <td title="Type: ${escapeHtml(entry.type)}${passwordIcon ? '\nPassword: ' + (entry.password ? 'Saved' : 'Required') : ''}">
                     <span class="file-icon">${icon}</span>
                     ${passwordIcon ? `<span style="font-size: 0.8em; vertical-align: super;">${passwordIcon}</span>` : ''}
                 </td>
-                <td title="${entry.name}">
-                    <span>${entry.name}</span>
+                <td title="${escapeHtml(entry.name)}">
+                    <span>${escapeHtml(entry.name)}</span>
                     <span style="margin-left: 5px; font-size: 0.8em;">${statusIcon}</span>
                 </td>
                 <td title="${size}">${size}</td>
-                <td title="${entry.metaTxId || '-'}">${metaTxId}</td>
+                <td title="${escapeHtml(entry.metaTxId || '-')}">${metaTxId}</td>
                 <td title="${uploadDate}">${uploadDate}</td>
             `;
             
@@ -19902,11 +19906,12 @@ Do you want to continue?`;
                 return (bytes / Math.pow(k, i)).toFixed(2) + ' ' + sizes[i];
             };
             
+            // XSS fix: Escape user data
             let infoHtml = `
                 <h3 style="margin-top: 0; color: var(--text-primary);">📋 File Information</h3>
                 <div style="display: grid; gap: 12px;">
                     <div style="border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
-                        <strong>File Name:</strong> ${file.name}<br>
+                        <strong>File Name:</strong> ${escapeHtml(file.name)}<br>
                         <strong>Size:</strong> ${formatSize(file.fileSize)}<br>
                         <strong>Type:</strong> ${file.type === 'kaspa-directory' ? '📁 Directory' : '📄 File'}
                     </div>
@@ -19917,7 +19922,7 @@ Do you want to continue?`;
                     <div style="border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
                         <strong>CID:</strong><br>
                         <span style="font-family: monospace; font-size: 0.9em; word-break: break-all;">
-                            ${file.cid}
+                            ${escapeHtml(file.cid)}
                         </span>
                     </div>
                 `;
@@ -19928,7 +19933,7 @@ Do you want to continue?`;
                     <div style="border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
                         <strong>MetaTxID:</strong><br>
                         <span style="font-family: monospace; font-size: 0.9em; word-break: break-all;">
-                            ${file.metaTxId}
+                            ${escapeHtml(file.metaTxId)}
                         </span>
                     </div>
                 `;

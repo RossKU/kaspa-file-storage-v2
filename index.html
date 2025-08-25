@@ -9383,6 +9383,7 @@ Do you want to continue?`;
             network: null, // v5.11.101: Will be initialized dynamically
             retryCount: 3,
             timeout: 300000,  // v5.11.118: Changed default from 30s to 300s (5 minutes)
+            restApiWaitTime: 10000,  // v6.2.60: Wait 10 seconds before REST API fallback
             // Super metadata configuration (experimental)
             superMeta: {
                 enabled: true,
@@ -12338,8 +12339,9 @@ Do you want to continue?`;
             while (!blockId && waitTime < maxWaitTime) {
                 // Phase 0-O-2: Check both ConnectionManager and WebSocket status
                 if (!ConnectionManager.isConnected || !NetworkState.ws.connected) {
-                    log(`[DEBUG] ネットワークDisconnectを検出 - BlockID待機を中断 (CM: ${ConnectionManager.isConnected}, WS: ${NetworkState.ws.connected})`, 'debug');
-                    throw new Error('Network disconnected while waiting for BlockID');
+                    log(`[DEBUG] ネットワークDisconnectを検出 - BlockID待機を継続してREST APIフォールバックを許可 (CM: ${ConnectionManager.isConnected}, WS: ${NetworkState.ws.connected})`, 'warning');
+                    // v6.2.60: Don't throw error - allow REST API fallback after 10 seconds
+                    // throw new Error('Network disconnected while waiting for BlockID');
                 }
                 
                 // Check WebSocket monitor first
@@ -12356,10 +12358,10 @@ Do you want to continue?`;
                     }
                 }
                 
-                // After 30 seconds, try RPC
-                if (waitTime >= 30000 && NetworkState.rpcClient) {
+                // After config.restApiWaitTime (10 seconds), try RPC
+                if (waitTime >= config.restApiWaitTime && NetworkState.rpcClient) {
                     try {
-                        log('30秒経過 - RPCで確認を試みます...');
+                        log(`${config.restApiWaitTime/1000}秒経過 - RPCで確認を試みます...`);
                         const txInfo = await NetworkState.rpcClient.getTransaction({
                             transactionId: txid,
                             includeBlockInfo: true
@@ -13486,8 +13488,9 @@ Do you want to continue?`;
                                 while (!blockId && waitTime < maxWaitTime) {
                                     // Check network connection
                                     if (!ConnectionManager.isConnected || !NetworkState.ws.connected) {
-                                        log(`[DEBUG] ネットワークDisconnectを検出 - BlockID待機を中断 (CM: ${ConnectionManager.isConnected}, WS: ${NetworkState.ws.connected})`, 'debug');
-                                        throw new Error('Network disconnected while waiting for BlockID');
+                                        log(`[DEBUG] ネットワークDisconnectを検出 - BlockID待機を継続してREST APIフォールバックを許可`, 'warning');
+                                        // v6.2.60: Don't throw error - allow REST API fallback
+                                        // throw new Error('Network disconnected while waiting for BlockID');
                                     }
                                     
                                     // Check WebSocket monitoring
@@ -13916,8 +13919,9 @@ Do you want to continue?`;
                             while (!blockId && waitTime < maxWaitTime) {
                                 // Check network connection
                                 if (!ConnectionManager.isConnected) {
-                                    log(`[DEBUG] ネットワークDisconnectを検出 - BlockID待機を中断`, 'debug');
-                                    throw new Error('Network disconnected while waiting for BlockID');
+                                    log(`[DEBUG] ネットワークDisconnectを検出 - BlockID待機を継続してREST APIフォールバックを許可`, 'warning');
+                                    // v6.2.60: Don't throw error - allow REST API fallback
+                                    // throw new Error('Network disconnected while waiting for BlockID');
                                 }
                                 
                                 // Check WebSocket monitor first
@@ -14755,7 +14759,7 @@ Do you want to continue?`;
                 log(`メタトランザクションのBlockIDを待機中...`);
                 let metaBlockId = null;
                 let waitTime = 0;
-                const maxWaitTime = 30000; // v5.11.118: Keep 30s for meta TX (different from TX confirmation)
+                const maxWaitTime = config.restApiWaitTime || 10000; // v6.2.60: Use config.restApiWaitTime for meta TX
                 
                 while (!metaBlockId && waitTime < maxWaitTime) {
                     // Phase 0-O-2: Check both ConnectionManager and WebSocket status
@@ -15028,7 +15032,7 @@ Do you want to continue?`;
                 // Wait for BlockID using WebSocket monitoring (same pattern as regular meta-tx)
                 let metaBlockId = null;
                 let waitTime = 0;
-                const maxWaitTime = 30000; // v5.11.118: Keep 30s for meta TX (different from TX confirmation)
+                const maxWaitTime = config.restApiWaitTime || 10000; // v6.2.60: Use config.restApiWaitTime for meta TX
                 
                 while (!metaBlockId && waitTime < maxWaitTime) {
                     // Phase 0-O-2: Check both ConnectionManager and WebSocket status
@@ -15186,7 +15190,7 @@ Do you want to continue?`;
                 let superMetaBlockId = null;
                 let superMetaBlockTime = null;
                 let waitTime = 0;
-                while (!superMetaBlockId && waitTime < 30000) {
+                while (!superMetaBlockId && waitTime < (config.restApiWaitTime || 10000)) {
                     // Phase 0-O-2: Check both ConnectionManager and WebSocket status
                     if (!ConnectionManager.isConnected || !NetworkState.ws.connected) {
                         log(`[DEBUG] ネットワークDisconnectを検出 - スーパーメタBlockID待機を継続してREST APIフォールバックを許可`, 'warning');

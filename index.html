@@ -14760,8 +14760,9 @@ Do you want to continue?`;
                 while (!metaBlockId && waitTime < maxWaitTime) {
                     // Phase 0-O-2: Check both ConnectionManager and WebSocket status
                     if (!ConnectionManager.isConnected || !NetworkState.ws.connected) {
-                        log(`[DEBUG] ネットワークDisconnectを検出 - メタBlockID待機を中断 (CM: ${ConnectionManager.isConnected}, WS: ${NetworkState.ws.connected})`, 'debug');
-                        throw new Error('Network disconnected while waiting for meta BlockID');
+                        log(`[DEBUG] ネットワークDisconnectを検出 - BlockID待機を継続してREST APIフォールバックを許可`, 'warning');
+                        // Don't throw error - allow REST API fallback
+                        // throw new Error('Network disconnected while waiting for meta BlockID');
                     }
                     
                     if (NetworkState.ws.monitoredTransactions.has(metaTxId)) {
@@ -15032,8 +15033,9 @@ Do you want to continue?`;
                 while (!metaBlockId && waitTime < maxWaitTime) {
                     // Phase 0-O-2: Check both ConnectionManager and WebSocket status
                     if (!ConnectionManager.isConnected || !NetworkState.ws.connected) {
-                        log(`[DEBUG] ネットワークDisconnectを検出 - メタBlockID待機を中断 (CM: ${ConnectionManager.isConnected}, WS: ${NetworkState.ws.connected})`, 'debug');
-                        throw new Error('Network disconnected while waiting for meta BlockID');
+                        log(`[DEBUG] ネットワークDisconnectを検出 - BlockID待機を継続してREST APIフォールバックを許可`, 'warning');
+                        // Don't throw error - allow REST API fallback
+                        // throw new Error('Network disconnected while waiting for meta BlockID');
                     }
                     
                     if (NetworkState.ws.monitoredTransactions.has(metaTxId)) {
@@ -15187,8 +15189,9 @@ Do you want to continue?`;
                 while (!superMetaBlockId && waitTime < 30000) {
                     // Phase 0-O-2: Check both ConnectionManager and WebSocket status
                     if (!ConnectionManager.isConnected || !NetworkState.ws.connected) {
-                        log(`[DEBUG] ネットワークDisconnectを検出 - スーパーメタBlockID待機を中断 (CM: ${ConnectionManager.isConnected}, WS: ${NetworkState.ws.connected})`, 'debug');
-                        throw new Error('Network disconnected while waiting for super meta BlockID');
+                        log(`[DEBUG] ネットワークDisconnectを検出 - スーパーメタBlockID待機を継続してREST APIフォールバックを許可`, 'warning');
+                        // Don't throw error - allow REST API fallback
+                        // throw new Error('Network disconnected while waiting for super meta BlockID');
                     }
                     
                     if (NetworkState.ws.monitoredTransactions.has(superMetaTxId)) {

@@ -2789,6 +2789,48 @@
             </div>
         </div>
         
+        <!-- v6.2.62: MetaTxID Chunk Limit (Test Feature) -->
+        <div class="container">
+            <h2>🧪 MetaTxID Chunk Limit (Test Feature)</h2>
+            <div class="metric-box" style="padding: 15px;">
+                <p style="margin-bottom: 10px; color: var(--text-secondary);">
+                    Adjust the number of chunks per MetaTxID for testing purposes (Production: 160)
+                </p>
+                
+                <div style="margin: 15px 0;">
+                    <label style="display: block; margin-bottom: 10px;">
+                        <strong>Chunks per MetaTxID:</strong>
+                        <input type="number" 
+                               id="debugChunksPerMeta" 
+                               min="2" 
+                               max="160" 
+                               value="160"
+                               style="margin-left: 10px; width: 80px; padding: 5px;"
+                               onchange="DebugHandlers.updateChunksPerMeta(this.value)">
+                        <span id="chunksPerMetaInfo" style="margin-left: 10px; color: var(--text-secondary);">
+                            Current: 160 (Production)
+                        </span>
+                    </label>
+                </div>
+                
+                <div style="padding: 10px; background: var(--bg-secondary); border-radius: 5px; margin-top: 10px;">
+                    <p style="margin: 5px 0;"><strong>Effect Examples:</strong></p>
+                    <ul style="margin: 10px 0 5px 20px; color: var(--text-secondary);">
+                        <li>160 (Production): 16MB file = Regular meta only</li>
+                        <li>10 (Test): 16MB file = 16 intermediate metas + 1 super meta</li>
+                        <li>2 (Minimum): 4MB file = 2 intermediate metas + 1 super meta</li>
+                    </ul>
+                </div>
+                
+                <div style="margin-top: 10px; padding: 10px; background: var(--warning-light); border-radius: 5px;">
+                    <small>
+                        ⚠️ <strong>Warning:</strong> This is for testing only. Smaller values create more MetaTxIDs, 
+                        which increases upload time and blockchain costs. Always use 160 for production.
+                    </small>
+                </div>
+            </div>
+        </div>
+        
         <!-- Debug Log -->
         <div class="container">
             <h2>🐛 Debug Log</h2>
@@ -3139,6 +3181,38 @@
                     }, 10000); // Extended to 10 seconds for reading error message
                 } finally {
                     if (btn) btn.disabled = false;
+                }
+            },
+            
+            // v6.2.62: Update chunks per meta limit for testing
+            updateChunksPerMeta(value) {
+                const limit = Math.min(160, Math.max(2, parseInt(value) || 160));
+                
+                // Store in localStorage for persistence
+                localStorage.setItem('debugChunksPerMeta', limit);
+                
+                // Update UI
+                const infoEl = document.getElementById('chunksPerMetaInfo');
+                if (infoEl) {
+                    if (limit === 160) {
+                        infoEl.textContent = 'Current: 160 (Production)';
+                        infoEl.style.color = 'var(--text-secondary)';
+                    } else {
+                        infoEl.textContent = `Current: ${limit} (Test Mode)`;
+                        infoEl.style.color = 'var(--warning-color)';
+                    }
+                }
+                
+                // Update input value if it was invalid
+                const inputEl = document.getElementById('debugChunksPerMeta');
+                if (inputEl && inputEl.value !== limit.toString()) {
+                    inputEl.value = limit;
+                }
+                
+                log(`🧪 [Debug] Chunks per MetaTxID set to: ${limit}`, limit === 160 ? 'info' : 'warning');
+                
+                if (limit !== 160) {
+                    log(`⚠️ [Debug] Test mode active! This will create more MetaTxIDs than normal.`, 'warning');
                 }
             }
         };
@@ -13255,7 +13329,8 @@ Do you want to continue?`;
                     // v5.11.18: Cost estimation and confirmation
                     const payloadCount = payloads.length;
                     const useMetaTx = document.getElementById('useMetaTx').checked;
-                    const CHUNKS_PER_META = 160;
+                    // v6.2.62: Use debug setting if available, otherwise use production value
+                    const CHUNKS_PER_META = parseInt(localStorage.getItem('debugChunksPerMeta')) || 160;
                     
                     // Calculate total transactions needed
                     let totalTxCount = payloadCount; // Base payload transactions
@@ -14518,8 +14593,9 @@ Do you want to continue?`;
                 
                 // Check if super metadata is needed based on chunk count
                 const totalChunks = FileState.kaspaMetadata?.chunks?.length || 0;
-                const CHUNKS_PER_META = 160; // 160 chunks per single MetaTxID
-                const MAX_CHUNKS_SUPPORTED = 25600; // 160 × 160
+                // v6.2.62: Use debug setting if available, otherwise use production value
+                const CHUNKS_PER_META = parseInt(localStorage.getItem('debugChunksPerMeta')) || 160;
+                const MAX_CHUNKS_SUPPORTED = CHUNKS_PER_META * 160; // Dynamic calculation based on chunks per meta
                 
                 // Check if exceeds maximum supported chunks
                 if (totalChunks > MAX_CHUNKS_SUPPORTED) {
@@ -14533,6 +14609,9 @@ Do you want to continue?`;
                 
                 if (totalChunks > CHUNKS_PER_META) {
                     log(`[SuperMeta] ${totalChunks} chunks detected - Generating super metadata`, 'info');
+                    if (CHUNKS_PER_META !== 160) {
+                        log(`🧪 [Debug] Using test mode: ${CHUNKS_PER_META} chunks per MetaTxID (Production: 160)`, 'warning');
+                    }
                     
                     // Group chunks
                     const chunkGroups = [];
@@ -17925,6 +18004,17 @@ Do you want to continue?`;
             
             window.loadParallelSetting(); // Load parallel download setting
             UtilityHandlers.loadTransactionAmountSetting(); // Load transaction amount setting
+            
+            // v6.2.62: Initialize debug chunks per meta setting
+            const savedChunksPerMeta = localStorage.getItem('debugChunksPerMeta');
+            if (savedChunksPerMeta) {
+                const limit = parseInt(savedChunksPerMeta);
+                const inputEl = document.getElementById('debugChunksPerMeta');
+                if (inputEl) {
+                    inputEl.value = limit;
+                    DebugHandlers.updateChunksPerMeta(limit);
+                }
+            }
             
             // v5.6.6: Initialize ConnectionManager after log function is available
             ConnectionManager.init();

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.58</title>
+    <title>Kaspa P2P File Storage v6.2.63</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -17582,10 +17582,11 @@ Do you want to continue?`;
                         updateNetworkStatus('offline', 'WebSocketDisconnect');
                         updateRpcNodeInfo(); // Reset display
                         
-                        // v5.7.5: Ensure RPC client is cleaned up on WebSocket disconnect
+                        // v6.2.63: Keep RPC client alive for REST API fallback
+                        // WebSocket切断時もRPCクライアントを保持してREST APIフォールバックを可能にする
                         if (NetworkState.rpcClient) {
-                            NetworkState.rpcClient = null;
-                            log('[WebSocket] RPCクライアントをクリアしました', 'debug');
+                            // NetworkState.rpcClient = null;  // v6.2.63: Commented out to enable REST API fallback
+                            log('[WebSocket] Disconnect検出 - RPCクライアントを保持（REST APIフォールバック用）', 'debug');
                         }
                         
                         ConnectionManager.scheduleReconnect();

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.65</title>
+    <title>Kaspa P2P File Storage v6.2.66</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -8468,16 +8468,22 @@ Do you want to continue?`;
                         log('[ConnectionManager] 新規RPCクライアントを作成します', 'info');
                         await initializeRpcClient();
                     } else {
-                        // This should not happen if handleError works correctly
-                        log('[ConnectionManager] 警告: RPCクライアントが残存していました', 'warning');
-                        log('[ConnectionManager] 既存のRPCクライアントを破棄して新規作成します', 'info');
-                        try {
-                            await NetworkState.rpcClient.disconnect();
-                        } catch (disconnectError) {
-                            log(`[ConnectionManager] 既存RPCDisconnectエラー: ${disconnectError.message}`, 'debug');
+                        // v6.2.66: Don't recreate RPC client during upload session
+                        if (FileState.uploadingMetaTx || FileState.uploadingChunksCount > 0) {
+                            log('[ConnectionManager] アップロード中のためRPCクライアントを保持', 'info');
+                            // Keep existing RPC client during upload
+                        } else {
+                            // Only recreate if not uploading
+                            log('[ConnectionManager] 警告: RPCクライアントが残存していました', 'warning');
+                            log('[ConnectionManager] 既存のRPCクライアントを破棄して新規作成します', 'info');
+                            try {
+                                await NetworkState.rpcClient.disconnect();
+                            } catch (disconnectError) {
+                                log(`[ConnectionManager] 既存RPCDisconnectエラー: ${disconnectError.message}`, 'debug');
+                            }
+                            NetworkState.rpcClient = null;
+                            await initializeRpcClient();
                         }
-                        NetworkState.rpcClient = null;
-                        await initializeRpcClient();
                     }
                     
                     // v5.7.7: Null check before getServerInfo

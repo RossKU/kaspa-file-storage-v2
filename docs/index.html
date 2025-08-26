@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.63</title>
+    <title>Kaspa P2P File Storage v6.2.64</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -14818,7 +14818,24 @@ Do you want to continue?`;
                 
                 const pendingTx = result.transactions[0];
                 await pendingTx.sign([UserState.privateKey]);
-                const metaTxId = await pendingTx.submit(NetworkState.rpcClient);
+                
+                // v6.2.64: Get transaction ID before submission for error recovery
+                const txId = pendingTx.id;
+                log(`[Meta] Transaction ID (pre-submit): ${txId.substring(0, 16)}...`, 'debug');
+                
+                // v6.2.64: Step 1 - Minimal error handling for meta transaction
+                let metaTxId;
+                try {
+                    metaTxId = await pendingTx.submit(NetworkState.rpcClient);
+                } catch (error) {
+                    // Handle undefined error as success (transaction likely sent but response not received)
+                    if (!error.message || error.message === 'undefined') {
+                        metaTxId = txId;  // Use pre-obtained ID
+                        log('Meta transaction sent (assumed success due to undefined error)', 'warning');
+                    } else {
+                        throw error;  // Re-throw other errors
+                    }
+                }
                 
                 log(`Meta transaction sent: ${metaTxId}`, 'success');
                 

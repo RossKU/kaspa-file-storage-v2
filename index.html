@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.74</title>
+    <title>Kaspa P2P File Storage v6.2.75</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -8601,11 +8601,17 @@ Do you want to continue?`;
                             try {
                                 log('[ConnectionManager] メタTx送信を再開中...', 'info');
                                 FileState.uploadSessionActive = true;  // Set session active
-                                await createAndUploadMetaTx();
-                                FileState.needsMetaTx = false;  // Clear flag on success
-                                FileState.networkErrorOccurred = false;
-                                FileState.uploadSessionActive = false;
-                                log('[ConnectionManager] メタTx送信が完了しました', 'success');
+                                // v6.2.75: Check return value before clearing flag
+                                const success = await createAndUploadMetaTx();
+                                if (success) {
+                                    FileState.needsMetaTx = false;  // Clear flag only on success
+                                    FileState.networkErrorOccurred = false;
+                                    FileState.uploadSessionActive = false;
+                                    log('[ConnectionManager] メタTx送信が完了しました', 'success');
+                                } else {
+                                    // v6.2.75: Keep session active for next retry
+                                    log('[ConnectionManager] メタTx送信失敗 - 次の再試行を待機', 'warning');
+                                }
                             } catch (error) {
                                 log(`[ConnectionManager] メタTx再開エラー: ${error.message}`, 'error');
                                 // Flag remains true for next retry
@@ -14446,11 +14452,17 @@ Do you want to continue?`;
                     // v5.11.126: Update status for meta-tx
                     uploadStatusUI.updateStatus('⏳', 'トランザクションを確認しています...', 4);
                     
-                    await createAndUploadMetaTx();
+                    // v6.2.75: Check return value before clearing flag
+                    const metaTxSuccess = await createAndUploadMetaTx();
                     
-                    // v6.2.73: Clear flag after successful meta-tx
-                    FileState.needsMetaTx = false;
-                    log('[DEBUG] needsMetaTxフラグをクリア: false', 'debug');
+                    if (metaTxSuccess) {
+                        // v6.2.73: Clear flag only after successful meta-tx
+                        FileState.needsMetaTx = false;
+                        log('[DEBUG] メタTx成功 - needsMetaTxフラグをクリア: false', 'debug');
+                    } else {
+                        // v6.2.75: Keep flag true on error for auto-resume
+                        log('[DEBUG] メタTxエラー - needsMetaTxフラグを維持: true', 'debug');
+                    }
                     
                     // v5.11.16: Calculate actual cost after meta-tx
                     const actualCost = await FileState.costTracking.calculateActualCost();
@@ -14663,7 +14675,8 @@ Do you want to continue?`;
                     if (FileState.metaTxAbortController) {
                         FileState.metaTxAbortController = null;
                     }
-                    return;
+                    // v6.2.75: Return true (meta-tx skipped but upload succeeded)
+                    return true;
                 }
                 
                 if (totalChunks > CHUNKS_PER_META) {
@@ -14779,7 +14792,8 @@ Do you want to continue?`;
                         log('[DEBUG] メタTx AbortControllerをクリアしました（スーパーメタ完了）', 'debug');
                     }
                     
-                    return;
+                    // v6.2.75: Return true for super meta success
+                    return true;
                 }
                 
                 // Regular meta-tx creation (for files <= 2 chunks)
@@ -15105,6 +15119,9 @@ Do you want to continue?`;
                 
                 log('メタトランザクション作成完了', 'info');
                 
+                // v6.2.75: Return true on success
+                return true;
+                
             } catch (error) {
                 // v6.2.74: Clear AbortController on error
                 if (FileState.metaTxAbortController) {
@@ -15125,6 +15142,9 @@ Do you want to continue?`;
                 if (error.stack) {
                     console.error('Error stack:', error.stack);
                 }
+                
+                // v6.2.75: Return false on error
+                return false;
                 
             }
         };

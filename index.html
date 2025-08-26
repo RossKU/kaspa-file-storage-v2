@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.73</title>
+    <title>Kaspa P2P File Storage v6.2.74</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -4467,6 +4467,7 @@
             currentFileCIDFull: null,  // Current file's full CID (v5.5.39)
             currentKenvEntryId: null,  // Current KENV entry ID for session (v5.12.13)
             needsMetaTx: false,        // v6.2.73: Whether meta-tx needs to be sent after chunk upload
+            metaTxAbortController: null,  // v6.2.74: AbortController for meta-tx BlockID waiting loop
             // v5.9.0: File selection management
             selectedFiles: new Set(),  // Set of selected file IDs
             
@@ -14626,6 +14627,16 @@ Do you want to continue?`;
         // Create and upload meta transaction
         window.createAndUploadMetaTx = async function() {
             try {
+                // v6.2.74: Cancel any existing meta-tx BlockID waiting loop
+                if (FileState.metaTxAbortController) {
+                    FileState.metaTxAbortController.abort();
+                    FileState.metaTxAbortController = null;
+                    log('[DEBUG] 既存のメタTx BlockID待機ループをキャンセルしました', 'debug');
+                }
+                
+                // Create new AbortController for this meta-tx session
+                FileState.metaTxAbortController = new AbortController();
+                
                 log('メタトランザクション作成を開始します...', 'info');
                 
                 // Debug logs
@@ -14648,6 +14659,10 @@ Do you want to continue?`;
                     log('.kaspaファイル（ローカル）は引き続き生成可能です', 'info');
                     
                     // Already warned in processAndUpload, so just skip meta-tx creation
+                    // v6.2.74: Clear AbortController before returning
+                    if (FileState.metaTxAbortController) {
+                        FileState.metaTxAbortController = null;
+                    }
                     return;
                 }
                 
@@ -14756,6 +14771,12 @@ Do you want to continue?`;
                     // Auto-stop monitoring
                     if (NetworkState.ws.monitorActive) {
                         await stopMonitoring();
+                    }
+                    
+                    // v6.2.74: Clear AbortController before returning (super meta case)
+                    if (FileState.metaTxAbortController) {
+                        FileState.metaTxAbortController = null;
+                        log('[DEBUG] メタTx AbortControllerをクリアしました（スーパーメタ完了）', 'debug');
                     }
                     
                     return;
@@ -14927,6 +14948,12 @@ Do you want to continue?`;
                 let lastApiCheck = 0;  // v6.2.70: Track last REST API check time (same as regular chunks)
                 
                 while (!metaBlockId && waitTime < maxWaitTime) {
+                    // v6.2.74: Check if this loop should be aborted
+                    if (FileState.metaTxAbortController && FileState.metaTxAbortController.signal.aborted) {
+                        log('[DEBUG] メタTx BlockID待機がキャンセルされました', 'debug');
+                        return; // Exit the function
+                    }
+                    
                     // Phase 0-O-2: Check both ConnectionManager and WebSocket status
                     if (!ConnectionManager.isConnected || !NetworkState.ws.connected) {
                         log(`[DEBUG] ネットワークDisconnectを検出 - BlockID待機を継続してREST APIフォールバックを許可`, 'warning');
@@ -14971,7 +14998,32 @@ Do you want to continue?`;
                         lastApiCheck = waitTime;  // v6.2.70: Reset timer after API call
                     }
                     
-                    await new Promise(resolve => setTimeout(resolve, 500));
+                    // v6.2.74: Handle abort signal in delay
+                    try {
+                        await new Promise((resolve, reject) => {
+                            const timeout = setTimeout(resolve, 500);
+                            
+                            // Check if already aborted
+                            if (FileState.metaTxAbortController?.signal.aborted) {
+                                clearTimeout(timeout);
+                                reject(new DOMException('Aborted', 'AbortError'));
+                                return;
+                            }
+                            
+                            // Listen for abort event
+                            FileState.metaTxAbortController?.signal.addEventListener('abort', () => {
+                                clearTimeout(timeout);
+                                reject(new DOMException('Aborted', 'AbortError'));
+                            }, { once: true });
+                        });
+                    } catch (err) {
+                        if (err.name === 'AbortError') {
+                            log('[DEBUG] メタTx BlockID待機がキャンセルされました（待機中）', 'debug');
+                            return; // Exit the function
+                        }
+                        throw err; // Re-throw other errors
+                    }
+                    
                     waitTime += 500;
                 }
                 
@@ -15045,9 +15097,21 @@ Do you want to continue?`;
                     await stopMonitoring();
                 }
                 
+                // v6.2.74: Clear AbortController on success
+                if (FileState.metaTxAbortController) {
+                    FileState.metaTxAbortController = null;
+                    log('[DEBUG] メタTx AbortControllerをクリアしました', 'debug');
+                }
+                
                 log('メタトランザクション作成完了', 'info');
                 
             } catch (error) {
+                // v6.2.74: Clear AbortController on error
+                if (FileState.metaTxAbortController) {
+                    FileState.metaTxAbortController = null;
+                    log('[DEBUG] メタTx AbortControllerをクリアしました（エラー時）', 'debug');
+                }
+                
                 log(`メタトランザクション作成エラー: ${error.message || error}`, 'error');
                 console.error('Meta-tx creation error:', error);
                 

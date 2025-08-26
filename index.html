@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.71</title>
+    <title>Kaspa P2P File Storage v6.2.72</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -17842,6 +17842,16 @@ Do you want to continue?`;
             
             log('[Monitor] WebSocket監視を再構築します', 'info');
             
+            // v6.2.72: Log waiting transactions before restart
+            if (NetworkState.ws.monitoredTransactions.size > 0) {
+                log(`[Monitor] 待機中のトランザクション: ${NetworkState.ws.monitoredTransactions.size}件`, 'info');
+                for (const [txId, data] of NetworkState.ws.monitoredTransactions.entries()) {
+                    if (!data.blockId) {
+                        log(`[Monitor] BlockID待機中: ${txId.substring(0, 16)}... (Type: ${data.type})`, 'debug');
+                    }
+                }
+            }
+            
             // 停止処理
             await stopMonitoring();
             
@@ -17850,6 +17860,30 @@ Do you want to continue?`;
                 // Phase 0-D: 無駄な待機を削除、代わりに状態確認
                 log('[Monitor] RPCConnect確認完了、監視を開始します', 'debug');
                 await startMonitoring();
+                
+                // v6.2.72: After reconnection, check pending transactions via RPC
+                if (NetworkState.ws.monitoredTransactions.size > 0) {
+                    log(`[Monitor] 再接続後、${NetworkState.ws.monitoredTransactions.size}件のトランザクションを確認`, 'info');
+                    
+                    // Check each pending transaction
+                    for (const [txId, data] of NetworkState.ws.monitoredTransactions.entries()) {
+                        if (!data.blockId) {
+                            try {
+                                // Try to get transaction info via RPC
+                                const txInfo = await NetworkState.rpcClient.getTransaction(txId, true);
+                                if (txInfo && txInfo.blockHash) {
+                                    // Update the monitoring list with found BlockID
+                                    data.blockId = txInfo.blockHash[0];
+                                    data.receivedAt = Date.now();
+                                    log(`[Monitor] RPC経由でBlockID取得: ${txId.substring(0, 16)}... → ${data.blockId.substring(0, 16)}...`, 'success');
+                                }
+                            } catch (err) {
+                                // Transaction might not be confirmed yet
+                                log(`[Monitor] TxID ${txId.substring(0, 16)}... はまだ未確定`, 'debug');
+                            }
+                        }
+                    }
+                }
             } else {
                 log('[Monitor] RPCConnectが不安定なため、監視開始を延期', 'warning');
             }

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.67</title>
+    <title>Kaspa P2P File Storage v6.2.68</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -14765,90 +14765,110 @@ Do you want to continue?`;
                 
                 log(`メタデータサイズ: ${metaDataBytes.length} bytes → 暗号化後: ${metaPayload.length} bytes (salt含む)`);
                 
-                // Upload meta-tx to blockchain
-                const utxoResponse = await NetworkState.rpcClient.getUtxosByAddresses([UserState.address.toString()]);
-                const entries = utxoResponse.entries || [];
+                // Upload meta-tx to blockchain - v6.2.68: Add retry logic like regular chunks
+                let metaTxId = null;
+                let retries = 0;
                 
-                log(`${entries.length} UTXOs available for meta-tx`);
-                
-                const formattedUtxos = entries.map(utxo => {
+                while (retries < config.retryCount && !metaTxId) {
                     try {
-                        return {
-                            address: UserState.address.toString(),
-                            outpoint: {
-                                transactionId: utxo.outpoint.transactionId,
-                                index: utxo.outpoint.index
-                            },
-                            scriptPublicKey: utxo.scriptPublicKey,
-                            amount: BigInt(utxo.amount),
-                            isCoinbase: utxo.isCoinbase || false,
-                            blockDaaScore: BigInt(utxo.blockDaaScore)
-                        };
-                    } catch (e) {
-                        log(`UTXO formatting error: ${e.message}`, 'error');
-                        console.error('UTXO:', utxo);
-                        throw e;
+                        // Get fresh UTXOs (this also checks connection)
+                        const utxoResponse = await NetworkState.rpcClient.getUtxosByAddresses([UserState.address.toString()]);
+                        const entries = utxoResponse.entries || [];
+                        
+                        if (!entries || entries.length === 0) {
+                            throw new Error('利用可能なUTXOがありません');
+                        }
+                        
+                        log(`${entries.length} UTXOs available for meta-tx`);
+                        
+                        const formattedUtxos = entries.map(utxo => {
+                            try {
+                                return {
+                                    address: UserState.address.toString(),
+                                    outpoint: {
+                                        transactionId: utxo.outpoint.transactionId,
+                                        index: utxo.outpoint.index
+                                    },
+                                    scriptPublicKey: utxo.scriptPublicKey,
+                                    amount: BigInt(utxo.amount),
+                                    isCoinbase: utxo.isCoinbase || false,
+                                    blockDaaScore: BigInt(utxo.blockDaaScore)
+                                };
+                            } catch (e) {
+                                log(`UTXO formatting error: ${e.message}`, 'error');
+                                console.error('UTXO:', utxo);
+                                throw e;
+                            }
+                        });
+                        
+                        log(`Creating meta-tx with ${formattedUtxos.length} UTXOs, payload size: ${metaPayload.length} bytes`);
+                        
+                        // Use same amount as regular chunks
+                        const amount = AppState.settings.transactionAmount;
+                        
+                        const result = await NetworkState.kaspa.createTransactions({
+                            entries: formattedUtxos,
+                            outputs: [{
+                                address: UserState.address.toString(),
+                                amount: amount
+                            }],
+                            changeAddress: UserState.address.toString(),
+                            priorityFee: 0n,  // v5.11.17: Priority Fee削除でコスト削減
+                            networkId: config.network,
+                            payload: metaPayload
+                        });
+                        
+                        if (!result) {
+                            throw new Error('createTransactions returned null/undefined');
+                        }
+                        
+                        if (!result.transactions || result.transactions.length === 0) {
+                            throw new Error('メタトランザクション生成失敗 - no transactions in result');
+                        }
+                        
+                        const pendingTx = result.transactions[0];
+                        await pendingTx.sign([UserState.privateKey]);
+                        
+                        // v6.2.64: Get transaction ID before submission for error recovery
+                        const txId = pendingTx.id;
+                        log(`[Meta] Transaction ID (pre-submit): ${txId.substring(0, 16)}...`, 'debug');
+                        
+                        // Submit transaction
+                        metaTxId = await pendingTx.submit(NetworkState.rpcClient);
+                        
+                        if (!metaTxId) {
+                            throw new Error('submit()がnullを返しました');
+                        }
+                        
+                        log(`Meta transaction sent: ${metaTxId}`, 'success');
+                        break; // Success - exit retry loop
+                        
+                    } catch (error) {
+                        retries++;
+                        const errorMessage = error?.message || error?.toString() || 'Unknown error';
+                        
+                        // Check for WebSocket disconnect (don't count as retry)
+                        if (errorMessage.includes('WebSocket') || 
+                            errorMessage.includes('disconnected') ||
+                            errorMessage.includes('not connected')) {
+                            log(`メタTx送信エラー - WebSocket切断 (試行 ${retries}/${config.retryCount})`, 'warning');
+                        } else {
+                            log(`メタTx送信エラー (試行 ${retries}/${config.retryCount}): ${errorMessage}`, 'error');
+                        }
+                        
+                        if (retries >= config.retryCount) {
+                            throw new Error(`メタトランザクション送信失敗: ${errorMessage}`);
+                        }
+                        
+                        // Wait before retry (allow ConnectionManager to reconnect)
+                        log('2秒後に再試行します...', 'info');
+                        await new Promise(resolve => setTimeout(resolve, 2000));
                     }
-                });
-                
-                log(`Creating meta-tx with ${formattedUtxos.length} UTXOs, payload size: ${metaPayload.length} bytes`);
-                
-                let result;
-                try {
-                    // Use same amount as regular chunks
-                    const amount = AppState.settings.transactionAmount;
-                    
-                    result = await NetworkState.kaspa.createTransactions({
-                        entries: formattedUtxos,
-                        outputs: [{
-                            address: UserState.address.toString(),
-                            amount: amount
-                        }],
-                        changeAddress: UserState.address.toString(),
-                        priorityFee: 0n,  // v5.11.17: Priority Fee削除でコスト削減
-                        networkId: config.network,
-                        payload: metaPayload
-                    });
-                } catch (e) {
-                    log(`createTransactions error: ${e.message || e}`, 'error');
-                    throw e;
                 }
                 
-                if (!result) {
-                    throw new Error('createTransactions returned null/undefined');
+                if (!metaTxId) {
+                    throw new Error('メタトランザクションの送信に失敗しました');
                 }
-                
-                if (!result.transactions || result.transactions.length === 0) {
-                    throw new Error('メタトランザクション生成失敗 - no transactions in result');
-                }
-                
-                const pendingTx = result.transactions[0];
-                await pendingTx.sign([UserState.privateKey]);
-                
-                // v6.2.64: Get transaction ID before submission for error recovery
-                const txId = pendingTx.id;
-                log(`[Meta] Transaction ID (pre-submit): ${txId.substring(0, 16)}...`, 'debug');
-                
-                // v6.2.64: Step 1 - Minimal error handling for meta transaction
-                let metaTxId;
-                try {
-                    metaTxId = await pendingTx.submit(NetworkState.rpcClient);
-                } catch (error) {
-                    // v6.2.65: Step 2 - Handle WebSocket disconnect errors as success
-                    const errorMsg = error?.message || error?.toString() || 'undefined';
-                    if (!errorMsg || 
-                        errorMsg === 'undefined' ||
-                        errorMsg.includes('WebSocket') ||
-                        errorMsg.includes('disconnected') ||
-                        errorMsg.includes('not connected')) {
-                        metaTxId = txId;  // Use pre-obtained ID
-                        log(`Meta transaction sent (assumed success - ${errorMsg})`, 'warning');
-                    } else {
-                        throw error;  // Re-throw other errors
-                    }
-                }
-                
-                log(`Meta transaction sent: ${metaTxId}`, 'success');
                 
                 // Add to monitoring list
                 FileState.uploadingMetaTx = true; // v5.5.37: Using FileState

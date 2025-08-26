@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.64</title>
+    <title>Kaspa P2P File Storage v6.2.65</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -14828,10 +14828,15 @@ Do you want to continue?`;
                 try {
                     metaTxId = await pendingTx.submit(NetworkState.rpcClient);
                 } catch (error) {
-                    // Handle undefined error as success (transaction likely sent but response not received)
-                    if (!error.message || error.message === 'undefined') {
+                    // v6.2.65: Step 2 - Handle WebSocket disconnect errors as success
+                    const errorMsg = error?.message || error?.toString() || 'undefined';
+                    if (!errorMsg || 
+                        errorMsg === 'undefined' ||
+                        errorMsg.includes('WebSocket') ||
+                        errorMsg.includes('disconnected') ||
+                        errorMsg.includes('not connected')) {
                         metaTxId = txId;  // Use pre-obtained ID
-                        log('Meta transaction sent (assumed success due to undefined error)', 'warning');
+                        log(`Meta transaction sent (assumed success - ${errorMsg})`, 'warning');
                     } else {
                         throw error;  // Re-throw other errors
                     }
@@ -14879,24 +14884,25 @@ Do you want to continue?`;
                         }
                     }
                     
-                    // v6.2.61: After 10 seconds, try RPC (same as regular chunks)
-                    if (waitTime >= config.restApiWaitTime && NetworkState.rpcClient) {
+                    // v6.2.65: Use REST API directly instead of RPC getTransaction
+                    if (waitTime >= config.restApiWaitTime && config.restApiControl.enabled) {
                         try {
-                            log(`${config.restApiWaitTime/1000}秒経過 - RPCでメタTx確認を試みます...`);
-                            const txInfo = await NetworkState.rpcClient.getTransaction({
-                                transactionId: metaTxId,
-                                includeBlockInfo: true
-                            });
+                            log(`${config.restApiWaitTime/1000}秒経過 - REST APIでメタTx確認を試みます...`);
+                            const apiUrl = `${config.apiEndpoints[config.network]}/transactions/${metaTxId}`;
+                            const response = await fetch(apiUrl);
                             
-                            if (txInfo && txInfo.blockHash) {
-                                metaBlockId = txInfo.blockHash;
-                                log(`RPC経由でメタTx BlockID取得: ${metaBlockId.substring(0, 16)}...`);
-                                FileState.uploadingMetaTx = false;
-                                break;
+                            if (response.ok) {
+                                const data = await response.json();
+                                if (data && data.block_id) {
+                                    metaBlockId = data.block_id;
+                                    log(`REST API経由でメタTx BlockID取得: ${metaBlockId.substring(0, 16)}...`);
+                                    FileState.uploadingMetaTx = false;
+                                    break;
+                                }
                             }
                         } catch (err) {
                             // Transaction might not be confirmed yet
-                            log(`RPC確認エラー: ${err.message}`, 'debug');
+                            log(`REST API確認エラー: ${err.message}`, 'debug');
                         }
                     }
                     

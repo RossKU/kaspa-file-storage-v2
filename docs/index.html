@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.70</title>
+    <title>Kaspa P2P File Storage v6.2.71</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -15012,6 +15012,12 @@ Do you want to continue?`;
             } catch (error) {
                 log(`メタトランザクション作成エラー: ${error.message || error}`, 'error');
                 console.error('Meta-tx creation error:', error);
+                
+                // v6.2.71: Set networkErrorOccurred flag for network errors (same as regular chunks)
+                if (isNetworkError(error)) {
+                    FileState.networkErrorOccurred = true;
+                    log('[INFO] メタTx作成でネットワークエラーを検出 - ProgressManagerを保持します', 'info');
+                }
                 
                 // Try to log more details
                 if (error.stack) {

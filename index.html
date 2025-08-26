@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.72</title>
+    <title>Kaspa P2P File Storage v6.2.73</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -4466,6 +4466,7 @@
             currentFileCID: null,     // Current file's short CID (v5.5.39)
             currentFileCIDFull: null,  // Current file's full CID (v5.5.39)
             currentKenvEntryId: null,  // Current KENV entry ID for session (v5.12.13)
+            needsMetaTx: false,        // v6.2.73: Whether meta-tx needs to be sent after chunk upload
             // v5.9.0: File selection management
             selectedFiles: new Set(),  // Set of selected file IDs
             
@@ -8539,6 +8540,7 @@ Do you want to continue?`;
                 log(`[DEBUG-RESUME] Auto-resume condition check started`, 'debug');
                 log(`[DEBUG-RESUME] ProgressManager存在: ${!!FileState.progressManager}`, 'debug');
                 log(`[DEBUG-RESUME] progress存在: ${!!FileState.progressManager?.progress}`, 'debug');
+                log(`[DEBUG-RESUME] needsMetaTx: ${FileState.needsMetaTx}`, 'debug');
                 
                 if (FileState.progressManager?.progress) {
                     const progress = FileState.progressManager.progress;
@@ -8551,12 +8553,21 @@ Do you want to continue?`;
                     log(`[DEBUG-RESUME]   - 完了率: ${((progress._progress.completedChunks / progress.recovery.totalChunks) * 100).toFixed(1)}%`, 'debug');
                 }
                 
-                if (FileState.progressManager?.progress && 
+                // v6.2.73: Check both chunk completion and meta-tx need
+                const hasIncompleteChunks = FileState.progressManager?.progress && 
                     FileState.progressManager.progress._progress.completedChunks < 
-                    FileState.progressManager.progress.recovery.totalChunks) {
+                    FileState.progressManager.progress.recovery.totalChunks;
                     
-                    log('[ConnectionManager] アップロードを自動的に再開します...', 'info');
-                    log(`[DEBUG-RESUME] 条件を満たしました - 自動再開を実行`, 'debug');
+                if (hasIncompleteChunks || FileState.needsMetaTx) {
+                    
+                    if (FileState.needsMetaTx && !hasIncompleteChunks) {
+                        // v6.2.73: Only meta-tx needs to be sent
+                        log('[ConnectionManager] メタTx送信を自動的に再開します...', 'info');
+                        log(`[DEBUG-RESUME] メタTxのみ必要 - needsMetaTx: true`, 'debug');
+                    } else {
+                        log('[ConnectionManager] アップロードを自動的に再開します...', 'info');
+                        log(`[DEBUG-RESUME] 条件を満たしました - 自動再開を実行`, 'debug');
+                    }
                     log(`[DEBUG] 再開条件満たす - uploadSessionActive: ${FileState.uploadSessionActive}`, 'debug');
                     // Debug: Check current state
                     log(`[DEBUG] FileState.currentFile: ${FileState.currentFile ? FileState.currentFile.name : 'null'}`, 'debug');
@@ -8582,35 +8593,54 @@ Do you want to continue?`;
                         }
                     }
                     
-                    // Call processAndUpload directly
-                    setTimeout(async () => {
-                        if (FileState.currentFile && window.pendingProgress) {
-                            log('[ConnectionManager] processAndUploadを呼び出します...', 'info');
-                            log(`[DEBUG] 自動再開前 - uploadSessionActive: ${FileState.uploadSessionActive}`, 'debug');
-                            await processAndUpload();
-                            // Phase 0-M: Move completion message after processAndUpload to ensure proper timing
-                            // Phase 0-L: Clear network error flag after successful auto-resume
-                            FileState.networkErrorOccurred = false;
-                            log('[DEBUG] 自動再開成功 - networkErrorOccurredフラグをクリア', 'debug');
-                            log('[ConnectionManager] 自動再開が完了しました', 'success');
-                        } else {
-                            log('[ConnectionManager] 自動再開に必要な情報が不足しています', 'warning');
-                            if (!FileState.currentFile) {
-                                log('[ConnectionManager] FileState.currentFileが設定されていません', 'debug');
+                    // v6.2.73: Handle meta-tx-only resume separately
+                    if (FileState.needsMetaTx && !hasIncompleteChunks) {
+                        // Meta-tx only - call createAndUploadMetaTx directly
+                        setTimeout(async () => {
+                            try {
+                                log('[ConnectionManager] メタTx送信を再開中...', 'info');
+                                FileState.uploadSessionActive = true;  // Set session active
+                                await createAndUploadMetaTx();
+                                FileState.needsMetaTx = false;  // Clear flag on success
+                                FileState.networkErrorOccurred = false;
+                                FileState.uploadSessionActive = false;
+                                log('[ConnectionManager] メタTx送信が完了しました', 'success');
+                            } catch (error) {
+                                log(`[ConnectionManager] メタTx再開エラー: ${error.message}`, 'error');
+                                // Flag remains true for next retry
                             }
-                            if (!window.pendingProgress) {
-                                log('[ConnectionManager] pendingProgressが設定されていません', 'debug');
+                        }, 1000);
+                    } else {
+                        // Normal chunk resume or chunks + meta-tx
+                        setTimeout(async () => {
+                            if (FileState.currentFile && window.pendingProgress) {
+                                log('[ConnectionManager] processAndUploadを呼び出します...', 'info');
+                                log(`[DEBUG] 自動再開前 - uploadSessionActive: ${FileState.uploadSessionActive}`, 'debug');
+                                await processAndUpload();
+                                // Phase 0-M: Move completion message after processAndUpload to ensure proper timing
+                                // Phase 0-L: Clear network error flag after successful auto-resume
+                                FileState.networkErrorOccurred = false;
+                                log('[DEBUG] 自動再開成功 - networkErrorOccurredフラグをクリア', 'debug');
+                                log('[ConnectionManager] 自動再開が完了しました', 'success');
+                            } else {
+                                log('[ConnectionManager] 自動再開に必要な情報が不足しています', 'warning');
+                                if (!FileState.currentFile) {
+                                    log('[ConnectionManager] FileState.currentFileが設定されていません', 'debug');
+                                }
+                                if (!window.pendingProgress) {
+                                    log('[ConnectionManager] pendingProgressが設定されていません', 'debug');
+                                }
                             }
-                        }
-                    }, 1000);
+                        }, 1000);
+                    }
                 } else {
                     log(`[DEBUG-RESUME] 自動再開条件を満たしません`, 'debug');
                     if (!FileState.progressManager) {
                         log(`[DEBUG-RESUME]   理由: ProgressManagerが存在しない`, 'debug');
                     } else if (!FileState.progressManager.progress) {
                         log(`[DEBUG-RESUME]   理由: progressデータが存在しない`, 'debug');
-                    } else if (FileState.progressManager.progress._progress.completedChunks >= FileState.progressManager.progress.recovery.totalChunks) {
-                        log(`[DEBUG-RESUME]   理由: すでに完了している (${FileState.progressManager.progress._progress.completedChunks}/${FileState.progressManager.progress.recovery.totalChunks})`, 'debug');
+                    } else if (FileState.progressManager.progress._progress.completedChunks >= FileState.progressManager.progress.recovery.totalChunks && !FileState.needsMetaTx) {
+                        log(`[DEBUG-RESUME]   理由: チャンク完了済み (${FileState.progressManager.progress._progress.completedChunks}/${FileState.progressManager.progress.recovery.totalChunks}) かつメタTx不要 (needsMetaTx: ${FileState.needsMetaTx})`, 'debug');
                     }
                 }
                 
@@ -14408,10 +14438,18 @@ Do you want to continue?`;
                 if (useMetaTx) {
                     log('[DEBUG] メタTx作成を開始します', 'debug');
                     
+                    // v6.2.73: Set flag indicating meta-tx is needed
+                    FileState.needsMetaTx = true;
+                    log('[DEBUG] needsMetaTxフラグを設定: true', 'debug');
+                    
                     // v5.11.126: Update status for meta-tx
                     uploadStatusUI.updateStatus('⏳', 'トランザクションを確認しています...', 4);
                     
                     await createAndUploadMetaTx();
+                    
+                    // v6.2.73: Clear flag after successful meta-tx
+                    FileState.needsMetaTx = false;
+                    log('[DEBUG] needsMetaTxフラグをクリア: false', 'debug');
                     
                     // v5.11.16: Calculate actual cost after meta-tx
                     const actualCost = await FileState.costTracking.calculateActualCost();

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.68</title>
+    <title>Kaspa P2P File Storage v6.2.69</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -14847,20 +14847,19 @@ Do you want to continue?`;
                         retries++;
                         const errorMessage = error?.message || error?.toString() || 'Unknown error';
                         
-                        // Check for WebSocket disconnect (don't count as retry)
-                        if (errorMessage.includes('WebSocket') || 
-                            errorMessage.includes('disconnected') ||
-                            errorMessage.includes('not connected')) {
-                            log(`メタTx送信エラー - WebSocket切断 (試行 ${retries}/${config.retryCount})`, 'warning');
-                        } else {
-                            log(`メタTx送信エラー (試行 ${retries}/${config.retryCount}): ${errorMessage}`, 'error');
+                        log(`メタTx送信エラー (試行 ${retries}/${config.retryCount}): ${errorMessage}`, 'error');
+                        
+                        // v6.2.69: Check connection status before retry (same as regular chunks)
+                        if (!ConnectionManager.isConnected) {
+                            log('[DEBUG] ネットワークDisconnect - 自動再開に任せます', 'debug');
+                            throw new Error('Network disconnected - waiting for auto-resume');
                         }
                         
                         if (retries >= config.retryCount) {
                             throw new Error(`メタトランザクション送信失敗: ${errorMessage}`);
                         }
                         
-                        // Wait before retry (allow ConnectionManager to reconnect)
+                        // Only wait and retry if connected
                         log('2秒後に再試行します...', 'info');
                         await new Promise(resolve => setTimeout(resolve, 2000));
                     }

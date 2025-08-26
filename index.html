@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.69</title>
+    <title>Kaspa P2P File Storage v6.2.70</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -14886,6 +14886,7 @@ Do you want to continue?`;
                 let metaBlockId = null;
                 let waitTime = 0;
                 const maxWaitTime = config.timeout || 300000; // v6.2.61: Use config.timeout (5 minutes) like regular chunks
+                let lastApiCheck = 0;  // v6.2.70: Track last REST API check time (same as regular chunks)
                 
                 while (!metaBlockId && waitTime < maxWaitTime) {
                     // Phase 0-O-2: Check both ConnectionManager and WebSocket status
@@ -14909,10 +14910,10 @@ Do you want to continue?`;
                         }
                     }
                     
-                    // v6.2.65: Use REST API directly instead of RPC getTransaction
-                    if (waitTime >= config.restApiWaitTime && NetworkState.restApiControl.globalEnabled) {
+                    // v6.2.70: Use REST API with proper interval tracking (same as regular chunks)
+                    if (waitTime - lastApiCheck >= 10000 && NetworkState.restApiControl.globalEnabled) {
                         try {
-                            log(`${config.restApiWaitTime/1000}秒経過 - REST APIでメタTx確認を試みます...`);
+                            log(`${(waitTime/1000).toFixed(0)}秒経過 - REST APIでメタTx確認を試みます...`);
                             const apiUrl = `${config.apiEndpoints[config.network]}/transactions/${metaTxId}`;
                             const response = await fetch(apiUrl);
                             
@@ -14929,6 +14930,7 @@ Do you want to continue?`;
                             // Transaction might not be confirmed yet
                             log(`REST API確認エラー: ${err.message}`, 'debug');
                         }
+                        lastApiCheck = waitTime;  // v6.2.70: Reset timer after API call
                     }
                     
                     await new Promise(resolve => setTimeout(resolve, 500));

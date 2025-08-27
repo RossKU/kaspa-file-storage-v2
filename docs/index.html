@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.79</title>
+    <title>Kaspa P2P File Storage v6.2.80</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -11091,9 +11091,21 @@ Do you want to continue?`;
                         combined = metadata.file?.compression?.enabled ? 
                             lzDecompress(decrypted) : decrypted;
                         
-                        // Verify final size
+                        // v6.2.80: Enhanced size verification with user-friendly messages
                         if (combined.length !== metadata.file.size) {
-                            log(`[DownloadManager] サイズ不一致警告: 期待値 ${metadata.file.size}, 実際 ${combined.length}`, 'warning');
+                            const diff = combined.length - metadata.file.size;
+                            const percent = ((Math.abs(diff) / metadata.file.size) * 100).toFixed(1);
+                            
+                            if (Math.abs(diff) < 100) {
+                                log(`⚠️ [DownloadManager] Size slightly different (${diff > 0 ? '+' : ''}${diff} bytes, ${percent}%)`, 'warning');
+                                log(`📝 File downloaded successfully despite minor size difference`, 'info');
+                            } else if (Math.abs(diff) < metadata.file.size * 0.01) {
+                                log(`⚠️ [DownloadManager] Size difference within 1% (${diff > 0 ? '+' : ''}${diff} bytes, ${percent}%)`, 'warning');
+                                log(`📝 File should be usable`, 'info');
+                            } else {
+                                log(`❌ [DownloadManager] Significant size mismatch (${diff > 0 ? '+' : ''}${diff} bytes, ${percent}%)`, 'error');
+                                log(`📝 File may be corrupted or incomplete`, 'warning');
+                            }
                         }
                         
                     }
@@ -16241,6 +16253,48 @@ Do you want to continue?`;
             await loadFromMetaTxId();
         };
 
+        // v6.2.80: Enhanced download error display function
+        window.showDownloadError = function(message, details = []) {
+            // Display error in progress window
+            const progressDiv = document.getElementById('downloadProgress');
+            const statusDiv = document.getElementById('downloadStatus');
+            const progressBar = document.getElementById('downloadProgressBar');
+            
+            if (progressDiv) {
+                progressDiv.style.display = 'block';
+                
+                // Change progress bar to error state
+                progressBar.style.backgroundColor = '#e74c3c';
+                progressBar.style.width = '100%';
+                progressBar.textContent = 'Error';
+                
+                // Build error message HTML
+                let errorHtml = `<div style="color: #e74c3c; font-weight: bold; margin-bottom: 10px;">❌ ${message}</div>`;
+                if (details.length > 0) {
+                    errorHtml += '<div style="font-size: 14px;">';
+                    errorHtml += '<div style="font-weight: bold; margin-bottom: 5px;">📝 Possible causes:</div>';
+                    details.forEach((detail, index) => {
+                        errorHtml += `<div style="margin-left: 20px; margin-bottom: 3px;">${index + 1}. ${detail}</div>`;
+                    });
+                    errorHtml += '</div>';
+                }
+                statusDiv.innerHTML = errorHtml;
+                
+                // Auto-hide after 15 seconds
+                setTimeout(() => {
+                    progressDiv.style.display = 'none';
+                    progressBar.style.backgroundColor = '';  // Reset color
+                    progressBar.style.width = '0%';
+                    progressBar.textContent = '0%';
+                    statusDiv.innerHTML = '';
+                }, 15000);
+            }
+            
+            // Also log to console
+            log(`❌ ${message}`, 'error');
+            details.forEach(detail => log(`  - ${detail}`, 'info'));
+        };
+
         window.loadFromMetaTxId = async function() {
             // v4.7.14: Clear previous global metadata to prevent reuse
             FileState.kaspaMetadata = null;
@@ -16275,18 +16329,41 @@ Do you want to continue?`;
                 log(`メタTxIDのみで復元（REST API使用）: ${metaTxId.substring(0, 16)}...`, 'info');
             }
             
+            // v6.2.80: Enhanced error messages with progress window display
             if (!metaTxId || metaTxId.length !== 64) {
-                log('有効なメタTxID（64文字）を入力してください', 'error');
+                if (!metaTxId) {
+                    showDownloadError('No TxID entered', [
+                        'Enter in format: TxID:BlockID:Password',
+                        'Or format: TxID:Password',
+                        'TxID must be 64 hexadecimal characters'
+                    ]);
+                } else if (metaTxId.length < 64) {
+                    showDownloadError(`TxID too short (${metaTxId.length}/64 characters)`, [
+                        'A valid TxID is 64 hexadecimal characters',
+                        'Check if you copied the complete TxID'
+                    ]);
+                } else {
+                    showDownloadError(`TxID too long (${metaTxId.length}/64 characters)`, [
+                        'A valid TxID is exactly 64 characters',
+                        'Remove any extra spaces or characters'
+                    ]);
+                }
                 return;
             }
             
             if (blockId && blockId.length !== 64) {
-                log('有効なBlockID（64文字）を入力してください', 'error');
+                showDownloadError(`Invalid BlockID (${blockId.length}/64 characters)`, [
+                    'BlockID must be exactly 64 hexadecimal characters',
+                    'Or leave it empty to use REST API fallback'
+                ]);
                 return;
             }
             
             if (!password) {
-                log('パスワードを入力してください', 'error');
+                showDownloadError('No password entered', [
+                    'Password is required for decryption',
+                    'Enter the same password used during upload'
+                ]);
                 return;
             }
             
@@ -16330,14 +16407,32 @@ Do you want to continue?`;
                             throw new Error(`ブロック内にメタトランザクションが見つかりません`);
                         }
                     } catch (rpcError) {
-                        log(`[RPC] エラー: ${rpcError.message}`, 'error');
+                        // v6.2.80: Enhanced RPC error handling with user-friendly messages
+                        const errorMsg = rpcError.message?.toLowerCase() || '';
+                        
+                        if (errorMsg.includes('not found') || errorMsg.includes('cannot find')) {
+                            showDownloadError('Transaction not found', [
+                                'TxID or BlockID may be incorrect',
+                                'Transaction might not be confirmed yet',
+                                `Current network: ${config.network} (check if correct)`,
+                                'Try again with REST API (BlockID not required)'
+                            ]);
+                        } else if (errorMsg.includes('pruned')) {
+                            showDownloadError('Data has been pruned', [
+                                'This node does not have old block data',
+                                'Enable Archive Node Discovery in Settings tab',
+                                'Or use REST API fallback (remove BlockID)'
+                            ]);
+                        } else {
+                            log(`[RPC] Error: ${rpcError.message}`, 'error');
+                        }
                         
                         // Check if error is due to pruned data
                         if (config.nodeType === 'auto' && 
                             (rpcError.message.includes('pruned') || 
                              rpcError.message.includes('プルーニング') ||
                              rpcError.message.includes('not found'))) {
-                            log(`[RPC] プルーニングされたデータを検出。アーカイブノードに切り替えます...`, 'info');
+                            log(`[RPC] Pruned data detected. Switching to archive node...`, 'info');
                             
                             // Try to use archive node via ArchiveNodeManager
                             let archiveClient = null;
@@ -16556,13 +16651,34 @@ Do you want to continue?`;
                             log(`Decrypted string preview: ${metaDataString.substring(0, 50)}...`, 'info');
                             metaData = JSON.parse(metaDataString);
                         } catch (e) {
-                            log('復号化失敗 - パスワードが間違っている可能性があります', 'error');
-                            log(`Decryption error details: ${e.message || e}`, 'error');
-                            console.error('Decryption error:', e);
+                            // v6.2.80: Enhanced decryption error handling
+                            const errorMsg = e.message?.toLowerCase() || '';
                             
-                            // Log first few bytes of payload for debugging
+                            if (errorMsg.includes('decrypt') || errorMsg.includes('authentication') || 
+                                errorMsg.includes('tag') || errorMsg.includes('bad decrypt')) {
+                                showDownloadError('Decryption failed', [
+                                    'Incorrect password (most likely)',
+                                    'Check for typos and case sensitivity',
+                                    'Must be the same password used during upload'
+                                ]);
+                            } else if (errorMsg.includes('json')) {
+                                showDownloadError('Invalid metadata format', [
+                                    'File may be corrupted',
+                                    'Wrong encryption format',
+                                    'Not a valid Kaspa metadata transaction'
+                                ]);
+                            } else {
+                                showDownloadError('Failed to restore metadata', [
+                                    e.message || 'Unknown error',
+                                    'Check TxID and password',
+                                    'Try using REST API (remove BlockID)'
+                                ]);
+                            }
+                            
+                            // Log for debugging
+                            console.error('Decryption error:', e);
                             const payloadPreview = Array.from(payload.slice(0, 32)).map(b => b.toString(16).padStart(2, '0')).join(' ');
-                            log(`Payload hex preview: ${payloadPreview}`, 'info');
+                            log(`Payload hex preview: ${payloadPreview}`, 'debug');
                             throw e;
                         }
                     } else {
@@ -16836,20 +16952,32 @@ Do you want to continue?`;
                 log(`パスワードを.kaspaファイルから取得しました (長さ: ${password.length})`, 'info');
             }
             
+            // v6.2.80: Enhanced error messages for download prerequisites
             if (!password) {
-                log('パスワードを入力してください', 'error');
+                showDownloadError('No password entered', [
+                    'Password is required for decryption',
+                    'Enter the same password used during upload',
+                    'Check if password is included in .kaspa file'
+                ]);
                 return;
             }
             
             log(`使用するパスワード: ${password.substring(0, 3)}... (長さ: ${password.length})`, 'debug');
             
             if (!FileState.kaspaMetadata) {
-                log('.kaspaファイルが読み込まれていません', 'error');
+                showDownloadError('No .kaspa file loaded', [
+                    'Click "Choose File" to select a .kaspa file',
+                    'Or use "Verify" with TxID:BlockID:Password'
+                ]);
                 return;
             }
             
             if (!NetworkState.rpcClient) {
-                log('Please restart Kaspa system first', 'error');
+                showDownloadError('Kaspa system not initialized', [
+                    'Click "Initialize Kaspa System" in Settings tab',
+                    'Wait for connection to establish',
+                    'Check network status in Status tab'
+                ]);
                 return;
             }
             

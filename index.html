@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.75</title>
+    <title>Kaspa P2P File Storage v6.2.76</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -2917,7 +2917,8 @@
             },
             monitoring: {
                 wsMonitorTimeout: null,  // WebSocket monitoring timeout
-                directoryStopTimeout: null  // v6.1.9: Directory upload stop delay timeout
+                directoryStopTimeout: null,  // v6.1.9: Directory upload stop delay timeout
+                metaTxStopTimeout: null  // v6.2.76: Meta-tx completion stop delay timeout
             },
             history: {
                 systemLogs: []         // System log entries
@@ -14781,9 +14782,45 @@ Do you want to continue?`;
                     // v5.12.7: Update status to complete for super meta case
                     uploadStatusUI.updateStatus('✅', 'Upload complete! Please check the File tab', 5);
                     
-                    // Auto-stop monitoring
+                    // v6.2.76: Delayed stop monitoring for super meta
                     if (NetworkState.ws.monitorActive) {
-                        await stopMonitoring();
+                        // Clear any existing meta-tx stop timeout
+                        if (AppState.monitoring.metaTxStopTimeout) {
+                            clearTimeout(AppState.monitoring.metaTxStopTimeout);
+                            AppState.monitoring.metaTxStopTimeout = null;
+                        }
+                        
+                        log('[DEBUG] Super meta complete - scheduling monitoring stop in 10 seconds', 'debug');
+                        
+                        AppState.monitoring.metaTxStopTimeout = setTimeout(async () => {
+                            // Check if still eligible to stop
+                            if (!FileState.uploadSessionActive && 
+                                FileState.uploadingChunksCount <= 0 && 
+                                !FileState.uploadingMetaTx && 
+                                !FileState.uploadingDirMeta && 
+                                !FileState.isUploadingFile && 
+                                !FileState.needsMetaTx) {
+                                
+                                await stopMonitoring();
+                                
+                                // Stop auxiliary RPCs
+                                if (NetworkState.auxRpcClients) {
+                                    NetworkState.auxRpcClients.forEach(client => {
+                                        if (client && client.client) {
+                                            try {
+                                                client.client.removeAllEventListeners();
+                                            } catch (e) {}
+                                        }
+                                    });
+                                }
+                                
+                                log('Super meta complete - WebSocket monitoring stopped after 10s delay', 'info');
+                            } else {
+                                log('[DEBUG] New upload detected during delay - cancelling stop', 'debug');
+                            }
+                            
+                            AppState.monitoring.metaTxStopTimeout = null;
+                        }, 10000);
                     }
                     
                     // v6.2.74: Clear AbortController before returning (super meta case)
@@ -15105,10 +15142,57 @@ Do you want to continue?`;
                     }
                 }
                 
-                // Auto-stop WebSocket monitoring after meta-tx creation
+                // v6.2.76: Delayed stop WebSocket monitoring after meta-tx creation
                 if (NetworkState.ws.monitorActive) {
-                    log('メタトランザクション作成完了 - WebSocket監視を自動停止します', 'info');
-                    await stopMonitoring();
+                    // Clear any existing meta-tx stop timeout
+                    if (AppState.monitoring.metaTxStopTimeout) {
+                        clearTimeout(AppState.monitoring.metaTxStopTimeout);
+                        AppState.monitoring.metaTxStopTimeout = null;
+                    }
+                    
+                    log('[DEBUG] Meta-tx complete - scheduling monitoring stop in 10 seconds', 'debug');
+                    
+                    // Schedule stop after 10 seconds (same pattern as directory upload)
+                    AppState.monitoring.metaTxStopTimeout = setTimeout(async () => {
+                        log('[DEBUG] Checking if monitoring can be stopped after 10 second delay', 'debug');
+                        
+                        // Check if still eligible to stop (no new uploads started)
+                        if (!FileState.uploadSessionActive && 
+                            FileState.uploadingChunksCount <= 0 && 
+                            !FileState.uploadingMetaTx && 
+                            !FileState.uploadingDirMeta && 
+                            !FileState.isUploadingFile && 
+                            !FileState.needsMetaTx) {
+                            
+                            await stopMonitoring();
+                            
+                            // Stop auxiliary RPCs
+                            if (NetworkState.auxRpcClients) {
+                                NetworkState.auxRpcClients.forEach(client => {
+                                    if (client && client.client) {
+                                        try {
+                                            client.client.removeAllEventListeners();
+                                        } catch (e) {
+                                            // Ignore errors
+                                        }
+                                    }
+                                });
+                            }
+                            
+                            // Clear 5-minute timer
+                            if (AppState.monitoring.wsMonitorTimeout) {
+                                log('[DEBUG] Cleared 5-minute timer', 'debug');
+                                clearTimeout(AppState.monitoring.wsMonitorTimeout);
+                                AppState.monitoring.wsMonitorTimeout = null;
+                            }
+                            
+                            log('Meta-tx complete - WebSocket monitoring stopped after 10s delay', 'info');
+                        } else {
+                            log('[DEBUG] New upload detected during delay - cancelling stop', 'debug');
+                        }
+                        
+                        AppState.monitoring.metaTxStopTimeout = null;
+                    }, 10000); // 10 second delay
                 }
                 
                 // v6.2.74: Clear AbortController on success
@@ -17630,6 +17714,19 @@ Do you want to continue?`;
                 // Set 5 minute timeout with upload session check (v5.3.6)
                 if (AppState.monitoring.wsMonitorTimeout) {
                     clearTimeout(AppState.monitoring.wsMonitorTimeout);
+                }
+                
+                // v6.2.76: Clear any pending meta-tx stop timeout
+                if (AppState.monitoring.metaTxStopTimeout) {
+                    clearTimeout(AppState.monitoring.metaTxStopTimeout);
+                    AppState.monitoring.metaTxStopTimeout = null;
+                    log('[DEBUG] Cleared pending meta-tx stop timeout', 'debug');
+                }
+                
+                // Also clear directory stop timeout for completeness
+                if (AppState.monitoring.directoryStopTimeout) {
+                    clearTimeout(AppState.monitoring.directoryStopTimeout);
+                    AppState.monitoring.directoryStopTimeout = null;
                 }
                 AppState.monitoring.wsMonitorTimeout = setTimeout(async function checkTimeout() {
                     // v5.3.7: Enhanced check - Don't stop monitoring during any upload activity

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.78</title>
+    <title>Kaspa P2P File Storage v6.2.79</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -14618,9 +14618,30 @@ Do you want to continue?`;
                 // v4.7.13: Reset ProgressManager to prevent reuse
                 // v5.5.28: Fixed local variable reference - use FileState.progressManager
                 // v5.6.2: Do not reset ProgressManager on network errors
+                // v6.2.79: Keep ProgressManager for SuperMeta processing
                 if (!FileState.networkErrorOccurred) {
-                    FileState.progressManager = null;
-                    log('ProgressManagerをリセットしました', 'debug');
+                    // Check if SuperMeta processing might be needed
+                    const useMetaTx = document.getElementById('generateMetaTx').checked;
+                    let shouldKeepProgressManager = false;
+                    
+                    if (useMetaTx && FileState.progressManager) {
+                        // Get total chunks from ProgressManager or kaspaMetadata
+                        const totalChunks = FileState.progressManager.progress?.recovery?.totalChunks || 
+                                          FileState.kaspaMetadata?.chunks?.length || 0;
+                        
+                        // Check if SuperMeta threshold
+                        const CHUNKS_PER_META = parseInt(localStorage.getItem('debugChunksPerMeta')) || 160;
+                        
+                        if (totalChunks > CHUNKS_PER_META) {
+                            shouldKeepProgressManager = true;
+                            log(`[SuperMeta] ProgressManagerを保持 (${totalChunks} chunks > ${CHUNKS_PER_META})`, 'debug');
+                        }
+                    }
+                    
+                    if (!shouldKeepProgressManager) {
+                        FileState.progressManager = null;
+                        log('ProgressManagerをリセットしました', 'debug');
+                    }
                 } else {
                     log('ネットワークエラーのため、ProgressManagerを保持します', 'info');
                     // Phase 0-F-3: Do not clear the flag immediately - keep it for auto-resume
@@ -14859,6 +14880,12 @@ Do you want to continue?`;
                     if (FileState.metaTxAbortController) {
                         FileState.metaTxAbortController = null;
                         log('[DEBUG] メタTx AbortControllerをクリアしました（スーパーメタ完了）', 'debug');
+                    }
+                    
+                    // v6.2.79: Clear ProgressManager after SuperMeta completion
+                    if (FileState.progressManager) {
+                        FileState.progressManager = null;
+                        log('[SuperMeta] 完了 - ProgressManagerをリセット', 'debug');
                     }
                     
                     // v6.2.75: Return true for super meta success
@@ -15233,6 +15260,12 @@ Do you want to continue?`;
                 if (FileState.metaTxAbortController) {
                     FileState.metaTxAbortController = null;
                     log('[DEBUG] メタTx AbortControllerをクリアしました', 'debug');
+                }
+                
+                // v6.2.79: Clear ProgressManager after regular meta-tx completion
+                if (FileState.progressManager) {
+                    FileState.progressManager = null;
+                    log('通常MetaTx完了 - ProgressManagerをリセット', 'debug');
                 }
                 
                 log('メタトランザクション作成完了', 'info');

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.77</title>
+    <title>Kaspa P2P File Storage v6.2.78</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -5994,7 +5994,7 @@ Do you want to continue?`;
                     // .kaspaファイルのメタデータ構造を作成（v3.3フォーマット）
                     const kaspaMetadata = {
                         type: "kaspa-file",
-                        version: "3.3",
+                        version: "3.4.3",  // v6.2.78: Updated to Format v3.4.3
                         created: kenvEntry.uploadDate || new Date().toISOString(),
                         network: config.network,
                         
@@ -8755,7 +8755,7 @@ Do you want to continue?`;
                 
                 this.progress = {
                     // v3.3 compliant format
-                    version: "3.3",
+                    version: "3.4.3",  // v6.2.78: Updated to Format v3.4.3
                     type: "kaspa-file",
                     created: new Date().toISOString(),
                     network: config.network,
@@ -8813,7 +8813,10 @@ Do you want to continue?`;
                             retryCount: {}
                         },
                         // Keep chunk details for progress tracking
-                        chunkDetails: []
+                        chunkDetails: [],
+                        
+                        // v6.2.78: SuperMeta intermediate meta-tx tracking (Format v3.4.3)
+                        intermediateMetaTxs: []
                     }
                 };
                 
@@ -10231,7 +10234,7 @@ Do you want to continue?`;
             // Build v3.3 format
             const v33Progress = {
                 // Basic info
-                version: "3.3",
+                version: "3.4.3",  // v6.2.78: Updated to Format v3.4.3
                 type: "kaspa-file",
                 created: new Date().toISOString(),
                 network: config.network,
@@ -14265,7 +14268,7 @@ Do you want to continue?`;
                 // Prepare metadata with unified structure
                 FileState.kaspaMetadata = {
                     type: 'kaspa-file',
-                    version: "3.3",  // v4.7.50: Updated to Format v3.3
+                    version: "3.4.3",  // v6.2.78: Updated to Format v3.4.3 (SuperMeta progress support)
                     created: new Date().toISOString(),
                     network: config.network,
                     
@@ -14713,7 +14716,22 @@ Do you want to continue?`;
                     
                     // Create intermediate meta-txs
                     const singleMetaTxs = [];
-                    for (let i = 0; i < chunkGroups.length; i++) {
+                    
+                    // v6.2.78: Check for existing intermediate meta-txs from progress
+                    const existingMetas = FileState.progressManager?.progress?._progress?.intermediateMetaTxs || [];
+                    if (existingMetas.length > 0) {
+                        log(`[SuperMeta] Resuming from progress: ${existingMetas.length} intermediate meta-tx already completed`, 'info');
+                        singleMetaTxs.push(...existingMetas);
+                        
+                        // Log existing meta-txs
+                        existingMetas.forEach((meta, idx) => {
+                            log(`[SuperMeta] Using existing intermediate meta-tx ${idx + 1}: ${meta.txId.substring(0, 16)}...`, 'debug');
+                        });
+                    }
+                    
+                    // Only create missing intermediate meta-txs
+                    for (let i = existingMetas.length; i < chunkGroups.length; i++) {
+                        log(`[SuperMeta] Creating new intermediate meta-tx ${i + 1}/${chunkGroups.length}`, 'info');
                         const singleMeta = await createSingleMetaTx(
                             chunkGroups[i], 
                             i, 
@@ -14724,6 +14742,16 @@ Do you want to continue?`;
                             CHUNKS_PER_META
                         );
                         singleMetaTxs.push(singleMeta);
+                        
+                        // v6.2.78: Save intermediate meta-tx to progress file
+                        if (FileState.progressManager?.progress?._progress) {
+                            if (!FileState.progressManager.progress._progress.intermediateMetaTxs) {
+                                FileState.progressManager.progress._progress.intermediateMetaTxs = [];
+                            }
+                            FileState.progressManager.progress._progress.intermediateMetaTxs.push(singleMeta);
+                            await FileState.progressManager.saveProgress();
+                            log(`[SuperMeta] Saved intermediate meta-tx ${i + 1}/${chunkGroups.length} to .kprogress`, 'info');
+                        }
                     }
                     
                     // Create super meta-tx
@@ -14841,7 +14869,7 @@ Do you want to continue?`;
                 // Prepare meta-tx data with Format v3.3
                 const metaTxData = {
                     type: "kaspa-meta-tx",
-                    version: "3.3",  // v4.7.50: Updated to Format v3.3
+                    version: "3.4.3",  // v6.2.78: Updated to Format v3.4.3 (SuperMeta progress support)
                     created: FileState.kaspaMetadata.created,
                     network: FileState.kaspaMetadata.network,
                     encryption: FileState.kaspaMetadata.encryption,
@@ -15247,7 +15275,7 @@ Do you want to continue?`;
                 // Create metadata for this chunk group
                 const metaTxData = {
                     type: "kaspa-meta-tx",
-                    version: "3.3",
+                    version: "3.4.3",  // v6.2.78: Updated to Format v3.4.3
                     created: new Date().toISOString(),
                     network: config.network,
                     
@@ -15475,7 +15503,7 @@ Do you want to continue?`;
                 // Create super metadata
                 const superMetaTxData = {
                     type: "kaspa-meta-tx",
-                    version: "3.3",
+                    version: "3.4.3",  // v6.2.78: Updated to Format v3.4.3
                     created: new Date().toISOString(),
                     network: config.network,
                     
@@ -16509,7 +16537,7 @@ Do you want to continue?`;
                     }
                     
                     // Verify this is a valid metadata (meta-tx or directory)
-                    if ((metaData.version === "2.1" || metaData.version === "3.3" || metaData.version === "3.1.1" || metaData.version === "3.4" || metaData.version === "3.4.2") && 
+                    if ((metaData.version === "2.1" || metaData.version === "3.3" || metaData.version === "3.1.1" || metaData.version === "3.4" || metaData.version === "3.4.2" || metaData.version === "3.4.3") && 
                         (metaData.type === "kaspa-meta-tx" || metaData.type === "kaspa-directory")) {
                         log(`メタデータを正常に復号化しました (v${metaData.version}, type: ${metaData.type})`, 'success');
                         log(`メタデータ内容: ${JSON.stringify(metaData, null, 2)}`, 'info');

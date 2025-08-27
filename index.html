@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.76</title>
+    <title>Kaspa P2P File Storage v6.2.77</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -2918,7 +2918,9 @@
             monitoring: {
                 wsMonitorTimeout: null,  // WebSocket monitoring timeout
                 directoryStopTimeout: null,  // v6.1.9: Directory upload stop delay timeout
-                metaTxStopTimeout: null  // v6.2.76: Meta-tx completion stop delay timeout
+                directoryStopSetTime: null,  // v6.2.77: Directory stop timer set timestamp
+                metaTxStopTimeout: null,  // v6.2.76: Meta-tx completion stop delay timeout
+                metaTxStopSetTime: null  // v6.2.77: Meta-tx stop timer set timestamp
             },
             history: {
                 systemLogs: []         // System log entries
@@ -14820,7 +14822,9 @@ Do you want to continue?`;
                             }
                             
                             AppState.monitoring.metaTxStopTimeout = null;
+                            AppState.monitoring.metaTxStopSetTime = null;  // v6.2.77: Clear timestamp
                         }, 10000);
+                        AppState.monitoring.metaTxStopSetTime = Date.now();  // v6.2.77: Record timer set time
                     }
                     
                     // v6.2.74: Clear AbortController before returning (super meta case)
@@ -15192,7 +15196,9 @@ Do you want to continue?`;
                         }
                         
                         AppState.monitoring.metaTxStopTimeout = null;
+                        AppState.monitoring.metaTxStopSetTime = null;  // v6.2.77: Clear timestamp
                     }, 10000); // 10 second delay
+                    AppState.monitoring.metaTxStopSetTime = Date.now();  // v6.2.77: Record timer set time
                 }
                 
                 // v6.2.74: Clear AbortController on success
@@ -17306,7 +17312,9 @@ Do you want to continue?`;
                     }
                     
                     AppState.monitoring.directoryStopTimeout = null;
+                    AppState.monitoring.directoryStopSetTime = null;  // v6.2.77: Clear timestamp
                 }, 10000); // 10 second delay
+                AppState.monitoring.directoryStopSetTime = Date.now();  // v6.2.77: Record timer set time
                 
                 return; // Don't check other conditions during delay
             } else if (FileState.uploadingChunksCount === 0 && !FileState.uploadingMetaTx && !FileState.uploadingDirMeta && !FileState.isUploadingFile) { // v5.5.34, v5.5.36 & v5.5.37: Using FileState
@@ -17716,17 +17724,36 @@ Do you want to continue?`;
                     clearTimeout(AppState.monitoring.wsMonitorTimeout);
                 }
                 
-                // v6.2.76: Clear any pending meta-tx stop timeout
-                if (AppState.monitoring.metaTxStopTimeout) {
-                    clearTimeout(AppState.monitoring.metaTxStopTimeout);
-                    AppState.monitoring.metaTxStopTimeout = null;
-                    log('[DEBUG] Cleared pending meta-tx stop timeout', 'debug');
+                // v6.2.77: Check elapsed time before clearing meta-tx stop timeout
+                if (AppState.monitoring.metaTxStopTimeout && AppState.monitoring.metaTxStopSetTime) {
+                    const elapsed = Date.now() - AppState.monitoring.metaTxStopSetTime;
+                    if (elapsed >= 10000) {
+                        // Timer has expired or should have fired - safe to clear
+                        clearTimeout(AppState.monitoring.metaTxStopTimeout);
+                        AppState.monitoring.metaTxStopTimeout = null;
+                        AppState.monitoring.metaTxStopSetTime = null;
+                        log('[DEBUG] Cleared expired meta-tx stop timeout', 'debug');
+                    } else {
+                        // Timer is still valid - preserve it
+                        const remaining = Math.round((10000 - elapsed) / 1000);
+                        log(`[DEBUG] Preserving meta-tx stop timeout (${remaining}s remaining)`, 'debug');
+                    }
                 }
                 
-                // Also clear directory stop timeout for completeness
-                if (AppState.monitoring.directoryStopTimeout) {
-                    clearTimeout(AppState.monitoring.directoryStopTimeout);
-                    AppState.monitoring.directoryStopTimeout = null;
+                // v6.2.77: Check elapsed time before clearing directory stop timeout
+                if (AppState.monitoring.directoryStopTimeout && AppState.monitoring.directoryStopSetTime) {
+                    const elapsed = Date.now() - AppState.monitoring.directoryStopSetTime;
+                    if (elapsed >= 10000) {
+                        // Timer has expired or should have fired - safe to clear
+                        clearTimeout(AppState.monitoring.directoryStopTimeout);
+                        AppState.monitoring.directoryStopTimeout = null;
+                        AppState.monitoring.directoryStopSetTime = null;
+                        log('[DEBUG] Cleared expired directory stop timeout', 'debug');
+                    } else {
+                        // Timer is still valid - preserve it
+                        const remaining = Math.round((10000 - elapsed) / 1000);
+                        log(`[DEBUG] Preserving directory stop timeout (${remaining}s remaining)`, 'debug');
+                    }
                 }
                 AppState.monitoring.wsMonitorTimeout = setTimeout(async function checkTimeout() {
                     // v5.3.7: Enhanced check - Don't stop monitoring during any upload activity

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.81</title>
+    <title>Kaspa P2P File Storage v6.2.82</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -16517,6 +16517,11 @@ Do you want to continue?`;
                         }
                         
                         if (!payload) {
+                            showDownloadError('Transaction not found in block', [
+                                'The TxID does not exist in the specified BlockID',
+                                'Check if TxID is correct',
+                                'Try using REST API (remove BlockID from input)'
+                            ]);
                             throw new Error(`ブロック内にメタトランザクションが見つかりません`);
                         }
                     } catch (rpcError) {
@@ -16764,17 +16769,20 @@ Do you want to continue?`;
                             log(`Decrypted string preview: ${metaDataString.substring(0, 50)}...`, 'info');
                             metaData = JSON.parse(metaDataString);
                         } catch (e) {
-                            // v6.2.80: Enhanced decryption error handling
+                            // v6.2.81: Enhanced decryption error handling with OperationError support
+                            const errorName = e.name || '';
                             const errorMsg = e.message?.toLowerCase() || '';
                             
-                            if (errorMsg.includes('decrypt') || errorMsg.includes('authentication') || 
+                            // OperationError = Web Crypto API decryption failed = wrong password
+                            if (errorName === 'OperationError' || 
+                                errorMsg.includes('decrypt') || errorMsg.includes('authentication') || 
                                 errorMsg.includes('tag') || errorMsg.includes('bad decrypt')) {
-                                showDownloadError('Decryption failed', [
-                                    'Incorrect password (most likely)',
+                                showDownloadError('Incorrect Password', [
+                                    'The password is wrong',
                                     'Check for typos and case sensitivity',
                                     'Must be the same password used during upload'
                                 ]);
-                            } else if (errorMsg.includes('json')) {
+                            } else if (errorMsg.includes('json') || errorName === 'SyntaxError') {
                                 showDownloadError('Invalid metadata format', [
                                     'File may be corrupted',
                                     'Wrong encryption format',

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.85</title>
+    <title>Kaspa P2P File Storage v6.2.86</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -3014,7 +3014,7 @@
                 // const globalSkipCountEl = document.getElementById('rest-api-skip-count'); // Removed
                 
                 if (skipCountEl) skipCountEl.textContent = NetworkState.restApiControl.skipCount;
-                // if (globalSkipCountEl) globalSkipCountEl.textContent = NetworkState.restApiControl.skipCount; // 削除済み
+                // if (globalSkipCountEl) globalSkipCountEl.textContent = NetworkState.restApiControl.skipCount; // deleted
                 if (lastSkipEl && NetworkState.restApiControl.lastSkipped) {
                     lastSkipEl.textContent = new Date(NetworkState.restApiControl.lastSkipped).toLocaleTimeString('ja-JP');
                 }
@@ -3601,7 +3601,7 @@
             lastBlockTime: null,
             blockTimestamps: [],  // 最新10ブロックのタイムスタンプ
             txCounts: [],         // 最新10ブロックのTX数
-            updateTimer: null,    // 5秒ごとの更新タイマー
+            updateTimer: null,    // Update timer every 5 seconds
             
             reset() {
                 this.startTime = Date.now();
@@ -4640,7 +4640,7 @@
                 }
             },
             
-            // 最小エントリー追加（5項目のみ）
+            // Add minimal entry (5 items only)
             addMinimalEntry(name, type = 'kaspa-file', source = 'manual') {
                 const entry = {
                     // Required 5 fields
@@ -4691,24 +4691,24 @@
                     tags: null,
                     notes: null,
                     authWarning: null,
-                    salt: null  // 47番目のカラム - v6.2.32で初期化時に追加
+                    salt: null  // 47th column - added at initialization in v6.2.32
                 };
                 
-                // エントリーを追加
+                // Add entry
                 const lineNumber = this.entries.length;
                 this.entries.push(entry);
                 
-                // インデックスを更新
+                // Update index
                 this.updateIndex(entry, lineNumber);
                 
-                // 統計を更新
+                // Update statistics
                 this.updateStats(entry);
                 
                 log(`[KENV] Entry added: ${entry.id} - ${entry.name}`, 'debug');
                 return entry;
             },
             
-            // インデックス更新（差分更新）
+            // Update index (differential update)
             updateIndex(entry, lineNumber) {
                 // v5.11.41: 防御的プログラミング - undefined/nullチェック
                 if (!entry || !entry.name) {
@@ -4716,7 +4716,7 @@
                     return;
                 }
                 
-                // v5.11.49: 既存のインデックスエントリーを削除してから追加（重複防止）
+                // v5.11.49: Delete existing index entry before adding (prevent duplicates)
                 this.removeFromAllIndexes(lineNumber);
                 
                 // 名前順インデックス
@@ -4755,13 +4755,13 @@
                 // フィルタインデックス（ステータス）
                 this.kindex.filterIndexes.status[entry.status].push(lineNumber);
                 
-                // 更新時刻
+                // Update timestamp
                 this.kindex.updated = new Date().toISOString();
             },
             
-            // すべてのインデックスから指定されたlineNumberのエントリーを削除
+            // Delete entry with specified lineNumber from all indexes
             removeFromAllIndexes(lineNumber) {
-                // sortIndexesから削除
+                // Delete from sortIndexes
                 this.kindex.sortIndexes.name = this.kindex.sortIndexes.name.filter(
                     ([name, lineNum, type]) => lineNum !== lineNumber
                 );
@@ -4772,18 +4772,18 @@
                     ([timestamp, lineNum]) => lineNum !== lineNumber
                 );
                 
-                // searchIndexesから削除
+                // Delete from searchIndexes
                 Object.keys(this.kindex.searchIndexes.name).forEach(prefix => {
                     this.kindex.searchIndexes.name[prefix] = this.kindex.searchIndexes.name[prefix].filter(
                         lineNum => lineNum !== lineNumber
                     );
-                    // 空の配列は削除
+                    // Delete empty arrays
                     if (this.kindex.searchIndexes.name[prefix].length === 0) {
                         delete this.kindex.searchIndexes.name[prefix];
                     }
                 });
                 
-                // filterIndexesから削除
+                // Delete from filterIndexes
                 ['type', 'status'].forEach(category => {
                     Object.keys(this.kindex.filterIndexes[category]).forEach(key => {
                         this.kindex.filterIndexes[category][key] = 
@@ -4813,7 +4813,7 @@
                 return left;
             },
             
-            // 統計情報の更新
+            // Update statistics
             updateStats(entry) {
                 const stats = this.kindex.stats;
                 stats.totalEntries++;
@@ -4824,7 +4824,7 @@
                     stats.smallestFile = Math.min(stats.smallestFile, entry.fileSize);
                 }
                 
-                // 日付の更新
+                // Update date
                 const date = entry.uploadDate;
                 if (!stats.oldestDate || date < stats.oldestDate) {
                     stats.oldestDate = date;
@@ -4942,7 +4942,7 @@
                 }
                 
                 try {
-                    // CSVヘッダー（v5.11.67: 46カラム - saltを追加）
+                    // CSV header (v5.11.67: 46 columns - added salt)
                     const headers = 'id,type,version,created,network,name,path,metaTxId,metaTxBlockId,firstChunkTxId,uploadDate,blockTime,uploadedBy,source,status,fileSize,originalSize,compressedSize,mimeType,sha256,encrypted,compressionAlgorithm,compressionEnabled,variableChunk,payloadSplit,cid,totalChunks,chunkCount,chunkSize,segmentCount,totalFiles,fileCount,directoryCount,entryCount,checksum,uploadCost,uploadDuration,chunkStructureType,chunkLevel,totalGroups,passwordIncluded,password,externalRef,tags,notes,authWarning,salt';
                     
                     let csvContent = headers + '\n';
@@ -4996,7 +4996,7 @@
                             entry.tags || '',
                             entry.notes || '',
                             entry.authWarning || '',
-                            entry.salt || ''  // v5.11.67: saltカラムを追加
+                            entry.salt || ''  // v5.11.67: added salt column
                         ].map(val => {
                             // CSV用にエスケープ
                             const str = String(val);
@@ -5006,10 +5006,10 @@
                             return str;
                         });
                         
-                        // v5.11.66: 固定45カラムの後に可変カラムを追加
+                        // v5.11.66: Add variable columns after fixed 45 columns
                         csvContent += row.join(',');
                         
-                        // チャンクペア追加（tx1,blk1,tx2,blk2,...）
+                        // Add chunk pairs (tx1,blk1,tx2,blk2,...)
                         if (entry._chunks && entry._chunkBlockIds) {
                             for (let i = 0; i < entry._chunks.length; i++) {
                                 csvContent += ',' + entry._chunks[i];
@@ -5017,7 +5017,7 @@
                             }
                         }
                         
-                        // セグメントバウンダリー追加（seg,index,offset,size,originalSize,compressedSize,payloadIndex）
+                        // Add segment boundaries (seg,index,offset,size,originalSize,compressedSize,payloadIndex)
                         if (entry._segmentBoundaries && entry._segmentBoundaries.length > 0) {
                             for (const boundary of entry._segmentBoundaries) {
                                 csvContent += ',seg';  // マーカー
@@ -5030,7 +5030,7 @@
                             }
                         }
                         
-                        // v5.11.111: directoryMetadataを7カラム形式で追加（KENV v3.1.4準拠）
+                        // v5.11.111: Add directoryMetadata in 7-column format (KENV v3.1.4 compliant)
                         if (entry.directoryMetadata && entry.type === 'kaspa-directory') {
                             const dirMeta = entry.directoryMetadata;
                             if (dirMeta.entries && Array.isArray(dirMeta.entries)) {
@@ -5039,7 +5039,7 @@
                                 const dirCount = dirMeta.entries.filter(e => e.type === 'directory').length;
                                 csvContent += ',entries,' + fileCount + ',' + dirCount;
                                 
-                                // 各エントリーを7カラムで追加
+                                // Add each entry in 7 columns
                                 dirMeta.entries.forEach(e => {
                                     // type（'f'または'd'）
                                     const type = (!e.type || e.type === 'file') ? 'f' : 'd';
@@ -5201,7 +5201,7 @@
                     const content = await file.text();
                     const kindexData = JSON.parse(content);
                     
-                    // 既存のkindexを更新
+                    // Update existing kindex
                     Object.assign(this.kindex, kindexData);
                     
                     log(`[KENV] ${this.kindexFile} loaded`, 'success');
@@ -5256,14 +5256,14 @@
                         if (values[10]) entry.uploadDate = values[10];
                         if (values[12]) entry.uploadedBy = values[12];
                         if (values[24]) entry.payloadSplit = values[24];  // v5.11.67: payloadSplitを明示的に読み込み
-                        if (values[25]) entry.cid = values[25];  // v5.12.58: CIDマッピング追加
+                        if (values[25]) entry.cid = values[25];  // v5.12.58: Added CID mapping
                         if (values[41]) entry.password = values[41];
                         if (values[42]) entry.externalRef = values[42];
                         if (values[45]) entry.authWarning = values[45];
                         if (values[46]) entry.salt = values[46];  // v5.11.67: saltカラムを読み込み
                         
                         // v5.11.66: Process variable columns after column 45
-                        // v5.11.67: 46カラム以降に変更（saltを追加したため）
+                        // v5.11.67: Changed to after column 46 (because salt was added)
                         if (values.length > 46) {
                             const chunks = [];
                             const chunkBlockIds = [];
@@ -5418,7 +5418,7 @@
             
             // v5.11.111: KENVエントリーとentriesから完全なdirectoryMetadataを再構築
             reconstructDirectoryMetadata(entry, entries) {
-                // 基本構造を作成
+                // Create basic structure
                 const metadata = {
                     type: 'kaspa-directory',
                     version: entry.version || '3.4.2',
@@ -5537,7 +5537,7 @@
                             }
                         }
                         
-                        // LocalStorage削除
+                        // Delete from LocalStorage
                         this.clearLocalStorage();
                     } else {
                         log('[KENV] Workspace not set - Operating in LocalStorage mode', 'info');
@@ -5639,7 +5639,7 @@
                                 entry.status = 'verified';
                                 log(`[KENV] Entry verified: ${entry.name}`, 'success');
                                 
-                                // UIを自動更新
+                                // Auto-update UI
                                 if (typeof updateFileListFromKENV === 'function') {
                                     updateFileListFromKENV();
                                 }
@@ -5653,7 +5653,7 @@
                             entry.authWarning = `Metadata unavailable: ${error.message}`;
                         }
                     } else if (entry.externalRef) {
-                        // .kaspaファイルのみモード
+                        // .kaspa file only mode
                         log(`[KENV] Verifying in .kaspa file mode: ${entry.externalRef}`, 'debug');
                         entry.status = 'verified';
                     } else {
@@ -5717,7 +5717,7 @@
                 if (entryCount === 0) return false;
                 
                 return confirm(
-                    `ワークスペース外で作成された${entryCount}件のKENVデータが見つかりました。\n\n` +
+                    `Found ${entryCount} KENV data items created outside the workspace.\n\n` +
                     'このデータをワークスペースに統合しますか？\n\n' +
                     '「OK」: 統合する（推奨）\n' +
                     '"Cancel": Discard'
@@ -5757,7 +5757,7 @@
                                 // CIDがある場合：名前+CID+TxID
                                 (entry.cid && e.cid === entry.cid && 
                                  entry.metaTxId && e.metaTxId === entry.metaTxId) ||
-                                // CIDまたはTxIDがない場合：名前+CID+ファイル数+ディレクトリ数+作成日
+                                // No CID or TxID: name+CID+file count+directory count+created date
                                 ((!entry.metaTxId || !e.metaTxId) &&
                                  e.cid === entry.cid &&
                                  e.fileCount === entry.fileCount &&
@@ -5787,7 +5787,7 @@
                         continue;
                     }
                     
-                    // 重複でなければ追加（履歴として保持）
+                    // Add if not duplicate (keep as history)
                     this.entries.push(entry);
                     const lineNumber = this.entries.length - 1;
                     this.updateIndex(entry, lineNumber);
@@ -5986,12 +5986,12 @@ Do you want to continue?`;
                     }
                     
                     // ファイルの場合、メタトランザクションIDはオプショナル
-                    // v5.12.12: メタTxIDがなくても.kaspaファイル生成可能に変更
+                    // v5.12.12: Changed to allow .kaspa file generation even without meta TxID
                     if (!kenvEntry.metaTxId || !kenvEntry.metaTxBlockId) {
                         log('No meta transaction information. Generating .kaspa file with chunk information only', 'warning');
                     }
                     
-                    // .kaspaファイルのメタデータ構造を作成（v3.3フォーマット）
+                    // Create .kaspa file metadata structure (v3.3 format)
                     const kaspaMetadata = {
                         type: "kaspa-file",
                         version: "3.4.3",  // v6.2.78: Updated to Format v3.4.3
@@ -6061,7 +6061,7 @@ Do you want to continue?`;
                         }
                     }
                     
-                    // パスワードを含まない場合はauthセクションからpasswordを削除
+                    // Delete password from auth section if not including password
                     if (!includePassword) {
                         delete kaspaMetadata.auth.password;
                     }
@@ -6580,7 +6580,7 @@ Do you want to continue?`;
                             verified: true  // Verified since metadata was retrieved
                         };
                         this.entries.push(newEntry);
-                        this.showStatus(`ファイル「${newEntry.name}」を追加しました`, 'success');
+                        this.showStatus(`Added file "${newEntry.name}"`, 'success');
                         // v5.11.18-fix12: Update button states after adding entry
                         this.updateButtonStates();
                         
@@ -6600,7 +6600,7 @@ Do you want to continue?`;
                             verified: true  // Verified since metadata was retrieved
                         };
                         this.entries.push(newEntry);
-                        this.showStatus(`ディレクトリ「${newEntry.name}」を追加しました`, 'success');
+                        this.showStatus(`Added directory "${newEntry.name}"`, 'success');
                         // v5.11.18-fix12: Update button states after adding entry
                         this.updateButtonStates();
                         
@@ -6686,7 +6686,7 @@ Do you want to continue?`;
                             html += ` <button onclick="event.stopPropagation(); DirectoryBuilderState.removeEntry(${index})" 
                                      style="margin-left: auto; padding: 2px 6px; font-size: 12px; background: var(--error-color); 
                                             color: var(--sidebar-text); border: none; border-radius: 3px; cursor: pointer;" 
-                                     title="削除">✕</button>`;
+                                     title="Delete">✕</button>`;
                         }
                         
                         html += '</div>';
@@ -6702,7 +6702,7 @@ Do you want to continue?`;
                             // Add "add here" option for root
                             if (isSelected) {
                                 html += `<div style="padding: 4px 2px; color: var(--text-secondary);">`;
-                                html += `└─ [ここに追加...]`;
+                                html += `└─ [Add here...]`;
                                 html += '</div>';
                             }
                         } else {
@@ -11504,7 +11504,7 @@ Do you want to continue?`;
                             log('[KENV] Entry marked as verified (download completed successfully)', 'info');
                         }
                         
-                        // インデックスを更新
+                        // Update index
                         const lineNumber = FileState.kenvManager.entries.indexOf(kenvEntry);
                         FileState.kenvManager.updateIndex(kenvEntry, lineNumber);
                         
@@ -14437,7 +14437,7 @@ Do you want to continue?`;
                         }
                     }
                     
-                    // インデックスを更新
+                    // Update index
                     const lineNumber = FileState.kenvManager.entries.indexOf(kenvEntry);
                     FileState.kenvManager.updateIndex(kenvEntry, lineNumber);
                     
@@ -14495,7 +14495,7 @@ Do you want to continue?`;
                             kenvEntry.uploadCost = actualCost;
                             log(`[KENV] 実際のコストを更新: ${actualCost.toFixed(8)} KAS`, 'info');
                             
-                            // インデックスを更新
+                            // Update index
                             const lineNumber = kenvEntries.indexOf(kenvEntry);
                             FileState.kenvManager.updateIndex(kenvEntry, lineNumber);
                             
@@ -14821,7 +14821,7 @@ Do you want to continue?`;
                             kenvEntry.status = 'verified';
                             kenvEntry.isSuperMeta = true;  // スーパーメタフラグを追加
                             
-                            // インデックスを更新
+                            // Update index
                             const lineNumber = kenvEntries.indexOf(kenvEntry);
                             FileState.kenvManager.updateIndex(kenvEntry, lineNumber);
                             
@@ -15192,7 +15192,7 @@ Do you want to continue?`;
                         kenvEntry.metaTxBlockId = metaBlockId;
                         kenvEntry.status = 'verified';
                         
-                        // インデックスを更新
+                        // Update index
                         const lineNumber = kenvEntries.indexOf(kenvEntry);
                         FileState.kenvManager.updateIndex(kenvEntry, lineNumber);
                         
@@ -19733,22 +19733,22 @@ Do you want to continue?`;
                 <div style="margin-bottom:15px">
                     <label style="display:block;margin-bottom:5px">タイプ:</label>
                     <select id="addEntryType" onchange="updateAddEntryForm()" style="width:100%;padding:8px">
-                        <option value="file">📄 ファイル</option>
-                        <option value="directory">📁 ディレクトリ</option>
+                        <option value="file">📄 File</option>
+                        <option value="directory">📁 Directory</option>
                     </select>
                 </div>
                 <div id="fileEntryForm">
-                    <label style="display:block;margin-bottom:5px">ダウンロード情報:</label>
+                    <label style="display:block;margin-bottom:5px">Download Information:</label>
                     <input id="addEntryInfo" type="text" style="width:100%;padding:8px;margin-bottom:10px" 
-                           placeholder="TxID:BlockID:Pass または .kaspa ファイルURL">
+                           placeholder="TxID:BlockID:Pass or .kaspa file URL">
                 </div>
                 <div id="directoryEntryForm" style="display:none">
-                    <label style="display:block;margin-bottom:5px">ディレクトリ名:</label>
+                    <label style="display:block;margin-bottom:5px">Directory Name:</label>
                     <input id="addDirName" type="text" style="width:100%;padding:8px;margin-bottom:10px" 
                            placeholder="Directory Name">
-                    <label style="display:block;margin-bottom:5px">ディレクトリメタデータ (オプション):</label>
+                    <label style="display:block;margin-bottom:5px">Directory Metadata (Optional):</label>
                     <input id="addDirMeta" type="text" style="width:100%;padding:8px;margin-bottom:10px" 
-                           placeholder="TxID:BlockID:Pass (空の場合は空ディレクトリ)">
+                           placeholder="TxID:BlockID:Pass (empty for empty directory)">
                 </div>
                 <div style="margin-top:15px;text-align:right">
                     <button onclick="this.parentElement.parentElement.remove()">Cancel</button>
@@ -19781,7 +19781,7 @@ Do you want to continue?`;
                 const info = document.getElementById('addEntryInfo').value;
                 
                 if (!info) {
-                    log('[KENV] ダウンロード情報を入力してください', 'error');
+                    log('[KENV] Please enter download information', 'error');
                     return;
                 }
                 
@@ -19805,12 +19805,12 @@ Do you want to continue?`;
                     }, 100);
                     
                 } else if (info.endsWith('.kaspa')) {
-                    // .kaspaファイルのみモード
+                    // .kaspa file only mode
                     const filename = info.split('/').pop();
                     const entry = FileState.kenvManager.addMinimalEntry(filename, 'kaspa-file', 'manual');
                     entry.externalRef = info;
                     
-                    log(`[KENV] .kaspaファイルエントリー追加: ${filename}`, 'info');
+                    log(`[KENV] Added .kaspa file entry: ${filename}`, 'info');
                     
                     // バックグラウンドで検証
                     setTimeout(() => {
@@ -19827,16 +19827,16 @@ Do you want to continue?`;
                 updateFileListFromKENV();
                 
             } else {
-                // ディレクトリエントリー
+                // Directory entry
                 const dirName = document.getElementById('addDirName').value;
                 const dirMeta = document.getElementById('addDirMeta').value;
                 
                 if (!dirName) {
-                    log('[KENV] ディレクトリ名を入力してください', 'error');
+                    log('[KENV] Please enter directory name', 'error');
                     return;
                 }
                 
-                // KENVにディレクトリを追加
+                // Add directory to KENV
                 const entry = FileState.kenvManager.addMinimalEntry(dirName, 'kaspa-directory', 'manual');
                 
                 if (dirMeta && dirMeta.includes(':')) {
@@ -19852,7 +19852,7 @@ Do you want to continue?`;
                     }, 100);
                 }
                 
-                log(`[KENV] ディレクトリエントリー追加: ${dirName}`, 'info');
+                log(`[KENV] Added directory entry: ${dirName}`, 'info');
                 
                 // UIを更新
                 updateFileListFromKENV();
@@ -20045,9 +20045,9 @@ Do you want to continue?`;
                     <tr>
                         <td colspan="6" style="text-align: center; padding: 40px; color: var(--text-secondary);">
                             <div style="font-size: 48px; margin-bottom: 10px;">📂</div>
-                            <div>ファイルがありません</div>
+                            <div>No files</div>
                             <div style="margin-top: 10px;">
-                                <button onclick="addFile()" style="padding: 5px 15px;">+ ファイルを追加</button>
+                                <button onclick="addFile()" style="padding: 5px 15px;">+ Add File</button>
                             </div>
                         </td>
                     </tr>
@@ -20228,7 +20228,7 @@ Do you want to continue?`;
                 tbody.innerHTML = `
                     <tr>
                         <td colspan="9" style="text-align: center; padding: 40px; color: var(--text-secondary);">
-                            🔍 "${query}" に一致するファイルが見つかりません
+                            🔍 No files found matching "${query}"
                         </td>
                     </tr>
                 `;
@@ -20402,7 +20402,7 @@ Do you want to continue?`;
                 tbody.innerHTML = `
                     <tr>
                         <td colspan="9" style="text-align: center; padding: 40px; color: var(--text-secondary);">
-                            🔍 該当するファイルがありません
+                            🔍 No matching files
                         </td>
                     </tr>
                 `;
@@ -20469,11 +20469,11 @@ Do you want to continue?`;
         window.shareAction = async function(action) {
             const selectedIds = Array.from(FileState.selectedFiles);
             if (selectedIds.length === 0) {
-                log('ファイルを選択してください', 'warning');
+                log('Please select a file', 'warning');
                 return;
             }
             if (selectedIds.length > 1) {
-                log('共有は1つのファイルのみ選択してください', 'warning');
+                log('Please select only one file for sharing', 'warning');
                 return;
             }
             
@@ -20484,7 +20484,7 @@ Do you want to continue?`;
             const selectedId = selectedIds[0];
             const kenvEntry = FileState.kenvManager.entries.find(e => e.id === selectedId);
             if (!kenvEntry) {
-                log('選択されたファイルの情報が見つかりません', 'error');
+                log('Selected file information not found', 'error');
                 return;
             }
             
@@ -20530,7 +20530,7 @@ Do you want to continue?`;
                         
                     case 'kaspa-password':
                     case 'kaspa-no-password':
-                        // .kaspaファイル生成 (v5.11.98: Use kenvManager method)
+                        // Generate .kaspa file (v5.11.98: Use kenvManager method)
                         await FileState.kenvManager.generateKaspaFile(selectedId, action === 'kaspa-password');
                         break;
                         

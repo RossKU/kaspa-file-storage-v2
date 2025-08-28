@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.80</title>
+    <title>Kaspa P2P File Storage v6.2.81</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -16253,20 +16253,26 @@ Do you want to continue?`;
             await loadFromMetaTxId();
         };
 
-        // v6.2.80: Enhanced download error display function
+        // v6.2.81: Enhanced download error display function with better visibility
         window.showDownloadError = function(message, details = []) {
+            // Debug logging
+            console.log('[showDownloadError] Called with:', message, details);
+            
             // Display error in progress window
             const progressDiv = document.getElementById('downloadProgress');
             const statusDiv = document.getElementById('downloadStatus');
             const progressBar = document.getElementById('downloadProgressBar');
             
             if (progressDiv) {
+                console.log('[showDownloadError] Progress div found, making visible');
                 progressDiv.style.display = 'block';
                 
                 // Change progress bar to error state
-                progressBar.style.backgroundColor = '#e74c3c';
-                progressBar.style.width = '100%';
-                progressBar.textContent = 'Error';
+                if (progressBar) {
+                    progressBar.style.backgroundColor = '#e74c3c';
+                    progressBar.style.width = '100%';
+                    progressBar.textContent = 'Error';
+                }
                 
                 // Build error message HTML
                 let errorHtml = `<div style="color: #e74c3c; font-weight: bold; margin-bottom: 10px;">❌ ${message}</div>`;
@@ -16278,20 +16284,35 @@ Do you want to continue?`;
                     });
                     errorHtml += '</div>';
                 }
-                statusDiv.innerHTML = errorHtml;
+                
+                if (statusDiv) {
+                    statusDiv.innerHTML = errorHtml;
+                } else {
+                    console.error('[showDownloadError] Status div not found!');
+                }
                 
                 // Auto-hide after 15 seconds
                 setTimeout(() => {
-                    progressDiv.style.display = 'none';
-                    progressBar.style.backgroundColor = '';  // Reset color
-                    progressBar.style.width = '0%';
-                    progressBar.textContent = '0%';
-                    statusDiv.innerHTML = '';
+                    if (progressDiv) {
+                        progressDiv.style.display = 'none';
+                    }
+                    if (progressBar) {
+                        progressBar.style.backgroundColor = '';  // Reset color
+                        progressBar.style.width = '0%';
+                        progressBar.textContent = '0%';
+                    }
+                    if (statusDiv) {
+                        statusDiv.innerHTML = '';
+                    }
                 }, 15000);
+            } else {
+                console.error('[showDownloadError] Progress div not found! Showing alert as fallback.');
+                // Fallback: Show alert if progress div doesn't exist
+                alert(`❌ ${message}\n\n${details.join('\n')}`);
             }
             
-            // Also log to console
-            log(`❌ ${message}`, 'error');
+            // Also log to console with enhanced formatting
+            log(`❌ [Download Error] ${message}`, 'error');
             details.forEach(detail => log(`  - ${detail}`, 'info'));
         };
 

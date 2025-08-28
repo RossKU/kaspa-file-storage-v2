@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.83</title>
+    <title>Kaspa P2P File Storage v6.2.84</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -4578,9 +4578,9 @@
             kaspaCompatVersion: "3.4.2",
             
             // File Name定義（v5.11.39: Phase 1-A）
-            kenvFile: 'workspace.kenv',      // 設定ファイル
-            kindexFile: 'workspace.kindex',  // インデックスファイル
-            kentryFile: 'workspace.kentry',  // エントリーデータファイル
+            kenvFile: 'workspace.kenv',      // Settings file
+            kindexFile: 'workspace.kindex',  // Index file
+            kentryFile: 'workspace.kentry',  // Entry data file
             
             // エントリー配列（.kentryの内容）
             entries: [],
@@ -4609,8 +4609,8 @@
                 // フィルタ用インデックス
                 filterIndexes: {
                     type: {
-                        file: [],      // ファイルの行番号リスト
-                        directory: []  // ディレクトリの行番号リスト
+                        file: [],      // File line number list
+                        directory: []  // Directory line number list
                     },
                     status: {
                         pending: [],    // Unverified
@@ -4838,9 +4838,9 @@
                 stats.typeDistribution[fileType] = (stats.typeDistribution[fileType] || 0) + 1;
             },
             
-            // ===== ファイル保存・読み込み関数 (v5.11.39: Phase 1-A) =====
+            // ===== File save/load functions (v5.11.39: Phase 1-A) =====
             
-            // .kenvファイルの保存
+            // Save .kenv file
             async saveKenvFile() {
                 if (!WorkspaceState.handle) {
                     log('[KENV] Workspace not configured', 'warning');
@@ -4913,7 +4913,7 @@
                 }
             },
             
-            // .kindexファイルの保存
+            // Save .kindex file
             async saveKindexFile() {
                 if (!WorkspaceState.handle) {
                     log('[KENV] Workspace not configured', 'warning');
@@ -4934,7 +4934,7 @@
                 }
             },
             
-            // .kentryファイルの保存
+            // Save .kentry file
             async saveKentryFile() {
                 if (!WorkspaceState.handle) {
                     log('[KENV] Workspace not configured', 'warning');
@@ -5070,7 +5070,7 @@
                 }
             },
             
-            // すべてのKENVファイルを保存
+            // Save all KENV files
             async saveAll() {
                 log('[KENV] Starting to save all files', 'info');
                 
@@ -5090,12 +5090,12 @@
                         return false;
                     }
                 } else {
-                    // ワークスペースがない場合はLocalStorageに保存
+                    // Save to LocalStorage if no workspace is set
                     return await this.saveToLocalStorage();
                 }
             },
             
-            // LocalStorageへの保存
+            // Save to LocalStorage
             async saveToLocalStorage() {
                 const KENV_LOCALSTORAGE_LIMIT = 5 * 1024 * 1024; // 5MB
                 const MAX_ENTRIES_IN_LOCALSTORAGE = 500; // 最大500件
@@ -5139,7 +5139,7 @@
                         log(`[KENV] Capacity limit: ${(dataStr.length/1024/1024).toFixed(1)}MB → Reduced to 5MB`, 'warning');
                     }
                     
-                    // Step 4: 保存
+                    // Step 4: Save
                     const result = SafeStorage.setItem('kenv_temp_data', JSON.stringify(data));
                     if (result.success) {
                         log(`[KENV] Saved to LocalStorage (${entriesToSave.length} items)`, 'success');
@@ -5158,7 +5158,7 @@
                 }
             },
             
-            // .kenvファイルの読み込み
+            // Load .kenv file
             async loadKenvFile() {
                 if (!WorkspaceState.handle) {
                     log('[KENV] Workspace not configured', 'warning');
@@ -5188,7 +5188,7 @@
                 }
             },
             
-            // .kindexファイルの読み込み
+            // Load .kindex file
             async loadKindexFile() {
                 if (!WorkspaceState.handle) {
                     log('[KENV] Workspace not configured', 'warning');
@@ -5216,7 +5216,7 @@
                 }
             },
             
-            // .kentryファイルの読み込み
+            // Load .kentry file
             async loadKentryFile() {
                 if (!WorkspaceState.handle) {
                     log('[KENV] Workspace not configured', 'warning');
@@ -5425,7 +5425,7 @@
                     created: entry.created || entry.uploadDate,
                     network: entry.network || config.network,
                     
-                    // 暗号化情報（saltから復元）
+                    // Encryption info (restored from salt)
                     encryption: {
                         algorithm: 'AES-256-GCM',
                         pbkdf2: {
@@ -5485,14 +5485,14 @@
                 return metadata;
             },
             
-            // すべてのKENVファイルを読み込み
+            // Load all KENV files
             async loadAll() {
                 log('[KENV] Starting to load all files', 'info');
                 
-                // 設定ファイルを読み込み
+                // Load settings file
                 const kenvData = await this.loadKenvFile();
                 
-                // エントリーとインデックスを読み込み
+                // Load entries and index
                 const kentryLoaded = await this.loadKentryFile();
                 const kindexLoaded = await this.loadKindexFile();
                 
@@ -5530,7 +5530,7 @@
                         const fileLoaded = await this.loadAll();
                         
                         if (fileLoaded && tempData && tempData.entries.length > 0) {
-                            // 統合確認
+                            // Verify integration
                             const shouldMerge = await this.confirmMerge(tempData);
                             if (shouldMerge) {
                                 await this.mergeTemporaryData(tempData);
@@ -5602,7 +5602,7 @@
                                     entry.sha256 = metadata.file.sha256;
                                     entry.encrypted = metadata.file.encrypted;
                                     
-                                    // 圧縮情報
+                                    // Compression info
                                     if (metadata.file.compression) {
                                         entry.compressionAlgorithm = metadata.file.compression.algorithm;
                                         entry.compressionEnabled = metadata.file.compression.enabled;
@@ -5619,7 +5619,7 @@
                                     entry.directoryCount = metadata.directory.directoryCount || 0;
                                 }
                                 
-                                // 暗号化情報
+                                // Encryption info
                                 if (metadata.encryption) {
                                     entry.encryptionAlgorithm = metadata.encryption.algorithm;
                                     if (metadata.encryption.pbkdf2) {
@@ -5667,7 +5667,7 @@
                 }
             },
             
-            // LocalStorageからの読み込み
+            // Load from LocalStorage
             loadFromLocalStorage() {
                 const data = SafeStorage.getItem('kenv_temp_data');
                 if (!data) return null;
@@ -5963,7 +5963,7 @@ Do you want to continue?`;
                             kaspaMetadata.auth = {
                                 passwordIncluded: true,
                                 password: kenvEntry.password,
-                                warning: "パスワードは平文で保存されています。信頼できる相手とのみ共有してください。"
+                                warning: "Passwords are saved in plain text. Only share with trusted parties."
                             };
                         }
                         
@@ -5981,7 +5981,7 @@ Do you want to continue?`;
                         a.click();
                         
                         URL.revokeObjectURL(url);
-                        log(`.kaspaファイルを生成しました: ${filename}`, 'success');
+                        log(`.kaspa file generated: ${filename}`, 'success');
                         return;
                     }
                     
@@ -6074,7 +6074,7 @@ Do you want to continue?`;
                     const cid = cidFull.length > 8 ? cidFull.slice(0, 8) : cidFull;
                     const filename = `${kenvEntry.name}.${cid}.kaspa`;
                     
-                    // Blobを作成してダウンロード
+                    // Create blob and download
                     const blob = new Blob([jsonString], { type: 'application/octet-stream' });
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
@@ -6086,12 +6086,12 @@ Do you want to continue?`;
                     URL.revokeObjectURL(url);
                     
                     log(includePassword ? 
-                        'パスワード付き.kaspaファイルを生成しました' : 
-                        'パスワードなし.kaspaファイルを生成しました', 'success');
+                        '.kaspa file with password generated' : 
+                        '.kaspa file without password generated', 'success');
                         
                 } catch (error) {
                     console.error('.kaspa file generation error:', error);
-                    log(`.kaspaファイル生成エラー: ${error.message}`, 'error');
+                    log(`.kaspa file generation error: ${error.message}`, 'error');
                 }
             }
         };
@@ -6432,9 +6432,9 @@ Do you want to continue?`;
                         
                         self.showEditSection();
                         self.updatePreview();
-                        this.showStatus('.kaspaファイルを読み込みました', 'success');
+                        this.showStatus('.kaspa file loaded successfully', 'success');
                     } catch (error) {
-                        this.showStatus(`ファイル読み込みエラー: ${error.message}`, 'error');
+                        this.showStatus(`File read error: ${error.message}`, 'error');
                     }
                 };
                 input.click();
@@ -6746,7 +6746,7 @@ Do you want to continue?`;
                 
                 // Show current path
                 const pathDisplay = path || 'ルート';
-                this.showStatus(`選択中: ${pathDisplay}`, 'info');
+                this.showStatus(`Selected: ${pathDisplay}`, 'info');
             },
             
             createEmptyFolder() {
@@ -6886,7 +6886,7 @@ Do you want to continue?`;
             },
             
             updatePreview() {
-                const name = document.getElementById('dirbuilder-name').value || '未設定';
+                const name = document.getElementById('dirbuilder-name').value || 'Not set';
                 this.name = name;
                 
                 const metadata = {
@@ -6956,7 +6956,7 @@ Do you want to continue?`;
                         created: new Date().toISOString(),
                         network: config.network,
                         directory: {
-                            name: this.name || '未設定',
+                            name: this.name || 'Not set',
                             totalSize: this.entries.reduce((sum, e) => sum + (e.size || 0), 0),
                             fileCount: this.entries.filter(e => e.type === 'file').length,
                             directoryCount: this.entries.filter(e => e.type === 'directory').length
@@ -7041,7 +7041,7 @@ Do you want to continue?`;
             
             exportAsKaspa() {
                 // v5.11.18-fix8: Check if name is valid
-                if (!this.name || this.name === '未設定') {
+                if (!this.name || this.name === 'Not set') {
                     this.showStatus('Please enter directory name', 'error');
                     return;
                 }
@@ -7094,7 +7094,7 @@ Do you want to continue?`;
                     // Save to storage
                     await FileState.kenvManager.saveAll();
                     
-                    this.showStatus('KENVに保存しました。File Tabで確認できます', 'success');
+                    this.showStatus('Saved to KENV. Check the File tab for details', 'success');
                     
                     // Update File Tab if active
                     if (document.querySelector('.tab-content.active')?.id === 'file-tab') {
@@ -7103,7 +7103,7 @@ Do you want to continue?`;
                     
                     return entry.id;
                 } catch (error) {
-                    this.showStatus(`KENV保存エラー: ${error.message}`, 'error');
+                    this.showStatus(`KENV save error: ${error.message}`, 'error');
                     console.error('[DirectoryBuilder] KENV save error:', error);
                     return null;
                 }
@@ -7212,7 +7212,7 @@ Do you want to continue?`;
                         
                         // v5.12.14: Add KENV entry for directory upload
                         if (FileState.kenvManager._initialized) {
-                            log('[KENV] ディレクトリアップロードエントリーを追加', 'info');
+                            log('[KENV] Adding directory upload entry', 'info');
                             const kenvEntry = FileState.kenvManager.addMinimalEntry(
                                 this.name,
                                 'kaspa-directory',
@@ -7539,15 +7539,15 @@ Do you want to continue?`;
         });
 
         // v5.5.6: Define getter/setter for kaspaMetadata
-        // v5.5.8: downloadByChunkIndex内の圧縮チェック2箇所を移行 (16/120)
+        // v5.5.8: Migrated 2 compression check points in downloadByChunkIndex (16/120)
         // v5.5.9: createSuperMetadata内のデバッグログ1箇所を移行 (17/120)
         // v5.5.10: createAndUploadMetaTx内のデバッグログ1箇所を移行 (18/120)
         // v5.5.11: processAndUpload内のデバッグログ3箇所を移行 (21/120)
-        // v5.5.12: downloadFile内の存在チェックと暗号化チェック5箇所を移行 (26/120)
+        // v5.5.12: Migrated 5 existence and encryption check points in downloadFile (26/120)
         // v5.5.13: downloadFile内のバージョン互換性チェック4箇所を移行 (30/120)
         // v5.5.14: fileInfo表示のchunks.length1箇所を移行 (31/120)
         // v5.5.15: fileプロパティの読み取り専用アクセス11箇所を移行 (42/120)
-        // v5.5.16: ダウンロード関連の読み取り専用アクセス16箇所を移行 (58/120)
+        // v5.5.16: Migrated 16 read-only download access points (58/120)
         // v5.5.17: 残りの読み取り専用アクセス23箇所を全て移行 (81/120) - 読み取り専用完了
         // v5.5.18: 残っていた読み取り専用参照8箇所を修正 (89/120)
         // v5.5.19: config is not definedエラーとProgressManager totalChunks undefined問題を修正
@@ -8012,7 +8012,7 @@ Do you want to continue?`;
             checkFileSizeWarning: function(file) {
                 const MAX_SIZE_WITH_META = 550 * 1024 * 1024; // 550MB
                 if (file.size > MAX_SIZE_WITH_META) {
-                    log(`⚠️ 警告: このファイルサイズ(${(file.size/1024/1024).toFixed(1)}MB)では、ブロックチェーン上のメタデータトランザクションが生成されない可能性があります`, 'warning');
+                    log(`⚠️ Warning: This file size (${(file.size/1024/1024).toFixed(1)}MB) may not generate a metadata transaction on the blockchain`, 'warning');
                     log('.kaspaファイルは生成されますが、メタデータの共有が制限されます', 'warning');
                     return true;
                 }
@@ -8475,11 +8475,11 @@ Do you want to continue?`;
                     } else {
                         // v6.2.66: Don't recreate RPC client during upload session
                         if (FileState.uploadingMetaTx || FileState.uploadingChunksCount > 0) {
-                            log('[ConnectionManager] アップロード中のためRPCクライアントを保持', 'info');
+                            log('[ConnectionManager] Keeping RPC client active during upload', 'info');
                             // Keep existing RPC client during upload
                         } else {
                             // Only recreate if not uploading
-                            log('[ConnectionManager] 警告: RPCクライアントが残存していました', 'warning');
+                            log('[ConnectionManager] Warning: RPC client remained active', 'warning');
                             log('[ConnectionManager] 既存のRPCクライアントを破棄して新規作成します', 'info');
                             try {
                                 await NetworkState.rpcClient.disconnect();
@@ -8569,7 +8569,7 @@ Do you want to continue?`;
                         log('[ConnectionManager] メタTx送信を自動的に再開します...', 'info');
                         log(`[DEBUG-RESUME] メタTxのみ必要 - needsMetaTx: true`, 'debug');
                     } else {
-                        log('[ConnectionManager] アップロードを自動的に再開します...', 'info');
+                        log('[ConnectionManager] Automatically resuming upload...', 'info');
                         log(`[DEBUG-RESUME] 条件を満たしました - 自動再開を実行`, 'debug');
                     }
                     log(`[DEBUG] 再開条件満たす - uploadSessionActive: ${FileState.uploadSessionActive}`, 'debug');
@@ -9234,11 +9234,11 @@ Do you want to continue?`;
                         }
                         
                         const decrypted = await decryptChunk(payload, key, index);
-                        log(`[DEBUG Download] チャンク${index} 復号化: ${payload.length} → ${decrypted.length} バイト`, 'debug');
+                        log(`[DEBUG Download] Chunk ${index} decryption: ${payload.length} → ${decrypted.length} bytes`, 'debug');
                         
                         const original = FileState.kaspaMetadata.file?.compression?.enabled ? 
                             lzDecompress(decrypted) : decrypted;
-                        log(`[DEBUG Download] チャンク${index} 解凍: ${decrypted.length} → ${original.length} バイト (圧縮${FileState.kaspaMetadata.file?.compression?.enabled ? '有効' : '無効'})`, 'debug');
+                        log(`[DEBUG Download] Chunk ${index} decompression: ${decrypted.length} → ${original.length} bytes (compression ${FileState.kaspaMetadata.file?.compression?.enabled ? 'enabled' : 'disabled'})`, 'debug');
                         
                         this.results.set(index, original);
                         this.completedCount++;
@@ -10455,7 +10455,7 @@ Do you want to continue?`;
                 
                 return sortedChunks;
             } catch (error) {
-                log(`[ParallelDownloader] 並列ダウンロードエラー: ${error.message}`, 'error');
+                log(`[ParallelDownloader] Parallel download error: ${error.message}`, 'error');
                 throw error;
             }
         };
@@ -10550,7 +10550,7 @@ Do you want to continue?`;
                         throw lastError || new Error('Payload not found');
                     }
                     
-                    // 暗号化されたデータをそのまま返す（復号化は呼び出し側で行う）
+                    // Return encrypted data as-is (decryption handled by caller)
                     this.results.set(index, payload);
                     this.completedCount++;
                     this.totalBytes += payload.length;
@@ -10667,7 +10667,7 @@ Do you want to continue?`;
                         
                         // Kill switch check
                         if (!NetworkState.restApiControl.globalEnabled || NetworkState.restApiControl.temporaryKilled) {
-                            throw new Error('ブロックデータが見つかりません（RPC）\nREST APIは無効化されています（プライバシー設定）\n→ アーカイブノードに接続するか、REST APIを一時的に有効化してください');
+                            throw new Error('Block data not found (RPC)\nREST API is disabled (privacy setting)\n→ Connect to an archive node or temporarily enable REST API');
                         }
                         
                         const apiUrl = `${config.apiEndpoints[config.network]}/transactions/${metaTxId}`;
@@ -10697,7 +10697,7 @@ Do you want to continue?`;
                         const metaDataString = new TextDecoder().decode(decrypted);
                         const metadata = JSON.parse(metaDataString);
                         
-                        log(`[DownloadManager] メタデータ復号成功: v${metadata.version}`, 'success');
+                        log(`[DownloadManager] Metadata decryption successful: v${metadata.version}`, 'success');
                         // v4.7.14: Store metadata internally
                         this.metadata = metadata;
                         return metadata;
@@ -10798,7 +10798,7 @@ Do you want to continue?`;
             // Download single chunk from blockchain
             async downloadChunk(txId, blockId, key, index, metadata) {
                 try {
-                    log(`[DownloadManager] チャンク ${index + 1} ダウンロード開始: ${txId.substring(0, 16)}...`, 'info');
+                    log(`[DownloadManager] Starting chunk ${index + 1} download: ${txId.substring(0, 16)}...`, 'info');
                     
                     // Skip RPC if REST API test mode
                     if (this.forceRestApi) {
@@ -10847,7 +10847,7 @@ Do you want to continue?`;
                     // v4.7.41: Enhanced debugging for variable chunk compression
                     const segmentBoundaries = metadata.metadata?.segmentBoundaries || metadata.metadata?.chunkBoundaries;
                     if (metadata.file?.compression?.enabled && segmentBoundaries) {
-                        log(`[DownloadManager] 可変チャンク圧縮ファイル検出 - 暗号化データをそのまま返す`, 'info');
+                        log(`[DownloadManager] Variable chunk compressed file detected - returning encrypted data as-is`, 'info');
                         log(`[DownloadManager] チャンク ${index}: payload size=${payload.length} bytes`, 'debug');
                         log(`[DownloadManager] Encrypted data preview: ${Array.from(payload.slice(0, 16)).map(b => b.toString(16).padStart(2, '0')).join(' ')}...`, 'debug');
                         if (segmentBoundaries[index]) {
@@ -10915,7 +10915,7 @@ Do you want to continue?`;
                     this.isDownloading = true;
                     const { onProgress, onComplete, folderStructure, metaTxId, metaTxBlockId, addToListOnly = false } = options;
                     
-                    log(`[DownloadManager] ${addToListOnly ? 'File List追加' : 'ダウンロード'}開始: ${metadata.file?.name || 'unknown'}`, 'info');
+                    log(`[DownloadManager] Starting ${addToListOnly ? 'File List addition' : 'download'}: ${metadata.file?.name || 'unknown'}`, 'info');
                     
                     // v6.2.33: Skip download if addToListOnly is true
                     let blob = null;
@@ -10952,7 +10952,7 @@ Do you want to continue?`;
                         
                         if (useParallel) {
                             // Parallel download for payload split
-                            log(`[DownloadManager] 並列ダウンロードモードを使用 (${totalPayloads}ペイロード)`, 'info');
+                            log(`[DownloadManager] Using parallel download mode (${totalPayloads} payloads)`, 'info');
                             
                             const downloader = new ParallelDownloader(rpcClient, 8);
                             
@@ -10975,7 +10975,7 @@ Do you want to continue?`;
                                 );
                                 payloads.push(...parallelPayloads);
                             } catch (error) {
-                                log(`[DownloadManager] PayloadSplit並列ダウンロードエラー: ${error.message}`, 'error');
+                                log(`[DownloadManager] PayloadSplit parallel download error: ${error.message}`, 'error');
                                 throw error;
                             }
                         } else {
@@ -11018,7 +11018,7 @@ Do you want to continue?`;
                         const boundaries = metadata.metadata?.segmentBoundaries || metadata.metadata?.chunkBoundaries;
                         if (boundaries) {
                             // Use segment boundary information for precise decryption
-                            log('[DownloadManager] セグメントバウンダリ情報を使用して復号化', 'info');
+                            log('[DownloadManager] Using segment boundary info for decryption', 'info');
                             
                             for (const boundary of boundaries) {
                                 const start = boundary.offset;
@@ -11113,12 +11113,12 @@ Do you want to continue?`;
                     // v5.4.54: Skip old approach if combined is already set (payloadSplit case)
                     if (!combined) {
                         // Old approach: download and decrypt chunks individually
-                        log('[DownloadManager] 従来方式: チャンク単位のダウンロードを使用', 'info');
+                        log('[DownloadManager] Using traditional chunk-based download', 'info');
                         
                         // v4.7.41: Enhanced debugging for variable chunk compression
                         const segmentBoundariesSeq = metadata.metadata?.segmentBoundaries || metadata.metadata?.chunkBoundaries;
                         if (metadata.file?.compression?.enabled && segmentBoundariesSeq) {
-                            log('[DownloadManager] 可変チャンク圧縮ファイルのシーケンシャルダウンロード', 'info');
+                            log('[DownloadManager] Sequential download for variable chunk compressed files', 'info');
                             log(`[DownloadManager] Total boundaries: ${segmentBoundariesSeq.length}`, 'debug');
                             log(`[DownloadManager] Total chunks: ${metadata.chunks.length}`, 'debug');
                             
@@ -11168,10 +11168,10 @@ Do you want to continue?`;
                                 if (start < encryptedData.length) {
                                     const encryptedChunk = encryptedData.slice(start, Math.min(end, encryptedData.length));
                                     try {
-                                        log(`[DownloadManager] チャンク ${boundary.index} 復号化: offset=${start}, size=${encryptedChunk.length}`, 'info');
+                                        log(`[DownloadManager] Chunk ${boundary.index} decryption: offset=${start}, size=${encryptedChunk.length}`, 'info');
                                         log(`[DownloadManager] Encrypted chunk preview: ${Array.from(encryptedChunk.slice(0, 16)).map(b => b.toString(16).padStart(2, '0')).join(' ')}...`, 'debug');
                                         const decryptedChunk = await decryptChunk(encryptedChunk, key, boundary.index);
-                                        log(`[DownloadManager] チャンク ${boundary.index} 復号化成功: ${decryptedChunk.length} bytes`, 'success');
+                                        log(`[DownloadManager] Chunk ${boundary.index} decryption successful: ${decryptedChunk.length} bytes`, 'success');
                                         decryptedChunks.push(decryptedChunk);
                                     } catch (e) {
                                         log(`[DownloadManager] Chunk ${boundary.index} decryption error: ${e.message}`, 'error');
@@ -11203,7 +11203,7 @@ Do you want to continue?`;
                             
                             if (useParallel) {
                                 // Use parallel download
-                                log(`[DownloadManager] 並列ダウンロードモードを使用 (${totalChunks}チャンク)`, 'info');
+                                log(`[DownloadManager] Using parallel download mode (${totalChunks} chunks)`, 'info');
                                 
                                 try {
                                     const downloader = new ParallelDownloader(rpcClient, 8);
@@ -11239,7 +11239,7 @@ Do you want to continue?`;
                                     }
                                     
                                 } catch (error) {
-                                    log(`[DownloadManager] 並列ダウンロードエラー、シーケンシャルにフォールバック: ${error.message}`, 'warning');
+                                    log(`[DownloadManager] Parallel download error, falling back to sequential: ${error.message}`, 'warning');
                                     
                                     // Fallback to sequential download
                                     chunks.length = 0; // Clear any partial downloads
@@ -11261,7 +11261,7 @@ Do you want to continue?`;
                                 }
                             } else {
                                 // Sequential download (original logic)
-                                log('[DownloadManager] シーケンシャルダウンロードモードを使用', 'info');
+                                log('[DownloadManager] Using sequential download mode', 'info');
                                 
                                 for (let i = 0; i < totalChunks; i++) {
                                     const txId = metadata.chunks[i];
@@ -11455,12 +11455,12 @@ Do you want to continue?`;
                             kenvEntry.encrypted = true;
                             kenvEntry.totalChunks = metadata.chunks?.length || metadata.recovery?.totalChunks || null;
                             
-                            // 暗号化情報
+                            // Encryption info
                             if (metadata.encryption?.pbkdf2?.salt) {
                                 kenvEntry.salt = metadata.encryption.pbkdf2.salt;
                             }
                             
-                            // 圧縮情報
+                            // Compression info
                             if (metadata.file?.compression) {
                                 const comp = metadata.file.compression;
                                 kenvEntry.compressionAlgorithm = comp.algorithm;
@@ -12689,9 +12689,9 @@ Do you want to continue?`;
                 
                 return new Uint8Array(decrypted);
             } catch (error) {
-                log(`復号化エラー (チャンク ${chunkIndex}): ${error.message || error}`, 'error');
+                log(`Decryption error (chunk ${chunkIndex}): ${error.message || error}`, 'error');
                 log(`データサイズ: ${data.length} bytes`, 'error');
-                console.error('復号化エラーの詳細:', error);
+                console.error('Decryption error details:', error);
                 throw error;
             }
         }

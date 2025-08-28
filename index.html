@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.86</title>
+    <title>Kaspa P2P File Storage v6.2.87</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -3582,7 +3582,7 @@
                 manager.maxConsecutiveNonArchive = maxConsecutive;
                 log(`[Archive] Max consecutive failures set to ${maxConsecutive}`, 'info');
                 
-                // LocalStorageに保存
+                // Save to LocalStorage
                 try {
                     localStorage.setItem('archiveMaxConsecutive', maxConsecutive.toString());
                 } catch (e) {
@@ -5382,7 +5382,7 @@
                 return values;
             },
             
-            // v5.11.110: directoryMetadataのエンコード（CSV保存用）
+            // v5.11.110: Encode directoryMetadata (for CSV save)
             encodeDirectoryMetadata(metadata) {
                 if (!metadata) return '';
                 try {
@@ -5513,7 +5513,7 @@
                 log('[KENV] Initialization started', 'info');
                 
                 try {
-                    // Step 1: LocalStorageから復元試行
+                    // Step 1: Try to restore from LocalStorage
                     const tempData = this.loadFromLocalStorage();
                     if (tempData) {
                         this.entries = tempData.entries || [];
@@ -5585,7 +5585,7 @@
                             );
                             
                             if (metadata) {
-                                // メタデータのすべての基本情報を保存（chunks配列などの大きなデータは除く）
+                                // Save all basic metadata information (excluding large data like chunks array)
                                 
                                 // 基本メタデータ情報
                                 entry.type = metadata.type || 'kaspa-file';
@@ -5594,10 +5594,10 @@
                                 entry.network = metadata.network || config.network;
                                 entry.cid = metadata.cid;
                                 
-                                // ファイル情報（kaspa-fileの場合）
+                                // File information (for kaspa-file)
                                 if (metadata.file) {
                                     entry.name = metadata.file.name || entry.name;
-                                    entry.fileSize = metadata.file.size || 0;  // fileSizeとして保存（表示で使用）
+                                    entry.fileSize = metadata.file.size || 0;  // Save as fileSize (used for display)
                                     entry.mimeType = metadata.file.mimeType;
                                     entry.sha256 = metadata.file.sha256;
                                     entry.encrypted = metadata.file.encrypted;
@@ -5711,7 +5711,7 @@
                 return true;
             },
             
-            // 統合確認
+            // Integration confirmation
             async confirmMerge(tempData) {
                 const entryCount = tempData.entries?.length || 0;
                 if (entryCount === 0) return false;
@@ -5766,7 +5766,7 @@
                             )
                         );
                     } else {
-                        // ファイルタイプの重複チェック（kaspa-fileなど）
+                        // Check for duplicate file types (kaspa-file, etc.)
                         isIdentical = this.entries.some(e => 
                             e.type !== 'kaspa-directory' &&
                             e.name === entry.name &&
@@ -5861,7 +5861,7 @@
                             if (similar) foundSimilar = true;
                         }
                     } else {
-                        // ファイルの重複チェック
+                        // Check for duplicate files
                         const identical = this.entries.find(e => 
                             e.type !== 'kaspa-directory' &&
                             e.name === entry.name &&
@@ -5985,7 +5985,7 @@ Do you want to continue?`;
                         return;
                     }
                     
-                    // ファイルの場合、メタトランザクションIDはオプショナル
+                    // For files, meta transaction ID is optional
                     // v5.12.12: Changed to allow .kaspa file generation even without meta TxID
                     if (!kenvEntry.metaTxId || !kenvEntry.metaTxBlockId) {
                         log('No meta transaction information. Generating .kaspa file with chunk information only', 'warning');
@@ -6002,7 +6002,7 @@ Do you want to continue?`;
                         encryption: {
                             algorithm: "AES-256-GCM",
                             pbkdf2: {
-                                salt: kenvEntry.salt || "", // v5.11.66: 保存されたsaltを使用
+                                salt: kenvEntry.salt || "", // v5.11.66: Use saved salt
                                 iterations: 100000
                             }
                         },
@@ -6023,7 +6023,7 @@ Do you want to continue?`;
                             }
                         },
                         
-                        // チャンク情報（v5.11.66: 保存されたデータを使用）
+                        // Chunk information (v5.11.66: Use saved data)
                         chunks: kenvEntry._chunks || [],
                         chunkBlockIds: kenvEntry._chunkBlockIds || [],
                         
@@ -6044,7 +6044,7 @@ Do you want to continue?`;
                             blockTime: kenvEntry.blockTime || null,
                             uploadedBy: kenvEntry.uploadedBy || "",
                             payloadSplit: kenvEntry.payloadSplit === 'true' || kenvEntry.payloadSplit === true,  // v5.11.67: 文字列と真偽値の両方に対応
-                            segmentBoundaries: kenvEntry._segmentBoundaries || [] // v5.11.66: 保存されたセグメントバウンダリーを使用
+                            segmentBoundaries: kenvEntry._segmentBoundaries || [] // v5.11.66: Use saved segment boundaries
                         },
                         
                         // Chunk structure
@@ -6418,7 +6418,7 @@ Do you want to continue?`;
                         const metadata = JSON.parse(text);
                         
                         if (metadata.type !== 'kaspa-directory') {
-                            this.showStatus('.kaspaファイルがディレクトリメタデータではありません', 'error');
+                            this.showStatus('.kaspa file is not directory metadata', 'error');
                             return;
                         }
                         
@@ -6783,7 +6783,7 @@ Do you want to continue?`;
                 this.updatePreview();
                 // v5.11.18-fix12: Update button states after adding folder
                 this.updateButtonStates();
-                this.showStatus(`フォルダ「${folderName}」を作成しました`, 'success');
+                this.showStatus(`Created folder "${folderName}"`, 'success');
                 
                 // Auto-select the new folder
                 this.selectNode(fullPath, 'directory');
@@ -7062,7 +7062,7 @@ Do you want to continue?`;
                 a.click();
                 URL.revokeObjectURL(url);
                 
-                this.showStatus(`.kaspaファイルを生成しました: ${filename}`, 'success');
+                this.showStatus(`Generated .kaspa file: ${filename}`, 'success');
             },
             
             // v5.11.109: Save generated directory metadata to KENV
@@ -7634,7 +7634,7 @@ Do you want to continue?`;
                     return value; 
                 },
                 set(value) { 
-                    // v5.5.38-phase2: 両方を更新（安全性のため）
+                    // v5.5.38-phase2: Update both (for safety)
                     FileState.uploadingDirMeta = value;
                     window._uploadingDirMetaGlobal = value;
                     console.log(`[v5.5.38] uploadingDirMeta set via proxy: ${value}`);
@@ -7642,7 +7642,7 @@ Do you want to continue?`;
                 configurable: true,
                 enumerable: true
             });
-            // 元のグローバル変数を別名で保存（初期値はfalse）
+            // Save original global variable with alias (initial value is false)
             window._uploadingDirMetaGlobal = false;
         } catch (e) {
             console.warn('uploadingDirMeta proxy already defined:', e);
@@ -7720,7 +7720,7 @@ Do you want to continue?`;
         
         // v5.5.20: currentPasswordの後方互換性プロキシ
         // v5.5.21: Added configurable option to avoid redefinition errors
-        // v5.7.12: 重複定義を削除（v5.5.3の定義を削除し、このtry-catch付きの定義のみを残す）
+        // v5.7.12: Remove duplicate definition (remove v5.5.3 definition, keep only this try-catch version)
         try {
             Object.defineProperty(window, 'currentPassword', {
                 get() { return FileState.currentPassword; },
@@ -7953,7 +7953,7 @@ Do you want to continue?`;
                     log(`endsWith('.kaspa'): ${file.name.endsWith('.kaspa')}`, 'info');
                     
                     if (file.name.endsWith('.kaspa')) {
-                        log('.kaspa ファイルが検出されました', 'info');
+                        log('.kaspa file detected', 'info');
                         
                         const reader = new FileReader();
                         reader.onload = async function(event) {
@@ -7972,7 +7972,7 @@ Do you want to continue?`;
                                     document.getElementById('metaTxId').value = kaspaData.metadata.metaTxId || '';
                                     document.getElementById('downloadPassword').value = '';
                                     document.getElementById('downloadPassword').placeholder = kaspaData.auth?.passwordIncluded ? 
-                                        'パスワードは.kaspaファイルに含まれています' : 'パスワードを入力';
+                                        'Password is included in .kaspa file' : 'Enter password';
                                     
                                     // Call appropriate function based on context
                                     if (typeof downloadFile === 'function') {
@@ -8000,7 +8000,7 @@ Do you want to continue?`;
                         };
                         reader.readAsText(file);
                     } else {
-                        log('.kaspa ファイルではありません', 'warning');
+                        log('Not a .kaspa file', 'warning');
                         alert('Please drop a .kaspa file');
                     }
                 } else {
@@ -8013,7 +8013,7 @@ Do you want to continue?`;
                 const MAX_SIZE_WITH_META = 550 * 1024 * 1024; // 550MB
                 if (file.size > MAX_SIZE_WITH_META) {
                     log(`⚠️ Warning: This file size (${(file.size/1024/1024).toFixed(1)}MB) may not generate a metadata transaction on the blockchain`, 'warning');
-                    log('.kaspaファイルは生成されますが、メタデータの共有が制限されます', 'warning');
+                    log('.kaspa file will be generated but metadata sharing will be limited', 'warning');
                     return true;
                 }
                 return false;
@@ -8244,7 +8244,7 @@ Do you want to continue?`;
                             return JSON.parse(value);
                         } catch (e) {
                             console.error(`Invalid JSON in ${key}:`, e);
-                            // 破損データを削除
+                            // Delete corrupted data
                             localStorage.removeItem(key);
                             return null;
                         }
@@ -8266,19 +8266,19 @@ Do you want to continue?`;
             }
             
             static handleQuotaExceeded(newKey) {
-                // 優先度の低いデータから削除
+                // Delete from lowest priority data
                 const priorityOrder = [
                     'kaspa-upload-progress',     // 一時的
                     'kaspa-upload-metadata',     // 一時的
                     'kaspaDirectories',          // 再構築可能
                     'kaspaDAG',                  // 再構築可能
-                    'kenv_temp_data'            // 重要（最後に削除）
+                    'kenv_temp_data'            // Important (delete last)
                 ];
                 
                 for (const key of priorityOrder) {
                     if (key !== newKey && localStorage.getItem(key)) {
                         localStorage.removeItem(key);
-                        log(`[Storage] 容量確保のため${key}を削除`, 'warning');
+                        log(`[Storage] Deleting ${key} to free up space`, 'warning');
                         break;
                     }
                 }
@@ -8470,7 +8470,7 @@ Do you want to continue?`;
                 try {
                     // v5.7.5: Always create new RPC client on reconnect
                     if (!NetworkState.rpcClient) {
-                        log('[ConnectionManager] 新規RPCクライアントを作成します', 'info');
+                        log('[ConnectionManager] Creating new RPC client', 'info');
                         await initializeRpcClient();
                     } else {
                         // v6.2.66: Don't recreate RPC client during upload session
@@ -8480,7 +8480,7 @@ Do you want to continue?`;
                         } else {
                             // Only recreate if not uploading
                             log('[ConnectionManager] Warning: RPC client remained active', 'warning');
-                            log('[ConnectionManager] 既存のRPCクライアントを破棄して新規作成します', 'info');
+                            log('[ConnectionManager] Discarding existing RPC client and creating new one', 'info');
                             try {
                                 await NetworkState.rpcClient.disconnect();
                             } catch (disconnectError) {
@@ -8586,13 +8586,13 @@ Do you want to continue?`;
                             // Verify the progress matches current file
                             if (FileState.currentFile && savedProgress.file?.name === FileState.currentFile.name) {
                                 window.pendingProgress = savedProgress;
-                                log('[ConnectionManager] 進捗データを復元しました', 'info');
+                                log('[ConnectionManager] Restored progress data', 'info');
                             } else if (!FileState.currentFile) {
                                 // If no current file, restore from progress
-                                log('[DEBUG] FileState.currentFileがnull - 進捗データから復元を試みます', 'debug');
+                                log('[DEBUG] FileState.currentFile is null - attempting to restore from progress data', 'debug');
                                 FileState.currentFile = savedProgress.file;
                                 window.pendingProgress = savedProgress;
-                                log('[ConnectionManager] File Informationを進捗データから復元しました', 'info');
+                                log('[ConnectionManager] Restored File Information from progress data', 'info');
                             }
                         }
                     }
@@ -8635,10 +8635,10 @@ Do you want to continue?`;
                             } else {
                                 log('[ConnectionManager] 自動再開に必要な情報が不足しています', 'warning');
                                 if (!FileState.currentFile) {
-                                    log('[ConnectionManager] FileState.currentFileが設定されていません', 'debug');
+                                    log('[ConnectionManager] FileState.currentFile is not set', 'debug');
                                 }
                                 if (!window.pendingProgress) {
-                                    log('[ConnectionManager] pendingProgressが設定されていません', 'debug');
+                                    log('[ConnectionManager] pendingProgress is not set', 'debug');
                                 }
                             }
                         }, 1000);
@@ -8648,7 +8648,7 @@ Do you want to continue?`;
                     if (!FileState.progressManager) {
                         log(`[DEBUG-RESUME]   理由: ProgressManagerが存在しない`, 'debug');
                     } else if (!FileState.progressManager.progress) {
-                        log(`[DEBUG-RESUME]   理由: progressデータが存在しない`, 'debug');
+                        log(`[DEBUG-RESUME]   Reason: progress data does not exist`, 'debug');
                     } else if (FileState.progressManager.progress._progress.completedChunks >= FileState.progressManager.progress.recovery.totalChunks && !FileState.needsMetaTx) {
                         log(`[DEBUG-RESUME]   Reason: Chunks completed (${FileState.progressManager.progress._progress.completedChunks}/${FileState.progressManager.progress.recovery.totalChunks}) and no meta-tx needed (needsMetaTx: ${FileState.needsMetaTx})`, 'debug');
                     }
@@ -8739,7 +8739,7 @@ Do you want to continue?`;
                     
                     // Log size difference if any
                     if (actualFileSize !== this.file.size) {
-                        log(`ファイルサイズ測定: File API=${this.file.size}バイト, 実際=${actualFileSize}バイト (差: ${actualFileSize - this.file.size}バイト)`, 'info');
+                        log(`File size measurement: File API=${this.file.size} bytes, actual=${actualFileSize} bytes (diff: ${actualFileSize - this.file.size} bytes)`, 'info');
                     }
                 }
                 
@@ -8850,7 +8850,7 @@ Do you want to continue?`;
                 
                 // Allow up to 1KB difference for File API measurement variations
                 if (sizeDiff > 1024) {
-                    log(`ファイルサイズが大きく異なります: 記録=${fileInfo.size}バイト, 現在=${currentFileSize}バイト (差: ${sizeDiff}バイト)`, 'error');
+                    log(`File size differs significantly: recorded=${fileInfo.size} bytes, current=${currentFileSize} bytes (diff: ${sizeDiff} bytes)`, 'error');
                     if (this.actualFileSize && this.actualFileSize !== this.file.size) {
                         log(`注: File API=${this.file.size}バイト, 実測=${this.actualFileSize}バイト`, 'info');
                     }
@@ -8859,7 +8859,7 @@ Do you want to continue?`;
                 
                 // Log success
                 if (sizeDiff > 0) {
-                    log(`ファイルサイズの微小な差を許容: ${sizeDiff}バイト`, 'info');
+                    log(`Allowing small file size difference: ${sizeDiff} bytes`, 'info');
                 }
                 
                 return true;
@@ -8934,7 +8934,7 @@ Do you want to continue?`;
                     log(`[DEBUG] saveProgress started - progressFileName: ${this.progressFileName}`, 'debug');
                     
                     const progressData = JSON.stringify(this.progress, null, 2);
-                    log(`[DEBUG] 進捗データサイズ: ${progressData.length} bytes`, 'debug');
+                    log(`[DEBUG] Progress data size: ${progressData.length} bytes`, 'debug');
                     
                     // Save to localStorage as backup
                     try {
@@ -8965,7 +8965,7 @@ Do you want to continue?`;
                             // First try to delete existing file to avoid state cache issues
                             try {
                                 await WorkspaceState.handle.removeEntry(this.progressFileName);
-                                log(`[DEBUG] 既存ファイルを削除しました`, 'debug');
+                                log(`[DEBUG] Deleted existing file`, 'debug');
                             } catch (removeErr) {
                                 // File might not exist, which is fine
                                 log(`[DEBUG] No existing file or deletion error (normal): ${removeErr.message}`, 'debug');
@@ -9019,7 +9019,7 @@ Do you want to continue?`;
                         }
                     } else {
                         // No workspace - localStorage only, no automatic downloads
-                        log(`[WARNING] workspaceHandleが設定されていません - localStorageのみ保存`, 'warning');
+                        log(`[WARNING] workspaceHandle not set - saving to localStorage only`, 'warning');
                     }
                 } catch (error) {
                     // v4.7.25: Remove error log for progress save
@@ -9048,7 +9048,7 @@ Do you want to continue?`;
                 document.body.removeChild(a);
                 URL.revokeObjectURL(url);
                 
-                log(`進捗ファイルをエクスポートしました`, 'success');
+                log(`Exported progress file`, 'success');
             }
             
             async exportAsKaspa(kaspaMetadata) {
@@ -9269,7 +9269,7 @@ Do you want to continue?`;
                             } finally {
                                 this.queueLock = false;
                             }
-                            log(`チャンク${work.index}を再試行キューに追加 (${work.retries}/${this.maxRetries})`, 'warning');
+                            log(`Adding chunk ${work.index} to retry queue (${work.retries}/${this.maxRetries})`, 'warning');
                         } else {
                             log(`Worker error (chunk ${work.index}): ${error.message}`, 'error');
                             this.errors.set(work.index, error.message);
@@ -9510,8 +9510,8 @@ Do you want to continue?`;
             // Super metadata configuration (experimental)
             superMeta: {
                 enabled: true,
-                chunksPerMeta: 2,  // 実験的: 2チャンクごとにメタデータ生成
-                metasPerSuper: 2   // 実験的: 2メタデータごとにスーパーメタ生成
+                chunksPerMeta: 2,  // Experimental: Generate metadata every 2 chunks
+                metasPerSuper: 2   // Experimental: Generate super meta every 2 metadata
             },
             // Archive node configuration
             nodeType: 'auto', // auto, standard, archive
@@ -10015,13 +10015,13 @@ Do you want to continue?`;
                                 progressFilename: entry.name
                             });
                             progressCount++;
-                            log(`進捗ファイル検出: ${entry.name}`, 'info');
+                            log(`Progress file detected: ${entry.name}`, 'info');
                         }
                     }
                 }
                 
                 if (progressCount > 0) {
-                    log(`${progressCount}個の進捗ファイルを検出しました`, 'success');
+                    log(`Detected ${progressCount} progress files`, 'success');
                     showToast(`レジューム可能: ${progressCount}個のファイル`, 'info');
                 }
                 
@@ -10199,7 +10199,7 @@ Do you want to continue?`;
                     `進捗: ${metaInfo.completedChunks || '?'}/${metaInfo.totalChunks || '?'} チャンク\n` +
                     `最終更新: ${metaInfo.lastUpdate ? new Date(metaInfo.lastUpdate).toLocaleString() : '不明'}\n\n` +
                     'これを使用しますか？\n\n' +
-                    '「キャンセル」を選択するとファイルから読み込みます。'
+                    'Select "Cancel" to load from file.'
                 );
                 
                 if (useLocal) {
@@ -10366,7 +10366,7 @@ Do you want to continue?`;
                 
                 // Store progress for later use
                 window.pendingProgress = progress;
-                log('進捗を読み込みました。同じファイルを選択してください。', 'info');
+                log('Progress loaded. Please select the same file.', 'info');
                 
                 // Show export button if no workspace
                 if (!WorkspaceState.handle) {
@@ -10581,7 +10581,7 @@ Do you want to continue?`;
                         } finally {
                             this.queueLock = false;
                         }
-                        log(`チャンク${work.index}を再試行キューに追加 (${work.retries}/${this.maxRetries})`, 'warning');
+                        log(`Adding chunk ${work.index} to retry queue (${work.retries}/${this.maxRetries})`, 'warning');
                     } else {
                         log(`ワーカーエラー (チャンク${work.index}): ${error.message}`, 'error');
                         this.errors.set(work.index, error.message);
@@ -11425,14 +11425,14 @@ Do you want to continue?`;
                             }
                         } else {
                             // 新規エントリーを作成
-                            log('[KENV] 新規ダウンロードエントリーを追加', 'info');
+                            log('[KENV] Adding new download entry', 'info');
                             kenvEntry = FileState.kenvManager.addMinimalEntry(
                                 metadata.file?.name || 'download',
                                 'kaspa-file',
                                 'download'
                             );
                             
-                            // ダウンロード情報を設定
+                            // Set download information
                             kenvEntry.metaTxId = metaTxId || null;
                             kenvEntry.metaTxBlockId = metaTxBlockId || null;
                             kenvEntry.password = password || null;
@@ -11444,7 +11444,7 @@ Do you want to continue?`;
                             }
                         }
                         
-                        // メタデータから情報を取得（新規・既存両方で更新）
+                        // Get information from metadata (update for both new and existing)
                         if (metadata && (!kenvEntry.cid || !kenvEntry.fileSize)) {
                             kenvEntry.fileSize = metadata.file?.size || null;
                             kenvEntry.cid = metadata.cid || null;
@@ -11490,7 +11490,7 @@ Do you want to continue?`;
                         
                         // v6.2.37: ステータスを適切に設定
                         if (addToListOnly) {
-                            // Verify経由（ブロックチェーンから取得）の場合のみverified
+                            // Only verified if obtained via Verify (from blockchain)
                             if (metadata.metaTx?.loadedAt) {
                                 kenvEntry.status = 'verified';
                                 log('[KENV] Entry marked as verified (blockchain-fetched via Verify)', 'info');
@@ -11510,7 +11510,7 @@ Do you want to continue?`;
                         
                         // Save file (execute asynchronously)
                         FileState.kenvManager.saveAll().then(() => {
-                            log('[KENV] ダウンロードエントリーを保存しました', 'success');
+                            log('[KENV] Saved download entry', 'success');
                             
                             // File Tabが開いている場合は更新
                             const activeTab = document.querySelector('.tab-content.active');
@@ -11527,7 +11527,7 @@ Do you want to continue?`;
                     
                 } catch (error) {
                     this.isDownloading = false;
-                    log(`[DownloadManager] ダウンロードエラー: ${error.message}`, 'error');
+                    log(`[DownloadManager] Download error: ${error.message}`, 'error');
                     throw error;
                 }
             }
@@ -11747,11 +11747,11 @@ Do you want to continue?`;
         // Initialize Archive Manager when system initializes
         async function initializeArchiveManager() {
             if (!NetworkState.kaspa) {
-                log('Kaspaモジュールが初期化されていません', 'error');
+                log('Kaspa module is not initialized', 'error');
                 return;
             }
             
-            log('Archive Node Managerを初期化中...', 'info');
+            log('Initializing Archive Node Manager...', 'info');
             
             // Use config.network for initialization (v5.11.93)
             const networkId = config.network;
@@ -11791,7 +11791,7 @@ Do you want to continue?`;
                     error.message.includes('not found') ||
                     error.message.includes('does not exist')
                 )) {
-                    log('通常ノードでデータが見つかりません。アーカイブノードを使用します。', 'info');
+                    log('Data not found on regular node. Using archive node.', 'info');
                     
                     if (!NetworkState.archiveManager || NetworkState.archiveManager.connections.size === 0) {
                         throw new Error('利用可能なアーカイブノードがありません');
@@ -11896,7 +11896,7 @@ Do you want to continue?`;
         window.initializeSystem = async function() {
             try {
                 log('Starting system initialization...');
-                updateNetworkStatus('connecting', '初期化中...');
+                updateNetworkStatus('connecting', 'Initializing...');
                 
                 // Import WASM SDK
                 NetworkState.kaspa = await import('./kaspa-core.js');
@@ -11905,7 +11905,7 @@ Do you want to continue?`;
                 // Initialize WASM binary
                 // v5.7.13: Use new initialization format to avoid deprecated parameters warning
                 await NetworkState.kaspa.default({ module_or_path: './kaspa-core_bg.wasm' });
-                log('WASMバイナリを初期化しました');
+                log('Initialized WASM binary');
                 
                 // Verify functions
                 const requiredFunctions = ['RpcClient', 'Resolver', 'createTransactions', 
@@ -11971,7 +11971,7 @@ Do you want to continue?`;
                 await initializeArchiveManager();
                 
             } catch (error) {
-                log(`初期化エラー: ${error.message}`, 'error');
+                log(`Initialization error: ${error.message}`, 'error');
                 updateNetworkStatus('offline', 'Error');
                 updateRpcNodeInfo(); // Reset display
             }
@@ -12026,7 +12026,7 @@ Do you want to continue?`;
         // Initialize or reinitialize RPC client
         async function initializeRpcClient() {
             try {
-                log('RPCクライアントを初期化中...');
+                log('Initializing RPC client...');
                 
                 // Close existing connection if any
                 // v5.7.5: Fixed variable reference - use NetworkState.rpcClient
@@ -12059,7 +12059,7 @@ Do you want to continue?`;
                 return true;
                 
             } catch (error) {
-                log(`RPC初期化エラー: ${error.message}`, 'error');
+                log(`RPC initialization error: ${error.message}`, 'error');
                 updateNetworkStatus('offline', 'Error');
                 updateRpcNodeInfo(); // Reset display
                 return false;
@@ -12338,7 +12338,7 @@ Do you want to continue?`;
                     timestamp: Date.now(),
                     blockId: null
                 });
-                log(`[DEBUG] WebSocket監視リストに追加: TxID: ${txid.substring(0, 16)}... (ディレクトリメタデータ)`, 'debug');
+                log(`[DEBUG] Added to WebSocket monitoring list: TxID: ${txid.substring(0, 16)}... (directory metadata)`, 'debug');
                 
                 // Wait for confirmation
                 const blockId = await waitForConfirmation(txid);
@@ -12690,7 +12690,7 @@ Do you want to continue?`;
                 return new Uint8Array(decrypted);
             } catch (error) {
                 log(`Decryption error (chunk ${chunkIndex}): ${error.message || error}`, 'error');
-                log(`データサイズ: ${data.length} bytes`, 'error');
+                log(`Data size: ${data.length} bytes`, 'error');
                 console.error('Decryption error details:', error);
                 throw error;
             }
@@ -12716,11 +12716,11 @@ Do you want to continue?`;
         // Calculate safe payload size based on storage mass limit
         function calculateSafePayloadSize(rawChunkSize) {
             // v4.7.30: 動的チャンクサイズ最適化（第2段階）
-            const KASPA_MAX_PAYLOAD = 24000; // Kaspaペイロード上限
+            const KASPA_MAX_PAYLOAD = 24000; // Kaspa payload limit
             const AES_GCM_OVERHEAD = 16;     // AES-256-GCM認証タグ
             const SAFETY_MARGIN = 1000;      // 安全マージン（約1KB）
             
-            // 最大安全ペイロード = 24000 - 16 - 1000 = 22984バイト ≈ 22.4KB
+            // Maximum safe payload = 24000 - 16 - 1000 = 22984 bytes ≈ 22.4KB
             const MAX_SAFE_CHUNK_SIZE = KASPA_MAX_PAYLOAD - AES_GCM_OVERHEAD - SAFETY_MARGIN;
             
             // v4.7.30: Stage 2 - Verification with 22KB fixed value (no change)
@@ -12774,7 +12774,7 @@ Do you want to continue?`;
             // 圧縮率を予測
             const compressionRatio = estimateCompressionRatio(fileName, mimeType);
             
-            // 暗号化後のペイロード上限（22984バイト）から逆算
+            // Calculate backwards from encrypted payload limit (22984 bytes)
             const MAX_ENCRYPTED_SIZE = 22984; // 24000 - 16 - 1000
             const MAX_COMPRESSED_SIZE = MAX_ENCRYPTED_SIZE - 16; // AES-GCM overhead
             
@@ -12784,7 +12784,7 @@ Do you want to continue?`;
             // 要求されたサイズと計算された最大サイズの小さい方を選択
             const optimalSize = Math.min(baseChunkSize, maxOriginalSize);
             
-            // ログ出力（22KB以上の場合のみ）
+            // Log output (only for 22KB or more)
             if (baseChunkSize >= 22528) {
                 log(`📊 動的チャンクサイズ最適化:`);
                 log(`  - ファイルタイプ: ${fileName} (${mimeType || 'unknown'})`);
@@ -13012,7 +13012,7 @@ Do you want to continue?`;
             }
             
             if (failedCount > 0) {
-                log(`警告: ${failedCount}個のチャンクが確認できませんでした`, 'warning');
+                log(`Warning: ${failedCount} chunks could not be verified`, 'warning');
                 const continueUpload = confirm(
                     `一部のチャンクがブロックチェーン上で確認できません。\n` +
                     `確認済み: ${verifiedChunks.length}個\n` +
@@ -13174,7 +13174,7 @@ Do you want to continue?`;
                 uploadStatusUI.reset();
                 uploadStatusUI.updateStatus('🔐', 'ファイルを準備しています...', 1);
             } else {
-                log('[ERROR] uploadProgress要素が初期化時に見つかりません！', 'error');
+                log('[ERROR] uploadProgress element not found during initialization!', 'error');
             }
             
             try {
@@ -13195,7 +13195,7 @@ Do you want to continue?`;
                 let fileCID = '';
                 const useRandomCid = document.getElementById('useRandomCid').checked;
                 const chunkSize = parseInt(document.getElementById('chunkSize').value) * 1024;
-                log(`チャンクサイズ設定: ${chunkSize / 1024} KB`);
+                log(`Chunk size setting: ${chunkSize / 1024} KB`);
                 
                 if (useRandomCid) {
                     fileCID = generateRandomCID();
@@ -13221,8 +13221,8 @@ Do you want to continue?`;
                     // v5.5.26: Direct assignment to FileState.progressManager
                     FileState.progressManager = new ProgressManager(currentFile, chunkSize, fileCID, 'upload');
                     await FileState.progressManager.initialize();
-                    // v5.5.19: totalChunksは後で設定されるため、初期化時は未計算
-                    log(`ProgressManager初期化完了 - ペイロード分割前のため総チャンク数は未計算`);
+                    // v5.5.19: totalChunks is set later, so not calculated during initialization
+                    log(`ProgressManager initialization complete - total chunks not calculated before payload split`);
                 } else {
                     log(`既存のProgressManagerを使用 - 完了済み: ${FileState.progressManager.progress._progress.completedChunks}/${FileState.progressManager.progress.recovery.totalChunks}`);
                     
@@ -13302,7 +13302,7 @@ Do you want to continue?`;
                     }
                 }
                 
-                // v5.5.19: この時点ではtotalChunksは未設定のため、ファイルサイズから推定
+                // v5.5.19: At this point totalChunks is not set, so estimate from file size
                 const estimatedChunks = Math.ceil(currentFile.size / (chunkSize || 22528));
                 log(`推定チャンク数: ${estimatedChunks} (ファイルサイズ: ${currentFile.size} bytes, チャンクサイズ: ${chunkSize || 22528} bytes)`);
                 const totalChunks = estimatedChunks; // 互換性のため変数名を保持
@@ -13954,7 +13954,7 @@ Do you want to continue?`;
                         log(`  - 暗号化後: ${encrypted.length.toLocaleString()} バイト (+${encrypted.length - compressed.length} バイト)`);
                         log(`  - ペイロード効率: ${((encrypted.length/24000)*100).toFixed(1)}% / 24KB制限`);
                         
-                        // 圧縮率が予測と大きく異なる場合の警告
+                        // Warning when compression ratio differs significantly from prediction
                         const expectedRatio = estimateCompressionRatio(currentFile.name, currentFile.type);
                         const actualRatio = useCompression ? (compressed.length / chunk.length) : 1.0;
                         if (Math.abs(expectedRatio - actualRatio) > 0.2) {
@@ -14238,7 +14238,7 @@ Do you want to continue?`;
                             if (retries >= config.retryCount) {
                                 document.getElementById(`chunk-status-${i}`).innerHTML = '<span class="error">❌ Failed</span>';
                                 FileState.progressManager.markChunkFailed(i);
-                                log(`チャンク ${i + 1} のアップロードが失敗 - 進捗を保存`);
+                                log(`Chunk ${i + 1} upload failed - saving progress`);
                                 await FileState.progressManager.saveProgress(); // Save progress on failure
                                 throw error;
                             }
@@ -14383,7 +14383,7 @@ Do you want to continue?`;
                     FileState.currentKenvEntryId = kenvEntry.id;
                     log(`[KENV] セッションエントリーID: ${kenvEntry.id}`, 'debug');
                     
-                    // 既知の情報を設定
+                    // Set known information
                     kenvEntry.fileSize = currentFile.size;
                     kenvEntry.uploadDate = new Date().toISOString();
                     kenvEntry.uploadedBy = UserState.address?.toString() || null;
@@ -14457,8 +14457,8 @@ Do you want to continue?`;
                 
                 // Check if meta-tx option is enabled
                 const useMetaTx = document.getElementById('useMetaTx').checked;
-                log(`[DEBUG] メタTx使用設定: ${useMetaTx}`, 'debug');
-                log(`[DEBUG] ワークスペース設定: ${WorkspaceState.handle ? 'あり' : 'なし'}`, 'debug');
+                log(`[DEBUG] Meta TX usage setting: ${useMetaTx}`, 'debug');
+                log(`[DEBUG] Workspace setting: ${WorkspaceState.handle ? 'Yes' : 'No'}`, 'debug');
                 
                 if (useMetaTx) {
                     log('[DEBUG] メタTx作成を開始します', 'debug');
@@ -18672,7 +18672,7 @@ Do you want to continue?`;
                 startMemoryMonitoring();
             } catch (error) {
                 console.error('Initialization error:', error);
-                log(`初期化エラー: ${error.message}`, 'error');
+                log(`Initialization error: ${error.message}`, 'error');
             }
             
             // Add event listeners for progress file buttons
@@ -20001,7 +20001,7 @@ Do you want to continue?`;
                     FileState.kenvManager.updateIndex(entry, index);
                 });
                 
-                // LocalStorageに保存
+                // Save to LocalStorage
                 try {
                     await FileState.kenvManager.saveAll();
                     log(`[KENV] ${selectedIds.length}個のエントリーを削除しました`, 'success');

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.84</title>
+    <title>Kaspa P2P File Storage v6.2.85</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -5262,14 +5262,14 @@
                         if (values[45]) entry.authWarning = values[45];
                         if (values[46]) entry.salt = values[46];  // v5.11.67: saltカラムを読み込み
                         
-                        // v5.11.66: 45カラム以降の可変カラムを処理
+                        // v5.11.66: Process variable columns after column 45
                         // v5.11.67: 46カラム以降に変更（saltを追加したため）
                         if (values.length > 46) {
                             const chunks = [];
                             const chunkBlockIds = [];
                             const segmentBoundaries = [];
                             
-                            let i = 47;  // v5.11.67: 46カラム目の次から開始（saltを追加したため）
+                            let i = 47;  // v5.11.67: Start from after column 46 (salt added)
                             while (i < values.length) {
                                 if (values[i] === 'seg') {
                                     // セグメントバウンダリー（7カラム）
@@ -5508,7 +5508,7 @@
                 }
             },
             
-            // 初期化処理
+            // Initialization
             async initialize() {
                 log('[KENV] Initialization started', 'info');
                 
@@ -5525,7 +5525,7 @@
                         }
                     }
                     
-                    // Step 2: ワークスペース処理
+                    // Step 2: Workspace processing
                     if (WorkspaceState.handle) {
                         const fileLoaded = await this.loadAll();
                         
@@ -5556,7 +5556,7 @@
                 }
             },
             
-            // エントリーの検証と補完
+            // Entry verification and completion
             async verifyAndCompleteEntry(entry) {
                 if (entry.status !== 'pending') return;
                 
@@ -5569,7 +5569,7 @@
                         log(`[KENV] Verifying in on-chain mode: ${entry.metaTxId}`, 'debug');
                         
                         try {
-                            // NetworkStateがあるか確認
+                            // Check if NetworkState exists
                             if (!NetworkState?.downloadManager) {
                                 log('[KENV] DownloadManager not available, marking as verified', 'warning');
                                 entry.status = 'verified';
@@ -5680,7 +5680,7 @@
                 return null;
             },
             
-            // データ検証
+            // Data validation
             validateKENVData(data) {
                 if (!data || typeof data !== 'object') return false;
                 if (!Array.isArray(data.entries)) return false;
@@ -5930,7 +5930,7 @@ Do you want to continue?`;
                 if (result.success) {
                     log('[KENV] LocalStorage cleared', 'debug');
                 } else {
-                    log(`[KENV] LocalStorageクリアエラー: ${result.error}`, 'error');
+                    log(`[KENV] LocalStorage clear error: ${result.error}`, 'error');
                 }
             },
             
@@ -5957,7 +5957,7 @@ Do you want to continue?`;
                             return;
                         }
                         
-                        // パスワードを含めるかどうかで処理を分岐
+                        // Branch processing based on whether to include password
                         const kaspaMetadata = JSON.parse(JSON.stringify(kenvEntry.directoryMetadata));
                         if (includePassword && kenvEntry.password) {
                             kaspaMetadata.auth = {
@@ -7548,10 +7548,10 @@ Do you want to continue?`;
         // v5.5.14: fileInfo表示のchunks.length1箇所を移行 (31/120)
         // v5.5.15: fileプロパティの読み取り専用アクセス11箇所を移行 (42/120)
         // v5.5.16: Migrated 16 read-only download access points (58/120)
-        // v5.5.17: 残りの読み取り専用アクセス23箇所を全て移行 (81/120) - 読み取り専用完了
+        // v5.5.17: Migrated all remaining 23 read-only access points (81/120) - Read-only complete
         // v5.5.18: 残っていた読み取り専用参照8箇所を修正 (89/120)
-        // v5.5.19: config is not definedエラーとProgressManager totalChunks undefined問題を修正
-        // v5.5.20: FileStateの他の変数に後方互換性プロキシを追加（currentPasswordから開始）
+        // v5.5.19: Fixed config is not defined error and ProgressManager totalChunks undefined issue
+        // v5.5.20: Added backward compatibility proxies to other FileState variables (starting from currentPassword)
         // v5.5.21: kaspaMetadataプロキシにもconfigurableオプションを追加
         try {
             Object.defineProperty(window, 'kaspaMetadata', {
@@ -7719,7 +7719,7 @@ Do you want to continue?`;
         }
         
         // v5.5.20: currentPasswordの後方互換性プロキシ
-        // v5.5.21: configurableオプションを追加して再定義エラーを回避
+        // v5.5.21: Added configurable option to avoid redefinition errors
         // v5.7.12: 重複定義を削除（v5.5.3の定義を削除し、このtry-catch付きの定義のみを残す）
         try {
             Object.defineProperty(window, 'currentPassword', {
@@ -7994,7 +7994,7 @@ Do you want to continue?`;
                                     alert('Unsupported Kaspa file format');
                                 }
                             } catch (error) {
-                                log(`Kaspaファイル読み込みエラー: ${error.message}`, 'error');
+                                log(`Kaspa file load error: ${error.message}`, 'error');
                                 alert('Failed to load Kaspa file');
                             }
                         };
@@ -8218,7 +8218,7 @@ Do you want to continue?`;
                     return { success: true };
                 } catch (e) {
                     if (e.name === 'QuotaExceededError') {
-                        // 容量超過時の処理
+                        // Processing when capacity exceeded
                         this.handleQuotaExceeded(key);
                         
                         // リトライ
@@ -8339,7 +8339,7 @@ Do you want to continue?`;
         
         // Check if error is network-related
         function isNetworkError(error) {
-            // WASMエラーオブジェクトはJSON.stringifyできないので、別の方法でログ出力
+            // WASM error objects cannot be JSON.stringified, so log using alternative method
             if (typeof error === 'string') {
                 log(`[DEBUG-isNetworkError] 入力: "${error}" (文字列)`, 'debug');
             } else if (typeof error === 'object' && error !== null) {
@@ -8349,7 +8349,7 @@ Do you want to continue?`;
             }
             
             if (!error) {
-                log(`[DEBUG-isNetworkError] エラーがnull/undefined - false を返します`, 'debug');
+                log(`[DEBUG-isNetworkError] Error is null/undefined - returning false`, 'debug');
                 return false;
             }
             
@@ -8382,7 +8382,7 @@ Do you want to continue?`;
             
             // Initialize connection monitoring
             init() {
-                log('[ConnectionManager] エラーベースのConnect管理を初期化', 'info');
+                log('[ConnectionManager] Initializing error-based connection management', 'info');
                 this.isConnected = true;
             },
             
@@ -8393,11 +8393,11 @@ Do you want to continue?`;
                 
                 // Only handle actual network errors
                 if (!isNetworkError(error)) {
-                    log(`[DEBUG-CM] ネットワークエラーではないため処理をスキップ`, 'debug');
+                    log(`[DEBUG-CM] Not a network error, skipping processing`, 'debug');
                     return false;
                 }
                 
-                log(`[ConnectionManager] ネットワークエラーを検出 - ${source}: ${errorMessage}`, 'warning');
+                log(`[ConnectionManager] Network error detected - ${source}: ${errorMessage}`, 'warning');
                 
                 // v5.7.6: Always cleanup RPC client first, regardless of connection state
                 if (NetworkState.rpcClient) {
@@ -8405,7 +8405,7 @@ Do you want to continue?`;
                         await NetworkState.rpcClient.disconnect();
                         log('[ConnectionManager] RPCConnectをDisconnectしました', 'info');
                     } catch (disconnectError) {
-                        log(`[ConnectionManager] RPCDisconnectエラー: ${disconnectError.message}`, 'debug');
+                        log(`[ConnectionManager] RPC disconnect error: ${disconnectError.message}`, 'debug');
                     }
                     NetworkState.rpcClient = null;
                     log('[ConnectionManager] RPC client cleared', 'debug');
@@ -8484,7 +8484,7 @@ Do you want to continue?`;
                             try {
                                 await NetworkState.rpcClient.disconnect();
                             } catch (disconnectError) {
-                                log(`[ConnectionManager] 既存RPCDisconnectエラー: ${disconnectError.message}`, 'debug');
+                                log(`[ConnectionManager] Existing RPC disconnect error: ${disconnectError.message}`, 'debug');
                             }
                             NetworkState.rpcClient = null;
                             await initializeRpcClient();
@@ -8498,7 +8498,7 @@ Do you want to continue?`;
                     
                     // Test connection
                     const info = await NetworkState.rpcClient.getServerInfo();
-                    log(`[ConnectionManager] RPCConnect成功: ${info.serverVersion}`, 'success');
+                    log(`[ConnectionManager] RPC connection successful: ${info.serverVersion}`, 'success');
                     
                     // Update RPC node info display
                     updateRpcNodeInfo(info, config.network, config.nodeType, config.currentEndpoint);
@@ -8570,7 +8570,7 @@ Do you want to continue?`;
                         log(`[DEBUG-RESUME] メタTxのみ必要 - needsMetaTx: true`, 'debug');
                     } else {
                         log('[ConnectionManager] Automatically resuming upload...', 'info');
-                        log(`[DEBUG-RESUME] 条件を満たしました - 自動再開を実行`, 'debug');
+                        log(`[DEBUG-RESUME] Conditions met - executing auto-resume`, 'debug');
                     }
                     log(`[DEBUG] 再開条件満たす - uploadSessionActive: ${FileState.uploadSessionActive}`, 'debug');
                     // Debug: Check current state
@@ -8616,7 +8616,7 @@ Do you want to continue?`;
                                     log('[ConnectionManager] Meta-tx submission failed - waiting for next retry', 'warning');
                                 }
                             } catch (error) {
-                                log(`[ConnectionManager] メタTx再開エラー: ${error.message}`, 'error');
+                                log(`[ConnectionManager] Meta transaction resume error: ${error.message}`, 'error');
                                 // Flag remains true for next retry
                             }
                         }, 1000);
@@ -8630,7 +8630,7 @@ Do you want to continue?`;
                                 // Phase 0-M: Move completion message after processAndUpload to ensure proper timing
                                 // Phase 0-L: Clear network error flag after successful auto-resume
                                 FileState.networkErrorOccurred = false;
-                                log('[DEBUG] 自動再開成功 - networkErrorOccurredフラグをクリア', 'debug');
+                                log('[DEBUG] Auto-resume successful - clearing networkErrorOccurred flag', 'debug');
                                 log('[ConnectionManager] Auto-resume completed', 'success');
                             } else {
                                 log('[ConnectionManager] 自動再開に必要な情報が不足しています', 'warning');
@@ -8947,12 +8947,12 @@ Do you want to continue?`;
                             lastUpdate: Date.now()
                         };
                         localStorage.setItem('kaspa-upload-metadata', JSON.stringify(metadata));
-                        log(`[DEBUG] localStorage保存成功`, 'debug');
+                        log(`[DEBUG] localStorage save successful`, 'debug');
                         // v4.7.25: Remove save notifications
                     } catch (err) {
                         // v4.7.25: Remove error log for localStorage
-                        console.error(`localStorage保存エラー: ${err.message}`);
-                        log(`[ERROR] localStorage保存エラー: ${err.message}`, 'error');
+                        console.error(`localStorage save error: ${err.message}`);
+                        log(`[ERROR] localStorage save error: ${err.message}`, 'error');
                     }
                     
                     // Save to file if workspace is available
@@ -8960,7 +8960,7 @@ Do you want to continue?`;
                     if (WorkspaceState.handle) {
                         try {
                             // v5.5.27: More robust file handle operations
-                            log(`[DEBUG] ファイル作成開始: ${this.progressFileName}`, 'debug');
+                            log(`[DEBUG] Starting file creation: ${this.progressFileName}`, 'debug');
                             
                             // First try to delete existing file to avoid state cache issues
                             try {
@@ -8968,7 +8968,7 @@ Do you want to continue?`;
                                 log(`[DEBUG] 既存ファイルを削除しました`, 'debug');
                             } catch (removeErr) {
                                 // File might not exist, which is fine
-                                log(`[DEBUG] 既存ファイルなし、または削除エラー（正常）: ${removeErr.message}`, 'debug');
+                                log(`[DEBUG] No existing file or deletion error (normal): ${removeErr.message}`, 'debug');
                             }
                             
                             // Create new file handle
@@ -8982,22 +8982,22 @@ Do you want to continue?`;
                             let writable;
                             try {
                                 writable = await fileHandle.createWritable();
-                                log(`[DEBUG] writable作成成功`, 'debug');
+                                log(`[DEBUG] Writable creation successful`, 'debug');
                             } catch (writableErr) {
-                                log(`[ERROR] writable作成エラー: ${writableErr.message}`, 'error');
+                                log(`[ERROR] Writable creation error: ${writableErr.message}`, 'error');
                                 throw writableErr;
                             }
                             
                             try {
                                 await writable.write(progressData);
-                                log(`[DEBUG] データ書き込み成功: ${progressData.length} bytes`, 'debug');
+                                log(`[DEBUG] Data write successful: ${progressData.length} bytes`, 'debug');
                             } catch (writeErr) {
-                                log(`[ERROR] データ書き込みエラー: ${writeErr.message}`, 'error');
+                                log(`[ERROR] Data write error: ${writeErr.message}`, 'error');
                                 // Try to close writable even if write failed
                                 try {
                                     await writable.close();
                                 } catch (closeErr) {
-                                    log(`[ERROR] writable closeエラー: ${closeErr.message}`, 'error');
+                                    log(`[ERROR] Writable close error: ${closeErr.message}`, 'error');
                                 }
                                 throw writeErr;
                             }
@@ -9008,13 +9008,13 @@ Do you want to continue?`;
                             // v4.7.25: Remove save notifications and status update
                         } catch (err) {
                             // v4.7.25: Remove error log for file save
-                            console.error(`ファイル保存エラー: ${err.message}`);
-                            log(`[ERROR] ファイル保存エラー: ${err.message}`, 'error');
-                            log(`[ERROR] エラー詳細: ${err.stack}`, 'error');
+                            console.error(`File save error: ${err.message}`);
+                            log(`[ERROR] File save error: ${err.message}`, 'error');
+                            log(`[ERROR] Error details: ${err.stack}`, 'error');
                             
                             // v5.5.27: If File System API fails due to state issues, continue with localStorage only
                             if (err.name === 'InvalidStateError' || err.message.includes('state cached')) {
-                                log(`[WARNING] File System API状態エラー - localStorageのみで継続`, 'warning');
+                                log(`[WARNING] File System API state error - continuing with localStorage only`, 'warning');
                             }
                         }
                     } else {
@@ -9025,7 +9025,7 @@ Do you want to continue?`;
                     // v4.7.25: Remove error log for progress save
                     console.error(`Progress save error: ${error.message}`);
                     log(`[ERROR] Progress save error: ${error.message}`, 'error');
-                    log(`[ERROR] エラー詳細: ${error.stack}`, 'error');
+                    log(`[ERROR] Error details: ${error.stack}`, 'error');
                 }
             }
             
@@ -9271,7 +9271,7 @@ Do you want to continue?`;
                             }
                             log(`チャンク${work.index}を再試行キューに追加 (${work.retries}/${this.maxRetries})`, 'warning');
                         } else {
-                            log(`ワーカーエラー (チャンク${work.index}): ${error.message}`, 'error');
+                            log(`Worker error (chunk ${work.index}): ${error.message}`, 'error');
                             this.errors.set(work.index, error.message);
                         }
                     } finally {
@@ -9322,7 +9322,7 @@ Do you want to continue?`;
                     
                     return sortedPayloads;
                 } catch (error) {
-                    log(`[ParallelDownloader] エラー: ${error.message}`, 'error');
+                    log(`[ParallelDownloader] Error: ${error.message}`, 'error');
                     throw error;
                 }
             }
@@ -9400,7 +9400,7 @@ Do you want to continue?`;
                         }
                         
                     } catch (rpcError) {
-                        // RPCエラー時、REST APIにフォールバック
+                        // Fall back to REST API on RPC error
                         log(`[ParallelDownloader] Payload ${work.index} RPC failed, falling back to REST API: ${rpcError.message}`, 'warning');
                         
                         try {
@@ -9422,7 +9422,7 @@ Do you want to continue?`;
                                 const payload = safeHexDecode(data.payload, 'payload from REST API');
                                 log(`[ParallelDownloader] Payload ${work.index} fetched via REST API: ${payload.length} bytes`, 'success');
                                 
-                                // 成功したら結果を保存
+                                // Save result if successful
                                 this.results.set(work.index, payload);
                                 this.completedCount++;
                                 this.totalBytes += payload.length;
@@ -9805,13 +9805,13 @@ Do you want to continue?`;
                     restApiStatus.textContent = 'Ready';
                     restApiIndicator.className = 'status-indicator-large status-connected';
                     restApiResponse.textContent = `Blocks: ${blueScoreM}M (${days}days+) | Synced: ${isSynced ? '✓' : '✗'} | Response: ${responseTime}ms`;
-                    log(`[REST API] ヘルスチェック成功: ${blueScoreM}M blocks, ${responseTime}ms`, 'success');
+                    log(`[REST API] Health check successful: ${blueScoreM}M blocks, ${responseTime}ms`, 'success');
                 } else {
                     // HTTP error
                     restApiStatus.textContent = 'Error';
                     restApiIndicator.className = 'status-indicator-large status-disconnected';
                     restApiResponse.textContent = `Response: HTTP ${response.status}`;
-                    log(`[REST API] ヘルスチェックエラー: HTTP ${response.status}`, 'error');
+                    log(`[REST API] Health check error: HTTP ${response.status}`, 'error');
                 }
             } catch (error) {
                 // Network error or timeout
@@ -9913,7 +9913,7 @@ Do you want to continue?`;
                     if (error.name === 'AbortError') {
                         log(`タイムアウト (${timeout}ms): ${url}`, 'warning');
                     } else {
-                        log(`ネットワークエラー: ${error.message}`, 'warning');
+                        log(`Network error: ${error.message}`, 'warning');
                     }
                     
                     if (attempt < retries) {
@@ -10029,7 +10029,7 @@ Do you want to continue?`;
                     log(`${skippedCount}個のゴミ箱/システムファイルをスキップしました`, 'debug');
                 }
             } catch (err) {
-                log('進捗ファイルスキャンエラー: ' + err.message, 'warning');
+                log('Progress file scan error: ' + err.message, 'warning');
             }
             
             return progressCount;
@@ -10394,7 +10394,7 @@ Do you want to continue?`;
                 }
                 
             } catch (error) {
-                log(`進捗読み込みエラー: ${error.message}`, 'error');
+                log(`Progress load error: ${error.message}`, 'error');
             }
         }
 
@@ -10656,7 +10656,7 @@ Do you want to continue?`;
                             }
                             }
                         } catch (rpcError) {
-                            log(`[DownloadManager] RPCエラー: ${rpcError.message} - REST APIにフォールバックします`, 'warning');
+                            log(`[DownloadManager] RPC error: ${rpcError.message} - falling back to REST API`, 'warning');
                             // Don't throw, proceed to REST API fallback
                         }
                     }
@@ -10789,7 +10789,7 @@ Do you want to continue?`;
                             throw new Error('No payload in REST API response');
                         }
                     } catch (apiError) {
-                        log(`[DownloadManager] REST APIエラー: ${apiError.message}`, 'error');
+                        log(`[DownloadManager] REST API error: ${apiError.message}`, 'error');
                         throw apiError;
                     }
                 }
@@ -10903,7 +10903,7 @@ Do you want to continue?`;
                             throw new Error('No payload in REST API response');
                         }
                     } catch (apiError) {
-                        log(`[DownloadManager] REST APIエラー: ${apiError.message}`, 'error');
+                        log(`[DownloadManager] REST API error: ${apiError.message}`, 'error');
                         throw apiError;
                     }
                 }
@@ -11326,7 +11326,7 @@ Do you want to continue?`;
                                     targetHandle = await targetHandle.getDirectoryHandle(folderStructure.basePath, { create: true });
                                     log(`[DownloadManager] ベースディレクトリ: ${folderStructure.basePath}`, 'info');
                                 } catch (e) {
-                                    log(`[DownloadManager] ベースディレクトリ作成エラー: ${e.message}`, 'error');
+                                    log(`[DownloadManager] Base directory creation error: ${e.message}`, 'error');
                                 }
                             }
                             
@@ -11342,7 +11342,7 @@ Do you want to continue?`;
                                             targetHandle = await targetHandle.getDirectoryHandle(part, { create: true });
                                             log(`[DownloadManager] サブディレクトリ作成: ${part}`, 'info');
                                         } catch (e) {
-                                            log(`[DownloadManager] サブディレクトリ作成エラー: ${part} - ${e.message}`, 'error');
+                                            log(`[DownloadManager] Subdirectory creation error: ${part} - ${e.message}`, 'error');
                                         }
                                     }
                                 }
@@ -11355,7 +11355,7 @@ Do you want to continue?`;
                                 const writable = await fileHandle.createWritable();
                                 await writable.write(blob);
                                 await writable.close();
-                                log(`[DownloadManager] ファイル保存完了: ${folderStructure.filePath || fileName}`, 'success');
+                                log(`[DownloadManager] File save complete: ${folderStructure.filePath || fileName}`, 'success');
                                 
                                 // Call onComplete if provided
                                 if (onComplete) {
@@ -11366,7 +11366,7 @@ Do you want to continue?`;
                                 this.isDownloading = false;
                                 return blob;
                             } catch (e) {
-                                log(`[DownloadManager] ファイル保存エラー: ${e.message}`, 'error');
+                                log(`[DownloadManager] File save error: ${e.message}`, 'error');
                                 throw e;
                             }
                             
@@ -11374,7 +11374,7 @@ Do you want to continue?`;
                             if (error.name === 'AbortError') {
                                 log('[DownloadManager] Folder selection cancelled', 'warning');
                             } else {
-                                log(`[DownloadManager] File System Access APIエラー: ${error.message}`, 'error');
+                                log(`[DownloadManager] File System Access API error: ${error.message}`, 'error');
                             }
                             // Fall through to default download
                         }
@@ -11396,9 +11396,9 @@ Do you want to continue?`;
                     }
                     } // v6.2.33: End of if (!addToListOnly) block
                     
-                    // Phase 2: KENV登録処理（ダウンロード成功時またはaddToListOnly時）
+                    // Phase 2: KENV registration (on download success or addToListOnly)
                     if (FileState.kenvManager._initialized) {
-                        // Phase 3: 重複チェック（v6.2.43: metaTxIdがなくても処理）
+                        // Phase 3: Duplicate check (v6.2.43: process even without metaTxId)
                         let kenvEntry = null;
                         
                         if (metaTxId) {
@@ -11499,7 +11499,7 @@ Do you want to continue?`;
                                 log('[KENV] Entry marked as pending (.kaspa file source, not verified)', 'info');
                             }
                         } else {
-                            // ダウンロード実行した場合は常にverified（成功=検証済み）
+                            // Always verified when download is executed (success = verified)
                             kenvEntry.status = 'verified';
                             log('[KENV] Entry marked as verified (download completed successfully)', 'info');
                         }
@@ -11508,7 +11508,7 @@ Do you want to continue?`;
                         const lineNumber = FileState.kenvManager.entries.indexOf(kenvEntry);
                         FileState.kenvManager.updateIndex(kenvEntry, lineNumber);
                         
-                        // ファイルを保存（非同期で実行）
+                        // Save file (execute asynchronously)
                         FileState.kenvManager.saveAll().then(() => {
                             log('[KENV] ダウンロードエントリーを保存しました', 'success');
                             
@@ -11518,7 +11518,7 @@ Do you want to continue?`;
                                 window.updateFileListFromKENV();
                             }
                         }).catch(error => {
-                            log(`[KENV] 保存エラー: ${error.message}`, 'error');
+                            log(`[KENV] Save error: ${error.message}`, 'error');
                         });
                     }
                     
@@ -11701,7 +11701,7 @@ Do you want to continue?`;
                         label.innerHTML = `
                             Force Archive Node<br>
                             <small style="color: var(--error-color);">
-                                アーカイブノードが見つかりません (${manager.maxConsecutiveNonArchive}回連続失敗)
+                                Archive node not found (${manager.maxConsecutiveNonArchive} consecutive failures)
                             </small>
                         `;
                     } else {
@@ -11895,7 +11895,7 @@ Do you want to continue?`;
         /*
         window.initializeSystem = async function() {
             try {
-                log('システム初期化を開始...');
+                log('Starting system initialization...');
                 updateNetworkStatus('connecting', '初期化中...');
                 
                 // Import WASM SDK
@@ -11915,7 +11915,7 @@ Do you want to continue?`;
                         throw new Error(`Required function not found: ${func}`);
                     }
                 }
-                log('すべての必要な関数を確認しました', 'success');
+                log('All required functions verified', 'success');
                 
                 // Create RPC client
                 NetworkState.rpcClient = new NetworkState.kaspa.RpcClient({
@@ -11928,7 +11928,7 @@ Do you want to continue?`;
                 
                 // Test connection
                 const info = await NetworkState.rpcClient.getServerInfo();
-                log(`Connect成功! サーバー: ${info.serverVersion}`, 'success');
+                log(`Connection successful! Server: ${info.serverVersion}`, 'success');
                 
                 // Update RPC node info display
                 updateRpcNodeInfo(info, config.network, config.nodeType, config.currentEndpoint);
@@ -11950,13 +11950,13 @@ Do you want to continue?`;
                 
                 if (UserState.address) {
                     document.getElementById('initStatus').innerHTML = `
-                        <p class="success">✅ システム初期化完了</p>
+                        <p class="success">✅ System initialization complete</p>
                         <p>Address: ${UserState.address.toString()}</p>
                         <p>Balance: ${balance} KAS</p>
                     `;
                 } else {
                     document.getElementById('initStatus').innerHTML = `
-                        <p class="success">✅ システム初期化完了</p>
+                        <p class="success">✅ System initialization complete</p>
                         <p style="color: #ffcc66;">⚠️ ウォレットDisconnected</p>
                         <p>Please connect wallet from Status tab</p>
                     `;
@@ -12047,7 +12047,7 @@ Do you want to continue?`;
                 
                 // Test connection
                 const info = await NetworkState.rpcClient.getServerInfo();
-                log(`RPC再Connect成功! サーバー: ${info.serverVersion}`, 'success');
+                log(`RPC reconnection successful! Server: ${info.serverVersion}`, 'success');
                 
                 // Update RPC node info display
                 updateRpcNodeInfo(info, config.network, config.nodeType, config.currentEndpoint);
@@ -12147,7 +12147,7 @@ Do you want to continue?`;
             }
             
             // Major disconnection - start reconnection
-            log(`[${source}] ネットワーク完全Disconnectを検知。再Connectを開始...`, 'error');
+            log(`[${source}] Complete network disconnect detected. Starting reconnection...`, 'error');
             reconnection.isReconnecting = true;
             
             try {
@@ -12159,7 +12159,7 @@ Do you want to continue?`;
                     await restartMonitoring();
                 }
                 
-                log('ネットワーク再Connect完了', 'success');
+                log('Network reconnection complete', 'success');
                 
                 // Resolve waiting promises
                 reconnection.activeWaiters.forEach(resolve => resolve());
@@ -12167,7 +12167,7 @@ Do you want to continue?`;
                 
                 return true;
             } catch (reconnectError) {
-                log(`再Connect失敗: ${reconnectError.message}`, 'error');
+                log(`Reconnection failed: ${reconnectError.message}`, 'error');
                 throw reconnectError;
             } finally {
                 reconnection.isReconnecting = false;
@@ -12460,7 +12460,7 @@ Do you want to continue?`;
         }
         
         async function waitForConfirmation(txid) {
-            log(`[DEBUG] waitForConfirmation開始 - TxID: ${txid.substring(0, 16)}...`, 'debug');
+            log(`[DEBUG] Starting waitForConfirmation - TxID: ${txid.substring(0, 16)}...`, 'debug');
             
             // v5.4.52: Restored v5.4.0 active polling logic for better performance
             let blockId = null;
@@ -12496,7 +12496,7 @@ Do you want to continue?`;
                 // After config.restApiWaitTime (10 seconds), try RPC
                 if (waitTime >= config.restApiWaitTime && NetworkState.rpcClient) {
                     try {
-                        log(`${config.restApiWaitTime/1000}秒経過 - RPCで確認を試みます...`);
+                        log(`${config.restApiWaitTime/1000} seconds elapsed - attempting RPC verification...`);
                         const txInfo = await NetworkState.rpcClient.getTransaction({
                             transactionId: txid,
                             includeBlockInfo: true
@@ -12509,7 +12509,7 @@ Do you want to continue?`;
                         }
                     } catch (err) {
                         // Transaction might not be confirmed yet
-                        log(`RPC確認エラー: ${err.message}`, 'debug');
+                        log(`RPC verification error: ${err.message}`, 'debug');
                     }
                 }
                 
@@ -12518,7 +12518,7 @@ Do you want to continue?`;
             }
             
             // Fallback - throw error if not found
-            throw new Error(`BlockIDの取得に失敗: ${txid}`);
+            throw new Error(`Failed to retrieve BlockID: ${txid}`);
         }
 
         // Compression logic
@@ -12723,7 +12723,7 @@ Do you want to continue?`;
             // 最大安全ペイロード = 24000 - 16 - 1000 = 22984バイト ≈ 22.4KB
             const MAX_SAFE_CHUNK_SIZE = KASPA_MAX_PAYLOAD - AES_GCM_OVERHEAD - SAFETY_MARGIN;
             
-            // v4.7.30: 第2段階 - 22KB固定値での検証（変更なし）
+            // v4.7.30: Stage 2 - Verification with 22KB fixed value (no change)
             if (rawChunkSize >= 22528) { // 22KB = 22 * 1024
                 return 22528; // 22KBに制限
             }
@@ -14499,7 +14499,7 @@ Do you want to continue?`;
                             const lineNumber = kenvEntries.indexOf(kenvEntry);
                             FileState.kenvManager.updateIndex(kenvEntry, lineNumber);
                             
-                            // ファイルを保存（非同期で実行）
+                            // Save file (execute asynchronously)
                             await FileState.kenvManager.saveAll();
                         }
                     }
@@ -14825,7 +14825,7 @@ Do you want to continue?`;
                             const lineNumber = kenvEntries.indexOf(kenvEntry);
                             FileState.kenvManager.updateIndex(kenvEntry, lineNumber);
                             
-                            // ファイルを保存（非同期で実行）
+                            // Save file (execute asynchronously)
                             FileState.kenvManager.saveAll().then(() => {
                                 log('[KENV] スーパーメタTx情報を保存しました', 'success');
                                 
@@ -14835,7 +14835,7 @@ Do you want to continue?`;
                                     window.updateFileListFromKENV();
                                 }
                             }).catch(error => {
-                                log(`[KENV] 保存エラー: ${error.message}`, 'error');
+                                log(`[KENV] Save error: ${error.message}`, 'error');
                             });
                         } else {
                             log(`[KENV] CID ${FileState.currentFileCID} のエントリーが見つかりません`, 'warning');
@@ -15196,7 +15196,7 @@ Do you want to continue?`;
                         const lineNumber = kenvEntries.indexOf(kenvEntry);
                         FileState.kenvManager.updateIndex(kenvEntry, lineNumber);
                         
-                        // ファイルを保存（非同期で実行）
+                        // Save file (execute asynchronously)
                         FileState.kenvManager.saveAll().then(() => {
                             log('[KENV] メタTx情報を保存しました', 'success');
                             
@@ -15206,7 +15206,7 @@ Do you want to continue?`;
                                 window.updateFileListFromKENV();
                             }
                         }).catch(error => {
-                            log(`[KENV] 保存エラー: ${error.message}`, 'error');
+                            log(`[KENV] Save error: ${error.message}`, 'error');
                         });
                     } else {
                         log(`[KENV] CID ${window.currentFileCID} のエントリーが見つかりません`, 'warning');

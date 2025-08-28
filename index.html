@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.82</title>
+    <title>Kaspa P2P File Storage v6.2.83</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -3011,7 +3011,7 @@
             updateRestApiStats() {
                 const skipCountEl = document.getElementById('rest-api-kill-skip-count');
                 const lastSkipEl = document.getElementById('rest-api-last-skip');
-                // const globalSkipCountEl = document.getElementById('rest-api-skip-count'); // 削除済み
+                // const globalSkipCountEl = document.getElementById('rest-api-skip-count'); // Removed
                 
                 if (skipCountEl) skipCountEl.textContent = NetworkState.restApiControl.skipCount;
                 // if (globalSkipCountEl) globalSkipCountEl.textContent = NetworkState.restApiControl.skipCount; // 削除済み
@@ -3312,7 +3312,7 @@
         const WorkspaceState = {
             handle: null,           // File System Access API directory handle
             progressFileMap: new Map()  // Map of filename -> {cid, fileHandle}
-            // Phase 3 手順4: historyManagerプロパティ削除
+            // Phase 3 Step 4: Remove historyManager property
         };
         
         // Expose WorkspaceState to window for onclick handlers
@@ -5576,7 +5576,7 @@
                                 return;
                             }
                             
-                            // メタデータを取得
+                            // Fetch metadata
                             log(`[KENV] Fetching metadata for: ${entry.metaTxId.substring(0, 16)}...`, 'info');
                             const metadata = await NetworkState.downloadManager.fetchMetadata(
                                 entry.metaTxId, 
@@ -5648,7 +5648,7 @@
                             }
                         } catch (error) {
                             log(`[KENV] Metadata fetch failed: ${error.message}`, 'error');
-                            // フォールバック: メタデータ取得に失敗しても基本的な検証は成功とする
+                            // Fallback: Even if metadata fetch fails, basic verification succeeds
                             entry.status = 'verified';
                             entry.authWarning = `Metadata unavailable: ${error.message}`;
                         }
@@ -6555,7 +6555,7 @@ Do you want to continue?`;
                 const [txId, blockId, password] = parts;
                 
                 try {
-                    this.showStatus('メタデータを取得中...', 'info');
+                    this.showStatus('Fetching metadata...', 'info');
                     
                     // Try to get metadata using download functionality
                     const result = await downloadFromTxId(txId, blockId, password || '');
@@ -7246,7 +7246,7 @@ Do you want to continue?`;
                             
                             // Save to localStorage
                             await FileState.kenvManager.saveAll();
-                            log('[KENV] ディレクトリエントリー保存完了', 'info');
+                            log('[KENV] Directory entry save completed', 'info');
                             
                             // Update file tab if needed
                             if (typeof updateFileTab === 'function') {
@@ -8554,7 +8554,7 @@ Do you want to continue?`;
                     log(`[DEBUG-RESUME]   - failedChunks: ${progress._progress.resume?.failedChunks?.length || 0}`, 'debug');
                     log(`[DEBUG-RESUME]   - File Name: ${progress.file.name}`, 'debug');
                     log(`[DEBUG-RESUME]   - CID: ${progress._progress.cid}`, 'debug');
-                    log(`[DEBUG-RESUME]   - 完了率: ${((progress._progress.completedChunks / progress.recovery.totalChunks) * 100).toFixed(1)}%`, 'debug');
+                    log(`[DEBUG-RESUME]   - Completion rate: ${((progress._progress.completedChunks / progress.recovery.totalChunks) * 100).toFixed(1)}%`, 'debug');
                 }
                 
                 // v6.2.73: Check both chunk completion and meta-tx need
@@ -8610,10 +8610,10 @@ Do you want to continue?`;
                                     FileState.needsMetaTx = false;  // Clear flag only on success
                                     FileState.networkErrorOccurred = false;
                                     FileState.uploadSessionActive = false;
-                                    log('[ConnectionManager] メタTx送信が完了しました', 'success');
+                                    log('[ConnectionManager] Meta-tx submission completed', 'success');
                                 } else {
                                     // v6.2.75: Keep session active for next retry
-                                    log('[ConnectionManager] メタTx送信失敗 - 次の再試行を待機', 'warning');
+                                    log('[ConnectionManager] Meta-tx submission failed - waiting for next retry', 'warning');
                                 }
                             } catch (error) {
                                 log(`[ConnectionManager] メタTx再開エラー: ${error.message}`, 'error');
@@ -8631,7 +8631,7 @@ Do you want to continue?`;
                                 // Phase 0-L: Clear network error flag after successful auto-resume
                                 FileState.networkErrorOccurred = false;
                                 log('[DEBUG] 自動再開成功 - networkErrorOccurredフラグをクリア', 'debug');
-                                log('[ConnectionManager] 自動再開が完了しました', 'success');
+                                log('[ConnectionManager] Auto-resume completed', 'success');
                             } else {
                                 log('[ConnectionManager] 自動再開に必要な情報が不足しています', 'warning');
                                 if (!FileState.currentFile) {
@@ -8650,11 +8650,11 @@ Do you want to continue?`;
                     } else if (!FileState.progressManager.progress) {
                         log(`[DEBUG-RESUME]   理由: progressデータが存在しない`, 'debug');
                     } else if (FileState.progressManager.progress._progress.completedChunks >= FileState.progressManager.progress.recovery.totalChunks && !FileState.needsMetaTx) {
-                        log(`[DEBUG-RESUME]   理由: チャンク完了済み (${FileState.progressManager.progress._progress.completedChunks}/${FileState.progressManager.progress.recovery.totalChunks}) かつメタTx不要 (needsMetaTx: ${FileState.needsMetaTx})`, 'debug');
+                        log(`[DEBUG-RESUME]   Reason: Chunks completed (${FileState.progressManager.progress._progress.completedChunks}/${FileState.progressManager.progress.recovery.totalChunks}) and no meta-tx needed (needsMetaTx: ${FileState.needsMetaTx})`, 'debug');
                     }
                 }
                 
-                log('[DEBUG] handleReconnected完了', 'debug');
+                log('[DEBUG] handleReconnected completed', 'debug');
             },
             
             // Manual reconnect trigger
@@ -8976,7 +8976,7 @@ Do you want to continue?`;
                                 this.progressFileName,
                                 { create: true }
                             );
-                            log(`[DEBUG] fileHandle取得成功`, 'debug');
+                            log(`[DEBUG] fileHandle obtained successfully`, 'debug');
                             
                             // Write data with error handling for each step
                             let writable;
@@ -9003,7 +9003,7 @@ Do you want to continue?`;
                             }
                             
                             await writable.close();
-                            log(`[DEBUG] ファイル保存完了: ${this.progressFileName}`, 'success');
+                            log(`[DEBUG] File save completed: ${this.progressFileName}`, 'success');
                             
                             // v4.7.25: Remove save notifications and status update
                         } catch (err) {
@@ -9307,7 +9307,7 @@ Do you want to continue?`;
                     
                     if (this.errors.size > 0) {
                         const errorMsg = Array.from(this.errors.entries())
-                            .map(([idx, err]) => `ペイロード${idx}: ${err}`)
+                            .map(([idx, err]) => `Payload ${idx}: ${err}`)
                             .join(', ');
                         throw new Error(`Download error: ${errorMsg}`);
                     }
@@ -9420,7 +9420,7 @@ Do you want to continue?`;
                             const data = await response.json();
                             if (data.payload) {
                                 const payload = safeHexDecode(data.payload, 'payload from REST API');
-                                log(`[ParallelDownloader] REST API経由でペイロード${work.index}取得成功: ${payload.length} bytes`, 'success');
+                                log(`[ParallelDownloader] Payload ${work.index} fetched via REST API: ${payload.length} bytes`, 'success');
                                 
                                 // 成功したら結果を保存
                                 this.results.set(work.index, payload);
@@ -9444,7 +9444,7 @@ Do you want to continue?`;
                                 throw new Error('No payload in REST API response');
                             }
                         } catch (apiError) {
-                            log(`[ParallelDownloader] ペイロード${work.index} REST APIエラー: ${apiError.message}`, 'error');
+                            log(`[ParallelDownloader] Payload ${work.index} REST API error: ${apiError.message}`, 'error');
                             this.errors.set(work.index, apiError.message);
                         }
                     } finally {
@@ -9819,7 +9819,7 @@ Do you want to continue?`;
                 restApiIndicator.className = 'status-indicator-large status-disconnected';
                 restApiResponse.textContent = 'Blocks: - | Synced: - | Response: Timeout/Error';
                 restApiEndpoint.textContent = 'Endpoint: -';
-                log(`[REST API] ヘルスチェック失敗: ${error.message}`, 'error');
+                log(`[REST API] Health check failed: ${error.message}`, 'error');
             }
         }
 
@@ -10451,7 +10451,7 @@ Do you want to continue?`;
                 
                 const elapsed = (Date.now() - this.startTime) / 1000;
                 const throughput = (this.totalBytes / 1024 / 1024) / elapsed;
-                log(`[ParallelDownloader] 並列ダウンロード完了: ${elapsed.toFixed(1)}秒, ${throughput.toFixed(1)} MB/秒`, 'success');
+                log(`[ParallelDownloader] Parallel download completed: ${elapsed.toFixed(1)}s, ${throughput.toFixed(1)} MB/s`, 'success');
                 
                 return sortedChunks;
             } catch (error) {
@@ -10540,7 +10540,7 @@ Do you want to continue?`;
                         } catch (error) {
                             lastError = error;
                             if (retry < this.maxRetries) {
-                                log(`チャンク${index}の取得に失敗 (リトライ ${retry + 1}/${this.maxRetries})`, 'warning');
+                                log(`Failed to fetch chunk ${index} (retry ${retry + 1}/${this.maxRetries})`, 'warning');
                                 await new Promise(resolve => setTimeout(resolve, 1000 * (retry + 1)));
                             }
                         }
@@ -10630,7 +10630,7 @@ Do you want to continue?`;
                     // If we have BlockID, use RPC directly (unless REST API test mode)
                     if (blockId && rpcClient && !this.forceRestApi) {
                         try {
-                            log(`[DownloadManager] BlockID経由でメタデータ取得: ${blockId.substring(0, 16)}...`, 'info');
+                            log(`[DownloadManager] Fetching metadata via BlockID: ${blockId.substring(0, 16)}...`, 'info');
                             
                             const blockResponse = await NetworkState.rpcClient.getBlock({
                                 hash: blockId,
@@ -10649,7 +10649,7 @@ Do you want to continue?`;
                                 if (txId === metaTxId) {
                                     if (tx.payload && tx.payload !== '') {
                                         payload = safeHexDecode(tx.payload, 'meta-tx payload');
-                                        log(`[DownloadManager] メタデータ取得成功: ${payload.length} bytes`, 'success');
+                                        log(`[DownloadManager] Metadata fetched successfully: ${payload.length} bytes`, 'success');
                                         break;
                                     }
                                 }
@@ -10663,7 +10663,7 @@ Do you want to continue?`;
                     
                     // Fallback to Explorer API
                     if (!payload) {
-                        log(`[DownloadManager] Explorer API経由でメタデータ取得`, 'info');
+                        log(`[DownloadManager] Fetching metadata via Explorer API`, 'info');
                         
                         // Kill switch check
                         if (!NetworkState.restApiControl.globalEnabled || NetworkState.restApiControl.temporaryKilled) {
@@ -10674,7 +10674,7 @@ Do you want to continue?`;
                         const response = await fetchWithTimeout(apiUrl, {}, 10000, 2);
                         
                         if (!response.ok) {
-                            throw new Error(`メタトランザクションの取得に失敗: ${response.status}`);
+                            throw new Error(`Failed to fetch meta transaction: ${response.status}`);
                         }
                         
                         const data = await response.json();
@@ -10702,11 +10702,11 @@ Do you want to continue?`;
                         this.metadata = metadata;
                         return metadata;
                     } else {
-                        throw new Error('ペイロードが短すぎます');
+                        throw new Error('Payload is too short');
                     }
                     
                 } catch (error) {
-                    log(`[DownloadManager] メタデータ取得エラー: ${error.message}`, 'error');
+                    log(`[DownloadManager] Metadata fetch error: ${error.message}`, 'error');
                     throw error;
                 }
             }
@@ -10714,7 +10714,7 @@ Do you want to continue?`;
             // Download raw payload without decryption (for new approach)
             async downloadPayload(txId, blockId, index) {
                 try {
-                    log(`[DownloadManager] ペイロード ${index + 1} ダウンロード開始: ${txId.substring(0, 16)}...`, 'info');
+                    log(`[DownloadManager] Starting payload ${index + 1} download: ${txId.substring(0, 16)}...`, 'info');
                     
                     // Skip RPC if REST API test mode
                     if (this.forceRestApi) {
@@ -10750,7 +10750,7 @@ Do you want to continue?`;
                         if (txHash === txId) {
                             if (tx.payload && tx.payload !== '') {
                                 payload = safeHexDecode(tx.payload, 'payload');
-                                log(`[DownloadManager] ペイロード取得: ${payload.length} bytes`, 'success');
+                                log(`[DownloadManager] Payload fetched: ${payload.length} bytes`, 'success');
                                 break;
                             }
                         }
@@ -10763,7 +10763,7 @@ Do you want to continue?`;
                     return payload;
                     
                 } catch (rpcError) {
-                    log(`[DownloadManager] RPC失敗、REST APIにフォールバック: ${rpcError.message}`, 'warning');
+                    log(`[DownloadManager] RPC failed, falling back to REST API: ${rpcError.message}`, 'warning');
                     
                     // Fallback to REST API
                     try {
@@ -10783,7 +10783,7 @@ Do you want to continue?`;
                         const data = await response.json();
                         if (data.payload) {
                             const payload = safeHexDecode(data.payload, 'payload from REST API');
-                            log(`[DownloadManager] REST API経由でペイロード取得成功: ${payload.length} bytes`, 'success');
+                            log(`[DownloadManager] Payload fetched via REST API: ${payload.length} bytes`, 'success');
                             return payload;
                         } else {
                             throw new Error('No payload in REST API response');
@@ -10834,7 +10834,7 @@ Do you want to continue?`;
                         if (txHash === txId) {
                             if (tx.payload && tx.payload !== '') {
                                 payload = safeHexDecode(tx.payload, 'chunk payload');
-                                log(`[DownloadManager] チャンクペイロード取得: ${payload.length} bytes`, 'success');
+                                log(`[DownloadManager] Chunk payload fetched: ${payload.length} bytes`, 'success');
                                 break;
                             }
                         }
@@ -10861,11 +10861,11 @@ Do you want to continue?`;
                     const decompressed = metadata.file?.compression?.enabled ? 
                         lzDecompress(decrypted) : decrypted;
                     
-                    log(`[DownloadManager] チャンク ${index + 1} 処理完了: ${decompressed.length} bytes`, 'success');
+                    log(`[DownloadManager] Chunk ${index + 1} processed: ${decompressed.length} bytes`, 'success');
                     return decompressed;
                     
                 } catch (rpcError) {
-                    log(`[DownloadManager] RPC失敗、REST APIにフォールバック: ${rpcError.message}`, 'warning');
+                    log(`[DownloadManager] RPC failed, falling back to REST API: ${rpcError.message}`, 'warning');
                     
                     // Fallback to REST API
                     try {
@@ -10885,7 +10885,7 @@ Do you want to continue?`;
                         const data = await response.json();
                         if (data.payload) {
                             const payload = safeHexDecode(data.payload, 'chunk payload from REST API');
-                            log(`[DownloadManager] REST API経由でチャンク取得成功: ${payload.length} bytes`, 'success');
+                            log(`[DownloadManager] Chunk fetched via REST API: ${payload.length} bytes`, 'success');
                             
                             // Process chunk data same as above
                             const segmentBoundaries = metadata.metadata?.segmentBoundaries || metadata.metadata?.chunkBoundaries;
@@ -10897,7 +10897,7 @@ Do you want to continue?`;
                             const decompressed = metadata.file?.compression?.enabled ? 
                                 lzDecompress(decrypted) : decrypted;
                             
-                            log(`[DownloadManager] チャンク ${index + 1} 処理完了 (REST API): ${decompressed.length} bytes`, 'success');
+                            log(`[DownloadManager] Chunk ${index + 1} processed (REST API): ${decompressed.length} bytes`, 'success');
                             return decompressed;
                         } else {
                             throw new Error('No payload in REST API response');
@@ -10939,7 +10939,7 @@ Do you want to continue?`;
                     
                         if (metadata.metadata?.payloadSplit) {
                         // New approach: download payloads and reconstruct
-                        log('[DownloadManager] 新方式: ペイロード分割ダウンロードを使用', 'info');
+                        log('[DownloadManager] New method: Using payload split download', 'info');
                         
                         const payloads = [];
                         const totalPayloads = metadata.chunks.length;
@@ -11010,7 +11010,7 @@ Do you want to continue?`;
                             payloadOffset += payload.length;
                         }
                         
-                        log(`[DownloadManager] 全ペイロード結合完了: ${totalPayloadSize} bytes`, 'info');
+                        log(`[DownloadManager] All payloads combined: ${totalPayloadSize} bytes`, 'info');
                         
                         // Decrypt entire data stream using chunk boundaries
                         const decryptedChunks = [];
@@ -11032,7 +11032,7 @@ Do you want to continue?`;
                                         const decryptedChunk = await decryptChunk(encryptedChunk, key, boundary.index, payloadIndex);
                                         decryptedChunks.push(decryptedChunk);
                                     } catch (e) {
-                                        log(`[DownloadManager] チャンク ${boundary.index} の復号化エラー: ${e.message}`, 'error');
+                                        log(`[DownloadManager] Chunk ${boundary.index} decryption error: ${e.message}`, 'error');
                                         log(`[DownloadManager] チャンクバウンダリ: ${JSON.stringify(boundary)}`, 'error');
                                         throw new Error(`Failed to decrypt chunk ${boundary.index}`);
                                     }
@@ -11071,7 +11071,7 @@ Do you want to continue?`;
                                         decryptedChunks.push(decryptedChunk);
                                         break;
                                     } catch (e) {
-                                        log(`[DownloadManager] 復号化エラー at offset ${encryptOffset}: ${e.message}`, 'error');
+                                        log(`[DownloadManager] Decryption error at offset ${encryptOffset}: ${e.message}`, 'error');
                                         throw new Error('Failed to decrypt data');
                                     }
                                 }
@@ -11154,7 +11154,7 @@ Do you want to continue?`;
                                 encryptOffset += chunk.length;
                             }
                             
-                            log(`[DownloadManager] 全暗号化データ結合完了: ${totalEncryptedSize} bytes`, 'info');
+                            log(`[DownloadManager] All encrypted data combined: ${totalEncryptedSize} bytes`, 'info');
                             
                             // Decrypt using chunk boundaries
                             const decryptedChunks = [];
@@ -11174,7 +11174,7 @@ Do you want to continue?`;
                                         log(`[DownloadManager] チャンク ${boundary.index} 復号化成功: ${decryptedChunk.length} bytes`, 'success');
                                         decryptedChunks.push(decryptedChunk);
                                     } catch (e) {
-                                        log(`[DownloadManager] チャンク ${boundary.index} の復号化エラー: ${e.message}`, 'error');
+                                        log(`[DownloadManager] Chunk ${boundary.index} decryption error: ${e.message}`, 'error');
                                         throw new Error(`Failed to decrypt chunk ${boundary.index}`);
                                     }
                                 }
@@ -11293,7 +11293,7 @@ Do you want to continue?`;
                         }
                     }
                     
-                    log(`[DownloadManager] ダウンロード完了: ${combined.length} bytes`, 'success');
+                    log(`[DownloadManager] Download completed: ${combined.length} bytes`, 'success');
                     
                     // Create blob and download
                     const blob = new Blob([combined], { 
@@ -16803,7 +16803,7 @@ Do you want to continue?`;
                             throw e;
                         }
                     } else {
-                        throw new Error('ペイロードが短すぎます');
+                        throw new Error('Payload is too short');
                     }
                     
                     // Verify this is a valid metadata (meta-tx or directory)

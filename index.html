@@ -16230,25 +16230,105 @@ Do you want to continue?`;
         };
 
         // Load from Meta-TxID
-        // Unified input handler
+        // Unified input handler - v6.2.81: Enhanced with proper error handling
         window.loadFromUnifiedInput = async function() {
             const txIdInput = document.getElementById('unifiedTxIdInput').value.trim();
-            const password = document.getElementById('unifiedPassword').value;
+            const passwordField = document.getElementById('unifiedPassword').value;
             
             if (!txIdInput) {
-                log('TxIDを入力してください', 'error');
+                showDownloadError('No input provided', [
+                    'Enter TxID:BlockID:Password',
+                    'Or TxID:Password',
+                    'Or just TxID'
+                ]);
                 return;
             }
             
-            log(`統一入力から復元開始: ${txIdInput.substring(0, 20)}...`, 'info');
+            log(`Unified input restoration started: ${txIdInput.substring(0, 20)}...`, 'info');
             
             // v4.7.14: Clear previous metadata in DownloadManager
             if (NetworkState.downloadManager) {
                 NetworkState.downloadManager.clearMetadata();
+                log('[DownloadManager] Metadata cleared', 'debug');
+            }
+            
+            // Parse input format (supports 3 patterns)
+            const parts = txIdInput.split(':');
+            let txId, blockId, password;
+            
+            if (parts.length === 3) {
+                // Format: TxID:BlockID:Password
+                txId = parts[0];
+                blockId = parts[1]; 
+                password = parts[2];
+                log(`TxID:BlockID:Password format: ${txId.substring(0, 16)}...:${blockId.substring(0, 16)}...:****`, 'info');
+            } else if (parts.length === 2) {
+                // Could be TxID:Password or TxID:BlockID
+                if (parts[1].length === 64) {
+                    // TxID:BlockID
+                    txId = parts[0];
+                    blockId = parts[1];
+                    password = passwordField;
+                    log(`TxID:BlockID format: ${txId.substring(0, 16)}...:${blockId.substring(0, 16)}...`, 'info');
+                } else {
+                    // TxID:Password
+                    txId = parts[0];
+                    blockId = '';
+                    password = parts[1];
+                    log(`TxID:Password format: ${txId.substring(0, 16)}...:****`, 'info');
+                }
+            } else {
+                // Format: TxID only
+                txId = parts[0];
+                blockId = '';
+                password = passwordField;
+                log(`TxID only format: ${txId.substring(0, 16)}...`, 'info');
+            }
+            
+            // Validate TxID length
+            if (txId.length !== 64) {
+                if (txId.length < 64) {
+                    showDownloadError(`TxID too short (${txId.length}/64 characters)`, [
+                        'A valid TxID is exactly 64 hexadecimal characters',
+                        'Check if you copied the complete TxID'
+                    ]);
+                } else {
+                    showDownloadError(`TxID too long (${txId.length}/64 characters)`, [
+                        'A valid TxID is exactly 64 characters',
+                        'Remove any extra spaces or characters'
+                    ]);
+                }
+                // Log the exact error for debugging
+                log(`❌ Invalid TxID (${txId.length}/64 characters)`, 'error');
+                log(`  - TxID must be exactly 64 hexadecimal characters`, 'info');
+                return;
+            }
+            
+            // Validate BlockID if provided
+            if (blockId && blockId.length !== 64) {
+                showDownloadError(`Invalid BlockID (${blockId.length}/64 characters)`, [
+                    'BlockID must be exactly 64 hexadecimal characters',
+                    'Or leave it empty to use REST API fallback'
+                ]);
+                // Log the exact error for debugging
+                log(`❌ Invalid BlockID (${blockId.length}/64 characters)`, 'error');
+                log(`  - BlockID must be exactly 64 hexadecimal characters`, 'info');
+                log(`  - Or leave it empty to use REST API fallback`, 'info');
+                return;
+            }
+            
+            // Check password
+            if (!password) {
+                showDownloadError('No password provided', [
+                    'Password is required for decryption',
+                    'Enter the same password used during upload'
+                ]);
+                return;
             }
             
             // Use existing loadFromMetaTxId logic
-            document.getElementById('metaTxIdInput').value = txIdInput;
+            const fullInput = blockId ? `${txId}:${blockId}` : txId;
+            document.getElementById('metaTxIdInput').value = fullInput;
             document.getElementById('metaTxPassword').value = password;
             await loadFromMetaTxId();
         };
@@ -16256,16 +16336,25 @@ Do you want to continue?`;
         // v6.2.81: Enhanced download error display function with better visibility
         window.showDownloadError = function(message, details = []) {
             // Debug logging
-            console.log('[showDownloadError] Called with:', message, details);
+            console.log('[Download Error] showDownloadError called with:', message, details);
             
             // Display error in progress window
             const progressDiv = document.getElementById('downloadProgress');
             const statusDiv = document.getElementById('downloadStatus');
             const progressBar = document.getElementById('downloadProgressBar');
             
+            console.log('[Download Error] Elements found:', {
+                progressDiv: !!progressDiv,
+                statusDiv: !!statusDiv,
+                progressBar: !!progressBar
+            });
+            
             if (progressDiv) {
-                console.log('[showDownloadError] Progress div found, making visible');
+                console.log('[Download Error] Progress div found, forcing visibility');
+                // Force display even if hidden
                 progressDiv.style.display = 'block';
+                progressDiv.style.visibility = 'visible';
+                progressDiv.style.opacity = '1';
                 
                 // Change progress bar to error state
                 if (progressBar) {

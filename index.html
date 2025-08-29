@@ -4628,7 +4628,7 @@
                     }
                 },
                 
-                // 統計情報
+                // Statistics
                 stats: {
                     totalEntries: 0,
                     totalSize: 0,
@@ -5434,7 +5434,7 @@
                         }
                     },
                     
-                    // ディレクトリ情報
+                    // Directory information
                     directory: {
                         name: entry.name,
                         totalSize: entries.reduce((sum, e) => sum + (e.size || 0), 0),
@@ -5611,7 +5611,7 @@
                                     }
                                 }
                                 
-                                // ディレクトリ情報（kaspa-directoryの場合）
+                                // Directory information（kaspa-directoryの場合）
                                 if (metadata.directory) {
                                     entry.name = metadata.directory.name || entry.name;
                                     entry.totalSize = metadata.directory.totalSize;
@@ -16736,7 +16736,7 @@ Do you want to continue?`;
                     throw new Error('メタトランザクションのペイロードが見つかりません');
                 }
                 
-                log(`ペイロード取得成功: ${payload.length} bytes`, 'info');
+                log(`Payload retrieved successfully: ${payload.length} bytes`, 'info');
                 
                 // Try to decrypt the payload
                 try {
@@ -17370,7 +17370,7 @@ Do you want to continue?`;
                                     if (tx.payload && tx.payload !== '') {
                                         // Get raw binary payload from hex (blockchain stores as hex)
                                         payload = safeHexDecode(tx.payload, 'chunk payload');
-                                        log(`ペイロード取得成功: ${payload.length} bytes`, 'info');
+                                        log(`Payload retrieved successfully: ${payload.length} bytes`, 'info');
                                         break;
                                     }
                                 }
@@ -17900,29 +17900,29 @@ Do you want to continue?`;
             
             document.getElementById('timeout').addEventListener('change', (e) => {
                 config.timeout = parseInt(e.target.value) * 1000;
-                log(`確認タイムアウト変更: ${config.timeout/1000}秒`, 'info');
+                log(`Confirmation timeout changed: ${config.timeout/1000} seconds`, 'info');
             });
             
             // Debug: Add event listener to file input
             const kaspaFileInput = document.getElementById('kaspaFileInput');
             if (kaspaFileInput) {
-                log('kaspaFileInput要素が見つかりました', 'info');
+                log('kaspaFileInput element found', 'info');
                 kaspaFileInput.addEventListener('change', (e) => {
                     log('=== kaspaFileInput change event ===', 'info');
                     log(`Event fired, files: ${e.target.files?.length || 0}`, 'info');
                 });
             } else {
-                log('警告: kaspaFileInput要素が見つかりません', 'error');
+                log('Warning: kaspaFileInput element not found', 'error');
             }
             
             log(`🚀 Kaspa P2P v${getAppVersion()} ready!`, 'info');
             log(`📋 v${getAppVersion()}: ${getVersionDescription()}`, 'info');
-            log('✨ 並列ダウンロード: ' + (AppState.settings.parallelDownloadEnabled ? '有効' : '無効'), 'info');
-            log('Kaspaシステムを再起動してください', 'info');
+            log('✨ Parallel download: ' + (AppState.settings.parallelDownloadEnabled ? 'enabled' : 'disabled'), 'info');
+            log('Please restart Kaspa system', 'info');
             
             // v5.10.0: Migration test log
             log('[v5.10.0] chunkBoundaries → segmentBoundaries migration complete', 'success');
-            log('[v5.10.0] 後方互換性: 既存のchunkBoundariesも読み込み可能', 'info');
+            log('[v5.10.0] Backward compatibility: Existing chunkBoundaries can also be loaded', 'info');
             
             // Update title and subtitle with dynamic version
             const version = getAppVersion();
@@ -17942,11 +17942,11 @@ Do you want to continue?`;
             // Initialize workspace prompt
             setTimeout(async () => {
                 // Check if File System Access API is available
-                // v5.11.18-fix: 作業フォルダの自動プロンプトを無効化
+                // v5.11.18-fix: Disable automatic workspace folder prompt
                 if ('showDirectoryPicker' in window) {
                     showWorkspaceStatus();
                 } else {
-                    log('File System Access APIはこのブラウザでは利用できません', 'warning');
+                    log('File System Access API is not available in this browser', 'warning');
                 }
                 
                 // Check for saved progress
@@ -17958,8 +17958,8 @@ Do you want to continue?`;
                             const hoursSince = (Date.now() - meta.lastUpdate) / (1000 * 60 * 60);
                             if (hoursSince < 24) {
                                 log(`Incomplete upload found`, 'warning');
-                                log(`ファイル: ${meta.fileName} (${meta.completedChunks}/${meta.totalChunks} チャンク)`, 'info');
-                                log('「進捗ファイルから再開」ボタンをクリックして続行', 'info');
+                                log(`File: ${meta.fileName} (${meta.completedChunks}/${meta.totalChunks} chunks)`, 'info');
+                                log('Click "Resume from progress file" button to continue', 'info');
                             }
                         }
                     } catch (err) {}
@@ -17980,7 +17980,7 @@ Do you want to continue?`;
                             // Clean up old progress after 7 days
                             localStorage.removeItem('kaspa-upload-progress');
                             localStorage.removeItem('kaspa-upload-metadata');
-                            log('古い進捗データを削除しました', 'info');
+                            log('Deleted old progress data', 'info');
                         }
                     } catch (err) {}
                 }
@@ -18004,17 +18004,17 @@ Do you want to continue?`;
                 await NetworkState.rpcClient.getServerInfo();
             } catch (error) {
                 try {
-                    log('RPC再Connected...', 'info');
+                    log('RPC reconnecting...', 'info');
                     await NetworkState.rpcClient.connect();
                     log('RPC reconnection successful', 'success');
                 } catch (reconnectError) {
-                    log(`RPC再Connectエラー: ${reconnectError.message}`, 'error');
+                    log(`RPC reconnection error: ${reconnectError.message}`, 'error');
                     return;
                 }
             }
             
             if (NetworkState.ws.monitorActive) {
-                log('すでに監視中です', 'warning');
+                log('Already monitoring', 'warning');
                 return;
             }
             
@@ -18024,7 +18024,7 @@ Do you want to continue?`;
                 
                 // v5.6.4: Debug logging for WebSocket monitoring
                 log(`[DEBUG] State before WebSocket monitoring start - navigator.onLine: ${navigator.onLine}, ` +
-                    `既存offlineタイマー: ${NetworkState.offlineTimeout ? `あり(ID: ${NetworkState.offlineTimeout})` : 'なし'}`, 'debug');
+                    `Existing offline timer: ${NetworkState.offlineTimeout ? `exists (ID: ${NetworkState.offlineTimeout})` : 'none'}`, 'debug');
                 
                 log('Starting WebSocket monitoring...', 'info');
                 NetworkState.ws.monitorActive = true;
@@ -18068,7 +18068,7 @@ Do you want to continue?`;
                 AppState.monitoring.wsMonitorTimeout = setTimeout(async function checkTimeout() {
                     // v5.3.7: Enhanced check - Don't stop monitoring during any upload activity
                     if (FileState.uploadSessionActive || FileState.isUploadingFile || FileState.uploadingChunksCount > 0 || FileState.uploadingMetaTx || FileState.uploadingDirMeta) { // v5.5.34, v5.5.35, v5.5.36 & v5.5.37: Using FileState
-                        log(`[DEBUG] アップロード中 - WebSocket監視を継続 (session=${FileState.uploadSessionActive}, file=${FileState.isUploadingFile}, chunks=${FileState.uploadingChunksCount})`, 'debug'); // v5.5.34, v5.5.35 & v5.5.36: Using FileState
+                        log(`[DEBUG] Uploading - Continuing WebSocket monitoring (session=${FileState.uploadSessionActive}, file=${FileState.isUploadingFile}, chunks=${FileState.uploadingChunksCount})`, 'debug'); // v5.5.34, v5.5.35 & v5.5.36: Using FileState
                         // Reset timeout
                         clearTimeout(AppState.monitoring.wsMonitorTimeout);
                         AppState.monitoring.wsMonitorTimeout = setTimeout(checkTimeout, 5 * 60 * 1000);
@@ -18077,7 +18077,7 @@ Do you want to continue?`;
                     
                     // Also check if there are monitored transactions
                     if (NetworkState.ws.monitoredTransactions.size > 0) {
-                        log(`[DEBUG] 監視中のトランザクションあり (${NetworkState.ws.monitoredTransactions.size}件) - 監視を継続`, 'debug');
+                        log(`[DEBUG] Monitored transactions exist (${NetworkState.ws.monitoredTransactions.size} items) - Continuing monitoring`, 'debug');
                         clearTimeout(AppState.monitoring.wsMonitorTimeout);
                         AppState.monitoring.wsMonitorTimeout = setTimeout(checkTimeout, 5 * 60 * 1000);
                         return;
@@ -18088,7 +18088,7 @@ Do you want to continue?`;
                 }, 5 * 60 * 1000);
                 
                 // v5.6.4: Debug logging before WebSocket subscription
-                log(`[DEBUG] WebSocket購読前の状態 - RPCConnect: ${NetworkState.rpcClient ? '有効' : '無効'}, ` +
+                log(`[DEBUG] State before WebSocket subscription - RPCConnect: ${NetworkState.rpcClient ? 'enabled' : 'disabled'}, ` +
                     `WebSocket内部状態: ${NetworkState.ws.connected ? 'Connected' : 'Disconnected'}`, 'debug');
                 
                 await NetworkState.rpcClient.subscribeBlockAdded();

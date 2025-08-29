@@ -4570,7 +4570,7 @@
         window.FileState = FileState;
         
         // ===== KENV Manager (v3.1.3) =====
-        // KENV v3.1.3 統合最適化版のデータ管理システム
+        // KENV v3.1.3 Integrated optimized data management system
         FileState.kenvManager = {
             // Version information
             version: "3.1.3",
@@ -5718,13 +5718,13 @@
                 
                 return confirm(
                     `Found ${entryCount} KENV data items created outside the workspace.\n\n` +
-                    'このデータをワークスペースに統合しますか？\n\n' +
+                    'Do you want to integrate this data into the workspace?\n\n' +
                     '「OK」: 統合する（推奨）\n' +
                     '"Cancel": Discard'
                 );
             },
             
-            // データ統合
+            // Data integration
             async mergeTemporaryData(tempData) {
                 const newEntries = tempData.entries || [];
                 
@@ -5749,7 +5749,7 @@
                     let isIdentical = false;
                     
                     if (entry.type === 'kaspa-directory') {
-                        // ディレクトリタイプの重複チェック
+                        // Directory type duplicate check
                         isIdentical = this.entries.some(e => 
                             e.type === 'kaspa-directory' &&
                             e.name === entry.name &&
@@ -5834,7 +5834,7 @@
                     let foundSimilar = false;
                     
                     if (entry.type === 'kaspa-directory') {
-                        // ディレクトリの重複チェック
+                        // Directory duplicate check
                         const identical = this.entries.find(e => 
                             e.type === 'kaspa-directory' &&
                             e.name === entry.name &&
@@ -5949,9 +5949,9 @@ Do you want to continue?`;
                         return;
                     }
                     
-                    // v5.11.111: ディレクトリタイプのサポート
+                    // v5.11.111: Directory type support
                     if (kenvEntry.type === 'kaspa-directory') {
-                        // ディレクトリの場合、directoryMetadataが必要
+                        // For directories, directoryMetadata is required
                         if (!kenvEntry.directoryMetadata) {
                             log('Directory metadata not found', 'error');
                             return;
@@ -7023,7 +7023,7 @@ Do you want to continue?`;
                     const namesInPath = pathMap.get(path);
                     if (namesInPath.has(entry.name)) {
                         const displayPath = path === '/' ? 'ルート' : path;
-                        duplicateInfo.push(`「${entry.name}」(${displayPath}ディレクトリ内)`);
+                        duplicateInfo.push(`"${entry.name}" (in ${displayPath} directory)`);
                     } else {
                         namesInPath.add(entry.name);
                     }
@@ -7221,7 +7221,7 @@ Do you want to continue?`;
                             
                             // Store entry ID for this session
                             FileState.currentKenvEntryId = kenvEntry.id;
-                            log(`[KENV] ディレクトリセッションエントリーID: ${kenvEntry.id}`, 'debug');
+                            log(`[KENV] Directory session entry ID: ${kenvEntry.id}`, 'debug');
                             
                             // Set directory-specific information
                             kenvEntry.uploadDate = new Date().toISOString();
@@ -10022,11 +10022,11 @@ Do you want to continue?`;
                 
                 if (progressCount > 0) {
                     log(`Detected ${progressCount} progress files`, 'success');
-                    showToast(`レジューム可能: ${progressCount}個のファイル`, 'info');
+                    showToast(`Resumable: ${progressCount} files`, 'info');
                 }
                 
                 if (skippedCount > 0) {
-                    log(`${skippedCount}個のゴミ箱/システムファイルをスキップしました`, 'debug');
+                    log(`Skipped ${skippedCount} trash/system files`, 'debug');
                 }
             } catch (err) {
                 log('Progress file scan error: ' + err.message, 'warning');
@@ -10048,7 +10048,7 @@ Do you want to continue?`;
                     
                     const useExisting = confirm(
                         'Incomplete upload found in workspace.\n\n' +
-                        `ファイル: ${progress.fileInfo.name}\n` +
+                        `File: ${progress.fileInfo.name}\n` +
                         `Progress: ${progress.metadata.completedChunks}/${progress.metadata.totalChunks} chunks\n\n` +
                         'Do you want to continue this?'
                     );
@@ -10195,7 +10195,7 @@ Do you want to continue?`;
                 
                 const useLocal = confirm(
                     'Saved progress found.\n\n' +
-                    `ファイル: ${metaInfo.fileName || '不明'}\n` +
+                    `File: ${metaInfo.fileName || 'Unknown'}\n` +
                     `Progress: ${metaInfo.completedChunks || '?'}/${metaInfo.totalChunks || '?'} chunks\n` +
                     `Last update: ${metaInfo.lastUpdate ? new Date(metaInfo.lastUpdate).toLocaleString() : 'Unknown'}\n\n` +
                     'これを使用しますか？\n\n' +
@@ -10386,7 +10386,7 @@ Do you want to continue?`;
                                 a.download = 'kaspa-upload-progress.json';
                                 a.click();
                                 URL.revokeObjectURL(url);
-                                log('進捗ファイルをエクスポートしました', 'success');
+                                log('Progress file exported', 'success');
                             }
                         };
                         resumeDiv.appendChild(exportBtn);
@@ -10431,7 +10431,7 @@ Do you want to continue?`;
                     const errorRate = (this.errors.size / this.totalChunks) * 100;
                     if (errorRate > 10) {
                         const errorMsg = Array.from(this.errors.entries())
-                            .map(([idx, err]) => `チャンク${idx}: ${err}`)
+                            .map(([idx, err]) => `Chunk ${idx}: ${err}`)
                             .join(', ');
                         throw new Error(`Download error rate too high (${errorRate.toFixed(1)}%): ${errorMsg}`);
                     }
@@ -11324,7 +11324,7 @@ Do you want to continue?`;
                             if (folderStructure.basePath && !folderStructure.targetHandle) {
                                 try {
                                     targetHandle = await targetHandle.getDirectoryHandle(folderStructure.basePath, { create: true });
-                                    log(`[DownloadManager] ベースディレクトリ: ${folderStructure.basePath}`, 'info');
+                                    log(`[DownloadManager] Base directory: ${folderStructure.basePath}`, 'info');
                                 } catch (e) {
                                     log(`[DownloadManager] Base directory creation error: ${e.message}`, 'error');
                                 }
@@ -12731,18 +12731,18 @@ Do you want to continue?`;
             return rawChunkSize; // それ以下はそのまま
         }
         
-        // v4.7.30: ファイルタイプ別の圧縮率予測
+        // v4.7.30: Compression ratio prediction by file type
         function estimateCompressionRatio(fileName, mimeType) {
-            // ファイル拡張子とMIMEタイプから圧縮率を予測
+            // Predict compression ratio from file extension and MIME type
             const ext = fileName.toLowerCase().split('.').pop();
             
-            // 既に圧縮されているファイル（圧縮効果なし: 100%）
+            // Already compressed files (no compression effect: 100%)
             const compressedFormats = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'mp3', 'mp4', 'avi', 'mov', 'zip', 'rar', '7z', 'gz', 'bz2'];
             if (compressedFormats.includes(ext)) {
                 return 1.0; // 圧縮効果なし
             }
             
-            // テキストベースファイル（高圧縮率: 30-50%）
+            // Text-based files (high compression ratio: 30-50%)
             const textFormats = ['txt', 'log', 'csv', 'json', 'xml', 'html', 'css', 'js', 'md', 'yml', 'yaml'];
             if (textFormats.includes(ext)) {
                 return 0.4; // 60%圧縮
@@ -12754,7 +12754,7 @@ Do you want to continue?`;
                 return 0.5; // 50%圧縮
             }
             
-            // バイナリファイル（低圧縮率: 80-90%）
+            // Binary files (low compression ratio: 80-90%)
             const binaryFormats = ['exe', 'dll', 'so', 'bin', 'dat'];
             if (binaryFormats.includes(ext)) {
                 return 0.85; // 15%圧縮
@@ -12787,7 +12787,7 @@ Do you want to continue?`;
             // Log output (only for 22KB or more)
             if (baseChunkSize >= 22528) {
                 log(`📊 Dynamic chunk size optimization:`);
-                log(`  - ファイルタイプ: ${fileName} (${mimeType || 'unknown'})`);
+                log(`  - File type: ${fileName} (${mimeType || 'unknown'})`);
                 log(`  - 予測圧縮率: ${(compressionRatio * 100).toFixed(1)}%`);
                 log(`  - 最大可能サイズ: ${(maxOriginalSize / 1024).toFixed(1)}KB`);
                 log(`  - 最適化後サイズ: ${(optimalSize / 1024).toFixed(1)}KB`);
@@ -13006,7 +13006,7 @@ Do you want to continue?`;
                         verifiedChunks.push(index);
                     } else {
                         failedCount++;
-                        log(`チャンク ${chunk.index + 1} が見つかりません: ${chunk.txid.substring(0, 16)}...`, 'warning');
+                        log(`Chunk ${chunk.index + 1} not found: ${chunk.txid.substring(0, 16)}...`, 'warning');
                     }
                 }
             }
@@ -13359,7 +13359,7 @@ Do you want to continue?`;
                 
                 // v4.7.55: Add debug log (minimal change)
                 if (actualChunkSize >= 22528) {
-                    log(`[INFO] チャンクサイズ: ${actualChunkSize} - 新方式対象`, 'info');
+                    log(`[INFO] Chunk size: ${actualChunkSize} - New method target`, 'info');
                 }
                 
                 // Declare nextChunkIndex outside of if/else blocks
@@ -13377,7 +13377,7 @@ Do you want to continue?`;
                     }
                     
                     // v5.11.126: Update status
-                    uploadStatusUI.updateStatus('📦', 'データを最適化しています...', 2);
+                    uploadStatusUI.updateStatus('📦', 'Optimizing data...', 2);
                     
                     // Process file and split into payloads (needed for both new and resume)
                     // NOTE: ProgressManager doesn't store payloads, they must be regenerated
@@ -13911,7 +13911,7 @@ Do you want to continue?`;
                     }
                     
                     const i = nextChunkIndex;
-                    log(`チャンク ${i + 1}: ${entries.length} UTXOs 利用可能`);
+                    log(`Chunk ${i + 1}: ${entries.length} UTXOs available`);
                     
                     // No iteration for old approach - use fixed chunk size
                     const optimalChunkSize = actualChunkSize;
@@ -13924,7 +13924,7 @@ Do you want to continue?`;
                     const chunkBlob = currentFile.slice(start, end);
                     const chunkArrayBuffer = await chunkBlob.arrayBuffer();
                     const chunk = new Uint8Array(chunkArrayBuffer);
-                    log(`チャンクサイズ: ${chunk.length} バイト`);
+                    log(`Chunk size: ${chunk.length} bytes`);
                     
                     // Create chunk UI
                     const chunkDiv = document.createElement('div');
@@ -13940,9 +13940,9 @@ Do you want to continue?`;
                     
                     // Process chunk
                     const compressed = useCompression ? lzCompress(chunk) : chunk;
-                    log(`[DEBUG Main] チャンク${i + 1} 圧縮: ${chunk.length} → ${compressed.length} バイト (圧縮${useCompression ? '有効' : '無効'})`, 'debug');
+                    log(`[DEBUG Main] Chunk ${i + 1} compression: ${chunk.length} → ${compressed.length} bytes (compression ${useCompression ? 'enabled' : 'disabled'})`, 'debug');
                     const encrypted = await encryptChunk(compressed, key, i);
-                    log(`[DEBUG Main] チャンク${i + 1} 暗号化: ${compressed.length} → ${encrypted.length} バイト`, 'debug');
+                    log(`[DEBUG Main] Chunk ${i + 1} encryption: ${compressed.length} → ${encrypted.length} bytes`, 'debug');
                     // No Base64 encoding - use raw binary
                     const payloadBytes = encrypted; // Direct binary payload
                     
@@ -14133,7 +14133,7 @@ Do you want to continue?`;
                                 FileState.uploadSessionActive = false;
                                 
                                 // User notification
-                                const errorMsg = `ネットワークが不安定です。\n\n` +
+                                const errorMsg = `Network is unstable.\n\n` +
                                                `Could not obtain BlockID for 5 minutes.\n` +
                                                `TxID: ${txid.substring(0, 16)}...\n\n` +
                                                `進捗は自動保存されています。\n` +
@@ -14316,7 +14316,7 @@ Do you want to continue?`;
                     // v5.5.22: window.processedChunks -> FileState.processedChunks (8-10/18)
                     chunks: FileState.processedChunks.map(c => c.txid),
                     chunkBlockIds: FileState.processedChunks.map(c => c.blockId),
-                    chunkSizes: FileState.processedChunks.map(c => c.originalSize || c.payloadSize), // v4.7.36: 各チャンクの実際のサイズ (Phase 0-M: 新方式対応)
+                    chunkSizes: FileState.processedChunks.map(c => c.originalSize || c.payloadSize), // v4.7.36: Actual size of each chunk (Phase 0-M: New method support)
                     
                     // Recovery information
                     recovery: {
@@ -14518,7 +14518,7 @@ Do you want to continue?`;
                 }
                 
             } catch (error) {
-                log(`[DEBUG-CATCH] processAndUploadのcatchブロックに到達しました`, 'debug');
+                log(`[DEBUG-CATCH] Reached processAndUpload catch block`, 'debug');
                 const errorMessage = error?.message || error?.toString() || 'Unknown error';
                 log(`Upload error: ${errorMessage}`, 'error');
                 console.error('Upload error:', error);
@@ -14607,7 +14607,7 @@ Do you want to continue?`;
                         log('UI cleared after upload completion', 'debug');
                     }
                     
-                    log('ファイル選択とパスワードをクリアしました', 'debug');
+                    log('File selection and password cleared', 'debug');
                 }
                 
                 // v5.11.135: Re-evaluate button state after clearing (should be disabled)
@@ -14705,9 +14705,9 @@ Do you want to continue?`;
                 
                 // Check if exceeds maximum supported chunks
                 if (totalChunks > MAX_CHUNKS_SUPPORTED) {
-                    log(`❌ エラー: チャンク数(${totalChunks})が最大サポート数(${MAX_CHUNKS_SUPPORTED})を超えています`, 'error');
-                    log('メタデータトランザクションは生成されません', 'warning');
-                    log('.kaspaファイル（ローカル）は引き続き生成可能です', 'info');
+                    log(`❌ Error: Number of chunks (${totalChunks}) exceeds maximum supported (${MAX_CHUNKS_SUPPORTED})`, 'error');
+                    log('Metadata transaction will not be generated', 'warning');
+                    log('.kaspa file (local) generation is still available', 'info');
                     
                     // Already warned in processAndUpload, so just skip meta-tx creation
                     // v6.2.74: Clear AbortController before returning
@@ -14944,7 +14944,7 @@ Do you want to continue?`;
                 metaPayload.set(salt, 0);
                 metaPayload.set(encryptedMetaData, salt.length);
                 
-                log(`メタデータサイズ: ${metaDataBytes.length} bytes → 暗号化後: ${metaPayload.length} bytes (salt含む)`);
+                log(`Metadata size: ${metaDataBytes.length} bytes → Encrypted: ${metaPayload.length} bytes (including salt)`);
                 
                 // Upload meta-tx to blockchain - v6.2.68: Add retry logic like regular chunks
                 let metaTxId = null;
@@ -15063,7 +15063,7 @@ Do you want to continue?`;
                 await new Promise(resolve => setTimeout(resolve, 2000));
                 
                 // Wait for BlockID from WebSocket monitor
-                log(`メタトランザクションのBlockIDを待機中...`);
+                log(`Waiting for meta transaction BlockID...`);
                 let metaBlockId = null;
                 let waitTime = 0;
                 const maxWaitTime = config.timeout || 300000; // v6.2.61: Use config.timeout (5 minutes) like regular chunks
@@ -15315,7 +15315,7 @@ Do you want to continue?`;
         // Create intermediate meta-tx for chunk groups (experimental)
         async function createSingleMetaTx(chunkGroup, groupIndex, totalGroups, fileMetadata, password, chunksPerMeta) {
             try {
-                log(`[SuperMeta] 中間メタデータ ${groupIndex + 1}/${totalGroups} を生成中...`, 'info');
+                log(`[SuperMeta] Generating intermediate metadata ${groupIndex + 1}/${totalGroups}...`, 'info');
                 
                 // Create metadata for this chunk group
                 const metaTxData = {
@@ -15360,14 +15360,14 @@ Do you want to continue?`;
                         payloadSplit: fileMetadata.metadata?.payloadSplit || false,
                         // Include chunk boundaries for this group if available
                         ...((fileMetadata.metadata?.segmentBoundaries || fileMetadata.metadata?.chunkBoundaries) ? (() => {
-                            // v5.10.0: 修正 - 各中間メタは自分が管理するチャンクに対応するバウンダリーのみを保持
+                            // v5.10.0: Fix - Each intermediate meta holds only boundaries for chunks it manages
                             const startChunk = groupIndex * chunksPerMeta;
                             const endChunk = Math.min((groupIndex + 1) * chunksPerMeta - 1, fileMetadata.recovery.totalChunks - 1);
                             
                             // デバッグログ：管理範囲を表示
-                            log(`[SuperMeta v5.10.0] 中間メタ ${groupIndex + 1} の管理範囲: チャンク ${startChunk} - ${endChunk}`, 'debug');
+                            log(`[SuperMeta v5.10.0] Intermediate meta ${groupIndex + 1} management range: chunks ${startChunk} - ${endChunk}`, 'debug');
                             
-                            // この中間メタが管理するペイロードに対応するバウンダリーのみをフィルタリング
+                            // Filter only boundaries corresponding to payloads managed by this intermediate meta
                             const boundariesSource = fileMetadata.metadata.segmentBoundaries || fileMetadata.metadata.chunkBoundaries;
                             const boundariesForGroup = boundariesSource.filter(boundary => {
                                 // boundary.payloadIndex is the index of the payload where this boundary starts
@@ -15399,7 +15399,7 @@ Do you want to continue?`;
                 metaPayload.set(salt, 0);
                 metaPayload.set(encryptedMetaData, salt.length);
                 
-                log(`[SuperMeta] 中間メタデータサイズ: ${metaDataBytes.length} bytes`, 'debug');
+                log(`[SuperMeta] Intermediate metadata size: ${metaDataBytes.length} bytes`, 'debug');
                 
                 // Upload to blockchain
                 const utxoResponse = await NetworkState.rpcClient.getUtxosByAddresses([UserState.address.toString()]);
@@ -15469,7 +15469,7 @@ Do you want to continue?`;
                 
                 // Add to monitoring list
                 if (NetworkState.ws.monitorActive && window.addTransactionToMonitor) {
-                    window.addTransactionToMonitor(metaTxId, '中間メタトランザクション');
+                    window.addTransactionToMonitor(metaTxId, 'Intermediate meta transaction');
                 }
                 
                 // Wait for BlockID using WebSocket monitoring (same pattern as regular chunk)
@@ -15535,7 +15535,7 @@ Do you want to continue?`;
                 };
                 
             } catch (error) {
-                log(`[SuperMeta] 中間メタデータ生成エラー: ${error.message}`, 'error');
+                log(`[SuperMeta] Intermediate metadata generation error: ${error.message}`, 'error');
                 throw error;
             }
         }
@@ -15583,8 +15583,8 @@ Do you want to continue?`;
                         // v5.10.3: Removed childMetadata to reduce redundancy
                         // Child metadata TxIDs and BlockIDs are already in chunks/chunkBlockIds arrays
                         
-                        // SuperMetaにはチャンクバウンダリを含めない（容量制限のため）
-                        // 各中間メタデータが管轄するチャンクのバウンダリを保持
+                        // SuperMeta does not include chunk boundaries (due to capacity limitations)
+                        // Each intermediate metadata holds boundaries for chunks it manages
                         payloadSplit: fileMetadata.metadata?.payloadSplit || false,
                         
                         // v5.10.2: Add upload information to super metadata
@@ -15725,7 +15725,7 @@ Do you want to continue?`;
             try {
                 log('Processing directory metadata...', 'info');
                 
-                // ディレクトリ情報を表示
+                // Display directory information
                 const totalSize = dirMetadata.directory?.totalSize || 0;
                 const fileCount = dirMetadata.directory?.fileCount || 0;
                 const dirCount = dirMetadata.directory?.directoryCount || 0;
@@ -16048,10 +16048,10 @@ Do you want to continue?`;
 
         // Download individual file from directory
         FileState.fileOperationHandlers.downloadFileFromDirectory = async function(metaTxId, blockId, fileName, password, filePath) {
-            // v4.7.8: DownloadManagerを使用したフォルダ構造対応実装
+            // v4.7.8: DownloadManager implementation with folder structure support
             log(`[DownloadManager] Starting download of directory file: ${fileName}`, 'info');
             if (filePath) {
-                log(`[DownloadManager] ファイルパス: ${filePath}`, 'info');
+                log(`[DownloadManager] File path: ${filePath}`, 'info');
             }
             
             try {
@@ -16812,7 +16812,7 @@ Do you want to continue?`;
                         log(`メタデータを正常に復号化しました (v${metaData.version}, type: ${metaData.type})`, 'success');
                         log(`メタデータ内容: ${JSON.stringify(metaData, null, 2)}`, 'info');
                         
-                        // ディレクトリタイプの場合
+                        // For directory type
                         if (metaData.type === 'kaspa-directory') {
                             log('Directory metadata detected', 'info');
                             
@@ -16830,7 +16830,7 @@ Do you want to continue?`;
                             return;
                         }
                         
-                        // 通常ファイルの場合
+                        // For regular file
                         
                         // Check if this is super metadata
                         if (metaData.chunkStructure?.type === 'super') {
@@ -16899,7 +16899,7 @@ Do you want to continue?`;
                                         if (txData.payload && txData.payload !== '') {
                                             intPayload = safeHexDecode(txData.payload, 'intermediate meta-tx payload from API');
                                         } else {
-                                            throw new Error(`中間メタデータのペイロードが空です`);
+                                            throw new Error(`Intermediate metadata payload is empty`);
                                         }
                                     }
                                     
@@ -16912,16 +16912,16 @@ Do you want to continue?`;
                                     
                                     // Debug: Check intermediate metadata content
                                     const segBoundaries = intMetaData.metadata?.segmentBoundaries || intMetaData.metadata?.chunkBoundaries;
-                                    log(`[SuperMeta DEBUG] 中間メタ ${i + 1} - payloadSplit: ${intMetaData.metadata?.payloadSplit}, segmentBoundaries: ${segBoundaries?.length || 0}`, 'debug');
+                                    log(`[SuperMeta DEBUG] Intermediate meta ${i + 1} - payloadSplit: ${intMetaData.metadata?.payloadSplit}, segmentBoundaries: ${segBoundaries?.length || 0}`, 'debug');
                                     if (segBoundaries?.length > 0) {
-                                        log(`[SuperMeta DEBUG] 中間メタ ${i + 1} - セグメントバウンダリ[0]: ${JSON.stringify(segBoundaries[0])}`, 'debug');
+                                        log(`[SuperMeta DEBUG] Intermediate meta ${i + 1} - Segment boundary[0]: ${JSON.stringify(segBoundaries[0])}`, 'debug');
                                     }
                                     
                                     singleMetadatas.push(intMetaData);
                                     log(`[SuperMeta] Intermediate metadata ${i + 1} retrieval complete`, 'success');
                                     
                                 } catch (error) {
-                                    log(`[SuperMeta] 中間メタデータ取得エラー: ${error.message}`, 'error');
+                                    log(`[SuperMeta] Intermediate metadata retrieval error: ${error.message}`, 'error');
                                     throw error;
                                 }
                             }
@@ -16946,14 +16946,14 @@ Do you want to continue?`;
                                 }
                             }
                             
-                            // デバッグ: 中間メタデータの内容を確認
+                            // Debug: Check intermediate metadata contents
                             if (payloadSplitFlag && allChunkBoundaries.length === 0) {
-                                log(`[SuperMeta WARNING] payloadSplitフラグがtrueですが、セグメントバウンダリが見つかりません`, 'warning');
-                                log(`[SuperMeta DEBUG] 中間メタデータ数: ${singleMetadatas.length}`, 'debug');
+                                log(`[SuperMeta WARNING] payloadSplit flag is true but no segment boundaries found`, 'warning');
+                                log(`[SuperMeta DEBUG] Number of intermediate metadata: ${singleMetadatas.length}`, 'debug');
                                 for (let i = 0; i < singleMetadatas.length; i++) {
                                     const intMeta = singleMetadatas[i];
                                     const metaBoundaries = intMeta.metadata?.segmentBoundaries || intMeta.metadata?.chunkBoundaries;
-                                    log(`[SuperMeta DEBUG] 中間メタ[${i}] payloadSplit: ${intMeta.metadata?.payloadSplit}, boundaries: ${metaBoundaries?.length || 0}`, 'debug');
+                                    log(`[SuperMeta DEBUG] Intermediate meta[${i}] payloadSplit: ${intMeta.metadata?.payloadSplit}, boundaries: ${metaBoundaries?.length || 0}`, 'debug');
                                 }
                             }
                             
@@ -16970,10 +16970,10 @@ Do you want to continue?`;
                                 metadata: {
                                     ...metaData.metadata,  // v5.10.2: includes uploadedBy, uploadDate, blockTime from super meta
                                     payloadSplit: payloadSplitFlag,
-                                    // セグメントバウンダリは階層的に管理（中間メタデータから収集）
+                                    // Segment boundaries are managed hierarchically (collected from intermediate metadata)
                                     ...(allChunkBoundaries.length > 0 ? { segmentBoundaries: allChunkBoundaries } : {})
                                 },
-                                // 中間メタデータを保持（将来の拡張用）
+                                // Retain intermediate metadata (for future expansion)
                                 _singleMetadatas: singleMetadatas,
                                 metaTx: {
                                     type: 'super',
@@ -16983,11 +16983,11 @@ Do you want to continue?`;
                                 }
                             };
                             
-                            // 後方互換性: v5.0.7以前のアップロードでセグメントバウンダリがない場合の対応
+                            // Backward compatibility: Handle uploads from v5.0.7 or earlier without segment boundaries
                             if (payloadSplitFlag && allChunkBoundaries.length === 0) {
                                 log(`[SuperMeta COMPAT] v5.0.7 or earlier upload detected - Attempting to retrieve segment boundaries from upload history`, 'warning');
                                 
-                                // アップロードヒストリーから該当するファイルを探す
+                                // Search for matching file in upload history
                                 try {
                                     const history = JSON.parse(localStorage.getItem('kaspa_upload_history') || '[]');
                                     const matchingEntry = history.find(entry => 
@@ -16998,12 +16998,12 @@ Do you want to continue?`;
                                     
                                     if (matchingEntry && (matchingEntry.metadata?.metadata?.segmentBoundaries || matchingEntry.metadata?.metadata?.chunkBoundaries)) {
                                         kaspaMetadata.metadata.segmentBoundaries = matchingEntry.metadata.metadata.segmentBoundaries || matchingEntry.metadata.metadata.chunkBoundaries;
-                                        log(`[SuperMeta COMPAT] アップロードヒストリーからセグメントバウンダリを復元: ${FileState.kaspaMetadata.metadata.segmentBoundaries.length}個`, 'success');
+                                        log(`[SuperMeta COMPAT] Restored segment boundaries from upload history: ${FileState.kaspaMetadata.metadata.segmentBoundaries.length} items`, 'success');
                                     } else {
-                                        log(`[SuperMeta COMPAT] アップロードヒストリーにセグメントバウンダリが見つかりません`, 'warning');
+                                        log(`[SuperMeta COMPAT] Segment boundaries not found in upload history`, 'warning');
                                     }
                                 } catch (e) {
-                                    log(`[SuperMeta COMPAT] アップロードヒストリーの読み込みエラー: ${e.message}`, 'error');
+                                    log(`[SuperMeta COMPAT] Upload history read error: ${e.message}`, 'error');
                                 }
                             }
                             
@@ -17070,7 +17070,7 @@ Do you want to continue?`;
             
             if (FileState.kaspaMetadata.auth?.passwordIncluded && FileState.kaspaMetadata.auth?.password) {
                 password = FileState.kaspaMetadata.auth.password;
-                log(`パスワードを.kaspaファイルから取得しました (長さ: ${password.length})`, 'info');
+                log(`Password retrieved from .kaspa file (length: ${password.length})`, 'info');
             }
             
             // v6.2.80: Enhanced error messages for download prerequisites
@@ -17105,7 +17105,7 @@ Do you want to continue?`;
             document.getElementById('downloadProgress').style.display = 'block';
             
             try {
-                // v4.6.27: ディレクトリタイプ対応
+                // v4.6.27: Directory type support
                 const fileName = FileState.kaspaMetadata.file?.name || 
                                FileState.kaspaMetadata.directory?.name || 
                                'unknown';

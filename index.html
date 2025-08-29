@@ -2757,8 +2757,8 @@
                 </div>
                 
                 <div style="margin-top: 15px; padding: 10px; background: var(--bg-secondary); border-radius: 5px;">
-                    <div style="margin-bottom: 5px;">フィルター済み: <span id="filter-blocked-count" style="font-weight: bold;">0</span>件</div>
-                    <div>最終フィルター: <span id="filter-last-blocked">-</span></div>
+                    <div style="margin-bottom: 5px;">Filtered: <span id="filter-blocked-count" style="font-weight: bold;">0</span> items</div>
+                    <div>Last filter: <span id="filter-last-blocked">-</span></div>
                     <button onclick="DebugHandlers.resetFilterStats()" style="margin-top: 10px; padding: 5px 10px;">Reset Stats</button>
                 </div>
             </div>
@@ -2777,14 +2777,14 @@
                         Kill REST API
                     </button>
                     <button onclick="DebugHandlers.reviveRestApi()" id="rest-api-revive-btn" style="padding: 10px 20px;" disabled>
-                        REST API復活
+                        Revive REST API
                     </button>
                 </div>
                 
                 <div style="margin-top: 15px; padding: 10px; background: var(--bg-secondary); border-radius: 5px;">
                     <div>Status: <span id="rest-api-kill-status" style="font-weight: bold; color: var(--success-color);">● Enabled</span></div>
-                    <div>スキップ回数: <span id="rest-api-kill-skip-count">0</span></div>
-                    <div>最終スキップ: <span id="rest-api-last-skip">-</span></div>
+                    <div>Skip count: <span id="rest-api-kill-skip-count">0</span></div>
+                    <div>Last skip: <span id="rest-api-last-skip">-</span></div>
                 </div>
             </div>
         </div>
@@ -5924,7 +5924,7 @@ Do you want to continue?`;
                 return confirm(message);
             },
             
-            // LocalStorageクリア
+            // Clear LocalStorage
             clearLocalStorage() {
                 const result = SafeStorage.removeItem('kenv_temp_data');
                 if (result.success) {
@@ -8548,7 +8548,7 @@ Do you want to continue?`;
                 
                 if (FileState.progressManager?.progress) {
                     const progress = FileState.progressManager.progress;
-                    log(`[DEBUG-RESUME] 進捗詳細:`, 'debug');
+                    log(`[DEBUG-RESUME] Progress details:`, 'debug');
                     log(`[DEBUG-RESUME]   - totalChunks: ${progress.recovery.totalChunks}`, 'debug');
                     log(`[DEBUG-RESUME]   - completedChunks: ${progress._progress.completedChunks}`, 'debug');
                     log(`[DEBUG-RESUME]   - failedChunks: ${progress._progress.resume?.failedChunks?.length || 0}`, 'debug');
@@ -13526,7 +13526,7 @@ Do you want to continue?`;
                         // Get fresh UTXOs
                         const { entries } = await NetworkState.rpcClient.getUtxosByAddresses([UserState.address.toString()]);
                         if (!entries || entries.length === 0) {
-                            throw new Error('利用可能なUTXOがありません');
+                            throw new Error('No available UTXOs');
                         }
                         
                         // Create UI element
@@ -13686,7 +13686,7 @@ Do you want to continue?`;
                                                    `Could not obtain BlockID for 5 minutes.\n` +
                                                    `TxID: ${txid.substring(0, 16)}...\n\n` +
                                                    `Progress is saved automatically.\n` +
-                                                   `ネットワークが安定してから再開してください。`;
+                                                   `Please resume after network stabilizes.`;
                                     alert(errorMsg);
                                     log(`Upload stopped: 5 minute timeout (TxID: ${txid.substring(0, 16)}...)`, 'error');
                                     
@@ -13907,7 +13907,7 @@ Do you want to continue?`;
                     log(`Starting to process chunk ${nextChunkIndex + 1}/${totalChunks}...`);
                     const { entries } = await NetworkState.rpcClient.getUtxosByAddresses([UserState.address.toString()]);
                     if (!entries || entries.length === 0) {
-                        throw new Error('利用可能なUTXOがありません');
+                        throw new Error('No available UTXOs');
                     }
                     
                     const i = nextChunkIndex;
@@ -13946,19 +13946,19 @@ Do you want to continue?`;
                     // No Base64 encoding - use raw binary
                     const payloadBytes = encrypted; // Direct binary payload
                     
-                    // v4.7.30: ペイロードサイズの詳細分析
-                    if (actualChunkSize >= 22528 && i === 0) { // 最初のチャンクのみ詳細表示
-                        log(`📊 チャンク詳細分析:`);
-                        log(`  - 元のサイズ: ${chunk.length.toLocaleString()} バイト`);
-                        log(`  - 圧縮後: ${compressed.length.toLocaleString()} バイト (${((compressed.length/chunk.length)*100).toFixed(1)}%)`);
-                        log(`  - 暗号化後: ${encrypted.length.toLocaleString()} バイト (+${encrypted.length - compressed.length} バイト)`);
-                        log(`  - ペイロード効率: ${((encrypted.length/24000)*100).toFixed(1)}% / 24KB制限`);
+                    // v4.7.30: Detailed payload size analysis
+                    if (actualChunkSize >= 22528 && i === 0) { // Show details only for first chunk
+                        log(`📊 Chunk detailed analysis:`);
+                        log(`  - Original size: ${chunk.length.toLocaleString()} bytes`);
+                        log(`  - After compression: ${compressed.length.toLocaleString()} bytes (${((compressed.length/chunk.length)*100).toFixed(1)}%)`);
+                        log(`  - After encryption: ${encrypted.length.toLocaleString()} bytes (+${encrypted.length - compressed.length} bytes`);
+                        log(`  - Payload efficiency: ${((encrypted.length/24000)*100).toFixed(1)}% / 24KB limit`);
                         
                         // Warning when compression ratio differs significantly from prediction
                         const expectedRatio = estimateCompressionRatio(currentFile.name, currentFile.type);
                         const actualRatio = useCompression ? (compressed.length / chunk.length) : 1.0;
                         if (Math.abs(expectedRatio - actualRatio) > 0.2) {
-                            log(`⚠️ 圧縮率の乖離: 予測${(expectedRatio*100).toFixed(1)}% vs 実際${(actualRatio*100).toFixed(1)}%`, 'warning');
+                            log(`⚠️ Compression ratio deviation: Predicted ${(expectedRatio*100).toFixed(1)}% vs Actual ${(actualRatio*100).toFixed(1)}%`, 'warning');
                         }
                     }
                     
@@ -14015,14 +14015,14 @@ Do you want to continue?`;
                             const pendingTx = result.transactions[0];
                             
                             // Sign the transaction
-                            log(`トランザクションに署名中...`);
+                            log(`Signing transaction...`);
                             await pendingTx.sign([UserState.privateKey]);
                             
                             // Submit to network
                             log(`Sending to network...`);
                             txid = await pendingTx.submit(NetworkState.rpcClient);
                             
-                            log(`チャンク ${i + 1} TxID: ${txid.substring(0, 16)}...`, 'success');
+                            log(`Chunk ${i + 1} TxID: ${txid.substring(0, 16)}...`, 'success');
                             
                             // Add to monitoring list
                             FileState.uploadingChunksCount++; // v5.5.36: Using FileState
@@ -14100,7 +14100,7 @@ Do you want to continue?`;
                                                 log(`REST API check: TxID confirmed, waiting for BlockID... (${waitTime/1000} seconds)`, 'debug');
                                             }
                                         } catch (apiError) {
-                                            log(`REST APIエラー: ${apiError.message} (${waitTime/1000}秒)`, 'debug');
+                                            log(`REST API error: ${apiError.message} (${waitTime/1000} seconds)`, 'debug');
                                         }
                                         lastApiCheck = waitTime;
                                     }
@@ -14136,10 +14136,10 @@ Do you want to continue?`;
                                 const errorMsg = `Network is unstable.\n\n` +
                                                `Could not obtain BlockID for 5 minutes.\n` +
                                                `TxID: ${txid.substring(0, 16)}...\n\n` +
-                                               `進捗は自動保存されています。\n` +
-                                               `ネットワークが安定してから再開してください。`;
+                                               `Progress is automatically saved.\n` +
+                                               `Please resume after network stabilizes.`;
                                 alert(errorMsg);
-                                log(`アップロード停止: 5分タイムアウト (TxID: ${txid.substring(0, 16)}...)`, 'error');
+                                log(`Upload stopped: 5-minute timeout (TxID: ${txid.substring(0, 16)}...)`, 'error');
                                 
                                 throw new Error('Network timeout - upload stopped after 5 minutes');
                             }
@@ -14186,7 +14186,7 @@ Do you want to continue?`;
                                 const match = errorMessage.match(/transaction ([a-f0-9]{64}) was already accepted/);
                                 if (match) {
                                     txid = match[1];
-                                    log(`チャンク ${i + 1} は既に承認済み: ${txid.substring(0, 16)}...`, 'info');
+                                    log(`Chunk ${i + 1} already confirmed: ${txid.substring(0, 16)}...`, 'info');
                                     // Extract blockId from error message if available
                                     const blockMatch = errorMessage.match(/by the consensus.*?([a-f0-9]{64})/);
                                     if (blockMatch) {
@@ -14652,7 +14652,7 @@ Do you want to continue?`;
                     
                     if (!shouldKeepProgressManager) {
                         FileState.progressManager = null;
-                        log('ProgressManagerをリセットしました', 'debug');
+                        log('ProgressManager reset', 'debug');
                     }
                 } else {
                     log('Maintaining ProgressManager due to network error', 'info');
@@ -14957,7 +14957,7 @@ Do you want to continue?`;
                         const entries = utxoResponse.entries || [];
                         
                         if (!entries || entries.length === 0) {
-                            throw new Error('利用可能なUTXOがありません');
+                            throw new Error('No available UTXOs');
                         }
                         
                         log(`${entries.length} UTXOs available for meta-tx`);
@@ -15176,7 +15176,7 @@ Do you want to continue?`;
                     createdAt: Date.now()
                 };
                 
-                // Step 4: 履歴更新処理を削除（KENVで既に処理済み）
+                // Step 4: Remove history update processing (already handled by KENV)
                 // メタTxの情報はKENVで管理されているため、
                 // ここでの履歴更新は不要
                 
@@ -15271,7 +15271,7 @@ Do you want to continue?`;
                 // v6.2.74: Clear AbortController on success
                 if (FileState.metaTxAbortController) {
                     FileState.metaTxAbortController = null;
-                    log('[DEBUG] メタTx AbortControllerをクリアしました', 'debug');
+                    log('[DEBUG] Meta Tx AbortController cleared', 'debug');
                 }
                 
                 // v6.2.79: Clear ProgressManager after regular meta-tx completion
@@ -15289,7 +15289,7 @@ Do you want to continue?`;
                 // v6.2.74: Clear AbortController on error
                 if (FileState.metaTxAbortController) {
                     FileState.metaTxAbortController = null;
-                    log('[DEBUG] メタTx AbortControllerをクリアしました（エラー時）', 'debug');
+                    log('[DEBUG] Meta Tx AbortController cleared (on error)', 'debug');
                 }
                 
                 log(`Meta transaction creation error: ${error.message || error}`, 'error');
@@ -16075,7 +16075,7 @@ Do you want to continue?`;
                     return;
                 }
                 
-                // 進捗表示
+                // Progress display
                 document.getElementById('downloadProgress').style.display = 'block';
                 document.getElementById('downloadStatus').textContent = 'Fetching metadata...';
                 
@@ -16180,7 +16180,7 @@ Do you want to continue?`;
                     // v5.5.23: window.directoryMetadata -> FileState.directoryMetadata (1/2)
                     FileState.directoryMetadata = kaspaMetadata;
                     window.currentDirectoryMetadata = kaspaMetadata; // v4.7.8: フォルダ構造用に保持
-                    FileState.kaspaMetadata = null; // 通常のメタデータをクリア
+                    FileState.kaspaMetadata = null; // Clear regular metadata
                     // v5.5.23: window.directoryMetadata -> FileState.directoryMetadata (2/2)
                     await loadDirectoryMetadata(FileState.directoryMetadata);
                     return;
@@ -16598,10 +16598,10 @@ Do you want to continue?`;
                                 }
                             } else {
                                 log(`[RPC] 利用可能なアーカイブノードがありません。REST APIにフォールバックします`, 'warning');
-                                // throw rpcError; // REST APIフォールバックのため削除
+                                // throw rpcError; // Removed for REST API fallback
                             }
                         } else {
-                            // throw rpcError; // REST APIフォールバックのため削除
+                            // throw rpcError; // Removed for REST API fallback
                             log(`[RPC] エラー: ${rpcError.message}。REST APIにフォールバックします`, 'warning');
                         }
                     }
@@ -17613,7 +17613,7 @@ Do you want to continue?`;
                         
                         // Clear 5-minute timer
                         if (AppState.monitoring.wsMonitorTimeout) {
-                            log(`[DEBUG] 5分タイマーをクリアしました`, 'debug');
+                            log(`[DEBUG] 5-minute timer cleared`, 'debug');
                             clearTimeout(AppState.monitoring.wsMonitorTimeout);
                             AppState.monitoring.wsMonitorTimeout = null;
                         }
@@ -17786,7 +17786,7 @@ Do you want to continue?`;
                 config.network = e.target.value;
                 log(`ネットワーク変更: ${previousNetwork} → ${config.network}`, 'info');
                 
-                // v5.11.102: ネットワーク変更時はConnectをリセット
+                // v5.11.102: Reset connection on network change
                 if (previousNetwork !== config.network && previousNetwork !== null) {
                     // 1. ウォレットをDisconnect
                     if (UserState.address) {
@@ -17794,7 +17794,7 @@ Do you want to continue?`;
                         log('ネットワーク変更のためウォレットをDisconnectしました', 'info');
                     }
                     
-                    // 2. RPCConnectをリセット
+                    // 2. Reset RPC connection
                     if (NetworkState.rpcClient) {
                         try {
                             await NetworkState.rpcClient.disconnect();
@@ -18240,13 +18240,13 @@ Do you want to continue?`;
                             // Received: delete 90 seconds after receipt
                             if (now - txData.receivedAt > 90000) {
                                 NetworkState.ws.monitoredTransactions.delete(txid);
-                                // log(`WebSocket監視から受信済みトランザクションを削除: ${txid.substring(0, 16)}... (受信から90秒経過)`, 'debug');
+                                // log(`Removed received transaction from WebSocket monitoring: ${txid.substring(0, 16)}... (90 seconds since receipt)`, 'debug');
                             }
                         } else {
                             // Not received: delete 300 seconds after transmission
                             if (now - txData.timestamp > 300000) {
                                 NetworkState.ws.monitoredTransactions.delete(txid);
-                                // log(`WebSocket監視から未受信トランザクションを削除: ${txid.substring(0, 16)}... (送信から300秒経過)`, 'debug');
+                                // log(`Removed unreceived transaction from WebSocket monitoring: ${txid.substring(0, 16)}... (300 seconds since sending)`, 'debug');
                             }
                         }
                     }
@@ -18330,7 +18330,7 @@ Do you want to continue?`;
                 if (AppState.monitoring.wsMonitorTimeout) {
                     clearTimeout(AppState.monitoring.wsMonitorTimeout);
                     AppState.monitoring.wsMonitorTimeout = null;
-                    log('[DEBUG] 5分タイマーをクリアしました', 'debug');
+                    log('[DEBUG] 5-minute timer cleared', 'debug');
                 }
                 
                 // v5.7.2: Fixed rpcClient check - use NetworkState.rpcClient
@@ -18343,7 +18343,7 @@ Do you want to continue?`;
                     
                     // v5.7.3: Remove all event listeners to prevent memory leak
                     NetworkState.rpcClient.removeAllEventListeners();
-                    log('[DEBUG] イベントリスナーをクリアしました', 'debug');
+                    log('[DEBUG] Event listeners cleared', 'debug');
                     
                     // v5.11.141: Stop all auxiliary RPC clients
                     if (NetworkState.auxRpcClients && NetworkState.auxRpcClients.length > 0) {
@@ -18413,7 +18413,7 @@ Do you want to continue?`;
             
             // WebSocketが本当に準備できるまで待つ
             if (NetworkState.rpcClient && NetworkState.rpcClient.isConnected) {
-                // Phase 0-D: 無駄な待機を削除、代わりに状態確認
+                // Phase 0-D: Remove unnecessary wait, check status instead
                 log('[Monitor] RPC connection confirmed, starting monitoring', 'debug');
                 await startMonitoring();
                 
@@ -18641,7 +18641,7 @@ Do you want to continue?`;
             } else {
                 config.network = config.defaultNetwork;
             }
-            log(`[Config] ネットワーク設定初期化: ${config.network}`, 'info');
+            log(`[Config] Network settings initialized: ${config.network}`, 'info');
             
             // Initialize archive network display (v5.11.94)
             const archiveNetworkDisplay = document.getElementById('archiveNetworkDisplay');
@@ -18859,7 +18859,7 @@ Do you want to continue?`;
             console.log('\n=== Phase 1 Basic Test ===');
             
             try {
-                // マネージャーの初期化
+                // Initialize managers
                 simpleWalletManager = new SimpleWalletManager();
                 console.log('✓ Manager initialized');
                 
@@ -19162,7 +19162,7 @@ Do you want to continue?`;
                 window.updateUploadButtonState();
             }
             
-            log('ファイル選択をクリアしました', 'info');
+            log('File selection cleared', 'info');
         };
         
         // File selection handler (moved from FILE OPERATIONS)
@@ -19191,7 +19191,7 @@ Do you want to continue?`;
             let resumeResult = { completed: false };
             if (!window.pendingProgress && WorkspaceState.progressFileMap.has(file.name)) {
                 const progressInfo = WorkspaceState.progressFileMap.get(file.name);
-                log(`進捗ファイルを自動検出: ${progressInfo.progressFilename}`, 'info');
+                log(`Progress file auto-detected: ${progressInfo.progressFilename}`, 'info');
                 
                 try {
                     // Load the progress file
@@ -19234,7 +19234,7 @@ Do you want to continue?`;
                         }
                     }
                 } catch (error) {
-                    log(`進捗ファイルの読み込みエラー: ${error.message}`, 'error');
+                    log(`Progress file loading error: ${error.message}`, 'error');
                 }
             }
             
@@ -19264,7 +19264,7 @@ Do you want to continue?`;
                     window.pendingProgress = null;
                     document.getElementById('resumeInfo').style.display = 'none';
                 } else {
-                    log('進捗ファイルが選択されたファイルと一致しません', 'error');
+                    log('Progress file does not match the selected file', 'error');
                     // v5.5.24: window.progressManager -> FileState.progressManager (9/11)
                     FileState.progressManager = null;
                     UIHandlers.updateFileSelectionUI(file, false);
@@ -19325,7 +19325,7 @@ Do you want to continue?`;
             try {
                 // Initialize wallet with SDK
                 if (!NetworkState.kaspa) {
-                    throw new Error('Kaspa SDK not initialized - システムを初期化してください');
+                    throw new Error('Kaspa SDK not initialized - Please initialize the system');
                 }
                 
                 // Create wallet from private key (correct API usage)
@@ -19967,7 +19967,7 @@ Do you want to continue?`;
             if (selectedIds.length === 0) return;
             
             if (confirm(`Remove ${selectedIds.length} file(s) from the list?`)) {
-                // KENVエントリーから削除（後ろから削除して、インデックスのずれを防ぐ）
+                // Delete from KENV entries (delete from end to prevent index shift)
                 const entriesToDelete = [];
                 for (const id of selectedIds) {
                     const entryIndex = FileState.kenvManager.entries.findIndex(e => e.id === id);
@@ -19976,7 +19976,7 @@ Do you want to continue?`;
                     }
                 }
                 
-                // インデックスを降順でソートして、後ろから削除
+                // Sort indices in descending order and delete from end
                 entriesToDelete.sort((a, b) => b - a);
                 for (const index of entriesToDelete) {
                     FileState.kenvManager.entries.splice(index, 1);

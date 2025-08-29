@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.91</title>
+    <title>Kaspa P2P File Storage v6.2.92</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -13666,7 +13666,7 @@ Do you want to continue?`;
                                                     log(`REST API check: TxID confirmed, waiting for BlockID... (${waitTime/1000} seconds)`, 'debug');
                                                 }
                                             } catch (apiError) {
-                                                log(`REST APIエラー: ${apiError.message} (${waitTime/1000}秒)`, 'debug');
+                                                log(`REST API error: ${apiError.message} (${waitTime/1000} seconds)`, 'debug');
                                             }
                                             lastApiCheck = waitTime;
                                         }
@@ -13776,7 +13776,7 @@ Do you want to continue?`;
                                     
                                     // ユーザー向けメッセージ
                                     const userMessage = 
-                                        `⚠️ トランザクションサイズ超過エラー\n\n` +
+                                        `⚠️ Transaction size exceeded error\n\n` +
                                         `現在のUTXO数: ${utxoCount}個\n` +
                                         `Current amount: ${currentAmountKAS.toFixed(1)} KAS\n\n` +
                                         `【原因】\n` +
@@ -13798,14 +13798,14 @@ Do you want to continue?`;
                                     throw new Error(`Storage mass exceeded with ${utxoCount} UTXOs - stopping upload`);
                                 }
                                 
-                                log(`ペイロード ${i + 1} エラー (試行 ${retries}/${config.retryCount}): ${errorMessage}`, 'error');
-                                // WASMエラーの詳細をログ出力
+                                log(`Payload ${i + 1} error (attempt ${retries}/${config.retryCount}): ${errorMessage}`, 'error');
+                                // Log WASM error details
                                 if (typeof error === 'object' && error !== null) {
-                                    log(`[DEBUG] エラーオブジェクト: ${error.message || '[messageなし]'} (${error.constructor?.name || 'object'})`, 'debug');
+                                    log(`[DEBUG] Error object: ${error.message || '[no message]'} (${error.constructor?.name || 'object'})`, 'debug');
                                 } else {
-                                    log(`[DEBUG] エラーオブジェクト: ${error}`, 'debug');
+                                    log(`[DEBUG] Error object: ${error}`, 'debug');
                                 }
-                                log(`[DEBUG] エラータイプ: ${typeof error}`, 'debug');
+                                log(`[DEBUG] Error type: ${typeof error}`, 'debug');
                                 if (error?.stack) {
                                     log(`[DEBUG] スタックトレース: ${error.stack}`, 'debug');
                                 }
@@ -13815,7 +13815,7 @@ Do you want to continue?`;
                                     if (chunkStatusElement) {
                                         chunkStatusElement.innerHTML = '<span class="error">❌ Failed</span>';
                                     } else {
-                                        log(`[ERROR] chunk-status-${i} 要素が見つかりません（エラー時）`, 'error');
+                                        log(`[ERROR] chunk-status-${i} element not found (during error)`, 'error');
                                     }
                                     FileState.progressManager.markChunkFailed(i);
                                     await FileState.progressManager.saveProgress();
@@ -13881,18 +13881,18 @@ Do you want to continue?`;
                     nextChunkIndex = -1;
                     
                     } catch (error) {
-                        // v4.7.57: 新方式のエラーハンドリング
-                        log(`[DEBUG-新方式] catchブロックに到達 - エラー型: ${typeof error}`, 'debug');
+                        // v4.7.57: New error handling approach
+                        log(`[DEBUG-new approach] Reached catch block - error type: ${typeof error}`, 'debug');
                         const errorMessage = error?.message || error?.toString() || 'Unknown error';
-                        log(`[新方式] エラーが発生しました: ${errorMessage}`, 'error');
+                        log(`[New approach] Error occurred: ${errorMessage}`, 'error');
                         // WASMエラーの詳細をログ出力
                         if (typeof error === 'object' && error !== null) {
-                            log(`[新方式] エラー詳細: ${error.message || '[messageなし]'} (${error.constructor?.name || 'object'})`, 'error');
+                            log(`[New approach] Error details: ${error.message || '[no message]'} (${error.constructor?.name || 'object'})`, 'error');
                         } else {
-                            log(`[新方式] エラー詳細: ${error}`, 'error');
+                            log(`[New approach] Error details: ${error}`, 'error');
                         }
                         log(`[新方式] 処理を中断します`, 'error');
-                        log(`[DEBUG-新方式] エラーを再throwします`, 'debug');
+                        log(`[DEBUG-new approach] Rethrowing error`, 'debug');
                         throw error;
                     }
                     
@@ -14065,7 +14065,7 @@ Do you want to continue?`;
                                     const monitorData = NetworkState.ws.monitoredTransactions.get(txid);
                                     if (monitorData.blockId) {
                                         blockId = monitorData.blockId;
-                                        log(`WebSocket経由でBlockID取得: ${blockId.substring(0, 16)}... (${waitTime/1000}秒)`, 'success');
+                                        log(`BlockID obtained via WebSocket: ${blockId.substring(0, 16)}... (${waitTime/1000} seconds)`, 'success');
                                         FileState.uploadingChunksCount--; // v5.5.36: Using FileState
                                         log(`[DEBUG] Removed from WebSocket monitoring list: TxID: ${txid.substring(0, 16)}... (BlockID obtained)`, 'debug');
                                         break;
@@ -14091,7 +14091,7 @@ Do you want to continue?`;
                                                 const data = await response.json();
                                                 blockId = data.block_hash?.[0] || data.accepting_block_hash;
                                                 if (blockId) {
-                                                    log(`REST API経由でBlockID取得: ${blockId.substring(0, 16)}... (${waitTime/1000}秒)`, 'success');
+                                                    log(`BlockID obtained via REST API: ${blockId.substring(0, 16)}... (${waitTime/1000} seconds)`, 'success');
                                                     if (NetworkState.ws.monitoredTransactions.has(txid)) {
                                                         FileState.uploadingChunksCount--;
                                                     }
@@ -14112,7 +14112,7 @@ Do you want to continue?`;
                                         const txInfo = await getTransactionWithArchive(txid);
                                         if (txInfo && txInfo.blockHash) {
                                             blockId = txInfo.blockHash;
-                                            log(`RPC経由でBlockID取得: ${blockId.substring(0, 16)}... (${waitTime/1000}秒)`, 'success');
+                                            log(`BlockID obtained via RPC: ${blockId.substring(0, 16)}... (${waitTime/1000} seconds)`, 'success');
                                             if (NetworkState.ws.monitoredTransactions.has(txid)) {
                                                 FileState.uploadingChunksCount--;
                                             }
@@ -14134,7 +14134,7 @@ Do you want to continue?`;
                                 
                                 // User notification
                                 const errorMsg = `ネットワークが不安定です。\n\n` +
-                                               `5分間BlockIDを取得できませんでした。\n` +
+                                               `Could not obtain BlockID for 5 minutes.\n` +
                                                `TxID: ${txid.substring(0, 16)}...\n\n` +
                                                `進捗は自動保存されています。\n` +
                                                `ネットワークが安定してから再開してください。`;
@@ -14154,7 +14154,7 @@ Do you want to continue?`;
                                 const txData = NetworkState.ws.monitoredTransactions.get(txid);
                                 if (txData.blockTime) {
                                     chunkBlockTime = txData.blockTime;
-                                    log(`[DEBUG] チャンク ${i + 1} のブロック時刻を取得: ${chunkBlockTime.toISOString()}`, 'debug');
+                                    log(`[DEBUG] Obtained block time for chunk ${i + 1}: ${chunkBlockTime.toISOString()}`, 'debug');
                                 }
                             }
                             
@@ -14172,7 +14172,7 @@ Do you want to continue?`;
                             });
                             
                             // Update progress manager
-                            log(`進捗情報を更新中...`);
+                            log(`Updating progress information...`);
                             await FileState.progressManager.markChunkComplete(i, txid, blockId, payloadBytes.length);
                             
                             break;
@@ -14219,14 +14219,14 @@ Do you want to continue?`;
                                 }
                             }
                             
-                            log(`チャンク ${i + 1} エラー (試行 ${retries}/${config.retryCount}): ${error.message || error}`, 'error');
-                            console.error('詳細エラー:', error);
+                            log(`Chunk ${i + 1} error (attempt ${retries}/${config.retryCount}): ${error.message || error}`, 'error');
+                            console.error('Detailed error:', error);
                             console.error('スタックトレース:', error.stack);
                             
                             // Phase 0-F-2: Manage counter on error
                             if (FileState.uploadingChunksCount > 0) {
                                 FileState.uploadingChunksCount--;
-                                log(`[DEBUG] エラーによりカウンターを減算: ${FileState.uploadingChunksCount}`, 'debug');
+                                log(`[DEBUG] Decrementing counter due to error: ${FileState.uploadingChunksCount}`, 'debug');
                             }
                             
                             // Remove from monitoring list if exists
@@ -14402,7 +14402,7 @@ Do you want to continue?`;
                     kenvEntry.cid = window.currentFileCIDFull || window.currentFileCID || '';
                     kenvEntry.uploadCost = totalCost;
                     
-                    // メタデータから追加情報を取得
+                    // Get additional information from metadata
                     if (FileState.kaspaMetadata) {
                         kenvEntry.mimeType = FileState.kaspaMetadata.file?.mimeType;
                         kenvEntry.totalChunks = FileState.kaspaMetadata.recovery?.totalChunks;
@@ -14445,7 +14445,7 @@ Do you want to continue?`;
                     FileState.kenvManager.saveAll().then(() => {
                         log('[KENV] Entry saved', 'success');
                         
-                        // File Tabが開いている場合は更新
+                        // Update if File tab is open
                         const activeTab = document.querySelector('.tab-content.active');
                         if (activeTab && activeTab.id === 'file-tab') {
                             window.updateFileListFromKENV();
@@ -14479,7 +14479,7 @@ Do you want to continue?`;
                         log('[DEBUG] Meta TX successful - clearing needsMetaTx flag: false', 'debug');
                     } else {
                         // v6.2.75: Keep flag true on error for auto-resume
-                        log('[DEBUG] メタTxエラー - needsMetaTxフラグを維持: true', 'debug');
+                        log('[DEBUG] Meta TX error - maintaining needsMetaTx flag: true', 'debug');
                     }
                     
                     // v5.11.16: Calculate actual cost after meta-tx
@@ -14493,7 +14493,7 @@ Do you want to continue?`;
                         
                         if (kenvEntry) {
                             kenvEntry.uploadCost = actualCost;
-                            log(`[KENV] 実際のコストを更新: ${actualCost.toFixed(8)} KAS`, 'info');
+                            log(`[KENV] Updated actual cost: ${actualCost.toFixed(8)} KAS`, 'info');
                             
                             // Update index
                             const lineNumber = kenvEntries.indexOf(kenvEntry);
@@ -14504,7 +14504,7 @@ Do you want to continue?`;
                         }
                     }
                 } else {
-                    log('[DEBUG] メタTxは作成しません（チェックボックスがOFF）', 'debug');
+                    log('[DEBUG] Will not create meta TX (checkbox is OFF)', 'debug');
                     // Auto-stop monitoring for non-meta-tx uploads
                     if (NetworkState.ws.monitorActive) {
                         log('Upload completed - Automatically stopping WebSocket monitoring', 'info');
@@ -14530,7 +14530,7 @@ Do you want to continue?`;
                 }
                 log(`[DEBUG] エラータイプ: ${typeof error}`, 'debug');
                 if (error?.stack) {
-                    log(`[DEBUG] エラースタック: ${error.stack}`, 'debug');
+                    log(`[DEBUG] Error stack: ${error.stack}`, 'debug');
                 }
                 
                 log(`[DEBUG-CATCH] isNetworkError呼び出し前`, 'debug');
@@ -14539,7 +14539,7 @@ Do you want to continue?`;
                     // Update WebSocket state on WebSocket errors
                     if (error.message && error.message.toLowerCase().includes('websocket')) {
                         NetworkState.ws.connected = false;
-                        log('[DEBUG] WebSocketエラー検出 - Connect状態をfalseに更新', 'debug');
+                        log('[DEBUG] WebSocket error detected - updating Connect state to false', 'debug');
                     }
                     
                     // Let ConnectionManager handle the error
@@ -14548,7 +14548,7 @@ Do you want to continue?`;
                     log(`[DEBUG-CATCH] ConnectionManager.handleError completed - result: ${handled}`, 'debug');
                     FileState.networkErrorOccurred = true;
                 } else {
-                    log(`[DEBUG-CATCH] ネットワークエラーではないため、ConnectionManagerは呼び出しません`, 'debug');
+                    log(`[DEBUG-CATCH] Not a network error, not calling ConnectionManager`, 'debug');
                     FileState.networkErrorOccurred = false;
                 }
             } finally {
@@ -14562,7 +14562,7 @@ Do you want to continue?`;
                     FileState.uploadSessionActive = false; // v5.5.35: Using FileState
                     log('[INFO] Upload session ended', 'info');
                 } else {
-                    log('[INFO] ネットワークエラーのためセッションを維持', 'info');
+                    log('[INFO] Maintaining session due to network error', 'info');
                 }
                 
                 // Debug: Check state in finally block
@@ -14655,7 +14655,7 @@ Do you want to continue?`;
                         log('ProgressManagerをリセットしました', 'debug');
                     }
                 } else {
-                    log('ネットワークエラーのため、ProgressManagerを保持します', 'info');
+                    log('Maintaining ProgressManager due to network error', 'info');
                     // Phase 0-F-3: Do not clear the flag immediately - keep it for auto-resume
                     log('[DEBUG] networkErrorOccurredフラグは自動再開完了まで保持', 'debug');
                     // Debug: Keep currentFile for auto-resume
@@ -14665,7 +14665,7 @@ Do you want to continue?`;
                 // v5.7.11: Clear network error flag AFTER ProgressManager check
                 // This ensures ProgressManager is retained during network errors
                 if (FileState.networkErrorOccurred) {
-                    log('[INFO] ネットワークエラーフラグをクリア', 'info');
+                    log('[INFO] Clearing network error flag', 'info');
                     FileState.networkErrorOccurred = false;
                 }
             }
@@ -14737,7 +14737,7 @@ Do you want to continue?`;
                         chunkGroups.push(group);
                     }
                     
-                    log(`[SuperMeta] ${chunkGroups.length}個のチャンクグループを作成`, 'info');
+                    log(`[SuperMeta] Created ${chunkGroups.length} chunk groups`, 'info');
                     
                     // v5.10.0: segmentBoundariesの全体状況をログに出力
                     const segmentBoundariesGlobal = FileState.kaspaMetadata.metadata?.segmentBoundaries || FileState.kaspaMetadata.metadata?.chunkBoundaries;
@@ -14804,14 +14804,14 @@ Do you want to continue?`;
                     
                     // Step 4: Remove history update process (already handled by KENV)
                     // スーパーメタの情報はKENVで管理されているため、
-                    // ここでの履歴更新は不要
+                    // History update not needed here
                     
-                    log(`[SuperMeta] 🎉 スーパーメタデータ作成完了！`, 'success');
+                    log(`[SuperMeta] 🎉 Super metadata creation complete!`, 'success');
                     
                     // v5.12.11: Update KENV entry with super meta TxID
                     // v5.12.13: Use entry ID instead of CID for session-based lookup
                     if (FileState.kenvManager._initialized && FileState.currentKenvEntryId) {
-                        log('[KENV] スーパーメタTx情報でエントリーを更新', 'info');
+                        log('[KENV] Updating entry with super meta TX information', 'info');
                         const kenvEntries = FileState.kenvManager.entries;
                         const kenvEntry = kenvEntries.find(e => e.id === FileState.currentKenvEntryId);
                         
@@ -15028,7 +15028,7 @@ Do you want to continue?`;
                         retries++;
                         const errorMessage = error?.message || error?.toString() || 'Unknown error';
                         
-                        log(`メタTx送信エラー (試行 ${retries}/${config.retryCount}): ${errorMessage}`, 'error');
+                        log(`Meta TX submission error (attempt ${retries}/${config.retryCount}): ${errorMessage}`, 'error');
                         
                         // v6.2.69: Check connection status before retry (same as regular chunks)
                         if (!ConnectionManager.isConnected) {
@@ -15108,7 +15108,7 @@ Do you want to continue?`;
                                 const data = await response.json();
                                 if (data && data.block_id) {
                                     metaBlockId = data.block_id;
-                                    log(`REST API経由でメタTx BlockID取得: ${metaBlockId.substring(0, 16)}...`);
+                                    log(`Meta TX BlockID obtained via REST API: ${metaBlockId.substring(0, 16)}...`);
                                     FileState.uploadingMetaTx = false;
                                     break;
                                 }
@@ -15158,7 +15158,7 @@ Do you want to continue?`;
                 }
                 
                 // Log meta-tx creation success
-                log(`🎉 メタトランザクション作成完了！ ${metaBlockId ? 'TxID:BlockID' : 'TxID'}: ${metaTxReference}`, 'success');
+                log(`🎉 Meta transaction creation complete! ${metaBlockId ? 'TxID:BlockID' : 'TxID'}: ${metaTxReference}`, 'success');
                 if (metaBlockId) {
                     log('✅ REST API不要で復元可能です', 'success');
                 } else {
@@ -15180,10 +15180,10 @@ Do you want to continue?`;
                 // メタTxの情報はKENVで管理されているため、
                 // ここでの履歴更新は不要
                 
-                // KENV処理（履歴処理から独立） - 2. MetaTx作成後
+                // KENV processing (independent from history) - 2. After MetaTx creation
                 // v5.12.13: Use entry ID instead of CID for session-based lookup
                 if (FileState.kenvManager._initialized && FileState.currentKenvEntryId) {
-                    log('[KENV] メタTx情報でエントリーを更新', 'info');
+                    log('[KENV] Updating entry with meta TX information', 'info');
                     const kenvEntries = FileState.kenvManager.entries;
                     const kenvEntry = kenvEntries.find(e => e.id === FileState.currentKenvEntryId);
                     
@@ -15280,7 +15280,7 @@ Do you want to continue?`;
                     log('通常MetaTx完了 - ProgressManagerをリセット', 'debug');
                 }
                 
-                log('メタトランザクション作成完了', 'info');
+                log('Meta transaction creation complete', 'info');
                 
                 // v6.2.75: Return true on success
                 return true;
@@ -15292,13 +15292,13 @@ Do you want to continue?`;
                     log('[DEBUG] メタTx AbortControllerをクリアしました（エラー時）', 'debug');
                 }
                 
-                log(`メタトランザクション作成エラー: ${error.message || error}`, 'error');
+                log(`Meta transaction creation error: ${error.message || error}`, 'error');
                 console.error('Meta-tx creation error:', error);
                 
                 // v6.2.71: Set networkErrorOccurred flag for network errors (same as regular chunks)
                 if (isNetworkError(error)) {
                     FileState.networkErrorOccurred = true;
-                    log('[INFO] メタTx作成でネットワークエラーを検出 - ProgressManagerを保持します', 'info');
+                    log('[INFO] Network error detected during meta TX creation - maintaining ProgressManager', 'info');
                 }
                 
                 // Try to log more details
@@ -15433,11 +15433,11 @@ Do you want to continue?`;
                 await pendingTx.sign([UserState.privateKey]);
                 
                 // Debug: Check transaction before submission
-                log(`[SuperMeta] トランザクション送信前 - ペイロードサイズ: ${metaPayload.length} bytes`, 'debug');
+                log(`[SuperMeta] Before transaction submission - payload size: ${metaPayload.length} bytes`, 'debug');
                 
                 // Get transaction ID before submission for tracking
                 const txId = pendingTx.id;
-                log(`[SuperMeta] トランザクションID (送信前): ${txId.substring(0, 16)}...`, 'debug');
+                log(`[SuperMeta] Transaction ID (before submission): ${txId.substring(0, 16)}...`, 'debug');
                 
                 // Declare metaTxId outside try block for proper scope
                 let metaTxId;
@@ -15463,7 +15463,7 @@ Do you want to continue?`;
                     // Wait for confirmation
                     await new Promise(resolve => setTimeout(resolve, 2000));
                 } catch (submitError) {
-                    log(`[SuperMeta] 送信エラー: ${submitError.message}`, 'error');
+                    log(`[SuperMeta] Submission error: ${submitError.message}`, 'error');
                     throw submitError;
                 }
                 
@@ -15493,7 +15493,7 @@ Do you want to continue?`;
                             // Remove from monitoring list
                             // v5.11.117: Keep in monitoring list for 90 seconds after receipt
                             // monitoredTransactions.delete(metaTxId);
-                            log(`[SuperMeta] 中間メタBlockID取得: ${metaBlockId.substring(0, 16)}...`, 'success');
+                            log(`[SuperMeta] Intermediate meta BlockID obtained: ${metaBlockId.substring(0, 16)}...`, 'success');
                             break;
                         }
                     }
@@ -15509,7 +15509,7 @@ Do you want to continue?`;
                             
                             if (txInfo && txInfo.blockHash) {
                                 metaBlockId = txInfo.blockHash;
-                                log(`[SuperMeta] RPC経由で中間メタBlockID取得: ${metaBlockId.substring(0, 16)}...`);
+                                log(`[SuperMeta] Intermediate meta BlockID obtained via RPC: ${metaBlockId.substring(0, 16)}...`);
                                 break;
                             }
                         } catch (err) {

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.92</title>
+    <title>Kaspa P2P File Storage v6.2.93</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -6728,7 +6728,7 @@ Do you want to continue?`;
                         } else {
                             const newPrefix = level === 0 ? '' : parentPrefix + (isLast ? '   ' : '│  ');
                             html += `<div style="padding: 4px 2px; color: var(--text-secondary);">`;
-                            html += `<span style="font-family: monospace; white-space: pre;">${newPrefix}└─ </span>[ここに追加...]`;
+                            html += `<span style="font-family: monospace; white-space: pre;">${newPrefix}└─ </span>[Add here...]`;
                             html += '</div>';
                         }
                     }
@@ -7966,7 +7966,7 @@ Do you want to continue?`;
                                 log(`Type: ${kaspaData.metadata?.dataType || 'Unknown'}`, 'info');
                                 
                                 if (kaspaData.metadata && kaspaData.metadata.dataType === 'KASPA_FILE_V2') {
-                                    log('KASPA_FILE_V2 フォーマットが検出されました', 'info');
+                                    log('KASPA_FILE_V2 format detected', 'info');
                                     
                                     window.kaspaMetadata = kaspaData;
                                     document.getElementById('metaTxId').value = kaspaData.metadata.metaTxId || '';
@@ -7983,7 +7983,7 @@ Do you want to continue?`;
                                     }
                                 } else if (kaspaData.version === 'v3.4.0' && kaspaData.type === 'directory') {
                                     // v4.6.18: Handle v3.4.0 directory format
-                                    log('v3.4.0 ディレクトリフォーマットが検出されました', 'info');
+                                    log('v3.4.0 directory format detected', 'info');
                                     
                                     if (typeof displayDirectoryContents === 'function') {
                                         displayDirectoryContents(kaspaData);
@@ -12910,7 +12910,7 @@ Do you want to continue?`;
                 throw error;
             } finally {
                 // v5.3.6: End upload session
-                // Phase 0-C: セッション終了をprocessAndUploadに移動
+                // Phase 0-C: Move session end to processAndUpload
                 // FileState.uploadSessionActive = false; // v5.5.35: Using FileState
                 log('[INFO] Payload split processing completed', 'info');
                 
@@ -13891,14 +13891,14 @@ Do you want to continue?`;
                         } else {
                             log(`[New approach] Error details: ${error}`, 'error');
                         }
-                        log(`[新方式] 処理を中断します`, 'error');
+                        log(`[New approach] Aborting processing`, 'error');
                         log(`[DEBUG-new approach] Rethrowing error`, 'debug');
                         throw error;
                     }
                     
                 } else {
                     // Use old approach for smaller chunks
-                    log('従来方式: チャンク単位の処理を使用', 'info');
+                    log('Legacy approach: Using chunk-by-chunk processing', 'info');
                     
                     // Continue from next incomplete chunk
                     nextChunkIndex = FileState.progressManager.getNextChunkIndex();
@@ -14037,7 +14037,7 @@ Do you want to continue?`;
                             log(`Transaction sent: ${txid.substring(0, 16)}...`);
                             
                             // Wait for transaction to be accepted
-                            log(`トランザクションの確認待ち...`);
+                            log(`Waiting for transaction confirmation...`);
                             await new Promise(resolve => setTimeout(resolve, 2000));
                             
                             // Try WebSocket monitoring first
@@ -14055,7 +14055,7 @@ Do you want to continue?`;
                             while (!blockId && waitTime < maxWaitTime) {
                                 // Check network connection
                                 if (!ConnectionManager.isConnected) {
-                                    log(`[DEBUG] ネットワークDisconnectを検出 - BlockID待機を継続してREST APIフォールバックを許可`, 'warning');
+                                    log(`[DEBUG] Network disconnect detected - Continuing BlockID wait and allowing REST API fallback`, 'warning');
                                     // v6.2.60: Don't throw error - allow REST API fallback
                                     // throw new Error('Network disconnected while waiting for BlockID');
                                 }
@@ -14097,7 +14097,7 @@ Do you want to continue?`;
                                                     }
                                                     break;
                                                 }
-                                                log(`REST APIチェック: TxIDは確認済み、BlockID待機中... (${waitTime/1000}秒)`, 'debug');
+                                                log(`REST API check: TxID confirmed, waiting for BlockID... (${waitTime/1000} seconds)`, 'debug');
                                             }
                                         } catch (apiError) {
                                             log(`REST APIエラー: ${apiError.message} (${waitTime/1000}秒)`, 'debug');
@@ -14207,7 +14207,7 @@ Do you want to continue?`;
                                     // Check if this is our own transaction
                                     if (NetworkState.ws.monitoredTransactions && NetworkState.ws.monitoredTransactions.has(spentByTxId)) {
                                         txid = spentByTxId;
-                                        log(`チャンク ${i + 1} は既に自分のトランザクションで処理済み: ${txid.substring(0, 16)}...`, 'info');
+                                        log(`Chunk ${i + 1} already processed in own transaction: ${txid.substring(0, 16)}...`, 'info');
                                         const monitorData = NetworkState.ws.monitoredTransactions.get(spentByTxId);
                                         if (monitorData && monitorData.blockId) {
                                             blockId = monitorData.blockId;
@@ -14468,7 +14468,7 @@ Do you want to continue?`;
                     log('[DEBUG] Setting needsMetaTx flag: true', 'debug');
                     
                     // v5.11.126: Update status for meta-tx
-                    uploadStatusUI.updateStatus('⏳', 'トランザクションを確認しています...', 4);
+                    uploadStatusUI.updateStatus('⏳', 'Confirming transaction...', 4);
                     
                     // v6.2.75: Check return value before clearing flag
                     const metaTxSuccess = await createAndUploadMetaTx();
@@ -14485,7 +14485,7 @@ Do you want to continue?`;
                     // v5.11.16: Calculate actual cost after meta-tx
                     const actualCost = await FileState.costTracking.calculateActualCost();
                     
-                    // KENV処理（履歴処理から独立） - 3. 実際のコスト計算後
+                    // KENV processing (independent from history) - 3. After actual cost calculation
                     // v5.12.13: Use entry ID instead of CID for session-based lookup
                     if (FileState.kenvManager._initialized && FileState.currentKenvEntryId) {
                         const kenvEntries = FileState.kenvManager.entries;
@@ -14657,7 +14657,7 @@ Do you want to continue?`;
                 } else {
                     log('Maintaining ProgressManager due to network error', 'info');
                     // Phase 0-F-3: Do not clear the flag immediately - keep it for auto-resume
-                    log('[DEBUG] networkErrorOccurredフラグは自動再開完了まで保持', 'debug');
+                    log('[DEBUG] Maintaining networkErrorOccurred flag until auto-resume completes', 'debug');
                     // Debug: Keep currentFile for auto-resume
                     log(`[DEBUG] FileState.currentFile保持状態: ${FileState.currentFile ? FileState.currentFile.name : 'null'}`, 'debug');
                 }
@@ -14819,7 +14819,7 @@ Do you want to continue?`;
                             kenvEntry.metaTxId = superMeta.txId;
                             kenvEntry.metaTxBlockId = superMeta.blockId;
                             kenvEntry.status = 'verified';
-                            kenvEntry.isSuperMeta = true;  // スーパーメタフラグを追加
+                            kenvEntry.isSuperMeta = true;  // Add super meta flag
                             
                             // Update index
                             const lineNumber = kenvEntries.indexOf(kenvEntry);
@@ -14891,13 +14891,13 @@ Do you want to continue?`;
                     // v6.2.74: Clear AbortController before returning (super meta case)
                     if (FileState.metaTxAbortController) {
                         FileState.metaTxAbortController = null;
-                        log('[DEBUG] メタTx AbortControllerをクリアしました（スーパーメタ完了）', 'debug');
+                        log('[DEBUG] Cleared meta TX AbortController (super meta complete)', 'debug');
                     }
                     
                     // v6.2.79: Clear ProgressManager after SuperMeta completion
                     if (FileState.progressManager) {
                         FileState.progressManager = null;
-                        log('[SuperMeta] 完了 - ProgressManagerをリセット', 'debug');
+                        log('[SuperMeta] Complete - Resetting ProgressManager', 'debug');
                     }
                     
                     // v6.2.75: Return true for super meta success
@@ -15057,7 +15057,7 @@ Do you want to continue?`;
                     timestamp: Date.now(),
                     blockId: null
                 });
-                log(`[DEBUG] WebSocket監視リストに追加: TxID: ${metaTxId.substring(0, 16)}... (メタトランザクション)`, 'debug');
+                log(`[DEBUG] Added to WebSocket monitoring list: TxID: ${metaTxId.substring(0, 16)}... (meta transaction)`, 'debug');
                 
                 // Wait for confirmation
                 await new Promise(resolve => setTimeout(resolve, 2000));
@@ -15100,7 +15100,7 @@ Do you want to continue?`;
                     // v6.2.70: Use REST API with proper interval tracking (same as regular chunks)
                     if (waitTime - lastApiCheck >= 10000 && NetworkState.restApiControl.globalEnabled) {
                         try {
-                            log(`${(waitTime/1000).toFixed(0)}秒経過 - REST APIでメタTx確認を試みます...`);
+                            log(`${(waitTime/1000).toFixed(0)} seconds elapsed - Attempting REST API meta TX confirmation...`);
                             const apiUrl = `${config.apiEndpoints[config.network]}/transactions/${metaTxId}`;
                             const response = await fetch(apiUrl);
                             
@@ -15115,7 +15115,7 @@ Do you want to continue?`;
                             }
                         } catch (err) {
                             // Transaction might not be confirmed yet
-                            log(`REST API確認エラー: ${err.message}`, 'debug');
+                            log(`REST API confirmation error: ${err.message}`, 'debug');
                         }
                         lastApiCheck = waitTime;  // v6.2.70: Reset timer after API call
                     }
@@ -15277,7 +15277,7 @@ Do you want to continue?`;
                 // v6.2.79: Clear ProgressManager after regular meta-tx completion
                 if (FileState.progressManager) {
                     FileState.progressManager = null;
-                    log('通常MetaTx完了 - ProgressManagerをリセット', 'debug');
+                    log('Normal MetaTx complete - Resetting ProgressManager', 'debug');
                 }
                 
                 log('Meta transaction creation complete', 'info');
@@ -15501,7 +15501,7 @@ Do you want to continue?`;
                     // v6.2.61: After 10 seconds, try RPC (same as regular chunks)
                     if (waitTime >= config.restApiWaitTime && NetworkState.rpcClient) {
                         try {
-                            log(`[SuperMeta] ${config.restApiWaitTime/1000}秒経過 - RPCで中間メタ確認を試みます...`);
+                            log(`[SuperMeta] ${config.restApiWaitTime/1000} seconds elapsed - Attempting RPC intermediate meta confirmation...`);
                             const txInfo = await NetworkState.rpcClient.getTransaction({
                                 transactionId: metaTxId,
                                 includeBlockInfo: true
@@ -15514,7 +15514,7 @@ Do you want to continue?`;
                             }
                         } catch (err) {
                             // Transaction might not be confirmed yet
-                            log(`[SuperMeta] RPC確認エラー: ${err.message}`, 'debug');
+                            log(`[SuperMeta] RPC confirmation error: ${err.message}`, 'debug');
                         }
                     }
                     
@@ -15680,7 +15680,7 @@ Do you want to continue?`;
                     // v6.2.61: After 10 seconds, try RPC (same as regular chunks)
                     if (waitTime >= config.restApiWaitTime && NetworkState.rpcClient) {
                         try {
-                            log(`[SuperMeta] ${config.restApiWaitTime/1000}秒経過 - RPCでスーパーメタ確認を試みます...`);
+                            log(`[SuperMeta] ${config.restApiWaitTime/1000} seconds elapsed - Attempting RPC super meta confirmation...`);
                             const txInfo = await NetworkState.rpcClient.getTransaction({
                                 transactionId: superMetaTxId,
                                 includeBlockInfo: true
@@ -15694,7 +15694,7 @@ Do you want to continue?`;
                             }
                         } catch (err) {
                             // Transaction might not be confirmed yet
-                            log(`[SuperMeta] RPC確認エラー: ${err.message}`, 'debug');
+                            log(`[SuperMeta] RPC confirmation error: ${err.message}`, 'debug');
                         }
                     }
                     
@@ -15809,7 +15809,7 @@ Do you want to continue?`;
                             window.pendingTreeButtons = [];
                         }
                         
-                        // v4.6.32: ボタン表示確認のデバッグ
+                        // v4.6.32: Debug button display confirmation
                         setTimeout(() => {
                             const allButtons = fileInfoElement.querySelectorAll('button');
                             log(`[DEBUG] 最終的なボタン数: ${allButtons.length}個`, 'warning');
@@ -15817,7 +15817,7 @@ Do you want to continue?`;
                                 log(`[DEBUG] ボタン${i}: ${btn.textContent}, display: ${window.getComputedStyle(btn).display}, visibility: ${window.getComputedStyle(btn).visibility}`, 'debug');
                             });
                             
-                            // プレースホルダーの確認
+                            // Check placeholder
                             const placeholders = fileInfoElement.querySelectorAll('span[id^="buttons_"]');
                             log(`[DEBUG] プレースホルダー数: ${placeholders.length}個`, 'debug');
                             placeholders.forEach((ph, i) => {
@@ -15829,7 +15829,7 @@ Do you want to continue?`;
                     document.getElementById('fileInfo').innerHTML += '<br><strong>⚠️ No file list information available</strong>';
                 }
                 
-                // パスワード処理（v4.6.26: DOM操作の安全性を改善）
+                // Password processing (v4.6.26: Improved DOM manipulation safety)
                 const passwordSection = document.getElementById('passwordSection');
                 if (dirMetadata.auth?.passwordIncluded) {
                     // 既存の要素を安全に操作
@@ -15899,10 +15899,10 @@ Do you want to continue?`;
                     log(`[File] Added ${dirMetadata.entries.length} entries to File tab`, 'info');
                 }
                 
-                log('ディレクトリ情報の表示完了', 'success');
+                log('Directory information display complete', 'success');
                 
             } catch (error) {
-                log(`ディレクトリメタデータ処理エラー: ${error.message}`, 'error');
+                log(`Directory metadata processing error: ${error.message}`, 'error');
             }
         }
 
@@ -16029,8 +16029,8 @@ Do you want to continue?`;
                 }
                 
                 // Summary
-                const summary = `完了: ${completedFiles}個, スキップ: ${skippedFiles}個, エラー: ${errorFiles}個`;
-                log(`[一括ダウンロード] 完了 - ${summary}`, 'success');
+                const summary = `Complete: ${completedFiles} files, Skipped: ${skippedFiles} files, Errors: ${errorFiles} files`;
+                log(`[Bulk Download] Complete - ${summary}`, 'success');
                 document.getElementById('downloadStatus').textContent = summary;
                 
                 setTimeout(() => {
@@ -16055,7 +16055,7 @@ Do you want to continue?`;
             }
             
             try {
-                // パスワード確認
+                // Password confirmation
                 if (!password || password.length < 8) {
                     password = prompt('Enter password (8 characters or more):');
                     if (!password || password.length < 8) {
@@ -16082,7 +16082,7 @@ Do you want to continue?`;
                 // メタデータ取得
                 const metadata = await NetworkState.downloadManager.fetchMetadata(metaTxId, blockId, password);
                 
-                // v4.7.8: フォルダ構造オプションを追加
+                // v4.7.8: Add folder structure option
                 const folderStructureOption = (filePath && window.currentDirectoryMetadata) ? {
                     enabled: true,
                     basePath: window.currentDirectoryMetadata.directory?.name || null,
@@ -16099,8 +16099,8 @@ Do you want to continue?`;
                             `チャンク ${progress.current}/${progress.total} をダウンロード中...`;
                     },
                     onComplete: (blob, filename) => {
-                        // ダウンロード完了（フォルダ構造を使用した場合はここは呼ばれない）
-                        log(`[DownloadManager] ${filename} のダウンロードが完了しました`, 'success');
+                        // Download complete (not called when using folder structure)
+                        log(`[DownloadManager] Download of ${filename} complete`, 'success');
                         document.getElementById('downloadProgress').style.display = 'none';
                     },
                     folderStructure: folderStructureOption
@@ -16108,7 +16108,7 @@ Do you want to continue?`;
                 
                 // v6.2.33: Switch to File tab if addToListOnly
                 if (window.tempAddToListOnly) {
-                    log('[DownloadManager] File List追加完了 - Fileタブに切り替え', 'success');
+                    log('[DownloadManager] File List addition complete - Switching to File tab', 'success');
                     const fileTab = document.querySelector('[onclick*="switchTab(\'file\')"]');
                     if (fileTab) {
                         fileTab.click();
@@ -16168,14 +16168,14 @@ Do you want to continue?`;
                 log(`kaspaMetadata.chunks: ${FileState.kaspaMetadata.chunks?.length || 0} chunks`, 'info');
                 log(`kaspaMetadata.auth: ${JSON.stringify(FileState.kaspaMetadata.auth)}`, 'info');
                 
-                // 統一ダウンロード処理 - タイプ別に処理
+                // Unified download processing - Process by type
                 if (!FileState.kaspaMetadata.version) {
                     throw new Error('無効な.kaspaファイル形式');
                 }
                 
                 // ディレクトリタイプの場合
                 if (FileState.kaspaMetadata.type === 'kaspa-directory') {
-                    log('ディレクトリメタデータを検出しました', 'info');
+                    log('Directory metadata detected', 'info');
                     // v4.6.36: ディレクトリ専用変数に保存
                     // v5.5.23: window.directoryMetadata -> FileState.directoryMetadata (1/2)
                     FileState.directoryMetadata = kaspaMetadata;
@@ -16814,9 +16814,9 @@ Do you want to continue?`;
                         
                         // ディレクトリタイプの場合
                         if (metaData.type === 'kaspa-directory') {
-                            log('ディレクトリメタデータを検出しました', 'info');
+                            log('Directory metadata detected', 'info');
                             
-                            // ディレクトリメタデータとして処理
+                            // Process as directory metadata
                             const dirMetadata = {
                                 ...metaData,
                                 auth: {
@@ -16834,7 +16834,7 @@ Do you want to continue?`;
                         
                         // Check if this is super metadata
                         if (metaData.chunkStructure?.type === 'super') {
-                            log('[SuperMeta] スーパーメタデータを検出しました', 'info');
+                            log('[SuperMeta] Super metadata detected', 'info');
                             log(`[SuperMeta] メタデータ数: ${metaData.chunks.length}`, 'info');
                             log(`[SuperMeta] 総チャンク数: ${metaData.chunkStructure.totalChunks}`, 'info');
                             
@@ -16910,7 +16910,7 @@ Do you want to continue?`;
                                     const intDecrypted = await decryptChunk(intEncryptedData, intKey, -1);
                                     const intMetaData = JSON.parse(new TextDecoder().decode(intDecrypted));
                                     
-                                    // デバッグ: 中間メタデータの内容を確認
+                                    // Debug: Check intermediate metadata content
                                     const segBoundaries = intMetaData.metadata?.segmentBoundaries || intMetaData.metadata?.chunkBoundaries;
                                     log(`[SuperMeta DEBUG] 中間メタ ${i + 1} - payloadSplit: ${intMetaData.metadata?.payloadSplit}, segmentBoundaries: ${segBoundaries?.length || 0}`, 'debug');
                                     if (segBoundaries?.length > 0) {
@@ -16918,7 +16918,7 @@ Do you want to continue?`;
                                     }
                                     
                                     singleMetadatas.push(intMetaData);
-                                    log(`[SuperMeta] 中間メタデータ ${i + 1} 取得完了`, 'success');
+                                    log(`[SuperMeta] Intermediate metadata ${i + 1} retrieval complete`, 'success');
                                     
                                 } catch (error) {
                                     log(`[SuperMeta] 中間メタデータ取得エラー: ${error.message}`, 'error');
@@ -16985,7 +16985,7 @@ Do you want to continue?`;
                             
                             // 後方互換性: v5.0.7以前のアップロードでセグメントバウンダリがない場合の対応
                             if (payloadSplitFlag && allChunkBoundaries.length === 0) {
-                                log(`[SuperMeta COMPAT] v5.0.7以前のアップロードを検出 - アップロードヒストリーからセグメントバウンダリを取得試行`, 'warning');
+                                log(`[SuperMeta COMPAT] v5.0.7 or earlier upload detected - Attempting to retrieve segment boundaries from upload history`, 'warning');
                                 
                                 // アップロードヒストリーから該当するファイルを探す
                                 try {
@@ -17007,7 +17007,7 @@ Do you want to continue?`;
                                 }
                             }
                             
-                            log(`[SuperMeta] 統合完了: ${allChunks.length}チャンク`, 'success');
+                            log(`[SuperMeta] Integration complete: ${allChunks.length} chunks`, 'success');
                             log(`[SuperMeta DEBUG] 統合後のchunks[0]: ${FileState.kaspaMetadata.chunks[0]?.substring(0, 16)}...`, 'debug');
                             log(`[SuperMeta DEBUG] allChunks[0]: ${allChunks[0]?.substring(0, 16)}...`, 'debug');
                             log(`[SuperMeta DEBUG] セグメントバウンダリ数: ${allChunkBoundaries.length}`, 'debug');
@@ -17126,7 +17126,7 @@ Do you want to continue?`;
                 if (FileState.kaspaMetadata.version === "3.0") {
                     // v3.0の場合は10000回を使用
                     iterations = 10000;
-                    log(`v3.0フォーマット検出: PBKDF2 ${iterations}回を使用`, 'info');
+                    log(`v3.0 format detected: Using PBKDF2 ${iterations} iterations`, 'info');
                 } else if (FileState.kaspaMetadata.version === "3.3") {
                     log(`v3.3フォーマット検出: PBKDF2 ${iterations}回を使用`, 'info');
                 } else {
@@ -17156,14 +17156,14 @@ Do you want to continue?`;
                     }
                 );
                 
-                log('ダウンロード処理完了', 'success');
+                log('Download processing complete', 'success');
                 document.getElementById('downloadProgress').style.display = 'none';
                 
-                return; // 新しい処理はここで終了
+                return; // New processing ends here
                 
-                // 以下は旧処理（到達しない）
+                // Below is old processing (unreachable)
                 const key = await deriveKey(password, salt, iterations);
-                log(`キー生成完了 (iterations: ${iterations})`, 'debug');
+                log(`Key generation complete (iterations: ${iterations})`, 'debug');
                 
                 const chunks = [];
                 
@@ -17438,14 +17438,14 @@ Do you want to continue?`;
                 a.click();
                 URL.revokeObjectURL(url);
                 
-                log(`ダウンロード完了: ${FileState.kaspaMetadata.file.name}`, 'success');
+                log(`Download complete: ${FileState.kaspaMetadata.file.name}`, 'success');
                 
                 // 成功時のUI表示
                 const statusEl = document.getElementById('downloadStatus');
                 if (statusEl) {
                     statusEl.innerHTML = `
                         <div style="color: #4caf50; font-weight: bold;">
-                            ✅ ダウンロード完了！
+                            ✅ Download complete!
                         </div>
                         <div style="color: #66bb6a; font-size: 0.9em; margin-top: 5px;">
                             ${FileState.kaspaMetadata.file.name} を保存しました
@@ -17457,7 +17457,7 @@ Do you want to continue?`;
                 const progressBar = document.getElementById('downloadProgressBar');
                 if (progressBar) {
                     progressBar.style.backgroundColor = '#4caf50';
-                    progressBar.textContent = '完了';
+                    progressBar.textContent = 'Complete';
                 }
                 
             } catch (error) {
@@ -18170,7 +18170,7 @@ Do you want to continue?`;
                 
                 log('Block Addedイベントを購読しました', 'success');
                 log('Starting block-added event monitoring via WebSocket', 'info');
-                log(`[DEBUG] WebSocket購読完了 - navigator.onLine: ${navigator.onLine}`, 'debug');
+                log(`[DEBUG] WebSocket subscription complete - navigator.onLine: ${navigator.onLine}`, 'debug');
                 
                 // v5.11.116: Start WebSocket Block Statistics timer
                 if (WSBlockStats.updateTimer) {
@@ -18310,7 +18310,7 @@ Do you want to continue?`;
                 // v5.6.6: Use ConnectionManager for error handling
                 log(`[DEBUG-WS] WebSocket監視でエラー発生 - ConnectionManager.handleErrorを呼び出します`, 'debug');
                 await ConnectionManager.handleError(error, 'WebSocket監視');
-                log(`[DEBUG-WS] ConnectionManager.handleError完了`, 'debug');
+                log(`[DEBUG-WS] ConnectionManager.handleError complete`, 'debug');
             }
         };
 

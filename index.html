@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.89</title>
+    <title>Kaspa P2P File Storage v6.2.90</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -12126,7 +12126,7 @@ Do you want to continue?`;
             
             // Already reconnecting - wait
             if (reconnection.isReconnecting) {
-                log(`[${source}] 再Connectedのため待機します`, 'info');
+                log(`[${source}] Waiting for reconnection`, 'info');
                 await waitForReconnection();
                 return true;
             }
@@ -12141,7 +12141,7 @@ Do you want to continue?`;
             // Minor errors (first 2 attempts) - short wait
             if (reconnection.retryCount <= 2) {
                 const delay = getBackoffDelay(reconnection.retryCount - 1);
-                log(`[${source}] ネットワーク応答遅延を検知。${delay}ms待機...`, 'warning');
+                log(`[${source}] Network response delay detected. Waiting ${delay}ms...`, 'warning');
                 await sleep(delay);
                 return false;
             }
@@ -12474,7 +12474,7 @@ Do you want to continue?`;
             while (!blockId && waitTime < maxWaitTime) {
                 // Phase 0-O-2: Check both ConnectionManager and WebSocket status
                 if (!ConnectionManager.isConnected || !NetworkState.ws.connected) {
-                    log(`[DEBUG] ネットワークDisconnectを検出 - BlockID待機を継続してREST APIフォールバックを許可 (CM: ${ConnectionManager.isConnected}, WS: ${NetworkState.ws.connected})`, 'warning');
+                    log(`[DEBUG] Network disconnect detected - Continuing BlockID wait and allowing REST API fallback (CM: ${ConnectionManager.isConnected}, WS: ${NetworkState.ws.connected})`, 'warning');
                     // v6.2.60: Don't throw error - allow REST API fallback after 10 seconds
                     // throw new Error('Network disconnected while waiting for BlockID');
                 }
@@ -13172,7 +13172,7 @@ Do you want to continue?`;
                 
                 // v5.11.126: Reset upload status UI
                 uploadStatusUI.reset();
-                uploadStatusUI.updateStatus('🔐', 'ファイルを準備しています...', 1);
+                uploadStatusUI.updateStatus('🔐', 'Preparing file...', 1);
             } else {
                 log('[ERROR] uploadProgress element not found during initialization!', 'error');
             }
@@ -13189,7 +13189,7 @@ Do you want to continue?`;
                 await FileState.costTracking.recordInitialBalance();
                 
                 log(`Processing started: ${currentFile.name}`);
-                log(`ファイルサイズ: ${(currentFile.size / 1024 / 1024).toFixed(2)} MB`);
+                log(`File size: ${(currentFile.size / 1024 / 1024).toFixed(2)} MB`);
                 
                 // Generate CID early for progress manager
                 let fileCID = '';
@@ -13239,12 +13239,12 @@ Do you want to continue?`;
                 // Get file hash for the entire file (expensive for large files, consider chunked hashing)
                 let fileHash;
                 if (currentFile.size < 10 * 1024 * 1024) { // Only hash small files completely
-                    log('小さなファイル - 全体をハッシュ化中...');
+                    log('Small file - hashing entire file...');
                     const data = new Uint8Array(await currentFile.arrayBuffer());
                     fileHash = await sha256(data);
                 } else {
                     // For large files, hash first and last 1MB
-                    log('大きなファイル - 最初と最後の1MBをハッシュ化中...');
+                    log('Large file - hashing first and last 1MB...');
                     const firstChunk = await currentFile.slice(0, 1024 * 1024).arrayBuffer();
                     const lastChunk = await currentFile.slice(-1024 * 1024).arrayBuffer();
                     const combined = new Uint8Array(firstChunk.byteLength + lastChunk.byteLength);
@@ -13252,14 +13252,14 @@ Do you want to continue?`;
                     combined.set(new Uint8Array(lastChunk), firstChunk.byteLength);
                     fileHash = await sha256(combined);
                 }
-                log(`ファイルハッシュ: ${fileHash}`);
+                log(`File hash: ${fileHash}`);
                 
                 // Compression strategy
                 const useCompression = shouldCompress(currentFile.name);
                 log(`圧縮: ${useCompression ? '有効' : '無効'}`);
                 
                 // v5.11.126: Update status
-                uploadStatusUI.updateStatus('🔐', 'ファイルを暗号化しています...');
+                uploadStatusUI.updateStatus('🔐', 'Encrypting file...');
                 
                 // Generate salt
                 const saltBase = fileHash + currentFile.name;
@@ -13275,7 +13275,7 @@ Do you want to continue?`;
                 // Get chunk size and apply safety limit
                 const requestedChunkSize = parseInt(document.getElementById('chunkSize').value) * 1024;
                 
-                // v4.7.30: 動的チャンクサイズ最適化を適用
+                // v4.7.30: Apply dynamic chunk size optimization
                 let actualChunkSize;
                 if (requestedChunkSize >= 20480) {
                     // 実験的: 圧縮率を考慮した動的最適化
@@ -13287,34 +13287,34 @@ Do you want to continue?`;
                     );
                     
                     if (requestedChunkSize >= 22528) {
-                        log(`🚀 動的最適化: ${(actualChunkSize/1024).toFixed(1)}KB チャンクを使用`, 'warning');
+                        log(`🚀 Dynamic optimization: Using ${(actualChunkSize/1024).toFixed(1)}KB chunks`, 'warning');
                         log('📊 ペイロード効率: ' + ((actualChunkSize / 23984) * 100).toFixed(1) + '% (理論最大値に対して)', 'info');
                         log('⚠️ この機能は実験的です。問題が発生した場合は20KBを選択してください', 'warning');
                     } else {
-                        log(`🧪 実験的機能: ${(actualChunkSize/1024).toFixed(1)}KB チャンクを使用`, 'warning');
+                        log(`🧪 Experimental feature: Using ${(actualChunkSize/1024).toFixed(1)}KB chunks`, 'warning');
                         log('⚠️ この機能は実験的です。問題が発生した場合は20KBを選択してください', 'warning');
                     }
                 } else {
                     // Normal: Safe size (unchanged)
                     actualChunkSize = calculateSafePayloadSize(requestedChunkSize);
                     if (actualChunkSize < requestedChunkSize) {
-                        log(`チャンクサイズを安全な値に調整: ${(actualChunkSize/1024).toFixed(1)}KB`, 'warning');
+                        log(`Adjusted chunk size to safe value: ${(actualChunkSize/1024).toFixed(1)}KB`, 'warning');
                     }
                 }
                 
                 // v5.5.19: At this point totalChunks is not set, so estimate from file size
                 const estimatedChunks = Math.ceil(currentFile.size / (chunkSize || 22528));
-                log(`推定チャンク数: ${estimatedChunks} (ファイルサイズ: ${currentFile.size} bytes, チャンクサイズ: ${chunkSize || 22528} bytes)`);
+                log(`Estimated chunks: ${estimatedChunks} (file size: ${currentFile.size} bytes, chunk size: ${chunkSize || 22528} bytes)`);
                 const totalChunks = estimatedChunks; // 互換性のため変数名を保持
                 
                 // Check if chunks exceed MAX_CHUNKS_SUPPORTED
                 if (totalChunks > MAX_CHUNKS_SUPPORTED) {
-                    log(`⚠️ チャンク数が上限を超えています: ${totalChunks} > ${MAX_CHUNKS_SUPPORTED}`, 'warning');
+                    log(`⚠️ Chunk count exceeds limit: ${totalChunks} > ${MAX_CHUNKS_SUPPORTED}`, 'warning');
                     const continueUpload = confirm(
-                        `このファイルは${totalChunks.toLocaleString()}個のチャンクに分割されており、` +
-                        `最大サポート数の${MAX_CHUNKS_SUPPORTED.toLocaleString()}チャンクを超えています。\n\n` +
-                        `ブロックチェーン上にメタデータトランザクションは生成されません。\n` +
-                        `.kaspaファイル（ローカル）のみが生成されます。\n\n` +
+                        `This file will be split into ${totalChunks.toLocaleString()} chunks, ` +
+                        `exceeding the maximum supported ${MAX_CHUNKS_SUPPORTED.toLocaleString()} chunks.\n\n` +
+                        `No metadata transaction will be created on the blockchain.\n` +
+                        `Only a .kaspa file (local) will be generated.\n\n` +
                         `Do you want to continue?`
                     );
                     
@@ -13331,7 +13331,7 @@ Do you want to continue?`;
                     
                     // Disable meta-tx option
                     document.getElementById('useMetaTx').checked = false;
-                    log('メタトランザクションを自動的に無効化しました', 'info');
+                    log('Automatically disabled meta transaction', 'info');
                 }
                 
                 // Initial UTXO fetch
@@ -13341,10 +13341,10 @@ Do you want to continue?`;
                 // Moved to after user confirmation
                 /*
                 if (!NetworkState.ws.monitorActive) {
-                    log('WebSocket監視を開始します...', 'info');
+                    log('Starting WebSocket monitoring...', 'info');
                     await startMonitoring();
                 } else {
-                    log('WebSocket監視は既に動作中です', 'info');
+                    log('WebSocket monitoring is already running', 'info');
                     // log(`現在監視中のトランザクション数: ${NetworkState.ws.monitoredTransactions.size}`, 'info');
                 }
                 */
@@ -13496,7 +13496,7 @@ Do you want to continue?`;
                     
                     // Start WebSocket monitoring after confirmation
                     if (!NetworkState.ws.monitorActive) {
-                        log('WebSocket監視を開始します...', 'info');
+                        log('Starting WebSocket monitoring...', 'info');
                         await startMonitoring();
                     }
                     
@@ -13519,7 +13519,7 @@ Do you want to continue?`;
                         
                         // v5.3.6: Check WebSocket monitoring every 10 chunks
                         if (i > 0 && i % 10 === 0 && !NetworkState.ws.monitorActive && FileState.uploadSessionActive) { // v5.5.35: Using FileState
-                            log('[WARNING] WebSocket監視が停止していたため再開', 'warning');
+                            log('[WARNING] WebSocket monitoring was stopped, restarting', 'warning');
                             await startMonitoring();
                         }
                         
@@ -13619,12 +13619,12 @@ Do you want to continue?`;
                                 const apiUrl = `${config.apiEndpoints[config.network]}/transactions/${txid}`;
                                 let lastApiCheck = 0;
                                 
-                                log(`ペイロード ${i + 1} BlockID待機中... (最大${maxWaitTime/1000}秒)`, 'info');
+                                log(`Payload ${i + 1} waiting for BlockID... (max ${maxWaitTime/1000} seconds)`, 'info');
                                 
                                 while (!blockId && waitTime < maxWaitTime) {
                                     // Check network connection
                                     if (!ConnectionManager.isConnected || !NetworkState.ws.connected) {
-                                        log(`[DEBUG] ネットワークDisconnectを検出 - BlockID待機を継続してREST APIフォールバックを許可`, 'warning');
+                                        log(`[DEBUG] Network disconnect detected - Continuing BlockID wait and allowing REST API fallback`, 'warning');
                                         // v6.2.60: Don't throw error - allow REST API fallback
                                         // throw new Error('Network disconnected while waiting for BlockID');
                                     }
@@ -13663,7 +13663,7 @@ Do you want to continue?`;
                                                         FileState.uploadingChunksCount--;
                                                         break;
                                                     }
-                                                    log(`REST APIチェック: TxIDは確認済み、BlockID待機中... (${waitTime/1000}秒)`, 'debug');
+                                                    log(`REST API check: TxID confirmed, waiting for BlockID... (${waitTime/1000} seconds)`, 'debug');
                                                 }
                                             } catch (apiError) {
                                                 log(`REST APIエラー: ${apiError.message} (${waitTime/1000}秒)`, 'debug');
@@ -13933,7 +13933,7 @@ Do you want to continue?`;
                     chunkDiv.innerHTML = `
                         <div>Chunk ${i + 1}/${totalChunks} ${sizeInfo}</div>
                         <div class="chunk-status pending" id="chunk-status-${i}">
-                            <span>待機中</span>
+                            <span>Waiting</span>
                         </div>
                     `;
                     chunksList.appendChild(chunkDiv);
@@ -14032,7 +14032,7 @@ Do you want to continue?`;
                                 timestamp: Date.now(),
                                 blockId: null
                             });
-                            log(`[DEBUG] WebSocket監視リストに追加: TxID: ${txid.substring(0, 16)}... (チャンク ${i + 1}/${totalChunks})`, 'debug');
+                            log(`[DEBUG] Added to WebSocket monitoring list: TxID: ${txid.substring(0, 16)}... (chunk ${i + 1}/${totalChunks})`, 'debug');
                             
                             log(`Transaction sent: ${txid.substring(0, 16)}...`);
                             
@@ -14041,7 +14041,7 @@ Do you want to continue?`;
                             await new Promise(resolve => setTimeout(resolve, 2000));
                             
                             // Try WebSocket monitoring first
-                            log(`トランザクション確認を待機中...`);
+                            log(`Waiting for transaction confirmation...`);
                             
                             // Wait for confirmation (WebSocket or RPC)
                             // v5.11.136: Enhanced BlockID acquisition with REST API polling
@@ -14050,7 +14050,7 @@ Do you want to continue?`;
                             const apiUrl = `${config.apiEndpoints[config.network]}/transactions/${txid}`;
                             let lastApiCheck = 0;
                             
-                            log(`チャンク ${i + 1} BlockID待機中... (最大${maxWaitTime/1000}秒)`, 'info');
+                            log(`Chunk ${i + 1} waiting for BlockID... (max ${maxWaitTime/1000} seconds)`, 'info');
                             
                             while (!blockId && waitTime < maxWaitTime) {
                                 // Check network connection
@@ -14232,7 +14232,7 @@ Do you want to continue?`;
                             // Remove from monitoring list if exists
                             if (txid && NetworkState.ws.monitoredTransactions.has(txid)) {
                                 NetworkState.ws.monitoredTransactions.delete(txid);
-                                log(`[DEBUG] エラーにより監視リストから削除: ${txid.substring(0, 16)}...`, 'debug');
+                                log(`[DEBUG] Removed from monitoring list due to error: ${txid.substring(0, 16)}...`, 'debug');
                             }
                             
                             if (retries >= config.retryCount) {
@@ -14245,11 +14245,11 @@ Do you want to continue?`;
                             
                             // Phase 0-N: Check connection before retry (old method)
                             if (!ConnectionManager.isConnected) {
-                                log(`[DEBUG] 再Connectを待機中...`, 'debug');
+                                log(`[DEBUG] Waiting for reconnection...`, 'debug');
                                 await ConnectionManager.attemptReconnect();
                             }
                             
-                            log(`2秒待機後にリトライ...`);
+                            log(`Retrying after 2 seconds...`);
                             await new Promise(resolve => setTimeout(resolve, 2000));
                         }
                     }
@@ -14351,7 +14351,7 @@ Do you want to continue?`;
                 
                 // Phase 0-L: Clear network error flag on successful completion
                 FileState.networkErrorOccurred = false;
-                log('[DEBUG] アップロード正常完了 - networkErrorOccurredフラグをクリア', 'debug');
+                log('[DEBUG] Upload completed successfully - clearing networkErrorOccurred flag', 'debug');
                 
                 // Debug log for kaspaMetadata
                 log(`[DEBUG] kaspaMetadata is: ${FileState.kaspaMetadata ? 'defined' : 'null'}`, 'debug');
@@ -14372,7 +14372,7 @@ Do you want to continue?`;
                 
                 // KENV処理（履歴処理から独立） - 1. データ本体アップロード後
                 if (FileState.kenvManager._initialized) {
-                    log('[KENV] アップロード完了エントリーを追加', 'info');
+                    log('[KENV] Added upload completion entry', 'info');
                     const kenvEntry = FileState.kenvManager.addMinimalEntry(
                         currentFile.name,
                         'kaspa-file',
@@ -14476,7 +14476,7 @@ Do you want to continue?`;
                     if (metaTxSuccess) {
                         // v6.2.73: Clear flag only after successful meta-tx
                         FileState.needsMetaTx = false;
-                        log('[DEBUG] メタTx成功 - needsMetaTxフラグをクリア: false', 'debug');
+                        log('[DEBUG] Meta TX successful - clearing needsMetaTx flag: false', 'debug');
                     } else {
                         // v6.2.75: Keep flag true on error for auto-resume
                         log('[DEBUG] メタTxエラー - needsMetaTxフラグを維持: true', 'debug');
@@ -14507,14 +14507,14 @@ Do you want to continue?`;
                     log('[DEBUG] メタTxは作成しません（チェックボックスがOFF）', 'debug');
                     // Auto-stop monitoring for non-meta-tx uploads
                     if (NetworkState.ws.monitorActive) {
-                        log('アップロード完了 - WebSocket監視を自動停止します', 'info');
+                        log('Upload completed - Automatically stopping WebSocket monitoring', 'info');
                         await stopMonitoring();
                     }
                     
                     // v5.11.126: Update status to complete
-                    uploadStatusUI.updateStatus('✅', '完了！ファイルIDをコピーしてください', 5);
+                    uploadStatusUI.updateStatus('✅', 'Complete! Please copy the file ID', 5);
                     
-                    log('🎉 アップロードが完了しました！', 'success');
+                    log('🎉 Upload completed!', 'success');
                 }
                 
             } catch (error) {
@@ -14545,7 +14545,7 @@ Do you want to continue?`;
                     // Let ConnectionManager handle the error
                     log(`[DEBUG-CATCH] ConnectionManager.handleErrorを呼び出します`, 'debug');
                     const handled = await ConnectionManager.handleError(error, 'processAndUpload');
-                    log(`[DEBUG-CATCH] ConnectionManager.handleError完了 - 結果: ${handled}`, 'debug');
+                    log(`[DEBUG-CATCH] ConnectionManager.handleError completed - result: ${handled}`, 'debug');
                     FileState.networkErrorOccurred = true;
                 } else {
                     log(`[DEBUG-CATCH] ネットワークエラーではないため、ConnectionManagerは呼び出しません`, 'debug');
@@ -14574,10 +14574,10 @@ Do you want to continue?`;
                     if (!FileState.uploadSessionActive && !FileState.isUploadingFile && NetworkState.ws.monitoredTransactions.size === 0) { // v5.5.34 & v5.5.35: Using FileState
                         // Phase 0-M: Check if monitoring is still active before calling checkMonitoringStop
                         if (NetworkState.ws.monitorActive) {
-                            log('[DEBUG] アップロード完了から10秒経過 - 監視停止を検討', 'debug');
+                            log('[DEBUG] 10 seconds elapsed since upload completion - considering stopping monitoring', 'debug');
                             await checkMonitoringStop();
                         } else {
-                            log('[DEBUG] アップロード完了から10秒経過 - 監視はすでに停止済み', 'debug');
+                            log('[DEBUG] 10 seconds elapsed since upload completion - monitoring already stopped', 'debug');
                         }
                     }
                 }, 10000);
@@ -14604,7 +14604,7 @@ Do you want to continue?`;
                     // v5.12.19: Clear UI after successful upload
                     if (typeof clearFileSelection === 'function') {
                         clearFileSelection();
-                        log('アップロード完了後UIをクリアしました', 'debug');
+                        log('UI cleared after upload completion', 'debug');
                     }
                     
                     log('ファイル選択とパスワードをクリアしました', 'debug');

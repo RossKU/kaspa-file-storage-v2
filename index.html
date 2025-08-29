@@ -16066,7 +16066,7 @@ Do you want to continue?`;
                 
                 // DownloadManagerを使用
                 if (!NetworkState.downloadManager) {
-                    log('[DownloadManager] 初期化されていません', 'error');
+                    log('[DownloadManager] Not initialized', 'error');
                     return;
                 }
                 
@@ -17307,7 +17307,7 @@ Do you want to continue?`;
                 } else {
                     // Sequential download (default)
                     log(`シーケンシャルダウンロードモードを使用します (${FileState.kaspaMetadata.chunks.length}チャンク)`, 'info');
-                    log(`圧縮設定: ${JSON.stringify(FileState.kaspaMetadata.file?.compression)}`, 'info');
+                    log(`Compression settings: ${JSON.stringify(FileState.kaspaMetadata.file?.compression)}`, 'info');
                     
                     for (let i = 0; i < FileState.kaspaMetadata.chunks.length; i++) {
                         const txId = FileState.kaspaMetadata.chunks[i];
@@ -17399,11 +17399,11 @@ Do you want to continue?`;
                             document.getElementById('downloadProgressBar').style.width = progress + '%';
                             document.getElementById('downloadProgressBar').textContent = progress + '%';
                             
-                            log(`チャンク ${i + 1} 取得成功`);
+                            log(`Chunk ${i + 1} retrieved successfully`);
                             
                         } catch (error) {
-                            log(`チャンク ${i + 1} エラー: ${error.message || error}`, 'error');
-                            console.error(`チャンク ${i + 1} 詳細エラー:`, error);
+                            log(`Chunk ${i + 1} error: ${error.message || error}`, 'error');
+                            console.error(`Chunk ${i + 1} detailed error:`, error);
                             throw error;
                         }
                     }
@@ -17420,13 +17420,13 @@ Do you want to continue?`;
                 
                 // Verify hash
                 const downloadedHash = await sha256(combined);
-                log(`ダウンロードしたファイルのハッシュ: ${downloadedHash}`, 'info');
-                log(`期待されるハッシュ: ${FileState.kaspaMetadata.file.sha256}`, 'info');
-                log(`ダウンロードしたファイルサイズ: ${combined.length} bytes`, 'info');
-                log(`期待されるファイルサイズ: ${FileState.kaspaMetadata.file.size} bytes`, 'info');
+                log(`Downloaded file hash: ${downloadedHash}`, 'info');
+                log(`Expected hash: ${FileState.kaspaMetadata.file.sha256}`, 'info');
+                log(`Downloaded file size: ${combined.length} bytes`, 'info');
+                log(`Expected file size: ${FileState.kaspaMetadata.file.size} bytes`, 'info');
                 
                 if (downloadedHash !== FileState.kaspaMetadata.file.sha256) {
-                    throw new Error('ファイル整合性チェック失敗！');
+                    throw new Error('File integrity check failed!');
                 }
                 
                 // Download
@@ -17440,7 +17440,7 @@ Do you want to continue?`;
                 
                 log(`Download complete: ${FileState.kaspaMetadata.file.name}`, 'success');
                 
-                // 成功時のUI表示
+                // Success UI display
                 const statusEl = document.getElementById('downloadStatus');
                 if (statusEl) {
                     statusEl.innerHTML = `
@@ -17448,12 +17448,12 @@ Do you want to continue?`;
                             ✅ Download complete!
                         </div>
                         <div style="color: #66bb6a; font-size: 0.9em; margin-top: 5px;">
-                            ${FileState.kaspaMetadata.file.name} を保存しました
+                            ${FileState.kaspaMetadata.file.name} saved
                         </div>
                     `;
                 }
                 
-                // プログレスバーも緑に
+                // Also make progress bar green
                 const progressBar = document.getElementById('downloadProgressBar');
                 if (progressBar) {
                     progressBar.style.backgroundColor = '#4caf50';
@@ -17461,40 +17461,40 @@ Do you want to continue?`;
                 }
                 
             } catch (error) {
-                const errorMsg = error.message || 'ダウンロード中にエラーが発生しました';
-                log(`ダウンロードエラー: ${errorMsg}`, 'error');
+                const errorMsg = error.message || 'An error occurred during download';
+                log(`Download error: ${errorMsg}`, 'error');
                 
-                // エラーメッセージをユーザーフレンドリーに変換
-                let userMessage = '❌ エラー: ';
+                // Convert error message to user-friendly format
+                let userMessage = '❌ Error: ';
                 let hint = '';
                 
-                // エラー種別を自動判定して適切なメッセージと対処法を表示
-                if (errorMsg.includes('パスワード')) {
-                    userMessage += 'パスワードが正しくありません';
-                    hint = '正しいパスワードを入力してください';
-                } else if (errorMsg.includes('初期化') || errorMsg.includes('RPC')) {
-                    userMessage += 'システムがConnectされていません';
-                    hint = '設定タブで「Kaspaシステム再起動」をクリックしてください';
-                } else if (errorMsg.includes('ブロック') || errorMsg.includes('見つかりません')) {
-                    userMessage += 'データが見つかりません';
-                    hint = 'ファイルが削除されているか、ネットワークを確認してください';
-                } else if (errorMsg.includes('ネットワーク') || errorMsg.includes('timeout')) {
-                    userMessage += 'ネットワークConnectエラー';
-                    hint = 'Connectを確認して再試行してください';
-                } else if (errorMsg.includes('整合性') || errorMsg.includes('ハッシュ')) {
-                    userMessage += 'ファイルが破損しています';
-                    hint = '再度ダウンロードしてください';
-                } else if (errorMsg.includes('エラー率')) {
+                // Automatically determine error type and display appropriate message and solution
+                if (errorMsg.includes('password') || errorMsg.includes('パスワード')) {
+                    userMessage += 'Incorrect password';
+                    hint = 'Please enter the correct password';
+                } else if (errorMsg.includes('initialized') || errorMsg.includes('初期化') || errorMsg.includes('RPC')) {
+                    userMessage += 'System not connected';
+                    hint = 'Click "Restart Kaspa System" in the Settings tab';
+                } else if (errorMsg.includes('block') || errorMsg.includes('ブロック') || errorMsg.includes('not found') || errorMsg.includes('見つかりません')) {
+                    userMessage += 'Data not found';
+                    hint = 'File may be deleted or check network connection';
+                } else if (errorMsg.includes('network') || errorMsg.includes('ネットワーク') || errorMsg.includes('timeout')) {
+                    userMessage += 'Network connection error';
+                    hint = 'Check connection and try again';
+                } else if (errorMsg.includes('integrity') || errorMsg.includes('整合性') || errorMsg.includes('hash') || errorMsg.includes('ハッシュ')) {
+                    userMessage += 'File is corrupted';
+                    hint = 'Please download again';
+                } else if (errorMsg.includes('error rate') || errorMsg.includes('エラー率')) {
                     userMessage += 'Multiple chunks could not be retrieved';
-                    hint = 'しばらく待ってから再試行してください';
+                    hint = 'Please wait a moment and try again';
                 } else if (errorMsg.includes('REST API')) {
-                    userMessage += 'APIConnectエラー';
-                    hint = '設定タブでREST APIを有効にしてください';
+                    userMessage += 'API connection error';
+                    hint = 'Please enable REST API in the Settings tab';
                 } else {
-                    userMessage += errorMsg.substring(0, 50); // 長すぎる場合は切る
+                    userMessage += errorMsg.substring(0, 50); // Truncate if too long
                 }
                 
-                // UI表示
+                // UI display
                 const statusEl = document.getElementById('downloadStatus');
                 if (statusEl) {
                     statusEl.innerHTML = `
@@ -18269,7 +18269,7 @@ Do you want to continue?`;
                                         existing.receivedAt = Date.now();  // v5.11.117: Track receive time for better cleanup
                                     
                                     log(`[DEBUG] WebSocket: 監視中のトランザクション検出！ TxID: ${txId.substring(0, 16)}... BlockID: ${blockId.substring(0, 16)}...`, 'debug');
-                                    log(`[DEBUG] WebSocket: ブロック時刻を保存 - Time: ${blockTime.toISOString()}`, 'debug');
+                                    log(`[DEBUG] WebSocket: Saved block time - Time: ${blockTime.toISOString()}`, 'debug');
                                     myTransactionFound = true;
                                     
                                         // v5.11.141: Track main RPC score (moved inside duplicate check)

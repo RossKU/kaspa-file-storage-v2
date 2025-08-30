@@ -8572,7 +8572,7 @@ Do you want to continue?`;
                         log('[ConnectionManager] Automatically resuming upload...', 'info');
                         log(`[DEBUG-RESUME] Conditions met - executing auto-resume`, 'debug');
                     }
-                    log(`[DEBUG] 再開条件満たす - uploadSessionActive: ${FileState.uploadSessionActive}`, 'debug');
+                    log(`[DEBUG] Resume conditions met - uploadSessionActive: ${FileState.uploadSessionActive}`, 'debug');
                     // Debug: Check current state
                     log(`[DEBUG] FileState.currentFile: ${FileState.currentFile ? FileState.currentFile.name : 'null'}`, 'debug');
                     log(`[DEBUG] window.pendingProgress: ${window.pendingProgress ? 'exists' : 'null'}`, 'debug');
@@ -8625,7 +8625,7 @@ Do you want to continue?`;
                         setTimeout(async () => {
                             if (FileState.currentFile && window.pendingProgress) {
                                 log('[ConnectionManager] processAndUploadを呼び出します...', 'info');
-                                log(`[DEBUG] 自動再開前 - uploadSessionActive: ${FileState.uploadSessionActive}`, 'debug');
+                                log(`[DEBUG] Before auto-resume - uploadSessionActive: ${FileState.uploadSessionActive}`, 'debug');
                                 await processAndUpload();
                                 // Phase 0-M: Move completion message after processAndUpload to ensure proper timing
                                 // Phase 0-L: Clear network error flag after successful auto-resume
@@ -8644,7 +8644,7 @@ Do you want to continue?`;
                         }, 1000);
                     }
                 } else {
-                    log(`[DEBUG-RESUME] 自動再開条件を満たしません`, 'debug');
+                    log(`[DEBUG-RESUME] Auto-resume conditions not met`, 'debug');
                     if (!FileState.progressManager) {
                         log(`[DEBUG-RESUME]   理由: ProgressManagerが存在しない`, 'debug');
                     } else if (!FileState.progressManager.progress) {
@@ -11987,14 +11987,14 @@ Do you want to continue?`;
                 // Check if archive endpoint exists
                 endpoint = config.archiveEndpoints[config.network];
                 if (!endpoint) {
-                    log(`[RPC] アーカイブノードは${config.network}では利用できません`, 'warning');
+                    log(`[RPC] Archive nodes not available on ${config.network}`, 'warning');
                     // Fall back to standard resolver
                     config.nodeType = 'auto';
                     config.currentEndpoint = null;
-                    log(`[RPC] 標準Resolverにフォールバック`, 'info');
+                    log(`[RPC] Falling back to standard Resolver`, 'info');
                 } else {
                     config.currentEndpoint = endpoint;
-                    log(`[RPC] アーカイブノードを使用: ${endpoint}`, 'info');
+                    log(`[RPC] Using archive node: ${endpoint}`, 'info');
                 }
             } else if (config.nodeType === 'custom' && config.customEndpoint) {
                 // Use custom endpoint
@@ -12739,46 +12739,46 @@ Do you want to continue?`;
             // Already compressed files (no compression effect: 100%)
             const compressedFormats = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'mp3', 'mp4', 'avi', 'mov', 'zip', 'rar', '7z', 'gz', 'bz2'];
             if (compressedFormats.includes(ext)) {
-                return 1.0; // 圧縮効果なし
+                return 1.0; // No compression effect
             }
             
             // Text-based files (high compression ratio: 30-50%)
             const textFormats = ['txt', 'log', 'csv', 'json', 'xml', 'html', 'css', 'js', 'md', 'yml', 'yaml'];
             if (textFormats.includes(ext)) {
-                return 0.4; // 60%圧縮
+                return 0.4; // 60% compression
             }
             
-            // ソースコード（中圧縮率: 40-60%）
+            // Source code (medium compression: 40-60%)
             const codeFormats = ['py', 'java', 'c', 'cpp', 'h', 'cs', 'php', 'rb', 'go', 'rs', 'swift'];
             if (codeFormats.includes(ext)) {
-                return 0.5; // 50%圧縮
+                return 0.5; // 50% compression
             }
             
             // Binary files (low compression ratio: 80-90%)
             const binaryFormats = ['exe', 'dll', 'so', 'bin', 'dat'];
             if (binaryFormats.includes(ext)) {
-                return 0.85; // 15%圧縮
+                return 0.85; // 15% compression
             }
             
-            // デフォルト（中程度の圧縮を想定）
-            return 0.7; // 30%圧縮
+            // Default (assuming medium compression)
+            return 0.7; // 30% compression
         }
         
         // v4.7.30: Dynamic chunk size calculation (considering compression ratio)
         function calculateOptimalChunkSize(baseChunkSize, fileName, mimeType, useCompression) {
             if (!useCompression) {
-                // 圧縮なしの場合は通常の計算
+                // Normal calculation for no compression
                 return calculateSafePayloadSize(baseChunkSize);
             }
             
-            // 圧縮率を予測
+            // Predict compression ratio
             const compressionRatio = estimateCompressionRatio(fileName, mimeType);
             
             // Calculate backwards from encrypted payload limit (22984 bytes)
             const MAX_ENCRYPTED_SIZE = 22984; // 24000 - 16 - 1000
             const MAX_COMPRESSED_SIZE = MAX_ENCRYPTED_SIZE - 16; // AES-GCM overhead
             
-            // 圧縮前の最大サイズを計算
+            // Calculate maximum size before compression
             const maxOriginalSize = Math.floor(MAX_COMPRESSED_SIZE / compressionRatio);
             
             // 要求されたサイズと計算された最大サイズの小さい方を選択
@@ -12788,9 +12788,9 @@ Do you want to continue?`;
             if (baseChunkSize >= 22528) {
                 log(`📊 Dynamic chunk size optimization:`);
                 log(`  - File type: ${fileName} (${mimeType || 'unknown'})`);
-                log(`  - 予測圧縮率: ${(compressionRatio * 100).toFixed(1)}%`);
-                log(`  - 最大可能サイズ: ${(maxOriginalSize / 1024).toFixed(1)}KB`);
-                log(`  - 最適化後サイズ: ${(optimalSize / 1024).toFixed(1)}KB`);
+                log(`  - Predicted compression ratio: ${(compressionRatio * 100).toFixed(1)}%`);
+                log(`  - Maximum possible size: ${(maxOriginalSize / 1024).toFixed(1)}KB`);
+                log(`  - Optimized size: ${(optimalSize / 1024).toFixed(1)}KB`);
             }
             
             return calculateSafePayloadSize(optimalSize);
@@ -13278,7 +13278,7 @@ Do you want to continue?`;
                 // v4.7.30: Apply dynamic chunk size optimization
                 let actualChunkSize;
                 if (requestedChunkSize >= 20480) {
-                    // 実験的: 圧縮率を考慮した動的最適化
+                    // Experimental: Dynamic optimization considering compression ratio
                     actualChunkSize = calculateOptimalChunkSize(
                         requestedChunkSize, 
                         currentFile.name, 
@@ -13366,7 +13366,7 @@ Do you want to continue?`;
                 let nextChunkIndex = -1;
                 
                 if (useNewApproach) {
-                    log('🚀 新方式: 暗号化後ペイロード分割を使用', 'info');
+                    log('🚀 New method: Using post-encryption payload splitting', 'info');
                     
                     // v6.2.11: Check if this is a resume (has progress)
                     const isResuming = FileState.progressManager?.progress?._progress?.completedChunks > 0;
@@ -13727,7 +13727,7 @@ Do you want to continue?`;
                                     const match = errorMessage.match(/transaction ([a-f0-9]{64}) was already accepted/);
                                     if (match) {
                                         txid = match[1];
-                                        log(`ペイロード ${i + 1} は既に承認済み: ${txid.substring(0, 16)}...`, 'info');
+                                        log(`Payload ${i + 1} already confirmed: ${txid.substring(0, 16)}...`, 'info');
                                         // Extract blockId from error message if available
                                         const blockMatch = errorMessage.match(/by the consensus.*?([a-f0-9]{64})/);
                                         if (blockMatch) {
@@ -13781,7 +13781,7 @@ Do you want to continue?`;
                                         `Current amount: ${currentAmountKAS.toFixed(1)} KAS\n\n` +
                                         `【原因】\n` +
                                         `ウォレット内に小額のUTXOが${utxoCount}個蓄積しています。\n` +
-                                        `これらを一度に使用するとサイズ制限を超えます。\n\n` +
+                                        `Using these at once will exceed size limit.\n\n` +
                                         `【解決方法】\n` +
                                         `Please set amount to ${recommendedAmount} KAS or more.\n` +
                                         `これによりUTXOが統合され、問題が解決します。\n\n` +
@@ -13825,7 +13825,7 @@ Do you want to continue?`;
                                 // Phase 0-N: Check connection before retry
                                 // v5.7.10: Don't call attemptReconnect to prevent dual execution
                                 if (!ConnectionManager.isConnected) {
-                                    log(`[DEBUG] ネットワークDisconnect - 自動再開に任せます`, 'debug');
+                                    log(`[DEBUG] Network disconnect - leaving to auto-resume`, 'debug');
                                     throw new Error('Network disconnected - waiting for auto-resume');
                                 }
                                 
@@ -14415,7 +14415,7 @@ Do you want to continue?`;
                             kenvEntry.salt = FileState.kaspaMetadata.encryption.pbkdf2.salt;
                         }
                         
-                        // 圧縮情報の詳細
+                        // Compression information details
                         if (FileState.kaspaMetadata?.file?.compression) {
                             const comp = FileState.kaspaMetadata.file.compression;
                             kenvEntry.compressionAlgorithm = comp.algorithm;
@@ -15376,7 +15376,7 @@ Do you want to continue?`;
                             });
                             
                             // デバッグログ：フィルタリング結果
-                            log(`[SuperMeta v5.10.0] 中間メタ ${groupIndex + 1} に割り当てられたセグメントバウンダリー数: ${boundariesForGroup.length}`, 'debug');
+                            log(`[SuperMeta v5.10.0] Segment boundaries assigned to intermediate meta ${groupIndex + 1}: ${boundariesForGroup.length}`, 'debug');
                             if (boundariesForGroup.length > 0) {
                                 log(`[SuperMeta v5.10.0] セグメントインデックス: [${boundariesForGroup.map(b => b.index).join(', ')}]`, 'debug');
                                 log(`[SuperMeta v5.10.0] payloadIndexリスト: [${boundariesForGroup.map(b => b.payloadIndex).join(', ')}]`, 'debug');
@@ -15450,7 +15450,7 @@ Do you want to continue?`;
                         throw new Error('submit() returned null');
                     }
                     
-                    log(`[SuperMeta] 中間メタTxID: ${metaTxId.substring(0, 16)}...`, 'success');
+                    log(`[SuperMeta] Intermediate meta TxID: ${metaTxId.substring(0, 16)}...`, 'success');
                     
                     // Add to monitored transactions (same as chunk upload)
                     NetworkState.ws.monitoredTransactions.set(metaTxId, {
@@ -16064,7 +16064,7 @@ Do you want to continue?`;
                     }
                 }
                 
-                // DownloadManagerを使用
+                // Use DownloadManager
                 if (!NetworkState.downloadManager) {
                     log('[DownloadManager] Not initialized', 'error');
                     return;
@@ -16439,7 +16439,7 @@ Do you want to continue?`;
                 metaTxId = parts[0];
                 blockId = null;
                 password = passwordFromField;
-                log(`メタTxIDのみで復元（REST API使用）: ${metaTxId.substring(0, 16)}...`, 'info');
+                log(`Restoring with MetaTxID only (using REST API): ${metaTxId.substring(0, 16)}...`, 'info');
             }
             
             // v6.2.80: Enhanced error messages with progress window display
@@ -16701,7 +16701,7 @@ Do you want to continue?`;
                         });
                         
                         if (txResponse && txResponse.transaction) {
-                            log('RPC経由でトランザクション取得成功', 'info');
+                            log('Transaction retrieval successful via RPC', 'info');
                             
                             // Extract payload from transaction
                             const tx = txResponse.transaction;
@@ -16727,13 +16727,13 @@ Do you want to continue?`;
                             }
                         }
                     } catch (rpcError) {
-                        log(`RPC取得エラー: ${rpcError.message}`, 'error');
+                        log(`RPC retrieval error: ${rpcError.message}`, 'error');
                     }
                 }
                 }
                 
                 if (!payload) {
-                    throw new Error('メタトランザクションのペイロードが見つかりません');
+                    throw new Error('Meta transaction payload not found');
                 }
                 
                 log(`Payload retrieved successfully: ${payload.length} bytes`, 'info');
@@ -16810,7 +16810,7 @@ Do you want to continue?`;
                     if ((metaData.version === "2.1" || metaData.version === "3.3" || metaData.version === "3.1.1" || metaData.version === "3.4" || metaData.version === "3.4.2" || metaData.version === "3.4.3") && 
                         (metaData.type === "kaspa-meta-tx" || metaData.type === "kaspa-directory")) {
                         log(`Metadata successfully decrypted (v${metaData.version}, type: ${metaData.type})`, 'success');
-                        log(`メタデータ内容: ${JSON.stringify(metaData, null, 2)}`, 'info');
+                        log(`Metadata content: ${JSON.stringify(metaData, null, 2)}`, 'info');
                         
                         // For directory type
                         if (metaData.type === 'kaspa-directory') {
@@ -16835,7 +16835,7 @@ Do you want to continue?`;
                         // Check if this is super metadata
                         if (metaData.chunkStructure?.type === 'super') {
                             log('[SuperMeta] Super metadata detected', 'info');
-                            log(`[SuperMeta] メタデータ数: ${metaData.chunks.length}`, 'info');
+                            log(`[SuperMeta] Number of metadata: ${metaData.chunks.length}`, 'info');
                             log(`[SuperMeta] 総チャンク数: ${metaData.chunkStructure.totalChunks}`, 'info');
                             
                             // Download all intermediate metadata
@@ -16861,7 +16861,7 @@ Do you want to continue?`;
                                             
                                             const block = blockResponse?.block?.block || blockResponse?.block;
                                             if (!block) {
-                                                throw new Error(`中間メタデータのブロックが見つかりません: ${intMetaBlockId}`);
+                                                throw new Error(`Intermediate metadata block not found: ${intMetaBlockId}`);
                                             }
                                             
                                             // Find the intermediate meta transaction
@@ -16891,7 +16891,7 @@ Do you want to continue?`;
                                         
                                         const txResponse = await fetch(`${config.apiEndpoints[config.network]}/transactions/${intMetaTxId}`);
                                         if (!txResponse.ok) {
-                                            throw new Error(`中間メタデータが見つかりません: ${intMetaTxId}`);
+                                            throw new Error(`Intermediate metadata not found: ${intMetaTxId}`);
                                         }
                                         
                                         const txData = await txResponse.json();
@@ -17239,10 +17239,10 @@ Do you want to continue?`;
                         // Find transaction with matching TxID
                         let payload = null;
                         const txCount = block.transactions?.length || 0;
-                        log(`ブロック内のトランザクション数: ${txCount}`, 'info');
+                        log(`Number of transactions in block: ${txCount}`, 'info');
                         
                         if (txCount === 0) {
-                            log(`警告: トランザクションが含まれていません`, 'warning');
+                            log(`Warning: No transactions included`, 'warning');
                             // BigIntを含む可能性があるのでJSON.stringifyは避ける
                             log(`Block has header.hash: ${block.header?.hash}`, 'warning');
                         }
@@ -17349,10 +17349,10 @@ Do you want to continue?`;
                             // Find transaction with matching TxID
                             let payload = null;
                             const txCount = block.transactions?.length || 0;
-                            log(`ブロック内のトランザクション数: ${txCount}`, 'info');
+                            log(`Number of transactions in block: ${txCount}`, 'info');
                             
                             if (txCount === 0) {
-                                log(`警告: トランザクションが含まれていません`, 'warning');
+                                log(`Warning: No transactions included`, 'warning');
                                 // BigIntを含む可能性があるのでJSON.stringifyは避ける
                                 log(`Block has header.hash: ${block.header?.hash}`, 'warning');
                             }
@@ -17385,9 +17385,9 @@ Do you want to continue?`;
                             log(`Chunk ${i + 1}: Encrypted data ${encrypted.length} bytes`, 'info');
                             // Log first few bytes for debugging
                             const preview = Array.from(encrypted.slice(0, 16)).map(b => b.toString(16).padStart(2, '0')).join(' ');
-                            log(`チャンク ${i + 1}: データプレビュー: ${preview}...`, 'debug');
+                            log(`Chunk ${i + 1}: Data preview: ${preview}...`, 'debug');
                             const compressed = await decryptChunk(encrypted, key, i);
-                            log(`チャンク ${i + 1}: 復号化後 ${compressed.length} bytes`, 'info');
+                            log(`Chunk ${i + 1}: After decryption ${compressed.length} bytes`, 'info');
                             log(`Compression enabled: ${FileState.kaspaMetadata.file?.compression?.enabled}`, 'info');
                             const original = kaspaMetadata.file?.compression?.enabled ? lzDecompress(compressed) : compressed;
                             
@@ -18446,7 +18446,7 @@ Do you want to continue?`;
         }
         NetworkState.downloadManager = new DownloadManager();
         
-        // Step 4: KENVエントリーを履歴形式に変換する関数
+        // Step 4: Function to convert KENV entries to history format
         function getHistoryFromKENV() {
             if (!FileState.kenvManager._initialized || !FileState.kenvManager.entries) {
                 return [];
@@ -18454,7 +18454,7 @@ Do you want to continue?`;
             
             // KENVエントリーを履歴形式にマッピング
             return FileState.kenvManager.entries
-                .filter(entry => entry.type !== 'kaspa-directory') // ディレクトリは履歴に含まれない
+                .filter(entry => entry.type !== 'kaspa-directory') // Directories not included in history
                 .map(entry => ({
                     // 基本情報
                     id: entry.id,
@@ -18482,7 +18482,7 @@ Do you want to continue?`;
                     uploadedBy: entry.uploadedBy || null,
                     network: config.network || config.defaultNetwork, // v5.11.101
                     
-                    // 圧縮情報（互換性のため）
+                    // Compression information (for compatibility)
                     compression: {
                         algorithm: entry.compressionAlgorithm || 'none',
                         enabled: entry.compressionEnabled === 'true',
@@ -18582,7 +18582,7 @@ Do you want to continue?`;
 
         window.addEventListener('unhandledrejection', (event) => {
             console.error('Unhandled promise rejection:', event.reason);
-            log(`未処理のPromiseエラー: ${event.reason}`, 'error');
+            log(`Unhandled Promise error: ${event.reason}`, 'error');
         });
 
         // Memory monitoring
@@ -20503,7 +20503,7 @@ Do you want to continue?`;
                         const blockId = kenvEntry.metaTxBlockId || '';
                         const textWithPass = `${kenvEntry.metaTxId}:${blockId}:${kenvEntry.password}`;
                         await window.copyToClipboard(textWithPass);
-                        log('パスワード付きTxIDをコピーしました（パスワードが含まれています）', 'warning');
+                        log('Copied TxID with password (password included)', 'warning');
                         break;
                         
                     case 'txid-no-password':
@@ -20934,7 +20934,7 @@ Do you want to continue?`;
                                 // event.data.blockでブロックデータを取得（メインと同じ構造）
                                 const block = event.data?.block;
                                 if (block) {
-                                    // handleBlockAddedが期待する形式に変換
+                                    // Convert to format expected by handleBlockAdded
                                     const blockEvent = {
                                         blockHash: block.header?.hash,
                                         verboseData: {
@@ -21047,7 +21047,7 @@ Do you want to continue?`;
             },
             
             checkBlockForTransactions(event) {
-                // メインのWebSocket処理と同じロジック
+                // Same logic as main WebSocket processing
                 if (event.verboseData && event.verboseData.transactionIds) {
                     for (const txId of event.verboseData.transactionIds) {
                         if (NetworkState.ws.monitoredTransactions.has(txId)) {

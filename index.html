@@ -4731,7 +4731,7 @@
                     this.kindex.sortIndexes.size.splice(sizeInsertPos, 0, sizeEntry);
                 }
                 
-                // 日付順インデックス（日付が有効な場合）
+                // Date order index (if date is valid)
                 if (entry.uploadDate) {
                     const timestamp = new Date(entry.uploadDate).getTime();
                     if (!isNaN(timestamp)) {
@@ -4947,7 +4947,7 @@
                     
                     let csvContent = headers + '\n';
                     
-                    // エントリーをCSV形式に変換
+                    // Convert entries to CSV format
                     this.entries.forEach(entry => {
                         const row = [
                             entry.id || '',
@@ -5477,7 +5477,7 @@
                     extensions: {
                         v4_5_6_compat: true,
                         custom: {
-                            // merkleRootは再計算が必要なので省略
+                            // merkleRoot is omitted as it needs recalculation
                         }
                     }
                 };
@@ -5658,7 +5658,7 @@
                         entry.status = 'verified';
                     } else {
                         entry.status = 'failed';
-                        entry.authWarning = 'MetaTxIDまたは外部参照が必要です';
+                        entry.authWarning = 'MetaTxID or external reference required';
                     }
                 } catch (error) {
                     entry.status = 'failed';
@@ -6066,10 +6066,10 @@ Do you want to continue?`;
                         delete kaspaMetadata.auth.password;
                     }
                     
-                    // JSON文字列に変換
+                    // Convert to JSON string
                     const jsonString = JSON.stringify(kaspaMetadata, null, 2);
                     
-                    // File Nameを生成（CIDの最初の8文字を使用）
+                    // Generate file name (using first 8 characters of CID)
                     const cidFull = kenvEntry.cid || 'unknown';
                     const cid = cidFull.length > 8 ? cidFull.slice(0, 8) : cidFull;
                     const filename = `${kenvEntry.name}.${cid}.kaspa`;
@@ -7544,7 +7544,7 @@ Do you want to continue?`;
         // v5.5.10: createAndUploadMetaTx内のデバッグログ1箇所を移行 (18/120)
         // v5.5.11: processAndUpload内のデバッグログ3箇所を移行 (21/120)
         // v5.5.12: Migrated 5 existence and encryption check points in downloadFile (26/120)
-        // v5.5.13: downloadFile内のバージョン互換性チェック4箇所を移行 (30/120)
+        // v5.5.13: Migrated 4 version compatibility checks from downloadFile (30/120)
         // v5.5.14: fileInfo表示のchunks.length1箇所を移行 (31/120)
         // v5.5.15: fileプロパティの読み取り専用アクセス11箇所を移行 (42/120)
         // v5.5.16: Migrated 16 read-only download access points (58/120)
@@ -8528,7 +8528,7 @@ Do you want to continue?`;
                 this.isConnected = true;
                 this.reconnectAttempts = 0;
                 this.lastError = null;
-                updateNetworkStatus('online', 'オンライン');
+                updateNetworkStatus('online', 'Online');
                 
                 // Phase 0-D: WebSocket monitoring adjustment
                 if (NetworkState.ws.monitorActive && NetworkState.ws.connected) {
@@ -8633,7 +8633,7 @@ Do you want to continue?`;
                                 log('[DEBUG] Auto-resume successful - clearing networkErrorOccurred flag', 'debug');
                                 log('[ConnectionManager] Auto-resume completed', 'success');
                             } else {
-                                log('[ConnectionManager] 自動再開に必要な情報が不足しています', 'warning');
+                                log('[ConnectionManager] Insufficient information for automatic resume', 'warning');
                                 if (!FileState.currentFile) {
                                     log('[ConnectionManager] FileState.currentFile is not set', 'debug');
                                 }
@@ -10213,7 +10213,7 @@ Do you want to continue?`;
         };
         */
 
-        // v2.1 から v3.3 形式への変換関数
+        // Conversion function from v2.1 to v3.3 format
         function convertV21ToV33Progress(v21Progress) {
             // Calculate 1MB processing segment boundaries
             const PROCESSING_CHUNK_SIZE = 1048576; // 1MB
@@ -10616,9 +10616,9 @@ Do you want to continue?`;
             toggleRestApiMode(enabled) {
                 this.forceRestApi = enabled;
                 if (enabled) {
-                    log('[DownloadManager] REST APIテストモード有効 - RPCをスキップします', 'warning');
+                    log('[DownloadManager] REST API test mode enabled - Skipping RPC', 'warning');
                 } else {
-                    log('[DownloadManager] REST APIテストモード無効 - 通常モード', 'info');
+                    log('[DownloadManager] REST API test mode disabled - Normal mode', 'info');
                 }
             }
             
@@ -11965,7 +11965,7 @@ Do you want to continue?`;
                 document.getElementById('testBtn').disabled = false;
                 document.getElementById('uploadBtn').disabled = !UserState.address; // Only enable if wallet connected
                 
-                updateNetworkStatus('online', 'オンライン');
+                updateNetworkStatus('online', 'Online');
                 
                 // Initialize Archive Manager
                 await initializeArchiveManager();
@@ -12000,11 +12000,11 @@ Do you want to continue?`;
                 // Use custom endpoint
                 endpoint = config.customEndpoint;
                 config.currentEndpoint = endpoint;
-                log(`[RPC] カスタムエンドポイントを使用: ${endpoint}`, 'info');
+                log(`[RPC] Using custom endpoint: ${endpoint}`, 'info');
             } else {
                 // Use standard resolver (auto or standard mode)
                 config.currentEndpoint = null;
-                log(`[RPC] 標準Resolverを使用 (${config.nodeType} mode)`, 'info');
+                log(`[RPC] Using standard Resolver (${config.nodeType} mode)`, 'info');
             }
             
             // Create RPC client with appropriate configuration
@@ -12055,7 +12055,7 @@ Do you want to continue?`;
                 // Check REST API health
                 checkRestApiHealth();
                 
-                updateNetworkStatus('online', 'オンライン');
+                updateNetworkStatus('online', 'Online');
                 return true;
                 
             } catch (error) {
@@ -12953,7 +12953,7 @@ Do you want to continue?`;
                 // Fallback to Explorer API (v5.11.99)
                 // Kill switch check
                 if (!NetworkState.restApiControl.globalEnabled || NetworkState.restApiControl.temporaryKilled) {
-                    log(`[REST API] 無効化されているためスキップ`, 'debug');
+                    log(`[REST API] Skipping because it's disabled`, 'debug');
                     return false;
                 }
                 
@@ -13200,13 +13200,13 @@ Do you want to continue?`;
                 if (useRandomCid) {
                     fileCID = generateRandomCID();
                     window.currentFileCIDFull = null; // No full CID for random mode
-                    log(`ランダムCID生成: ${fileCID}`, 'info');
+                    log(`Random CID generated: ${fileCID}`, 'info');
                 } else {
                     // Generate content-based CID using v3.3 specification
                     const cidInfo = await generateFileCID(currentFile);
                     fileCID = cidInfo.display;
                     window.currentFileCIDFull = cidInfo.full; // Store full CID for metadata
-                    log(`決定論的CID生成: ${fileCID} (Full: ${cidInfo.full.slice(0, 16)}...)`, 'info');
+                    log(`Deterministic CID generated: ${fileCID} (Full: ${cidInfo.full.slice(0, 16)}...)`, 'info');
                 }
                 
                 // Store CID for later use
@@ -13256,7 +13256,7 @@ Do you want to continue?`;
                 
                 // Compression strategy
                 const useCompression = shouldCompress(currentFile.name);
-                log(`圧縮: ${useCompression ? '有効' : '無効'}`);
+                log(`Compression: ${useCompression ? 'Enabled' : 'Disabled'}`);
                 
                 // v5.11.126: Update status
                 uploadStatusUI.updateStatus('🔐', 'Encrypting file...');
@@ -13289,10 +13289,10 @@ Do you want to continue?`;
                     if (requestedChunkSize >= 22528) {
                         log(`🚀 Dynamic optimization: Using ${(actualChunkSize/1024).toFixed(1)}KB chunks`, 'warning');
                         log('📊 ペイロード効率: ' + ((actualChunkSize / 23984) * 100).toFixed(1) + '% (理論最大値に対して)', 'info');
-                        log('⚠️ この機能は実験的です。問題が発生した場合は20KBを選択してください', 'warning');
+                        log('⚠️ This feature is experimental. If problems occur, please select 20KB', 'warning');
                     } else {
                         log(`🧪 Experimental feature: Using ${(actualChunkSize/1024).toFixed(1)}KB chunks`, 'warning');
-                        log('⚠️ この機能は実験的です。問題が発生した場合は20KBを選択してください', 'warning');
+                        log('⚠️ This feature is experimental. If problems occur, please select 20KB', 'warning');
                     }
                 } else {
                     // Normal: Safe size (unchanged)
@@ -14522,13 +14522,13 @@ Do you want to continue?`;
                 const errorMessage = error?.message || error?.toString() || 'Unknown error';
                 log(`Upload error: ${errorMessage}`, 'error');
                 console.error('Upload error:', error);
-                // WASMエラーの詳細をログ出力（JSON.stringifyを使わない）
+                // Log WASM error details (without JSON.stringify)
                 if (typeof error === 'object' && error !== null) {
-                    log(`[DEBUG] エラーオブジェクト: ${error.message || '[messageなし]'} (${error.constructor?.name || 'object'})`, 'debug');
+                    log(`[DEBUG] Error object: ${error.message || '[no message]'} (${error.constructor?.name || 'object'})`, 'debug');
                 } else {
-                    log(`[DEBUG] エラーオブジェクト: ${error}`, 'debug');
+                    log(`[DEBUG] Error object: ${error}`, 'debug');
                 }
-                log(`[DEBUG] エラータイプ: ${typeof error}`, 'debug');
+                log(`[DEBUG] Error type: ${typeof error}`, 'debug');
                 if (error?.stack) {
                     log(`[DEBUG] Error stack: ${error.stack}`, 'debug');
                 }
@@ -14543,7 +14543,7 @@ Do you want to continue?`;
                     }
                     
                     // Let ConnectionManager handle the error
-                    log(`[DEBUG-CATCH] ConnectionManager.handleErrorを呼び出します`, 'debug');
+                    log(`[DEBUG-CATCH] Calling ConnectionManager.handleError`, 'debug');
                     const handled = await ConnectionManager.handleError(error, 'processAndUpload');
                     log(`[DEBUG-CATCH] ConnectionManager.handleError completed - result: ${handled}`, 'debug');
                     FileState.networkErrorOccurred = true;
@@ -15140,7 +15140,7 @@ Do you want to continue?`;
                         });
                     } catch (err) {
                         if (err.name === 'AbortError') {
-                            log('[DEBUG] メタTx BlockID待機がキャンセルされました（待機中）', 'debug');
+                            log('[DEBUG] Meta Tx BlockID wait was cancelled (while waiting)', 'debug');
                             return; // Exit the function
                         }
                         throw err; // Re-throw other errors
@@ -15160,7 +15160,7 @@ Do you want to continue?`;
                 // Log meta-tx creation success
                 log(`🎉 Meta transaction creation complete! ${metaBlockId ? 'TxID:BlockID' : 'TxID'}: ${metaTxReference}`, 'success');
                 if (metaBlockId) {
-                    log('✅ REST API不要で復元可能です', 'success');
+                    log('✅ Can be restored without REST API', 'success');
                 } else {
                     log('⚠️ Failed to obtain BlockID. REST API required for restoration', 'warning');
                 }
@@ -15178,7 +15178,7 @@ Do you want to continue?`;
                 
                 // Step 4: Remove history update processing (already handled by KENV)
                 // メタTxの情報はKENVで管理されているため、
-                // ここでの履歴更新は不要
+                // History update not needed here
                 
                 // KENV processing (independent from history) - 2. After MetaTx creation
                 // v5.12.13: Use entry ID instead of CID for session-based lookup
@@ -15658,7 +15658,7 @@ Do you want to continue?`;
                 while (!superMetaBlockId && waitTime < (config.timeout || 300000)) {
                     // Phase 0-O-2: Check both ConnectionManager and WebSocket status
                     if (!ConnectionManager.isConnected || !NetworkState.ws.connected) {
-                        log(`[DEBUG] ネットワークDisconnectを検出 - スーパーメタBlockID待機を継続してREST APIフォールバックを許可`, 'warning');
+                        log(`[DEBUG] Network disconnect detected - Continuing super meta BlockID wait and allowing REST API fallback`, 'warning');
                         // Don't throw error - allow REST API fallback
                         // throw new Error('Network disconnected while waiting for super meta BlockID');
                     }
@@ -15926,7 +15926,7 @@ Do you want to continue?`;
                 }
                 
                 if (!password || password.length < 8) {
-                    log('パスワードが必要です', 'error');
+                    log('Password required', 'error');
                     return;
                 }
                 
@@ -16150,7 +16150,7 @@ Do you want to continue?`;
             }
             
             if (!file || !file.name.endsWith('.kaspa')) {
-                log('有効な.kaspaファイルを選択してください', 'error');
+                log('Please select a valid .kaspa file', 'error');
                 log(`理由: file=${!!file}, name=${file?.name}, endsWith=${file?.name?.endsWith('.kaspa')}`, 'error');
                 return;
             }
@@ -16158,7 +16158,7 @@ Do you want to continue?`;
             try {
                 log('Loading file content...', 'info');
                 const content = await file.text();
-                log(`ファイル内容の長さ: ${content.length} 文字`, 'info');
+                log(`File content length: ${content.length} characters`, 'info');
                 log(`最初の100文字: ${content.substring(0, 100)}...`, 'info');
                 
                 kaspaMetadata = JSON.parse(content);
@@ -16170,13 +16170,13 @@ Do you want to continue?`;
                 
                 // Unified download processing - Process by type
                 if (!FileState.kaspaMetadata.version) {
-                    throw new Error('無効な.kaspaファイル形式');
+                    throw new Error('Invalid .kaspa file format');
                 }
                 
-                // ディレクトリタイプの場合
+                // For directory type
                 if (FileState.kaspaMetadata.type === 'kaspa-directory') {
                     log('Directory metadata detected', 'info');
-                    // v4.6.36: ディレクトリ専用変数に保存
+                    // v4.6.36: Save to directory-specific variable
                     // v5.5.23: window.directoryMetadata -> FileState.directoryMetadata (1/2)
                     FileState.directoryMetadata = kaspaMetadata;
                     window.currentDirectoryMetadata = kaspaMetadata; // v4.7.8: フォルダ構造用に保持
@@ -16186,9 +16186,9 @@ Do you want to continue?`;
                     return;
                 }
                 
-                // 通常ファイルの場合
+                // For regular file
                 if (!FileState.kaspaMetadata.chunks) {
-                    throw new Error('無効な.kaspaファイル形式');
+                    throw new Error('Invalid .kaspa file format');
                 }
                 
                 // v3.6.5 fix: Check for different metadata structures and cost fields
@@ -16222,7 +16222,7 @@ Do you want to continue?`;
                 }
                 
                 document.getElementById('downloadSection').style.display = 'block';
-                log('.kaspaファイルを読み込みました', 'success');
+                log('.kaspa file loaded successfully', 'success');
                 
             } catch (error) {
                 log(`.kaspaファイル読み込みエラー: ${error.message}`, 'error');
@@ -16491,7 +16491,7 @@ Do you want to continue?`;
                 
                 // If we have BlockID, use RPC directly (no REST API needed)
                 if (blockId && (!NetworkState.downloadManager || !NetworkState.downloadManager.forceRestApi)) {
-                    log(`BlockIDを使用してRPC経由で取得中...`, 'info');
+                    log(`Retrieving via RPC using BlockID...`, 'info');
                     try {
                         const blockResponse = await NetworkState.rpcClient.getBlock({
                             hash: blockId,
@@ -16597,12 +16597,12 @@ Do you want to continue?`;
                                     throw rpcError; // Re-throw original error
                                 }
                             } else {
-                                log(`[RPC] 利用可能なアーカイブノードがありません。REST APIにフォールバックします`, 'warning');
+                                log(`[RPC] No available archive nodes. Falling back to REST API`, 'warning');
                                 // throw rpcError; // Removed for REST API fallback
                             }
                         } else {
                             // throw rpcError; // Removed for REST API fallback
-                            log(`[RPC] エラー: ${rpcError.message}。REST APIにフォールバックします`, 'warning');
+                            log(`[RPC] Error: ${rpcError.message}. Falling back to REST API`, 'warning');
                         }
                     }
                 }
@@ -16611,14 +16611,14 @@ Do you want to continue?`;
                 if (!payload) {
                     // Fall back to REST API if no BlockID provided or REST API test mode
                     if (NetworkState.downloadManager && NetworkState.downloadManager.forceRestApi) {
-                        log(`REST APIテストモード - RPCをスキップしてREST API経由で復元`, 'warning');
+                        log(`REST API test mode - Skipping RPC and restoring via REST API`, 'warning');
                     } else {
                         log(`Starting restoration from meta TxID ${metaTxId.substring(0, 16)}... via REST API`, 'info');
                     }
                     
                     try {
                     // First try to get via Explorer API (more reliable)
-                    log('Explorer API経由でメタトランザクションを取得中...', 'info');
+                    log('Retrieving meta transaction via Explorer API...', 'info');
                     const apiUrl = `${config.apiEndpoints[config.network]}/transactions/${metaTxId}`;
                     const response = await fetchWithTimeout(apiUrl, {}, 15000, 3); // 15s timeout, 3 retries
                     
@@ -16809,7 +16809,7 @@ Do you want to continue?`;
                     // Verify this is a valid metadata (meta-tx or directory)
                     if ((metaData.version === "2.1" || metaData.version === "3.3" || metaData.version === "3.1.1" || metaData.version === "3.4" || metaData.version === "3.4.2" || metaData.version === "3.4.3") && 
                         (metaData.type === "kaspa-meta-tx" || metaData.type === "kaspa-directory")) {
-                        log(`メタデータを正常に復号化しました (v${metaData.version}, type: ${metaData.type})`, 'success');
+                        log(`Metadata successfully decrypted (v${metaData.version}, type: ${metaData.type})`, 'success');
                         log(`メタデータ内容: ${JSON.stringify(metaData, null, 2)}`, 'info');
                         
                         // For directory type
@@ -16844,7 +16844,7 @@ Do you want to continue?`;
                                 const intMetaTxId = metaData.chunks[i];
                                 const intMetaBlockId = metaData.chunkBlockIds[i];
                                 
-                                log(`[SuperMeta] 中間メタデータ ${i + 1}/${metaData.chunks.length} を取得中...`, 'info');
+                                log(`[SuperMeta] Retrieving intermediate metadata ${i + 1}/${metaData.chunks.length}...`, 'info');
                                 
                                 // Download intermediate metadata
                                 try {
@@ -16876,13 +16876,13 @@ Do you want to continue?`;
                                                 }
                                             }
                                         } catch (blockError) {
-                                            log(`[SuperMeta] BlockID経由の取得に失敗、REST APIにフォールバック`, 'warning');
+                                            log(`[SuperMeta] Failed to retrieve via BlockID, falling back to REST API`, 'warning');
                                         }
                                     }
                                     
                                     // Fallback to REST API if BlockID failed or not available
                                     if (!intPayload) {
-                                        log(`[SuperMeta] REST API経由で中間メタデータを取得中...`, 'info');
+                                        log(`[SuperMeta] Retrieving intermediate metadata via REST API...`, 'info');
                                         
                                         // Kill switch check
                                         if (!NetworkState.restApiControl.globalEnabled || NetworkState.restApiControl.temporaryKilled) {
@@ -17204,7 +17204,7 @@ Do you want to continue?`;
                     const blockId = FileState.kaspaMetadata.chunkBlockIds[i];
                     
                     document.getElementById('downloadStatus').textContent = 
-                        `チャンク ${i + 1}/${FileState.kaspaMetadata.chunks.length} を取得中...`;
+                        `Retrieving chunk ${i + 1}/${FileState.kaspaMetadata.chunks.length}...`;
                     
                     try {
                         log(`チャンク ${i + 1}: TxID ${txId.substring(0, 16)}... BlockID ${blockId.substring(0, 16)}...`, 'info');
@@ -17314,7 +17314,7 @@ Do you want to continue?`;
                         const blockId = FileState.kaspaMetadata.chunkBlockIds[i];
                         
                         document.getElementById('downloadStatus').textContent = 
-                            `チャンク ${i + 1}/${FileState.kaspaMetadata.chunks.length} を取得中...`;
+                            `Retrieving chunk ${i + 1}/${FileState.kaspaMetadata.chunks.length}...`;
                         
                         try {
                             log(`チャンク ${i + 1}: TxID ${txId.substring(0, 16)}... BlockID ${blockId.substring(0, 16)}...`, 'info');
@@ -17382,13 +17382,13 @@ Do you want to continue?`;
                             
                             // Decrypt and decompress
                             const encrypted = payload; // Already binary Uint8Array
-                            log(`チャンク ${i + 1}: 暗号化データ ${encrypted.length} bytes`, 'info');
+                            log(`Chunk ${i + 1}: Encrypted data ${encrypted.length} bytes`, 'info');
                             // Log first few bytes for debugging
                             const preview = Array.from(encrypted.slice(0, 16)).map(b => b.toString(16).padStart(2, '0')).join(' ');
                             log(`チャンク ${i + 1}: データプレビュー: ${preview}...`, 'debug');
                             const compressed = await decryptChunk(encrypted, key, i);
                             log(`チャンク ${i + 1}: 復号化後 ${compressed.length} bytes`, 'info');
-                            log(`圧縮が有効か: ${FileState.kaspaMetadata.file?.compression?.enabled}`, 'info');
+                            log(`Compression enabled: ${FileState.kaspaMetadata.file?.compression?.enabled}`, 'info');
                             const original = kaspaMetadata.file?.compression?.enabled ? lzDecompress(compressed) : compressed;
                             
                             chunks.push(original);
@@ -17573,7 +17573,7 @@ Do you want to continue?`;
             
             // v5.3.6: Don't stop monitoring during upload session
             if (FileState.uploadSessionActive) { // v5.5.35: Using FileState
-                log('[DEBUG] アップロードセッション中のため監視を継続', 'debug');
+                log('[DEBUG] Continuing monitoring during upload session', 'debug');
                 return;
             }
             
@@ -17675,9 +17675,9 @@ Do you want to continue?`;
             }
             
             if (enabled) {
-                log('⚠️ REST APIテストモードを有効にしました - RPCは使用されません', 'warning');
+                log('⚠️ REST API test mode enabled - RPC will not be used', 'warning');
             } else {
-                log('✅ REST APIテストモードを無効にしました - 通常モード', 'success');
+                log('✅ REST API test mode disabled - Normal mode', 'success');
             }
         };
 
@@ -17691,7 +17691,7 @@ Do you want to continue?`;
             }
             
             if (enabled) {
-                log('⚠️ アーカイブノード強制使用モードを有効にしました', 'warning');
+                log('⚠️ Archive node force mode enabled', 'warning');
             } else {
                 log('✅ アーカイブノード強制使用モードを無効にしました', 'success');
             }
@@ -17870,7 +17870,7 @@ Do you want to continue?`;
                 // Custom endpoint input handler
                 customRpcEndpoint.addEventListener('input', (e) => {
                     config.customEndpoint = e.target.value.trim();
-                    log(`カスタムエンドポイント更新: ${config.customEndpoint}`, 'info');
+                    log(`Custom endpoint updated: ${config.customEndpoint}`, 'info');
                 });
             }
             
@@ -18198,7 +18198,7 @@ Do you want to continue?`;
                         // Keep RPC client even when WebSocket disconnects to enable REST API fallback
                         if (NetworkState.rpcClient) {
                             // NetworkState.rpcClient = null;  // v6.2.63: Commented out to enable REST API fallback
-                            log('[WebSocket] Disconnect検出 - RPCクライアントを保持（REST APIフォールバック用）', 'debug');
+                            log('[WebSocket] Disconnect detected - Keeping RPC client (for REST API fallback)', 'debug');
                         }
                         
                         ConnectionManager.scheduleReconnect();
@@ -18400,10 +18400,10 @@ Do you want to continue?`;
             
             // v6.2.72: Log waiting transactions before restart
             if (NetworkState.ws.monitoredTransactions.size > 0) {
-                log(`[Monitor] 待機中のトランザクション: ${NetworkState.ws.monitoredTransactions.size}件`, 'info');
+                log(`[Monitor] Waiting transactions: ${NetworkState.ws.monitoredTransactions.size} items`, 'info');
                 for (const [txId, data] of NetworkState.ws.monitoredTransactions.entries()) {
                     if (!data.blockId) {
-                        log(`[Monitor] BlockID待機中: ${txId.substring(0, 16)}... (Type: ${data.type})`, 'debug');
+                        log(`[Monitor] Waiting for BlockID: ${txId.substring(0, 16)}... (Type: ${data.type})`, 'debug');
                     }
                 }
             }
@@ -18598,9 +18598,9 @@ Do you want to continue?`;
                 const percent = Math.round((used / limit) * 100);
                 
                 if (percent > 90) {
-                    log(`⚠️ メモリ使用率警告: ${percent}% (${used}MB/${limit}MB)`, 'warning');
+                    log(`⚠️ Memory usage warning: ${percent}% (${used}MB/${limit}MB)`, 'warning');
                 } else if (percent > 95) {
-                    log(`🚨 メモリ使用率危険: ${percent}% (${used}MB/${limit}MB)`, 'error');
+                    log(`🚨 Memory usage critical: ${percent}% (${used}MB/${limit}MB)`, 'error');
                 }
             }, 30000); // Check every 30 seconds
         }
@@ -18630,7 +18630,7 @@ Do you want to continue?`;
             // Log debug info at startup
             const debugInfo = collectDebugInfo();
             console.log('=== DEBUG INFO ===', debugInfo);
-            log(`デバッグ情報: ${JSON.stringify(debugInfo, null, 2)}`, 'debug');
+            log(`Debug information: ${JSON.stringify(debugInfo, null, 2)}`, 'debug');
             
             log('Page loaded - Auto-initializing system', 'info');
             
@@ -19379,7 +19379,7 @@ Do you want to continue?`;
                 
                 let csvContent = headers + '\n';
                 
-                // エントリーをCSV形式に変換（saveKentryFileと同じロジック）
+                // Convert entries to CSV format（saveKentryFileと同じロジック）
                 entries.forEach(entry => {
                     const row = [
                         entry.id || '',

@@ -14930,7 +14930,7 @@ Do you want to continue?`;
                 
                 // Use the same salt and key from file encryption
                 if (!FileState.kaspaMetadata.encryption || !FileState.kaspaMetadata.encryption.pbkdf2) {
-                    throw new Error('暗号化情報が見つかりません');
+                    throw new Error('Encryption information not found');
                 }
                 const salt = fromBase64(FileState.kaspaMetadata.encryption.pbkdf2.salt);
                 // v5.5.20: window.currentPassword -> FileState.currentPassword (5/6)
@@ -15018,7 +15018,7 @@ Do you want to continue?`;
                         metaTxId = await pendingTx.submit(NetworkState.rpcClient);
                         
                         if (!metaTxId) {
-                            throw new Error('submit()がnullを返しました');
+                            throw new Error('submit() returned null');
                         }
                         
                         log(`Meta transaction sent: ${metaTxId}`, 'success');
@@ -15032,7 +15032,7 @@ Do you want to continue?`;
                         
                         // v6.2.69: Check connection status before retry (same as regular chunks)
                         if (!ConnectionManager.isConnected) {
-                            log('[DEBUG] ネットワークDisconnect - 自動再開に任せます', 'debug');
+                            log('[DEBUG] Network disconnect - leaving to auto-resume', 'debug');
                             throw new Error('Network disconnected - waiting for auto-resume');
                         }
                         
@@ -15041,7 +15041,7 @@ Do you want to continue?`;
                         }
                         
                         // Only wait and retry if connected
-                        log('2秒後に再試行します...', 'info');
+                        log('Retrying in 2 seconds...', 'info');
                         await new Promise(resolve => setTimeout(resolve, 2000));
                     }
                 }
@@ -15072,13 +15072,13 @@ Do you want to continue?`;
                 while (!metaBlockId && waitTime < maxWaitTime) {
                     // v6.2.74: Check if this loop should be aborted
                     if (FileState.metaTxAbortController && FileState.metaTxAbortController.signal.aborted) {
-                        log('[DEBUG] メタTx BlockID待機がキャンセルされました', 'debug');
+                        log('[DEBUG] Meta Tx BlockID wait was cancelled', 'debug');
                         return; // Exit the function
                     }
                     
                     // Phase 0-O-2: Check both ConnectionManager and WebSocket status
                     if (!ConnectionManager.isConnected || !NetworkState.ws.connected) {
-                        log(`[DEBUG] ネットワークDisconnectを検出 - BlockID待機を継続してREST APIフォールバックを許可`, 'warning');
+                        log(`[DEBUG] Network disconnect detected - Continuing BlockID wait and allowing REST API fallback`, 'warning');
                         // Don't throw error - allow REST API fallback
                         // throw new Error('Network disconnected while waiting for meta BlockID');
                     }
@@ -15447,7 +15447,7 @@ Do you want to continue?`;
                     metaTxId = await pendingTx.submit(NetworkState.rpcClient);
                     
                     if (!metaTxId) {
-                        throw new Error('submit()がnullを返しました');
+                        throw new Error('submit() returned null');
                     }
                     
                     log(`[SuperMeta] 中間メタTxID: ${metaTxId.substring(0, 16)}...`, 'success');
@@ -15480,7 +15480,7 @@ Do you want to continue?`;
                 while (!metaBlockId && waitTime < maxWaitTime) {
                     // Phase 0-O-2: Check both ConnectionManager and WebSocket status
                     if (!ConnectionManager.isConnected || !NetworkState.ws.connected) {
-                        log(`[DEBUG] ネットワークDisconnectを検出 - BlockID待機を継続してREST APIフォールバックを許可`, 'warning');
+                        log(`[DEBUG] Network disconnect detected - Continuing BlockID wait and allowing REST API fallback`, 'warning');
                         // Don't throw error - allow REST API fallback
                         // throw new Error('Network disconnected while waiting for meta BlockID');
                     }
@@ -16510,7 +16510,7 @@ Do you want to continue?`;
                                 if (tx.payload && tx.payload !== '') {
                                     const hexPayload = tx.payload;
                                     payload = safeHexDecode(hexPayload, 'meta-tx payload from RPC');
-                                    log(`メタトランザクションをブロックから取得: ${payload.length} bytes`, 'success');
+                                    log(`Meta transaction retrieved from block: ${payload.length} bytes`, 'success');
                                     break;
                                 }
                             }
@@ -16522,7 +16522,7 @@ Do you want to continue?`;
                                 'Check if TxID is correct',
                                 'Try using REST API (remove BlockID from input)'
                             ]);
-                            throw new Error(`ブロック内にメタトランザクションが見つかりません`);
+                            throw new Error(`Meta transaction not found in block`);
                         }
                     } catch (rpcError) {
                         // v6.2.80: Enhanced RPC error handling with user-friendly messages
@@ -16548,7 +16548,7 @@ Do you want to continue?`;
                         // Check if error is due to pruned data
                         if (config.nodeType === 'auto' && 
                             (rpcError.message.includes('pruned') || 
-                             rpcError.message.includes('プルーニング') ||
+                             rpcError.message.includes('pruning') ||
                              rpcError.message.includes('not found'))) {
                             log(`[RPC] Pruned data detected. Switching to archive node...`, 'info');
                             
@@ -16558,13 +16558,13 @@ Do you want to continue?`;
                                 try {
                                     archiveClient = await NetworkState.archiveManager.getOptimalClient();
                                 } catch (e) {
-                                    log(`[RPC] アーカイブノード取得エラー: ${e.message}`, 'error');
+                                    log(`[RPC] Archive node retrieval error: ${e.message}`, 'error');
                                 }
                             }
                             
                             if (archiveClient) {
                                 // Retry the operation with archive node
-                                log(`[RPC] アーカイブノードで再試行中...`, 'info');
+                                log(`[RPC] Retrying with archive node...`, 'info');
                                 try {
                                     const blockResponse = await archiveClient.getBlock({
                                     hash: blockId,
@@ -16583,18 +16583,18 @@ Do you want to continue?`;
                                         if (tx.payload && tx.payload !== '') {
                                             const hexPayload = tx.payload;
                                             payload = safeHexDecode(hexPayload, 'meta-tx payload from archive RPC');
-                                            log(`[RPC] アーカイブノードからメタトランザクションを取得: ${payload.length} bytes`, 'success');
+                                            log(`[RPC] Meta transaction retrieved from archive node: ${payload.length} bytes`, 'success');
                                             break;
                                         }
                                     }
                                 }
                                 
                                 if (!payload) {
-                                        throw new Error(`ブロック内にメタトランザクションが見つかりません`);
+                                        throw new Error(`Meta transaction not found in block`);
                                     }
                                 } catch (archiveError) {
-                                    log(`[RPC] アーカイブノードでもエラー: ${archiveError.message}`, 'error');
-                                    throw rpcError; // 元のエラーを再throw
+                                    log(`[RPC] Error even with archive node: ${archiveError.message}`, 'error');
+                                    throw rpcError; // Re-throw original error
                                 }
                             } else {
                                 log(`[RPC] 利用可能なアーカイブノードがありません。REST APIにフォールバックします`, 'warning');
@@ -17110,12 +17110,12 @@ Do you want to continue?`;
                                FileState.kaspaMetadata.directory?.name || 
                                'unknown';
                 log(`Download started: ${fileName}`);
-                log(`[DEBUG] ダウンロード時のchunks[0]: ${FileState.kaspaMetadata.chunks[0]?.substring(0, 16)}...`, 'debug');
-                log(`[DEBUG] chunks配列長: ${FileState.kaspaMetadata.chunks?.length}`, 'debug');
+                log(`[DEBUG] Download chunks[0]: ${FileState.kaspaMetadata.chunks[0]?.substring(0, 16)}...`, 'debug');
+                log(`[DEBUG] chunks array length: ${FileState.kaspaMetadata.chunks?.length}`, 'debug');
                 
                 // Derive key
                 if (!FileState.kaspaMetadata.encryption || !FileState.kaspaMetadata.encryption.pbkdf2) {
-                    throw new Error('暗号化情報が見つかりません');
+                    throw new Error('Encryption information not found');
                 }
                 const salt = fromBase64(FileState.kaspaMetadata.encryption.pbkdf2.salt);
                 log(`Salt (base64): ${FileState.kaspaMetadata.encryption.pbkdf2.salt}`, 'debug');
@@ -17128,9 +17128,9 @@ Do you want to continue?`;
                     iterations = 10000;
                     log(`v3.0 format detected: Using PBKDF2 ${iterations} iterations`, 'info');
                 } else if (FileState.kaspaMetadata.version === "3.3") {
-                    log(`v3.3フォーマット検出: PBKDF2 ${iterations}回を使用`, 'info');
+                    log(`v3.3 format detected: Using PBKDF2 ${iterations} iterations`, 'info');
                 } else {
-                    log(`v${FileState.kaspaMetadata.version}フォーマット: PBKDF2 ${iterations}回を使用`, 'info');
+                    log(`v${FileState.kaspaMetadata.version} format: Using PBKDF2 ${iterations} iterations`, 'info');
                 }
                 
                 // v4.7.43: Use DownloadManager internally
@@ -17142,7 +17142,7 @@ Do you want to continue?`;
                     document.getElementById('downloadProgressBar').textContent = percent + '%';
                     if (progress.current && progress.total) {
                         document.getElementById('downloadStatus').textContent = 
-                            `チャンク ${progress.current}/${progress.total} を取得中...`;
+                            `Retrieving chunk ${progress.current}/${progress.total}...`;
                     }
                 };
                 
@@ -17173,7 +17173,7 @@ Do you want to continue?`;
                 
                 if (useParallel) {
                     // Parallel download
-                    log(`並列ダウンロードモードを使用します (${FileState.kaspaMetadata.chunks.length}チャンク)`, 'info');
+                    log(`Using parallel download mode (${FileState.kaspaMetadata.chunks.length} chunks)`, 'info');
                     
                     try {
                         const downloader = new ParallelDownloader(rpcClient, 8);
@@ -17188,14 +17188,14 @@ Do you want to continue?`;
                                 document.getElementById('downloadProgressBar').style.width = percent + '%';
                                 document.getElementById('downloadProgressBar').textContent = percent + '%';
                                 document.getElementById('downloadStatus').textContent = 
-                                    `${progress.completed}/${progress.total} チャンク (${progress.speed.toFixed(1)} チャンク/秒, ${progress.throughput.toFixed(1)} MB/秒)`;
+                                    `${progress.completed}/${progress.total} chunks (${progress.speed.toFixed(1)} chunks/sec, ${progress.throughput.toFixed(1)} MB/sec)`;
                             }
                         );
                         
                         chunks.push(...parallelChunks);
                     } catch (parallelError) {
-                        log(`並列ダウンロードエラー: ${parallelError.message}`, 'error');
-                        log('シーケンシャルダウンロードにフォールバックします', 'warning');
+                        log(`Parallel download error: ${parallelError.message}`, 'error');
+                        log('Falling back to sequential download', 'warning');
                         
                         // Fallback to sequential
                         chunks.length = 0;

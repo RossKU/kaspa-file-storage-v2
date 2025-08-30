@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.3.3</title>
+    <title>Kaspa P2P File Storage v6.3.4</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -1897,12 +1897,12 @@
             <div class="file-table-wrapper">
                 <table class="file-table">
                     <colgroup>
-                        <col style="width: 40px;">  <!-- チェックボックス -->
-                        <col style="width: 50px;">  <!-- アイコン -->
+                        <col style="width: 40px;">  <!-- Checkbox -->
+                        <col style="width: 50px;">  <!-- Icon -->
                         <col style="width: auto;">  <!-- File Name -->
-                        <col style="width: 100px;"> <!-- 容量 -->
+                        <col style="width: 100px;"> <!-- Capacity -->
                         <col style="width: 100px;"> <!-- MetaTxID -->
-                        <col style="width: 150px;"> <!-- UP日 -->
+                        <col style="width: 150px;"> <!-- Upload Date -->
                     </colgroup>
                     <thead>
                         <tr>
@@ -2581,7 +2581,7 @@
                 </div>
             </div>
             
-            <!-- Kaspaシステム再起動 (Moved from Debug Tab) -->
+            <!-- Kaspa System Restart (Moved from Debug Tab) -->
             <div class="metric-box" style="margin-top: 20px;">
                 <h3>🔄 Kaspa System Restart</h3>
                 <p style="font-size: 13px; color: var(--text-secondary); margin: 10px 0;">
@@ -2595,7 +2595,7 @@
                 </button>
                 <div id="restartStatus" style="margin-top: 10px; padding: 10px; 
                      background: var(--bg-secondary); border-radius: 5px; display: none;">
-                    <!-- ステータス表示エリア -->
+                    <!-- Status Display Area -->
                 </div>
             </div>
             
@@ -2700,7 +2700,7 @@
                 </div>
                 
                 <div id="multiWsConnections" style="margin: 10px 0;">
-                    <!-- Connectリストがここに表示される -->
+                    <!-- Connection list will be displayed here -->
                 </div>
                 
                 <div style="display: flex; gap: 10px; margin-top: 15px;">
@@ -2710,7 +2710,7 @@
                 </div>
                 
                 <div id="multiWsLog" style="margin-top: 15px; max-height: 200px; overflow-y: auto; padding: 10px; background: var(--background-dark); border-radius: 5px; font-size: 12px; font-family: monospace;">
-                    <!-- ログがここに表示される -->
+                    <!-- Logs will be displayed here -->
                 </div>
             </div>
         </div>
@@ -2836,9 +2836,9 @@
             <h2>🐛 Debug Log</h2>
             <div class="log-container" id="systemLog"></div>
             <div style="margin-top: 12px; display: flex; gap: 8px;">
-                <button onclick="copyLog()">ログをコピー</button>
-                <button onclick="exportLogs()">ログをJSON形式でエクスポート</button>
-                <button onclick="exportLogsAsText()">ログをテキスト形式でエクスポート</button>
+                <button onclick="copyLog()">Copy Logs</button>
+                <button onclick="exportLogs()">Export Logs as JSON</button>
+                <button onclick="exportLogsAsText()">Export Logs as Text</button>
                 <button onclick="clearLog()">Clear Logs</button>
             </div>
         </div>
@@ -2959,7 +2959,7 @@
                 });
                 NetworkState.blockEventFilter.targetNodes = targets;
                 
-                const targetText = targets.length === 0 ? '全ノード' : targets.join(', ');
+                const targetText = targets.length === 0 ? 'All Nodes' : targets.join(', ');
                 log(`🎯 [BlockFilter] Target nodes: ${targetText}`, 'info');
             },
             
@@ -7754,7 +7754,7 @@ Do you want to continue?`;
                 a.click();
                 URL.revokeObjectURL(url);
                 
-                log('ログをエクスポートしました', 'success');
+                log('Logs exported', 'success');
             },
             
             exportLogsAsText: function() {
@@ -7768,7 +7768,7 @@ Do you want to continue?`;
                         second: '2-digit',
                         fractionalSecondDigits: 3  // ミリ秒3桁
                     });
-                    const typeStr = log.type.toUpperCase().padEnd(7); // 幅を揃える
+                    const typeStr = log.type.toUpperCase().padEnd(7); // Align width
                     return `[${time}] [${typeStr}] ${log.message}`;
                 });
                 
@@ -7780,7 +7780,7 @@ Do you want to continue?`;
                 a.click();
                 URL.revokeObjectURL(url);
                 
-                log('ログをテキスト形式でエクスポートしました', 'success');
+                log('Logs exported as text', 'success');
             },
             
             clearLog: function() {
@@ -7815,12 +7815,12 @@ Do you want to continue?`;
                 const preview = text && text.length > 20 ? text.substring(0, 20) + '...' : text;
                 // Use window.log to ensure it's accessible
                 if (typeof log !== 'undefined') {
-                    log(`[DEBUG] copyToClipboard が呼び出されました: ${preview}`, 'debug');
+                    log(`[DEBUG] copyToClipboard called: ${preview}`, 'debug');
                 }
                 try {
                     await navigator.clipboard.writeText(text);
                     if (typeof log !== 'undefined') {
-                        log('クリップボードにコピーしました', 'success');
+                        log('Copied to clipboard', 'success');
                     }
                     return true;
                 } catch (error) {
@@ -7957,7 +7957,7 @@ Do you want to continue?`;
                         
                         const reader = new FileReader();
                         reader.onload = async function(event) {
-                            log('FileReader.onload が呼び出されました', 'info');
+                            log('FileReader.onload called', 'info');
                             try {
                                 const kaspaContent = event.target.result;
                                 const kaspaData = JSON.parse(kaspaContent);
@@ -8291,7 +8291,7 @@ Do you want to continue?`;
                     localStorage.removeItem(test);
                     return true;
                 } catch (e) {
-                    log('[Storage] LocalStorage使用不可', 'warning');
+                    log('[Storage] LocalStorage unavailable', 'warning');
                     return false;
                 }
             }
@@ -8341,11 +8341,11 @@ Do you want to continue?`;
         function isNetworkError(error) {
             // WASM error objects cannot be JSON.stringified, so log using alternative method
             if (typeof error === 'string') {
-                log(`[DEBUG-isNetworkError] 入力: "${error}" (文字列)`, 'debug');
+                log(`[DEBUG-isNetworkError] Input: "${error}" (string)`, 'debug');
             } else if (typeof error === 'object' && error !== null) {
-                log(`[DEBUG-isNetworkError] 入力: ${error.message || '[messageなし]'} (${error.constructor?.name || 'object'})`, 'debug');
+                log(`[DEBUG-isNetworkError] Input: ${error.message || '[no message]'} (${error.constructor?.name || 'object'})`, 'debug');
             } else {
-                log(`[DEBUG-isNetworkError] 入力: ${error} (${typeof error})`, 'debug');
+                log(`[DEBUG-isNetworkError] Input: ${error} (${typeof error})`, 'debug');
             }
             
             if (!error) {
@@ -8355,7 +8355,7 @@ Do you want to continue?`;
             
             // Handle both string errors and error objects
             const message = (typeof error === 'string' ? error : error.message || '').toLowerCase();
-            log(`[DEBUG-isNetworkError] 検査対象メッセージ: "${message}"`, 'debug');
+            log(`[DEBUG-isNetworkError] Target message: "${message}"`, 'debug');
             
             const result = message.includes('network') || 
                    message.includes('connection') || 
@@ -8365,7 +8365,7 @@ Do you want to continue?`;
                    message.includes('disconnected') ||
                    message.includes('websocket');  // Phase 0-F: Added WebSocket check
             
-            log(`[DEBUG-isNetworkError] 結果: ${result}`, 'debug');
+            log(`[DEBUG-isNetworkError] Result: ${result}`, 'debug');
             return result;
         }
         
@@ -8403,7 +8403,7 @@ Do you want to continue?`;
                 if (NetworkState.rpcClient) {
                     try {
                         await NetworkState.rpcClient.disconnect();
-                        log('[ConnectionManager] RPCConnectをDisconnectしました', 'info');
+                        log('[ConnectionManager] RPC connection disconnected', 'info');
                     } catch (disconnectError) {
                         log(`[ConnectionManager] RPC disconnect error: ${disconnectError.message}`, 'debug');
                     }
@@ -8440,7 +8440,7 @@ Do you want to continue?`;
                 
                 // Phase 0-O: Support unlimited retries
                 if (this.maxReconnectAttempts !== null && this.reconnectAttempts >= this.maxReconnectAttempts) {
-                    log('[ConnectionManager] 最大再Connect試行回数に到達', 'error');
+                    log('[ConnectionManager] Maximum reconnection attempts reached', 'error');
                     return;
                 }
                 
@@ -8448,7 +8448,7 @@ Do you want to continue?`;
                 const attemptInfo = this.maxReconnectAttempts === null 
                     ? `${this.reconnectAttempts + 1}` 
                     : `${this.reconnectAttempts + 1}/${this.maxReconnectAttempts}`;
-                log(`[ConnectionManager] ${delay}ms後に再Connectを試行します（${attemptInfo}）`, 'info');
+                log(`[ConnectionManager] Attempting reconnection in ${delay}ms (${attemptInfo})`, 'info');
                 
                 this.reconnectTimer = setTimeout(() => {
                     this.attemptReconnect();
@@ -8459,13 +8459,13 @@ Do you want to continue?`;
             async attemptReconnect() {
                 // v5.7.7: Prevent concurrent reconnection attempts
                 if (this.isReconnecting) {
-                    log('[ConnectionManager] 既に再Connectedです', 'debug');
+                    log('[ConnectionManager] Already reconnected', 'debug');
                     return;
                 }
                 
                 this.isReconnecting = true;
                 this.reconnectAttempts++;
-                log(`[ConnectionManager] 再Connect試行 #${this.reconnectAttempts}`, 'info');
+                log(`[ConnectionManager] Reconnection attempt #${this.reconnectAttempts}`, 'info');
                 
                 try {
                     // v5.7.5: Always create new RPC client on reconnect
@@ -8522,7 +8522,7 @@ Do you want to continue?`;
             // Handle successful reconnection
             async handleReconnected() {
                 // Phase 0-D: Improved connection state management
-                log('[ConnectionManager] Connectが安定しました', 'info');
+                log('[ConnectionManager] Connection stabilized', 'info');
                 log(`[DEBUG] handleReconnected started - uploadSessionActive: ${FileState.uploadSessionActive}`, 'debug');
                 
                 this.isConnected = true;
@@ -8542,8 +8542,8 @@ Do you want to continue?`;
                 
                 // Auto-resume upload if in progress
                 log(`[DEBUG-RESUME] Auto-resume condition check started`, 'debug');
-                log(`[DEBUG-RESUME] ProgressManager存在: ${!!FileState.progressManager}`, 'debug');
-                log(`[DEBUG-RESUME] progress存在: ${!!FileState.progressManager?.progress}`, 'debug');
+                log(`[DEBUG-RESUME] ProgressManager exists: ${!!FileState.progressManager}`, 'debug');
+                log(`[DEBUG-RESUME] progress exists: ${!!FileState.progressManager?.progress}`, 'debug');
                 log(`[DEBUG-RESUME] needsMetaTx: ${FileState.needsMetaTx}`, 'debug');
                 
                 if (FileState.progressManager?.progress) {

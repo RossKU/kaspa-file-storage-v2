@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.2.93</title>
+    <title>Kaspa P2P File Storage v6.3.1</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -4998,7 +4998,7 @@
                             entry.authWarning || '',
                             entry.salt || ''  // v5.11.67: added salt column
                         ].map(val => {
-                            // CSV用にエスケープ
+                            // Escape for CSV
                             const str = String(val);
                             if (str.includes(',') || str.includes('"') || str.includes('\n')) {
                                 return `"${str.replace(/"/g, '""')}"`;
@@ -5020,7 +5020,7 @@
                         // Add segment boundaries (seg,index,offset,size,originalSize,compressedSize,payloadIndex)
                         if (entry._segmentBoundaries && entry._segmentBoundaries.length > 0) {
                             for (const boundary of entry._segmentBoundaries) {
-                                csvContent += ',seg';  // マーカー
+                                csvContent += ',seg';  // Marker
                                 csvContent += ',' + boundary.index;
                                 csvContent += ',' + boundary.offset;
                                 csvContent += ',' + boundary.size;
@@ -5034,14 +5034,14 @@
                         if (entry.directoryMetadata && entry.type === 'kaspa-directory') {
                             const dirMeta = entry.directoryMetadata;
                             if (dirMeta.entries && Array.isArray(dirMeta.entries)) {
-                                // entries,fileCount,dirCount のヘッダー
+                                // Header for entries, fileCount, dirCount
                                 const fileCount = dirMeta.entries.filter(e => !e.type || e.type === 'file').length;
                                 const dirCount = dirMeta.entries.filter(e => e.type === 'directory').length;
                                 csvContent += ',entries,' + fileCount + ',' + dirCount;
                                 
                                 // Add each entry in 7 columns
                                 dirMeta.entries.forEach(e => {
-                                    // type（'f'または'd'）
+                                    // type ('f' or 'd')
                                     const type = (!e.type || e.type === 'file') ? 'f' : 'd';
                                     csvContent += ',' + type;
                                     csvContent += ',' + (e.name || '');
@@ -5074,7 +5074,7 @@
             async saveAll() {
                 log('[KENV] Starting to save all files', 'info');
                 
-                // ワークスペースがある場合
+                // When workspace exists
                 if (WorkspaceState.handle) {
                     const results = await Promise.all([
                         this.saveKenvFile(),
@@ -5098,10 +5098,10 @@
             // Save to LocalStorage
             async saveToLocalStorage() {
                 const KENV_LOCALSTORAGE_LIMIT = 5 * 1024 * 1024; // 5MB
-                const MAX_ENTRIES_IN_LOCALSTORAGE = 500; // 最大500件
+                const MAX_ENTRIES_IN_LOCALSTORAGE = 500; // Maximum 500 items
                 
                 try {
-                    // Step 1: エントリー数チェック
+                    // Step 1: Entry count check
                     let entriesToSave = this.entries;
                     let truncated = false;
                     
@@ -5122,10 +5122,10 @@
                         savedCount: entriesToSave.length
                     };
                     
-                    // Step 3: サイズチェック
+                    // Step 3: Size check
                     const dataStr = JSON.stringify(data);
                     if (dataStr.length > KENV_LOCALSTORAGE_LIMIT) {
-                        // さらに削減
+                        // Further reduction
                         const reductionRatio = KENV_LOCALSTORAGE_LIMIT / dataStr.length;
                         const targetCount = Math.floor(entriesToSave.length * reductionRatio * 0.8);
                         entriesToSave = entriesToSave.slice(-targetCount);
@@ -5171,7 +5171,7 @@
                     const content = await file.text();
                     const kenvData = JSON.parse(content);
                     
-                    // バージョンチェック
+                    // Version check
                     if (kenvData.version !== this.version) {
                         log(`[KENV] Version mismatch: ${kenvData.version} (expected: ${this.version})`, 'warning');
                     }
@@ -5228,7 +5228,7 @@
                     const file = await fileHandle.getFile();
                     const content = await file.text();
                     
-                    // CSVパース
+                    // CSV parsing
                     const lines = content.trim().split('\n');
                     if (lines.length < 2) {
                         log('[KENV] Entry file is empty', 'info');
@@ -5249,18 +5249,18 @@
                         entry.source = values[13];
                         entry.status = values[14];
                         
-                        // オプショナルフィールド
+                        // Optional fields
                         if (values[7]) entry.metaTxId = values[7];
                         if (values[8]) entry.metaTxBlockId = values[8];
                         if (values[15]) entry.fileSize = parseInt(values[15]) || null;
                         if (values[10]) entry.uploadDate = values[10];
                         if (values[12]) entry.uploadedBy = values[12];
-                        if (values[24]) entry.payloadSplit = values[24];  // v5.11.67: payloadSplitを明示的に読み込み
+                        if (values[24]) entry.payloadSplit = values[24];  // v5.11.67: Explicitly load payloadSplit
                         if (values[25]) entry.cid = values[25];  // v5.12.58: Added CID mapping
                         if (values[41]) entry.password = values[41];
                         if (values[42]) entry.externalRef = values[42];
                         if (values[45]) entry.authWarning = values[45];
-                        if (values[46]) entry.salt = values[46];  // v5.11.67: saltカラムを読み込み
+                        if (values[46]) entry.salt = values[46];  // v5.11.67: Load salt column
                         
                         // v5.11.66: Process variable columns after column 45
                         // v5.11.67: Changed to after column 46 (because salt was added)
@@ -5272,7 +5272,7 @@
                             let i = 47;  // v5.11.67: Start from after column 46 (salt added)
                             while (i < values.length) {
                                 if (values[i] === 'seg') {
-                                    // セグメントバウンダリー（7カラム）
+                                    // Segment boundary (7 columns)
                                     if (i + 6 < values.length) {
                                         segmentBoundaries.push({
                                             index: parseInt(values[i + 1]),
@@ -5287,7 +5287,7 @@
                                         break;
                                     }
                                 } else if (values[i] === 'entries' && values[i + 1] && values[i + 2]) {
-                                    // v5.11.111: directoryエントリー（7カラム形式、KENV v3.1.4準拠）
+                                    // v5.11.111: directory entry (7 column format, KENV v3.1.4 compliant)
                                     const fileCount = parseInt(values[i + 1]) || 0;
                                     const dirCount = parseInt(values[i + 2]) || 0;
                                     const totalEntries = fileCount + dirCount;
@@ -5308,11 +5308,11 @@
                                         j += 7;
                                     }
                                     
-                                    // directoryMetadataを再構築
+                                    // Reconstruct directoryMetadata
                                     entry.directoryMetadata = this.reconstructDirectoryMetadata(entry, entries);
                                     i = j;
                                 } else if (values[i] === 'dirmeta' && values[i + 1]) {
-                                    // v5.11.110: 後方互換性のため旧形式も読み込み
+                                    // v5.11.110: Load old format for backward compatibility
                                     const decoded = this.decodeDirectoryMetadata(values[i + 1]);
                                     if (decoded) {
                                         entry.directoryMetadata = decoded;
@@ -5353,7 +5353,7 @@
                 }
             },
             
-            // CSVライン解析ヘルパー
+            // CSV line parsing helper
             parseCSVLine(line) {
                 const values = [];
                 let current = '';
@@ -5386,9 +5386,9 @@
             encodeDirectoryMetadata(metadata) {
                 if (!metadata) return '';
                 try {
-                    // JSON文字列化してBase64エンコード
+                    // JSON stringify and Base64 encode
                     const jsonStr = JSON.stringify(metadata);
-                    // URLセーフなBase64エンコード（+/= を -_. に置換）
+                    // URL-safe Base64 encoding (replace +/= with -_.)
                     return btoa(encodeURIComponent(jsonStr))
                         .replace(/\+/g, '-')
                         .replace(/\//g, '_')
@@ -5399,11 +5399,11 @@
                 }
             },
             
-            // v5.11.110: directoryMetadataのデコード（CSV読み込み用）
+            // v5.11.110: directoryMetadata decoding (for CSV loading)
             decodeDirectoryMetadata(encoded) {
                 if (!encoded) return null;
                 try {
-                    // URLセーフなBase64デコード（-_. を +/= に戻す）
+                    // URL-safe Base64 decoding (revert -_. to +/=)
                     const base64 = encoded
                         .replace(/-/g, '+')
                         .replace(/_/g, '/')
@@ -5416,7 +5416,7 @@
                 }
             },
             
-            // v5.11.111: KENVエントリーとentriesから完全なdirectoryMetadataを再構築
+            // v5.11.111: Reconstruct complete directoryMetadata from KENV entry and entries
             reconstructDirectoryMetadata(entry, entries) {
                 // Create basic structure
                 const metadata = {
@@ -5442,13 +5442,13 @@
                         directoryCount: entries.filter(e => e.type === 'directory').length
                     },
                     
-                    // CID（存在する場合）
+                    // CID (if exists)
                     cid: entry.cid || null,
                     
-                    // エントリー配列
+                    // Entry array
                     entries: entries,
                     
-                    // リカバリー情報
+                    // Recovery information
                     recovery: {
                         totalFiles: entry.totalFiles || entries.length,
                         totalSize: entry.fileSize || entries.reduce((sum, e) => sum + (e.size || 0), 0),
@@ -5466,14 +5466,14 @@
                         segmentBoundaries: []
                     },
                     
-                    // 認証情報
+                    // Authentication information
                     auth: {
                         passwordIncluded: entry.passwordIncluded || false,
                         password: entry.passwordIncluded ? entry.password : null,
                         warning: entry.authWarning || null
                     },
                     
-                    // 拡張情報
+                    // Extension information
                     extensions: {
                         v4_5_6_compat: true,
                         custom: {
@@ -5565,7 +5565,7 @@
                 
                 try {
                     if (entry.metaTxId && entry.metaTxBlockId) {
-                        // オンチェーンモード
+                        // On-chain mode
                         log(`[KENV] Verifying in on-chain mode: ${entry.metaTxId}`, 'debug');
                         
                         try {
@@ -5611,7 +5611,7 @@
                                     }
                                 }
                                 
-                                // Directory information（kaspa-directoryの場合）
+                                // Directory information (for kaspa-directory)
                                 if (metadata.directory) {
                                     entry.name = metadata.directory.name || entry.name;
                                     entry.totalSize = metadata.directory.totalSize;
@@ -5628,7 +5628,7 @@
                                     }
                                 }
                                 
-                                // リカバリー情報
+                                // Recovery information
                                 if (metadata.recovery) {
                                     entry.totalChunks = metadata.recovery.totalChunks;
                                     entry.chunkSize = metadata.recovery.chunkSize;
@@ -5686,12 +5686,12 @@
                 if (!Array.isArray(data.entries)) return false;
                 if (!data.kindex || typeof data.kindex !== 'object') return false;
                 
-                // バージョンチェック
+                // Version check
                 if (data.version && !['3.1.3', '3.1.2', '3.1.1'].includes(data.version)) {
                     log(`[KENV] Unsupported version: ${data.version}`, 'warning');
                 }
                 
-                // インデックス整合性チェック
+                // Index consistency check
                 const maxLineNumber = data.entries.length - 1;
                 const indexTypes = ['name', 'size', 'uploadDate'];
                 
@@ -5719,7 +5719,7 @@
                 return confirm(
                     `Found ${entryCount} KENV data items created outside the workspace.\n\n` +
                     'Do you want to integrate this data into the workspace?\n\n' +
-                    '「OK」: 統合する（推奨）\n' +
+                    '"OK": Integrate (recommended)\n' +
                     '"Cancel": Discard'
                 );
             },
@@ -5728,7 +5728,7 @@
             async mergeTemporaryData(tempData) {
                 const newEntries = tempData.entries || [];
                 
-                // Phase 2: 10件以上の場合はサマリー表示
+                // Phase 2: Show summary for 10 or more items
                 if (newEntries.length >= 10) {
                     const analysis = this.analyzeEntries(newEntries);
                     const userConfirmed = await this.showMergeSummary(analysis);
@@ -5754,7 +5754,7 @@
                             e.type === 'kaspa-directory' &&
                             e.name === entry.name &&
                             (
-                                // CIDがある場合：名前+CID+TxID
+                                // When CID exists: name+CID+TxID
                                 (entry.cid && e.cid === entry.cid && 
                                  entry.metaTxId && e.metaTxId === entry.metaTxId) ||
                                 // No CID or TxID: name+CID+file count+directory count+created date
@@ -5772,7 +5772,7 @@
                             e.name === entry.name &&
                             e.cid === entry.cid &&
                             (
-                                // MetaTxIDがある場合：名前+CID+MetaTxID
+                                // When MetaTxID exists: name+CID+MetaTxID
                                 (entry.metaTxId && e.metaTxId === entry.metaTxId) ||
                                 // If no MetaTxID: name + CID + first chunk TxID
                                 (!entry.metaTxId && !e.metaTxId &&
@@ -5794,7 +5794,7 @@
                     mergedCount++;
                 }
                 
-                // レポート
+                // Report
                 if (skippedCount > 0) {
                     log(`[KENV] Skipped ${skippedCount} duplicates`, 'info');
                     if (skippedCount <= 5) {
@@ -5808,13 +5808,13 @@
                 }
             },
             
-            // Phase 2: エントリー分析関数
+            // Phase 2: Entry analysis function
             analyzeEntries(newEntries) {
                 const analysis = {
                     total: newEntries.length,
-                    identical: [],      // 完全重複（スキップ対象）
-                    similar: [],        // 類似（別セッション）
-                    newFiles: [],       // 完全新規
+                    identical: [],      // Complete duplicates (to be skipped)
+                    similar: [],        // Similar (different session)
+                    newFiles: [],       // Completely new
                     byType: {
                         'kaspa-file': 0,
                         'kaspa-directory': 0
@@ -5822,14 +5822,14 @@
                 };
                 
                 for (const entry of newEntries) {
-                    // タイプカウント
+                    // Type count
                     if (entry.type === 'kaspa-directory') {
                         analysis.byType['kaspa-directory']++;
                     } else {
                         analysis.byType['kaspa-file']++;
                     }
                     
-                    // 重複チェック（Phase 1のロジックを再利用）
+                    // Duplicate check (reusing Phase 1 logic)
                     let foundIdentical = false;
                     let foundSimilar = false;
                     
@@ -5852,7 +5852,7 @@
                         if (identical) {
                             foundIdentical = true;
                         } else {
-                            // 類似チェック（名前とCIDは同じだが他が異なる）
+                            // Similarity check (same name and CID but other differences)
                             const similar = this.entries.find(e =>
                                 e.type === 'kaspa-directory' &&
                                 e.name === entry.name &&
@@ -5876,7 +5876,7 @@
                         if (identical) {
                             foundIdentical = true;
                         } else {
-                            // 類似チェック（名前とCIDは同じだが他が異なる）
+                            // Similarity check (same name and CID but other differences)
                             const similar = this.entries.find(e =>
                                 e.type !== 'kaspa-directory' &&
                                 e.name === entry.name &&
@@ -5886,7 +5886,7 @@
                         }
                     }
                     
-                    // 分類
+                    // Classification
                     if (foundIdentical) {
                         analysis.identical.push(entry);
                     } else if (foundSimilar) {
@@ -5899,12 +5899,12 @@
                 return analysis;
             },
             
-            // Phase 2: サマリー表示関数
+            // Phase 2: Summary display function
             async showMergeSummary(analysis) {
                 const message = `
-📊 KENV統合サマリー
+📊 KENV Integration Summary
 ━━━━━━━━━━━━━━━━━━━━━
-総エントリー数: ${analysis.total}件
+Total entries: ${analysis.total} items
 
 [Breakdown]
 ✅ New entries: ${analysis.newFiles.length} items
@@ -17008,11 +17008,11 @@ Do you want to continue?`;
                             }
                             
                             log(`[SuperMeta] Integration complete: ${allChunks.length} chunks`, 'success');
-                            log(`[SuperMeta DEBUG] 統合後のchunks[0]: ${FileState.kaspaMetadata.chunks[0]?.substring(0, 16)}...`, 'debug');
+                            log(`[SuperMeta DEBUG] chunks[0] after integration: ${FileState.kaspaMetadata.chunks[0]?.substring(0, 16)}...`, 'debug');
                             log(`[SuperMeta DEBUG] allChunks[0]: ${allChunks[0]?.substring(0, 16)}...`, 'debug');
-                            log(`[SuperMeta DEBUG] セグメントバウンダリ数: ${allChunkBoundaries.length}`, 'debug');
+                            log(`[SuperMeta DEBUG] Segment boundary count: ${allChunkBoundaries.length}`, 'debug');
                             if (allChunkBoundaries.length > 0) {
-                                log(`[SuperMeta DEBUG] セグメントバウンダリ[0]: ${JSON.stringify(allChunkBoundaries[0])}`, 'debug');
+                                log(`[SuperMeta DEBUG] Segment boundary[0]: ${JSON.stringify(allChunkBoundaries[0])}`, 'debug');
                             }
                             
                         } else {
@@ -17059,14 +17059,14 @@ Do you want to continue?`;
                 }
                 
             } catch (error) {
-                log(`メタTxID復元エラー: ${error.message}`, 'error');
+                log(`Meta TxID restoration error: ${error.message}`, 'error');
             }
         };
 
         // Download file
         FileState.fileOperationHandlers.downloadFile = async function() {
             let password = document.getElementById('downloadPassword').value;
-            log(`パスワードフィールドの値: ${password ? '入力あり' : '空'}`, 'debug');
+            log(`Password field value: ${password ? 'Has input' : 'Empty'}`, 'debug');
             
             if (FileState.kaspaMetadata.auth?.passwordIncluded && FileState.kaspaMetadata.auth?.password) {
                 password = FileState.kaspaMetadata.auth.password;
@@ -17083,7 +17083,7 @@ Do you want to continue?`;
                 return;
             }
             
-            log(`使用するパスワード: ${password.substring(0, 3)}... (長さ: ${password.length})`, 'debug');
+            log(`Password to use: ${password.substring(0, 3)}... (length: ${password.length})`, 'debug');
             
             if (!FileState.kaspaMetadata) {
                 showDownloadError('No .kaspa file loaded', [
@@ -17121,10 +17121,10 @@ Do you want to continue?`;
                 log(`Salt (base64): ${FileState.kaspaMetadata.encryption.pbkdf2.salt}`, 'debug');
                 log(`Salt (bytes): ${salt.length} bytes`, 'debug');
                 
-                // v3.0とv3.1の互換性対応
+                // v3.0 and v3.1 compatibility
                 let iterations = FileState.kaspaMetadata.encryption.pbkdf2.iterations || 100000;
                 if (FileState.kaspaMetadata.version === "3.0") {
-                    // v3.0の場合は10000回を使用
+                    // Use 10000 iterations for v3.0
                     iterations = 10000;
                     log(`v3.0 format detected: Using PBKDF2 ${iterations} iterations`, 'info');
                 } else if (FileState.kaspaMetadata.version === "3.3") {
@@ -17207,7 +17207,7 @@ Do you want to continue?`;
                         `Retrieving chunk ${i + 1}/${FileState.kaspaMetadata.chunks.length}...`;
                     
                     try {
-                        log(`チャンク ${i + 1}: TxID ${txId.substring(0, 16)}... BlockID ${blockId.substring(0, 16)}...`, 'info');
+                        log(`Chunk ${i + 1}: TxID ${txId.substring(0, 16)}... BlockID ${blockId.substring(0, 16)}...`, 'info');
                         
                         // Get block data
                         const request = { 
@@ -17243,12 +17243,12 @@ Do you want to continue?`;
                         
                         if (txCount === 0) {
                             log(`Warning: No transactions included`, 'warning');
-                            // BigIntを含む可能性があるのでJSON.stringifyは避ける
+                            // Avoid JSON.stringify as it may contain BigInt
                             log(`Block has header.hash: ${block.header?.hash}`, 'warning');
                         }
                         
                         for (const tx of block.transactions || []) {
-                            // BigIntを含む可能性があるのでJSON.stringifyは避ける
+                            // Avoid JSON.stringify as it may contain BigInt
                             log(`Checking transaction...`, 'info');
                             const txHash = tx.verboseData?.transactionId || tx.id || tx.transactionId;
                             log(`Transaction ID variants: verboseData.transactionId=${tx.verboseData?.transactionId}, tx.id=${tx.id}, tx.transactionId=${tx.transactionId}`, 'info');
@@ -17260,20 +17260,20 @@ Do you want to continue?`;
                                 if (tx.payload && tx.payload !== '') {
                                     // Get raw binary payload from hex (blockchain stores as hex)
                                     const hexPayload = tx.payload;
-                                    log(`ペイロード長: ${hexPayload.length} 文字 (hex)`, 'info');
-                                    log(`最初の100文字: ${hexPayload.substring(0, 100)}...`, 'info');
+                                    log(`Payload length: ${hexPayload.length} characters (hex)`, 'info');
+                                    log(`First 100 characters: ${hexPayload.substring(0, 100)}...`, 'info');
                                     
                                     // Blockchain stores binary payloads as hex strings
                                     try {
                                         payload = safeHexDecode(hexPayload, 'chunk payload');
-                                        log(`Hex decode成功: ${payload.length} バイト (生バイナリ)`, 'info');
+                                        log(`Hex decode success: ${payload.length} bytes (raw binary)`, 'info');
                                     } catch (e) {
                                         log(`Hex decode error details: ${e.stack || e}`, 'error');
-                                        throw new Error(`ペイロードのデコードに失敗: ${e.message}`);
+                                        throw new Error(`Failed to decode payload: ${e.message}`);
                                     }
                                     break;
                                 } else {
-                                    log(`警告: ペイロードが空です (TxID: ${txId})`, 'warning');
+                                    log(`Warning: Payload is empty (TxID: ${txId})`, 'warning');
                                 }
                             } else {
                                 log(`TxID不一致: ${txHash} !== ${txId}`, 'info');
@@ -17281,7 +17281,7 @@ Do you want to continue?`;
                         }
                         
                         if (!payload) {
-                            throw new Error(`チャンク ${i + 1} のペイロードが見つかりません`);
+                            throw new Error(`Payload for chunk ${i + 1} not found`);
                         }
                         
                         // Decrypt and decompress
@@ -17296,17 +17296,17 @@ Do you want to continue?`;
                         document.getElementById('downloadProgressBar').style.width = progress + '%';
                         document.getElementById('downloadProgressBar').textContent = progress + '%';
                         
-                        log(`チャンク ${i + 1} 取得成功`);
+                        log(`Chunk ${i + 1} retrieved successfully`);
                         
                     } catch (error) {
-                        log(`チャンク ${i + 1} エラー: ${error.message}`, 'error');
+                        log(`Chunk ${i + 1} error: ${error.message}`, 'error');
                         throw error;
                     }
                 }
                     }
                 } else {
                     // Sequential download (default)
-                    log(`シーケンシャルダウンロードモードを使用します (${FileState.kaspaMetadata.chunks.length}チャンク)`, 'info');
+                    log(`Using sequential download mode (${FileState.kaspaMetadata.chunks.length} chunks)`, 'info');
                     log(`Compression settings: ${JSON.stringify(FileState.kaspaMetadata.file?.compression)}`, 'info');
                     
                     for (let i = 0; i < FileState.kaspaMetadata.chunks.length; i++) {
@@ -17317,7 +17317,7 @@ Do you want to continue?`;
                             `Retrieving chunk ${i + 1}/${FileState.kaspaMetadata.chunks.length}...`;
                         
                         try {
-                            log(`チャンク ${i + 1}: TxID ${txId.substring(0, 16)}... BlockID ${blockId.substring(0, 16)}...`, 'info');
+                            log(`Chunk ${i + 1}: TxID ${txId.substring(0, 16)}... BlockID ${blockId.substring(0, 16)}...`, 'info');
                             
                             // Get block data
                             const request = { 
@@ -17353,12 +17353,12 @@ Do you want to continue?`;
                             
                             if (txCount === 0) {
                                 log(`Warning: No transactions included`, 'warning');
-                                // BigIntを含む可能性があるのでJSON.stringifyは避ける
+                                // Avoid JSON.stringify as it may contain BigInt
                                 log(`Block has header.hash: ${block.header?.hash}`, 'warning');
                             }
                             
                             for (const tx of block.transactions || []) {
-                                // BigIntを含む可能性があるのでJSON.stringifyは避ける
+                                // Avoid JSON.stringify as it may contain BigInt
                                 log(`Checking transaction...`, 'info');
                                 const txHash = tx.verboseData?.transactionId || tx.id || tx.transactionId;
                                 log(`Transaction ID variants: verboseData.transactionId=${tx.verboseData?.transactionId}, tx.id=${tx.id}, tx.transactionId=${tx.transactionId}`, 'info');
@@ -17377,7 +17377,7 @@ Do you want to continue?`;
                             }
                             
                             if (!payload) {
-                                throw new Error(`チャンク ${i + 1} のペイロードが見つかりません`);
+                                throw new Error(`Payload for chunk ${i + 1} not found`);
                             }
                             
                             // Decrypt and decompress
@@ -17392,7 +17392,7 @@ Do you want to continue?`;
                             const original = kaspaMetadata.file?.compression?.enabled ? lzDecompress(compressed) : compressed;
                             
                             chunks.push(original);
-                            log(`チャンク ${i + 1}: 最終サイズ ${original.length} bytes`, 'info');
+                            log(`Chunk ${i + 1}: Final size ${original.length} bytes`, 'info');
                             
                             // Update progress
                             const progress = ((i + 1) / FileState.kaspaMetadata.chunks.length * 100).toFixed(0);
@@ -17469,22 +17469,22 @@ Do you want to continue?`;
                 let hint = '';
                 
                 // Automatically determine error type and display appropriate message and solution
-                if (errorMsg.includes('password') || errorMsg.includes('パスワード')) {
+                if (errorMsg.includes('password')) {
                     userMessage += 'Incorrect password';
                     hint = 'Please enter the correct password';
-                } else if (errorMsg.includes('initialized') || errorMsg.includes('初期化') || errorMsg.includes('RPC')) {
+                } else if (errorMsg.includes('initialized') || errorMsg.includes('RPC')) {
                     userMessage += 'System not connected';
                     hint = 'Click "Restart Kaspa System" in the Settings tab';
-                } else if (errorMsg.includes('block') || errorMsg.includes('ブロック') || errorMsg.includes('not found') || errorMsg.includes('見つかりません')) {
+                } else if (errorMsg.includes('block') || errorMsg.includes('not found')) {
                     userMessage += 'Data not found';
                     hint = 'File may be deleted or check network connection';
-                } else if (errorMsg.includes('network') || errorMsg.includes('ネットワーク') || errorMsg.includes('timeout')) {
+                } else if (errorMsg.includes('network') || errorMsg.includes('timeout')) {
                     userMessage += 'Network connection error';
                     hint = 'Check connection and try again';
-                } else if (errorMsg.includes('integrity') || errorMsg.includes('整合性') || errorMsg.includes('hash') || errorMsg.includes('ハッシュ')) {
+                } else if (errorMsg.includes('integrity') || errorMsg.includes('hash')) {
                     userMessage += 'File is corrupted';
                     hint = 'Please download again';
-                } else if (errorMsg.includes('error rate') || errorMsg.includes('エラー率')) {
+                } else if (errorMsg.includes('error rate')) {
                     userMessage += 'Multiple chunks could not be retrieved';
                     hint = 'Please wait a moment and try again';
                 } else if (errorMsg.includes('REST API')) {
@@ -17505,11 +17505,11 @@ Do you want to continue?`;
                     `;
                 }
                 
-                // プログレスバーも赤く
+                // Make progress bar red too
                 const progressBar = document.getElementById('downloadProgressBar');
                 if (progressBar) {
                     progressBar.style.backgroundColor = '#f44336';
-                    progressBar.textContent = 'エラー';
+                    progressBar.textContent = 'Error';
                 }
             }
         };
@@ -17520,14 +17520,14 @@ Do you want to continue?`;
         // v6.2.34: Add to File List only function
         window.addToFileListOnly = async function() {
             if (!FileState.kaspaMetadata && !FileState.directoryMetadata) {
-                log('メタデータが読み込まれていません。まずVerifyボタンをクリックしてください。', 'error');
+                log('Metadata not loaded. Please click the Verify button first.', 'error');
                 return;
             }
 
             const metadata = FileState.kaspaMetadata || FileState.directoryMetadata;
             const fileName = metadata.file?.name || metadata.directory?.name || 'unknown';
             
-            log(`[File List] ${fileName} をリストに追加中...`, 'info');
+            log(`[File List] Adding ${fileName} to list...`, 'info');
 
             try {
                 // Get password
@@ -17537,7 +17537,7 @@ Do you want to continue?`;
                 }
                 
                 if (!password) {
-                    log('パスワードを入力してください', 'error');
+                    log('Please enter a password', 'error');
                     return;
                 }
 
@@ -17551,7 +17551,7 @@ Do you want to continue?`;
                     }
                 });
 
-                log(`[File List] ${fileName} をFile Listに追加しました`, 'success');
+                log(`[File List] Added ${fileName} to File List`, 'success');
                 
                 // Switch to File tab
                 const fileTab = document.querySelector('[onclick*="switchTab(\'file\')"]');
@@ -17559,7 +17559,7 @@ Do you want to continue?`;
                     fileTab.click();
                 }
             } catch (error) {
-                log(`[File List] エラー: ${error.message}`, 'error');
+                log(`[File List] Error: ${error.message}`, 'error');
             }
         };
 
@@ -17567,7 +17567,7 @@ Do you want to continue?`;
         async function checkMonitoringStop() {
             // Phase 0-F-1: Check network error status first
             if (FileState.networkErrorOccurred) {
-                log('[DEBUG] ネットワークエラーのため監視を継続', 'debug');
+                log('[DEBUG] Continuing monitoring due to network error', 'debug');
                 return;
             }
             
@@ -17693,7 +17693,7 @@ Do you want to continue?`;
             if (enabled) {
                 log('⚠️ Archive node force mode enabled', 'warning');
             } else {
-                log('✅ アーカイブノード強制使用モードを無効にしました', 'success');
+                log('✅ Archive node force mode disabled', 'success');
             }
         };
 
@@ -17784,14 +17784,14 @@ Do you want to continue?`;
             document.getElementById('networkSelect').addEventListener('change', async (e) => {
                 const previousNetwork = config.network;
                 config.network = e.target.value;
-                log(`ネットワーク変更: ${previousNetwork} → ${config.network}`, 'info');
+                log(`Network changed: ${previousNetwork} → ${config.network}`, 'info');
                 
                 // v5.11.102: Reset connection on network change
                 if (previousNetwork !== config.network && previousNetwork !== null) {
-                    // 1. ウォレットをDisconnect
+                    // 1. Disconnect wallet
                     if (UserState.address) {
                         AppState.disconnectWallet();
-                        log('ネットワーク変更のためウォレットをDisconnectしました', 'info');
+                        log('Disconnected wallet due to network change', 'info');
                     }
                     
                     // 2. Reset RPC connection
@@ -17799,13 +17799,13 @@ Do you want to continue?`;
                         try {
                             await NetworkState.rpcClient.disconnect();
                             NetworkState.rpcClient = null;
-                            log('既存のRPCConnectをDisconnectしました', 'info');
+                            log('Disconnected existing RPC connection', 'info');
                             
-                            // 3. 新しいネットワークで再Connect
+                            // 3. Reconnect with new network
                             await initializeRpcClient();
-                            log('新しいネットワークでRPCConnectを確立しました', 'success');
+                            log('Established RPC connection with new network', 'success');
                         } catch (error) {
-                            log(`RPC再Connectエラー: ${error.message}`, 'error');
+                            log(`RPC reconnection error: ${error.message}`, 'error');
                         }
                     }
                 }
@@ -17850,19 +17850,19 @@ Do you want to continue?`;
                         customEndpointSection.style.display = 'none';
                     }
                     
-                    log(`ノードタイプ変更: ${previousNodeType} → ${config.nodeType}`, 'info');
+                    log(`Node type changed: ${previousNodeType} → ${config.nodeType}`, 'info');
                     
                     // If RPC is connected and node type changed, reconnect with new settings
                     if (NetworkState.rpcClient && previousNodeType !== config.nodeType) {
                         try {
                             await NetworkState.rpcClient.disconnect();
                             NetworkState.rpcClient = null;
-                            log('ノードタイプ変更のためRPCConnectをDisconnectしました', 'info');
+                            log('Disconnected RPC connection due to node type change', 'info');
                             
                             // Reconnect with new node type
                             await initializeSystem();
                         } catch (error) {
-                            log(`再Connectエラー: ${error.message}`, 'error');
+                            log(`Reconnection error: ${error.message}`, 'error');
                         }
                     }
                 });
@@ -17895,7 +17895,7 @@ Do you want to continue?`;
             
             document.getElementById('retryCount').addEventListener('change', (e) => {
                 config.retryCount = parseInt(e.target.value);
-                log(`リトライ回数変更: ${config.retryCount}`, 'info');
+                log(`Retry count changed: ${config.retryCount}`, 'info');
             });
             
             document.getElementById('timeout').addEventListener('change', (e) => {

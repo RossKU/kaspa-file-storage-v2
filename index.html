@@ -1712,7 +1712,7 @@
                     <span class="nav-item-icon">🛠️</span>
                     <span class="nav-item-text">Dir Builder</span>
                 </div>
-                <div class="nav-item" onclick="UIHandlers.switchTab('debug')" data-tooltip="Debug">
+                <div class="nav-item" onclick="UIHandlers.switchTab('debug')" data-tooltip="Debug" id="debug-nav-item" style="display: none;">
                     <span class="nav-item-icon">🐛</span>
                     <span class="nav-item-text">Debug</span>
                 </div>
@@ -8053,6 +8053,15 @@ Do you want to continue?`;
             
             // Tab switching
             switchTab: function(tab) {
+                // Check if debug tab is requested but not visible
+                if (tab === 'debug') {
+                    const debugNavItem = document.getElementById('debug-nav-item');
+                    if (debugNavItem && debugNavItem.style.display === 'none') {
+                        console.warn('Debug tab is hidden. Enable debug mode by adding ?debug to the URL or calling enableDebugMode() in console.');
+                        return;
+                    }
+                }
+                
                 // Update nav items
                 document.querySelectorAll('.nav-item').forEach(btn => btn.classList.remove('active'));
                 document.querySelector(`[onclick="UIHandlers.switchTab('${tab}')"]`)?.classList.add('active');
@@ -8111,6 +8120,44 @@ Do you want to continue?`;
         
         // Expose UIHandlers to window for debugging (can be removed later)
         window.UIHandlers = UIHandlers;
+        
+        // Debug mode detection
+        (function() {
+            // Check URL parameters for debug mode
+            const urlParams = new URLSearchParams(window.location.search);
+            const hashParams = window.location.hash.includes('#debug');
+            const isDebugMode = urlParams.has('debug') || hashParams;
+            
+            // Show debug tab if in debug mode
+            if (isDebugMode) {
+                const debugNavItem = document.getElementById('debug-nav-item');
+                if (debugNavItem) {
+                    debugNavItem.style.display = 'flex';
+                }
+                
+                // Also make debug tab accessible via console
+                window.enableDebugMode = function() {
+                    const debugNavItem = document.getElementById('debug-nav-item');
+                    if (debugNavItem) {
+                        debugNavItem.style.display = 'flex';
+                        console.log('Debug mode enabled. Debug tab is now visible.');
+                    }
+                };
+                
+                console.log('Debug mode activated via URL parameter');
+            } else {
+                // Provide function to enable debug mode from console
+                window.enableDebugMode = function() {
+                    const debugNavItem = document.getElementById('debug-nav-item');
+                    if (debugNavItem) {
+                        debugNavItem.style.display = 'flex';
+                        console.log('Debug mode enabled. Debug tab is now visible.');
+                        return true;
+                    }
+                    return false;
+                };
+            }
+        })();
         
         // ===== Backward Compatibility Proxies for Utility Functions =====
         // Define proxies for log-related functions

@@ -3636,9 +3636,9 @@
             
             getStatus() {
                 const bps = this.getBPS();
-                if (bps >= 8) return { icon: '🟢', text: '正常' };
-                if (bps >= 5) return { icon: '🟡', text: '遅延' };
-                return { icon: '🔴', text: '異常' };
+                if (bps >= 8) return { icon: '🟢', text: 'Normal' };
+                if (bps >= 5) return { icon: '🟡', text: 'Delayed' };
+                return { icon: '🔴', text: 'Abnormal' };
             }
         };
         
@@ -3725,7 +3725,7 @@
                                 ✅ Restart Complete
                             </div>
                             <div style="font-size: 12px; color: var(--text-secondary); margin-top: 5px;">
-                                WASM SDKとKaspa core.jsが正常に再起動されました
+                                WASM SDK and Kaspa core.js have been successfully restarted
                             </div>
                         `;
                         // Hide after 5 seconds
@@ -4577,28 +4577,28 @@
             schemaVersion: 3,
             kaspaCompatVersion: "3.4.2",
             
-            // File Name定義（v5.11.39: Phase 1-A）
+            // File Name definition (v5.11.39: Phase 1-A)
             kenvFile: 'workspace.kenv',      // Settings file
             kindexFile: 'workspace.kindex',  // Index file
             kentryFile: 'workspace.kentry',  // Entry data file
             
-            // エントリー配列（.kentryの内容）
+            // Entry array (.kentry contents)
             entries: [],
             
-            // 高速アクセス用インデックス（.kindexの内容）
+            // Index for fast access (.kindex contents)
             kindex: {
                 version: "2.0",
                 updated: new Date().toISOString(),
                 format: "optimized",
                 
-                // ソート用インデックス
+                // Sort indexes
                 sortIndexes: {
                     name: [],      // [[name, lineNum, type], ...]
                     size: [],      // [[size, lineNum], ...]
                     uploadDate: [] // [[timestamp, lineNum], ...]
                 },
                 
-                // 検索用インデックス（プレフィックス）
+                // Search indexes (prefix)
                 searchIndexes: {
                     name: {},      // {"doc": [0,1,2], "ima": [3,4], ...}
                     metaTxId: {},  // {"a1b2c3de": [0], ...}
@@ -4606,7 +4606,7 @@
                     uploader: {}   // {"qq": [0,1], "qr": [2], ...}
                 },
                 
-                // フィルタ用インデックス
+                // Filter indexes
                 filterIndexes: {
                     type: {
                         file: [],      // File line number list
@@ -4659,7 +4659,7 @@
                     uploadedBy: null,
                     source: source,
                     status: 'pending',
-                    // File Information（後で補完）
+                    // File Information (to be filled later)
                     fileSize: null,
                     originalSize: null,
                     compressedSize: null,
@@ -4710,7 +4710,7 @@
             
             // Update index (differential update)
             updateIndex(entry, lineNumber) {
-                // v5.11.41: 防御的プログラミング - undefined/nullチェック
+                // v5.11.41: Defensive programming - undefined/null check
                 if (!entry || !entry.name) {
                     log('[KENV] updateIndex: Invalid entry or name', 'error');
                     return;
@@ -4719,12 +4719,12 @@
                 // v5.11.49: Delete existing index entry before adding (prevent duplicates)
                 this.removeFromAllIndexes(lineNumber);
                 
-                // 名前順インデックス
+                // Name order index
                 const nameEntry = [entry.name, lineNumber, entry.type === 'kaspa-directory' ? 'd' : 'f'];
                 const nameInsertPos = this.findInsertPosition(this.kindex.sortIndexes.name, entry.name, 0);
                 this.kindex.sortIndexes.name.splice(nameInsertPos, 0, nameEntry);
                 
-                // サイズ順インデックス（サイズがある場合）
+                // Size order index (if size exists)
                 if (entry.fileSize !== null && entry.fileSize !== undefined) {
                     const sizeEntry = [entry.fileSize, lineNumber];
                     const sizeInsertPos = this.findInsertPosition(this.kindex.sortIndexes.size, entry.fileSize, 0);
@@ -4741,18 +4741,18 @@
                     }
                 }
                 
-                // 検索インデックス（名前）
+                // Search index (name)
                 const namePrefix = entry.name.substring(0, 3).toLowerCase();
                 if (!this.kindex.searchIndexes.name[namePrefix]) {
                     this.kindex.searchIndexes.name[namePrefix] = [];
                 }
                 this.kindex.searchIndexes.name[namePrefix].push(lineNumber);
                 
-                // フィルタインデックス（タイプ）
+                // Filter index (type)
                 const typeKey = entry.type === 'kaspa-directory' ? 'directory' : 'file';
                 this.kindex.filterIndexes.type[typeKey].push(lineNumber);
                 
-                // フィルタインデックス（ステータス）
+                // Filter index (status)
                 this.kindex.filterIndexes.status[entry.status].push(lineNumber);
                 
                 // Update timestamp
@@ -4794,7 +4794,7 @@
                 });
             },
             
-            // バイナリサーチで挿入位置を見つける
+            // Find insertion position using binary search
             findInsertPosition(array, value, keyIndex) {
                 let left = 0;
                 let right = array.length;
@@ -4833,7 +4833,7 @@
                     stats.newestDate = date;
                 }
                 
-                // タイプ分布
+                // Type distribution
                 const fileType = entry.mimeType ? entry.mimeType.split('/')[1] : 'unknown';
                 stats.typeDistribution[fileType] = (stats.typeDistribution[fileType] || 0) + 1;
             },
@@ -6043,7 +6043,7 @@ Do you want to continue?`;
                             uploadDate: kenvEntry.uploadDate || new Date().toISOString(),
                             blockTime: kenvEntry.blockTime || null,
                             uploadedBy: kenvEntry.uploadedBy || "",
-                            payloadSplit: kenvEntry.payloadSplit === 'true' || kenvEntry.payloadSplit === true,  // v5.11.67: 文字列と真偽値の両方に対応
+                            payloadSplit: kenvEntry.payloadSplit === 'true' || kenvEntry.payloadSplit === true,  // v5.11.67: Support both string and boolean values
                             segmentBoundaries: kenvEntry._segmentBoundaries || [] // v5.11.66: Use saved segment boundaries
                         },
                         
@@ -6104,7 +6104,7 @@ Do you want to continue?`;
         // Shared functions for building and rendering directory trees
         window.SharedTreeBuilder = {
             // Build hierarchical structure from flat entries
-            buildTreeStructure(entries, rootName = 'ルート') {
+            buildTreeStructure(entries, rootName = 'Root') {
                 const root = {
                     name: rootName,
                     type: 'root',
@@ -6630,7 +6630,7 @@ Do you want to continue?`;
             
             buildTreeStructure() {
                 // Use shared tree builder
-                return window.SharedTreeBuilder.buildTreeStructure(this.entries, this.name || 'ルート');
+                return window.SharedTreeBuilder.buildTreeStructure(this.entries, this.name || 'Root');
             },
             
             renderTree() {
@@ -6745,7 +6745,7 @@ Do you want to continue?`;
                 this.renderTree();
                 
                 // Show current path
-                const pathDisplay = path || 'ルート';
+                const pathDisplay = path || 'Root';
                 this.showStatus(`Selected: ${pathDisplay}`, 'info');
             },
             
@@ -7022,7 +7022,7 @@ Do you want to continue?`;
                     
                     const namesInPath = pathMap.get(path);
                     if (namesInPath.has(entry.name)) {
-                        const displayPath = path === '/' ? 'ルート' : path;
+                        const displayPath = path === '/' ? 'Root' : path;
                         duplicateInfo.push(`"${entry.name}" (in ${displayPath} directory)`);
                     } else {
                         namesInPath.add(entry.name);
@@ -7030,7 +7030,7 @@ Do you want to continue?`;
                 }
                 
                 if (duplicateInfo.length > 0) {
-                    this.showStatus(`同じ階層に重複するFile Nameがあります: ${duplicateInfo.join(', ')}`, 'error');
+                    this.showStatus(`Duplicate file names found in same directory: ${duplicateInfo.join(', ')}`, 'error');
                     return false;
                 }
                 
@@ -7295,7 +7295,7 @@ Do you want to continue?`;
                     updateFileListFromKENV();
                 }
                 
-                this.showStatus('Fileタブに登録しました', 'success');
+                this.showStatus('Registered to File tab', 'success');
                 
                 // Reset builder
                 this.resetBuilder();
@@ -7540,16 +7540,16 @@ Do you want to continue?`;
 
         // v5.5.6: Define getter/setter for kaspaMetadata
         // v5.5.8: Migrated 2 compression check points in downloadByChunkIndex (16/120)
-        // v5.5.9: createSuperMetadata内のデバッグログ1箇所を移行 (17/120)
-        // v5.5.10: createAndUploadMetaTx内のデバッグログ1箇所を移行 (18/120)
-        // v5.5.11: processAndUpload内のデバッグログ3箇所を移行 (21/120)
+        // v5.5.9: Migrated 1 debug log from createSuperMetadata (17/120)
+        // v5.5.10: Migrated 1 debug log from createAndUploadMetaTx (18/120)
+        // v5.5.11: Migrated 3 debug logs from processAndUpload (21/120)
         // v5.5.12: Migrated 5 existence and encryption check points in downloadFile (26/120)
         // v5.5.13: Migrated 4 version compatibility checks from downloadFile (30/120)
-        // v5.5.14: fileInfo表示のchunks.length1箇所を移行 (31/120)
-        // v5.5.15: fileプロパティの読み取り専用アクセス11箇所を移行 (42/120)
+        // v5.5.14: Migrated 1 chunks.length from fileInfo display (31/120)
+        // v5.5.15: Migrated 11 read-only file property access points (42/120)
         // v5.5.16: Migrated 16 read-only download access points (58/120)
         // v5.5.17: Migrated all remaining 23 read-only access points (81/120) - Read-only complete
-        // v5.5.18: 残っていた読み取り専用参照8箇所を修正 (89/120)
+        // v5.5.18: Fixed 8 remaining read-only reference points (89/120)
         // v5.5.19: Fixed config is not defined error and ProgressManager totalChunks undefined issue
         // v5.5.20: Added backward compatibility proxies to other FileState variables (starting from currentPassword)
         // v5.5.21: Add configurable option to kaspaMetadata proxy as well
@@ -7566,7 +7566,7 @@ Do you want to continue?`;
             console.warn('kaspaMetadata proxy already defined:', e);
         }
         
-        // v5.5.34: isUploadingFileの後方互換性プロキシ
+        // v5.5.34: isUploadingFile backward compatibility proxy
         try {
             Object.defineProperty(window, 'isUploadingFile', {
                 get() { return FileState.isUploadingFile; },
@@ -7580,7 +7580,7 @@ Do you want to continue?`;
             console.warn('isUploadingFile proxy already defined:', e);
         }
         
-        // v5.5.35: uploadSessionActiveの後方互換性プロキシ
+        // v5.5.35: uploadSessionActive backward compatibility proxy
         try {
             Object.defineProperty(window, 'uploadSessionActive', {
                 get() { return FileState.uploadSessionActive; },
@@ -7594,7 +7594,7 @@ Do you want to continue?`;
             console.warn('uploadSessionActive proxy already defined:', e);
         }
         
-        // v5.5.36: uploadingChunksCountの後方互換性プロキシ
+        // v5.5.36: uploadingChunksCount backward compatibility proxy
         try {
             Object.defineProperty(window, 'uploadingChunksCount', {
                 get() { return FileState.uploadingChunksCount; },
@@ -7608,7 +7608,7 @@ Do you want to continue?`;
             console.warn('uploadingChunksCount proxy already defined:', e);
         }
         
-        // v5.5.37: uploadingMetaTxの後方互換性プロキシ
+        // v5.5.37: uploadingMetaTx backward compatibility proxy
         try {
             Object.defineProperty(window, 'uploadingMetaTx', {
                 get() { return FileState.uploadingMetaTx; },
@@ -7622,11 +7622,11 @@ Do you want to continue?`;
             console.warn('uploadingMetaTx proxy already defined:', e);
         }
         
-        // v5.5.38-phase2: uploadingDirMetaの後方互換性プロキシ（慎重な移行）
+        // v5.5.38-phase2: uploadingDirMeta backward compatibility proxy (careful migration)
         try {
             Object.defineProperty(window, 'uploadingDirMeta', {
                 get() { 
-                    // v5.5.38-phase2: デバッグログで読み取りを追跡
+                    // v5.5.38-phase2: Track reads with debug log
                     const value = FileState.uploadingDirMeta;
                     if (value !== window._uploadingDirMetaGlobal) {
                         console.warn(`[v5.5.38] Proxy detected mismatch: global=${window._uploadingDirMetaGlobal}, FileState=${value}`);
@@ -7648,7 +7648,7 @@ Do you want to continue?`;
             console.warn('uploadingDirMeta proxy already defined:', e);
         }
         
-        // v5.5.39: pendingProgressの後方互換性プロキシ
+        // v5.5.39: pendingProgress backward compatibility proxy
         try {
             Object.defineProperty(window, 'pendingProgress', {
                 get() { return FileState.pendingProgress; },
@@ -7662,7 +7662,7 @@ Do you want to continue?`;
             console.warn('pendingProgress proxy already defined:', e);
         }
         
-        // v5.5.39: currentFileCIDの後方互換性プロキシ
+        // v5.5.39: currentFileCID backward compatibility proxy
         try {
             Object.defineProperty(window, 'currentFileCID', {
                 get() { return FileState.currentFileCID; },
@@ -7676,7 +7676,7 @@ Do you want to continue?`;
             console.warn('currentFileCID proxy already defined:', e);
         }
         
-        // v5.5.39: currentFileCIDFullの後方互換性プロキシ
+        // v5.5.39: currentFileCIDFull backward compatibility proxy
         try {
             Object.defineProperty(window, 'currentFileCIDFull', {
                 get() { return FileState.currentFileCIDFull; },
@@ -7690,7 +7690,7 @@ Do you want to continue?`;
             console.warn('currentFileCIDFull proxy already defined:', e);
         }
         
-        // v5.5.39: multiWalletTestModeの後方互換性プロキシ
+        // v5.5.39: multiWalletTestMode backward compatibility proxy
         try {
             Object.defineProperty(window, 'multiWalletTestMode', {
                 get() { return AppState.experimental.multiWalletTestMode; },
@@ -7704,7 +7704,7 @@ Do you want to continue?`;
             console.warn('multiWalletTestMode proxy already defined:', e);
         }
         
-        // v5.5.39: simpleWalletManagerの後方互換性プロキシ
+        // v5.5.39: simpleWalletManager backward compatibility proxy
         try {
             Object.defineProperty(window, 'simpleWalletManager', {
                 get() { return AppState.experimental.simpleWalletManager; },
@@ -7718,7 +7718,7 @@ Do you want to continue?`;
             console.warn('simpleWalletManager proxy already defined:', e);
         }
         
-        // v5.5.20: currentPasswordの後方互換性プロキシ
+        // v5.5.20: currentPassword backward compatibility proxy
         // v5.5.21: Added configurable option to avoid redefinition errors
         // v5.7.12: Remove duplicate definition (remove v5.5.3 definition, keep only this try-catch version)
         try {
@@ -7727,11 +7727,11 @@ Do you want to continue?`;
                 set(value) { 
                     FileState.currentPassword = value;
                 },
-                configurable: true,  // 再定義を許可
-                enumerable: true     // for...inで列挙可能
+                configurable: true,  // Allow redefinition
+                enumerable: true     // Enumerable with for...in
             });
         } catch (e) {
-            // 既に定義されている場合はスキップ
+            // Skip if already defined
             console.warn('currentPassword proxy already defined:', e);
         }
         
@@ -7760,13 +7760,13 @@ Do you want to continue?`;
             exportLogsAsText: function() {
                 const logs = AppState.history.systemLogs;
                 const textLines = logs.map(log => {
-                    // ISO形式から時刻部分を抽出（ミリ秒付き）
+                    // Extract time part from ISO format (with milliseconds)
                     const date = new Date(log.timestamp);
                     const time = date.toLocaleTimeString('ja-JP', {
                         hour: '2-digit',
                         minute: '2-digit',
                         second: '2-digit',
-                        fractionalSecondDigits: 3  // ミリ秒3桁
+                        fractionalSecondDigits: 3  // 3 digit milliseconds
                     });
                     const typeStr = log.type.toUpperCase().padEnd(7); // Align width
                     return `[${time}] [${typeStr}] ${log.message}`;
@@ -8210,7 +8210,7 @@ Do you want to continue?`;
         });
         
         // SafeStorage Class - v5.11.48
-        // 堅牢なLocalStorage操作を提供
+        // Provides robust LocalStorage operations
         class SafeStorage {
             static setItem(key, value) {
                 try {
@@ -8221,7 +8221,7 @@ Do you want to continue?`;
                         // Processing when capacity exceeded
                         this.handleQuotaExceeded(key);
                         
-                        // リトライ
+                        // Retry
                         try {
                             localStorage.setItem(key, value);
                             return { success: true };
@@ -8238,7 +8238,7 @@ Do you want to continue?`;
                     const value = localStorage.getItem(key);
                     if (!value) return null;
                     
-                    // JSON形式の場合は自動パース
+                    // Auto-parse if JSON format
                     if (value.startsWith('{') || value.startsWith('[')) {
                         try {
                             return JSON.parse(value);
@@ -8268,10 +8268,10 @@ Do you want to continue?`;
             static handleQuotaExceeded(newKey) {
                 // Delete from lowest priority data
                 const priorityOrder = [
-                    'kaspa-upload-progress',     // 一時的
-                    'kaspa-upload-metadata',     // 一時的
-                    'kaspaDirectories',          // 再構築可能
-                    'kaspaDAG',                  // 再構築可能
+                    'kaspa-upload-progress',     // Temporary
+                    'kaspa-upload-metadata',     // Temporary
+                    'kaspaDirectories',          // Rebuildable
+                    'kaspaDAG',                  // Rebuildable
                     'kenv_temp_data'            // Important (delete last)
                 ];
                 
@@ -18452,33 +18452,33 @@ Do you want to continue?`;
                 return [];
             }
             
-            // KENVエントリーを履歴形式にマッピング
+            // Map KENV entries to history format
             return FileState.kenvManager.entries
                 .filter(entry => entry.type !== 'kaspa-directory') // Directories not included in history
                 .map(entry => ({
-                    // 基本情報
+                    // Basic information
                     id: entry.id,
                     fileName: entry.name,
                     fileSize: entry.fileSize || 0,
                     cid: entry.cid || '',
                     
-                    // メタトランザクション情報
+                    // Meta transaction information
                     metaTxId: entry.metaTxId || null,
                     metaTxBlockId: entry.metaTxBlockId || null,
                     
-                    // 日時情報
+                    // Date and time information
                     uploadTime: entry.uploadDate || entry.created || new Date().toISOString(),
                     uploadDate: entry.uploadDate || entry.created || new Date().toISOString(),
                     blockTime: entry.blockTime || null,
                     
-                    // その他の情報
+                    // Other information
                     password: entry.password || null,
                     fileSha256: entry.sha256 || null,
                     totalCost: entry.uploadCost || 0,
                     status: entry.status || 'pending',
-                    type: 'file', // 履歴では常に'file'
+                    type: 'file', // Always 'file' in history
                     
-                    // アップロード情報
+                    // Upload information
                     uploadedBy: entry.uploadedBy || null,
                     network: config.network || config.defaultNetwork, // v5.11.101
                     
@@ -18491,7 +18491,7 @@ Do you want to continue?`;
                         variableChunk: entry.variableChunk === 'true'
                     },
                     
-                    // メタデータ（互換性のため）
+                    // Metadata (for compatibility)
                     metadata: {
                         file: {
                             name: entry.name,
@@ -18771,16 +18771,16 @@ Do you want to continue?`;
                     } catch (addrError) {
                         console.error('[MultiWallet] Primary address generation failed:', addrError);
                         
-                        // フォールバック1: 引数なしで試す（デフォルトネットワーク）
+                        // Fallback 1: Try without arguments (default network)
                         try {
                             address = privateKey.toAddress().toString();
                             console.log('[MultiWallet] Address generated with default network:', address);
                         } catch (fallback1Error) {
                             console.error('[MultiWallet] Fallback 1 failed:', fallback1Error);
                             
-                            // フォールバック2: 公開鍵から直接アドレス作成を試す
+                            // Fallback 2: Try to create address directly from public key
                             try {
-                                // 最後の手段として、公開鍵の文字列表現を使用
+                                // As a last resort, use string representation of public key
                                 const pubKeyStr = publicKey.toString();
                                 address = `testnet:${pubKeyStr.substring(0, 62)}`;
                                 console.log('[MultiWallet] Temporary address generated:', address);
@@ -18854,7 +18854,7 @@ Do you want to continue?`;
             }
         }
 
-        // テスト関数
+        // Test functions
         function testPhase1_Basic() {
             console.log('\n=== Phase 1 Basic Test ===');
             
@@ -18863,7 +18863,7 @@ Do you want to continue?`;
                 simpleWalletManager = new SimpleWalletManager();
                 console.log('✓ Manager initialized');
                 
-                // 2つのウォレットを生成
+                // Generate 2 wallets
                 const wallets = simpleWalletManager.generateMultipleWallets(2);
                 
                 if (wallets.length === 2) {
@@ -18872,7 +18872,7 @@ Do you want to continue?`;
                     throw new Error('Failed to generate wallets');
                 }
                 
-                // 保存テスト
+                // Save test
                 const saved = simpleWalletManager.saveToLocalStorage();
                 console.log(`Save result: ${saved ? 'SUCCESS' : 'FAILED'}`);
                 
@@ -18888,7 +18888,7 @@ Do you want to continue?`;
             console.log('✓ Test data cleared');
         }
 
-        // UI用の関数
+        // UI functions
         function runPhase1Test() {
             const statusEl = document.getElementById('phase1TestStatus');
             statusEl.style.display = 'block';
@@ -19982,7 +19982,7 @@ Do you want to continue?`;
                     FileState.kenvManager.entries.splice(index, 1);
                 }
                 
-                // インデックスをクリアして再構築
+                // Clear and rebuild indexes
                 FileState.kenvManager.kindex.sortIndexes = {
                     name: [],
                     size: [],
@@ -19996,7 +19996,7 @@ Do you want to continue?`;
                     status: { pending: [], verified: [], failed: [], verifying: [] }
                 };
                 
-                // すべてのエントリーのインデックスを再構築
+                // Rebuild indexes for all entries
                 FileState.kenvManager.entries.forEach((entry, index) => {
                     FileState.kenvManager.updateIndex(entry, index);
                 });
@@ -20886,7 +20886,7 @@ Do you want to continue?`;
             isActive: false,
             detectedBlocks: new Map(),
             blockCounts: new Map(), // v5.11.137-fix: Block reception count for each node
-            statsInterval: null, // v5.11.137-fix: 統計表示用タイマー
+            statsInterval: null, // v5.11.137-fix: Timer for statistics display
             
             async start() {
                 if (this.isActive) {
@@ -20900,7 +20900,7 @@ Do you want to continue?`;
                 document.getElementById('multiWsStatusText').textContent = 'Connected...';
                 
                 try {
-                    // ArchiveNodeManagerから利用可能なノードを取得
+                    // Get available nodes from ArchiveNodeManager
                     if (!NetworkState.archiveManager || NetworkState.archiveManager.connections.size === 0) {
                         this.log('Archive nodes not found. Please run archive node discovery first.');
                         document.getElementById('multiWsStatusText').textContent = 'Failed';
@@ -20908,30 +20908,30 @@ Do you want to continue?`;
                         return;
                     }
                     
-                    // 最大3つのノードを選択
+                    // Select up to 3 nodes
                     const nodes = Array.from(NetworkState.archiveManager.connections.entries()).slice(0, 3);
                     this.log(`Attempting to connect to ${nodes.length} nodes`);
                     
-                    // 各ノードの既存RPCClientConnectを利用してBlock-addedをリッスン
+                    // Use existing RPCClientConnect of each node to listen for Block-added
                     for (const [nodeId, nodeData] of nodes) {
                         try {
-                            // 既存のRPCClientを使用（既にConnect済み）
+                            // Use existing RPCClient (already Connected)
                             const rpcClient = nodeData.client;
                             if (!rpcClient || !rpcClient.isConnected) {
                                 this.log(`❌ Node disconnected: ${nodeId}`);
                                 continue;
                             }
                             
-                            // Block-addedイベントのリスナーを追加
-                            // メインのWebSocket監視と同じ方式で実装
+                            // Add Block-added event listener
+                            // Implement the same way as main WebSocket monitoring
                             await rpcClient.subscribeBlockAdded();
                             
-                            // addEventListenerでイベントを受信
+                            // Receive events with addEventListener
                             rpcClient.addEventListener('block-added', (event) => {
-                                // デバッグログ
+                                // Debug log
                                 this.log(`🔔 Block-added event received from ${nodeId}`, 'debug');
                                 
-                                // event.data.blockでブロックデータを取得（メインと同じ構造）
+                                // Get block data with event.data.block (same structure as main)
                                 const block = event.data?.block;
                                 if (block) {
                                     // Convert to format expected by handleBlockAdded
@@ -20963,13 +20963,13 @@ Do you want to continue?`;
                     
                     if (this.auxConnections.length > 0) {
                         this.isActive = true;
-                        document.getElementById('multiWsStatusText').textContent = `${this.auxConnections.length}個のノードでリッスン中`;
+                        document.getElementById('multiWsStatusText').textContent = `Listening on ${this.auxConnections.length} nodes`;
                         this.log(`Listening for Block-added events on ${this.auxConnections.length} nodes`);
                         
-                        // v5.11.137-fix: 統計情報を定期的に表示
+                        // v5.11.137-fix: Display statistics periodically
                         this.statsInterval = setInterval(() => {
                             this.showStats();
-                        }, 10000); // 10秒ごと
+                        }, 10000); // Every 10 seconds
                     } else {
                         this.log('No connectable nodes found');
                         this.reset();
@@ -20986,13 +20986,13 @@ Do you want to continue?`;
                 
                 this.log('Stopping multiple WebSocket test...');
                 
-                // 全ての補助Connectのリスナーを解除
+                // Remove all auxiliary Connect listeners
                 for (const conn of this.auxConnections) {
                     try {
-                        // イベントリスナーを削除（メインと同じ方式）
+                        // Remove event listeners (same way as main)
                         conn.rpc.removeAllEventListeners();
                         await conn.rpc.unsubscribeBlockAdded();
-                        // 注意: RPCClient自体はDisconnectしない（アーカイブノード探索で使用中の可能性）
+                        // Note: Don't Disconnect RPCClient itself (may be in use for archive node discovery)
                         this.log(`Listener removed: ${conn.nodeId}`);
                     } catch (err) {
                         this.log(`Error removing listener: ${conn.nodeId} - ${err.message}`);
@@ -21008,7 +21008,7 @@ Do you want to continue?`;
                 const blockHash = event.blockHash || event.hash;
                 if (!blockHash) return;
                 
-                // v5.11.137-fix: ノードごとのブロック受信数をカウント
+                // v5.11.137-fix: Count block reception per node
                 const currentCount = this.blockCounts.get(nodeId) || 0;
                 this.blockCounts.set(nodeId, currentCount + 1);
                 this.updateConnectionDisplay();
@@ -21016,7 +21016,7 @@ Do you want to continue?`;
                 const shortHash = blockHash.substring(0, 16);
                 const timestamp = Date.now();
                 
-                // 初回検出かチェック
+                // Check if first detection
                 if (!this.detectedBlocks.has(blockHash)) {
                     this.detectedBlocks.set(blockHash, {
                         firstNode: nodeId,
@@ -21025,19 +21025,19 @@ Do you want to continue?`;
                     });
                     this.log(`🆕 New block detected: ${shortHash}... (from ${nodeId})`, 'success');
                     
-                    // 監視中のトランザクションをチェック
+                    // Check monitored transactions
                     if (NetworkState.ws.monitoredTransactions && NetworkState.ws.monitoredTransactions.size > 0) {
                         this.checkBlockForTransactions(event);
                     }
                 } else {
-                    // 既に検出済み
+                    // Already detected
                     const blockInfo = this.detectedBlocks.get(blockHash);
                     blockInfo.count++;
                     const delay = timestamp - blockInfo.timestamp;
                     this.log(`♻️ Block re-detected: ${shortHash}... (from ${nodeId}, ${delay}ms delay)`, 'debug');
                 }
                 
-                // 古いエントリーをクリーンアップ（1分以上前）
+                // Clean up old entries (older than 1 minute)
                 const oldThreshold = timestamp - 60000;
                 for (const [hash, info] of this.detectedBlocks.entries()) {
                     if (info.timestamp < oldThreshold) {
@@ -21054,7 +21054,7 @@ Do you want to continue?`;
                             const blockHash = event.blockHash || event.hash;
                             this.log(`🎯 Monitored Tx detected! TxID: ${txId.substring(0, 16)}... BlockID: ${blockHash.substring(0, 16)}...`, 'success');
                             
-                            // メインの監視リストを更新
+                            // Update main monitoring list
                             const monitorData = NetworkState.ws.monitoredTransactions.get(txId);
                             if (!monitorData.blockId) {
                                 monitorData.blockId = blockHash;
@@ -21070,11 +21070,11 @@ Do you want to continue?`;
                 const container = document.getElementById('multiWsConnections');
                 if (!container) return;
                 
-                let html = '<strong>Connectedのノード:</strong><ul style="margin: 5px 0; padding-left: 20px;">';
+                let html = '<strong>Connected nodes:</strong><ul style="margin: 5px 0; padding-left: 20px;">';
                 for (const conn of this.auxConnections) {
                     const archiveBlocks = conn.stats?.blockCount ? ` (${conn.stats.blockCount} blocks)` : '';
                     const receivedCount = this.blockCounts.get(conn.nodeId) || 0;
-                    const receivedInfo = receivedCount > 0 ? ` | 📊 受信: ${receivedCount}` : '';
+                    const receivedInfo = receivedCount > 0 ? ` | 📊 Received: ${receivedCount}` : '';
                     html += `<li>${conn.nodeId}${archiveBlocks}${receivedInfo}</li>`;
                 }
                 html += '</ul>';
@@ -21085,7 +21085,7 @@ Do you want to continue?`;
                 this.auxConnections = [];
                 this.isActive = false;
                 this.detectedBlocks.clear();
-                this.blockCounts.clear(); // v5.11.137-fix: カウントもクリア
+                this.blockCounts.clear(); // v5.11.137-fix: Clear counts too
                 if (this.statsInterval) {
                     clearInterval(this.statsInterval);
                     this.statsInterval = null;
@@ -21097,16 +21097,16 @@ Do you want to continue?`;
             },
             
             showStats() {
-                // v5.11.137-fix: 統計情報を表示
+                // v5.11.137-fix: Display statistics
                 let totalBlocks = 0;
-                let statsText = '📊 統計: ';
+                let statsText = '📊 Stats: ';
                 for (const [nodeId, count] of this.blockCounts.entries()) {
                     totalBlocks += count;
                 }
                 
                 if (totalBlocks > 0) {
-                    statsText += `合計 ${totalBlocks} ブロック受信 | `;
-                    statsText += `ユニーク: ${this.detectedBlocks.size}`;
+                    statsText += `Total ${totalBlocks} blocks received | `;
+                    statsText += `Unique: ${this.detectedBlocks.size}`;
                     this.log(statsText, 'info');
                 }
             },
@@ -21121,7 +21121,7 @@ Do you want to continue?`;
                 
                 logDiv.innerHTML = entry + logDiv.innerHTML;
                 
-                // 最大100行まで
+                // Maximum 100 lines
                 const lines = logDiv.getElementsByTagName('div');
                 while (lines.length > 100) {
                     lines[lines.length - 1].remove();

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.3.5</title>
+    <title>Kaspa P2P File Storage v6.3.6</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -13053,7 +13053,7 @@ Do you want to continue?`;
                     const minutes = Math.floor(elapsed / 60);
                     const seconds = elapsed % 60;
                     document.getElementById('uploadElapsedTime').textContent = 
-                        `経過時間: ${minutes > 0 ? minutes + '分' : ''}${seconds}秒`;
+                        `Elapsed time: ${minutes > 0 ? minutes + ' min' : ''}${seconds} sec`;
                 }
                 
                 // Update remaining time estimate
@@ -13069,7 +13069,7 @@ Do you want to continue?`;
                         const minutes = Math.floor(remainingSeconds / 60);
                         const seconds = remainingSeconds % 60;
                         document.getElementById('uploadRemainingTime').textContent = 
-                            `残り時間: 約${minutes > 0 ? minutes + '分' : ''}${seconds}秒`;
+                            `Remaining time: About ${minutes > 0 ? minutes + ' min' : ''}${seconds} sec`;
                     }
                 } else {
                     document.getElementById('uploadRemainingTime').textContent = 'Time remaining: Calculating...';
@@ -13305,7 +13305,7 @@ Do you want to continue?`;
                 // v5.5.19: At this point totalChunks is not set, so estimate from file size
                 const estimatedChunks = Math.ceil(currentFile.size / (chunkSize || 22528));
                 log(`Estimated chunks: ${estimatedChunks} (file size: ${currentFile.size} bytes, chunk size: ${chunkSize || 22528} bytes)`);
-                const totalChunks = estimatedChunks; // 互換性のため変数名を保持
+                const totalChunks = estimatedChunks; // Keep variable name for compatibility
                 
                 // Check if chunks exceed MAX_CHUNKS_SUPPORTED
                 if (totalChunks > MAX_CHUNKS_SUPPORTED) {
@@ -13409,8 +13409,8 @@ Do you want to continue?`;
                     }
                     
                     // Calculate estimated cost and time
-                    const costPerTx = 0.00024; // 24,000 sompi per tx (Priority Fee削除済み)
-                    const timePerTx = 2.4; // 2.4 seconds per tx (実測値)
+                    const costPerTx = 0.00024; // 24,000 sompi per tx (Priority Fee removed)
+                    const timePerTx = 2.4; // 2.4 seconds per tx (measured value)
                     const estimatedCost = totalTxCount * costPerTx;
                     const estimatedTime = totalTxCount * timePerTx;
                     
@@ -13682,7 +13682,7 @@ Do you want to continue?`;
                                     FileState.uploadSessionActive = false;
                                     
                                     // User notification
-                                    const errorMsg = `ネットワークが不安定です。\n\n` +
+                                    const errorMsg = `Network is unstable.\n\n` +
                                                    `Could not obtain BlockID for 5 minutes.\n` +
                                                    `TxID: ${txid.substring(0, 16)}...\n\n` +
                                                    `Progress is saved automatically.\n` +
@@ -13774,24 +13774,24 @@ Do you want to continue?`;
                                                              utxoCount > 40 ? 50 : 
                                                              utxoCount > 20 ? 10 : 5;
                                     
-                                    // ユーザー向けメッセージ
+                                    // User message
                                     const userMessage = 
                                         `⚠️ Transaction size exceeded error\n\n` +
-                                        `現在のUTXO数: ${utxoCount}個\n` +
+                                        `Current UTXO count: ${utxoCount}\n` +
                                         `Current amount: ${currentAmountKAS.toFixed(1)} KAS\n\n` +
-                                        `【原因】\n` +
-                                        `ウォレット内に小額のUTXOが${utxoCount}個蓄積しています。\n` +
+                                        `[Cause]\n` +
+                                        `${utxoCount} small UTXOs have accumulated in your wallet.\n` +
                                         `Using these at once will exceed size limit.\n\n` +
-                                        `【解決方法】\n` +
+                                        `[Solution]\n` +
                                         `Please set amount to ${recommendedAmount} KAS or more.\n` +
-                                        `これによりUTXOが統合され、問題が解決します。\n\n` +
+                                        `This will consolidate UTXOs and resolve the issue.\n\n` +
                                         `Change amount in Settings tab and try again.`;
                                     
-                                    // ログにも記録
+                                    // Also log
                                     log(`❌ Storage mass exceeded: ${utxoCount} UTXOs (Payload ${i + 1}/${FileState.payloadCount})`, 'error');
                                     log(`💡 Recommended: Set amount to ${recommendedAmount} KAS or more`, 'warning');
                                     
-                                    // アラート表示
+                                    // Show alert
                                     alert(userMessage);
                                     
                                     // Stop immediately without retry (no need to save progress)
@@ -13885,7 +13885,7 @@ Do you want to continue?`;
                         log(`[DEBUG-new approach] Reached catch block - error type: ${typeof error}`, 'debug');
                         const errorMessage = error?.message || error?.toString() || 'Unknown error';
                         log(`[New approach] Error occurred: ${errorMessage}`, 'error');
-                        // WASMエラーの詳細をログ出力
+                        // Log WASM error details
                         if (typeof error === 'object' && error !== null) {
                             log(`[New approach] Error details: ${error.message || '[no message]'} (${error.constructor?.name || 'object'})`, 'error');
                         } else {
@@ -14078,7 +14078,7 @@ Do you want to continue?`;
                                     if (!NetworkState.restApiControl.globalEnabled || NetworkState.restApiControl.temporaryKilled) {
                                         NetworkState.restApiControl.skipCount++;
                                         NetworkState.restApiControl.lastSkipped = Date.now();
-                                        log(`🚫 [REST API Kill] REST APIスキップ (無効化中) - スキップ回数: ${NetworkState.restApiControl.skipCount}`, 'debug');
+                                        log(`🚫 [REST API Kill] REST API skipped (disabled) - Skip count: ${NetworkState.restApiControl.skipCount}`, 'debug');
                                         // Update UI stats
                                         if (typeof DebugHandlers !== 'undefined' && DebugHandlers.updateRestApiStats) {
                                             DebugHandlers.updateRestApiStats();
@@ -14221,7 +14221,7 @@ Do you want to continue?`;
                             
                             log(`Chunk ${i + 1} error (attempt ${retries}/${config.retryCount}): ${error.message || error}`, 'error');
                             console.error('Detailed error:', error);
-                            console.error('スタックトレース:', error.stack);
+                            console.error('Stack trace:', error.stack);
                             
                             // Phase 0-F-2: Manage counter on error
                             if (FileState.uploadingChunksCount > 0) {
@@ -14381,7 +14381,7 @@ Do you want to continue?`;
                     
                     // v5.12.13: Store entry ID for this upload session
                     FileState.currentKenvEntryId = kenvEntry.id;
-                    log(`[KENV] セッションエントリーID: ${kenvEntry.id}`, 'debug');
+                    log(`[KENV] Session entry ID: ${kenvEntry.id}`, 'debug');
                     
                     // Set known information
                     kenvEntry.fileSize = currentFile.size;
@@ -14533,7 +14533,7 @@ Do you want to continue?`;
                     log(`[DEBUG] Error stack: ${error.stack}`, 'debug');
                 }
                 
-                log(`[DEBUG-CATCH] isNetworkError呼び出し前`, 'debug');
+                log(`[DEBUG-CATCH] Before isNetworkError call`, 'debug');
                 // v5.6.6: Use ConnectionManager for network error handling
                 if (isNetworkError(error)) {
                     // Update WebSocket state on WebSocket errors
@@ -14646,7 +14646,7 @@ Do you want to continue?`;
                         
                         if (totalChunks > CHUNKS_PER_META) {
                             shouldKeepProgressManager = true;
-                            log(`[SuperMeta] ProgressManagerを保持 (${totalChunks} chunks > ${CHUNKS_PER_META})`, 'debug');
+                            log(`[SuperMeta] Keeping ProgressManager (${totalChunks} chunks > ${CHUNKS_PER_META})`, 'debug');
                         }
                     }
                     
@@ -14659,7 +14659,7 @@ Do you want to continue?`;
                     // Phase 0-F-3: Do not clear the flag immediately - keep it for auto-resume
                     log('[DEBUG] Maintaining networkErrorOccurred flag until auto-resume completes', 'debug');
                     // Debug: Keep currentFile for auto-resume
-                    log(`[DEBUG] FileState.currentFile保持状態: ${FileState.currentFile ? FileState.currentFile.name : 'null'}`, 'debug');
+                    log(`[DEBUG] FileState.currentFile retention status: ${FileState.currentFile ? FileState.currentFile.name : 'null'}`, 'debug');
                 }
                 
                 // v5.7.11: Clear network error flag AFTER ProgressManager check
@@ -14682,7 +14682,7 @@ Do you want to continue?`;
                 if (FileState.metaTxAbortController) {
                     FileState.metaTxAbortController.abort();
                     FileState.metaTxAbortController = null;
-                    log('[DEBUG] 既存のメタTx BlockID待機ループをキャンセルしました', 'debug');
+                    log('[DEBUG] Cancelled existing meta Tx BlockID wait loop', 'debug');
                 }
                 
                 // Create new AbortController for this meta-tx session
@@ -14739,12 +14739,12 @@ Do you want to continue?`;
                     
                     log(`[SuperMeta] Created ${chunkGroups.length} chunk groups`, 'info');
                     
-                    // v5.10.0: segmentBoundariesの全体状況をログに出力
+                    // v5.10.0: Log overall segmentBoundaries status
                     const segmentBoundariesGlobal = FileState.kaspaMetadata.metadata?.segmentBoundaries || FileState.kaspaMetadata.metadata?.chunkBoundaries;
                     if (segmentBoundariesGlobal) {
-                        log(`[SuperMeta v5.10.0] 全segmentBoundaries数: ${segmentBoundariesGlobal.length}`, 'debug');
-                        log(`[SuperMeta v5.10.0] segmentBoundariesインデックス: [${segmentBoundariesGlobal.map(b => b.index).join(', ')}]`, 'debug');
-                        log(`[SuperMeta v5.10.0] payloadIndexリスト: [${segmentBoundariesGlobal.map(b => b.payloadIndex).join(', ')}]`, 'debug');
+                        log(`[SuperMeta v5.10.0] Total segmentBoundaries: ${segmentBoundariesGlobal.length}`, 'debug');
+                        log(`[SuperMeta v5.10.0] segmentBoundaries indices: [${segmentBoundariesGlobal.map(b => b.index).join(', ')}]`, 'debug');
+                        log(`[SuperMeta v5.10.0] payloadIndex list: [${segmentBoundariesGlobal.map(b => b.payloadIndex).join(', ')}]`, 'debug');
                     }
                     
                     // Create intermediate meta-txs
@@ -14803,7 +14803,7 @@ Do you want to continue?`;
                     };
                     
                     // Step 4: Remove history update process (already handled by KENV)
-                    // スーパーメタの情報はKENVで管理されているため、
+                    // Super meta information is managed by KENV,
                     // History update not needed here
                     
                     log(`[SuperMeta] 🎉 Super metadata creation complete!`, 'success');
@@ -14838,7 +14838,7 @@ Do you want to continue?`;
                                 log(`[KENV] Save error: ${error.message}`, 'error');
                             });
                         } else {
-                            log(`[KENV] CID ${FileState.currentFileCID} のエントリーが見つかりません`, 'warning');
+                            log(`[KENV] Entry for CID ${FileState.currentFileCID} not found`, 'warning');
                         }
                     }
                     
@@ -14914,7 +14914,7 @@ Do you want to continue?`;
                     encryption: FileState.kaspaMetadata.encryption,
                     file: FileState.kaspaMetadata.file,
                     chunks: FileState.kaspaMetadata.chunks,
-                    chunkBlockIds: FileState.kaspaMetadata.chunkBlockIds,  // v3.3フォーマット準拠
+                    chunkBlockIds: FileState.kaspaMetadata.chunkBlockIds,  // v3.3 format compliant
                     recovery: FileState.kaspaMetadata.recovery,
                     metadata: FileState.kaspaMetadata.metadata,
                     // Add flat structure for regular meta-tx
@@ -15177,7 +15177,7 @@ Do you want to continue?`;
                 };
                 
                 // Step 4: Remove history update processing (already handled by KENV)
-                // メタTxの情報はKENVで管理されているため、
+                // Meta Tx information is managed by KENV,
                 // History update not needed here
                 
                 // KENV processing (independent from history) - 2. After MetaTx creation
@@ -15209,7 +15209,7 @@ Do you want to continue?`;
                             log(`[KENV] Save error: ${error.message}`, 'error');
                         });
                     } else {
-                        log(`[KENV] CID ${window.currentFileCID} のエントリーが見つかりません`, 'warning');
+                        log(`[KENV] Entry for CID ${window.currentFileCID} not found`, 'warning');
                     }
                 }
                 
@@ -15364,7 +15364,7 @@ Do you want to continue?`;
                             const startChunk = groupIndex * chunksPerMeta;
                             const endChunk = Math.min((groupIndex + 1) * chunksPerMeta - 1, fileMetadata.recovery.totalChunks - 1);
                             
-                            // デバッグログ：管理範囲を表示
+                            // Debug log: Show management range
                             log(`[SuperMeta v5.10.0] Intermediate meta ${groupIndex + 1} management range: chunks ${startChunk} - ${endChunk}`, 'debug');
                             
                             // Filter only boundaries corresponding to payloads managed by this intermediate meta
@@ -15375,11 +15375,11 @@ Do you want to continue?`;
                                 return payloadStartIndex >= startChunk && payloadStartIndex <= endChunk;
                             });
                             
-                            // デバッグログ：フィルタリング結果
+                            // Debug log: Filtering results
                             log(`[SuperMeta v5.10.0] Segment boundaries assigned to intermediate meta ${groupIndex + 1}: ${boundariesForGroup.length}`, 'debug');
                             if (boundariesForGroup.length > 0) {
-                                log(`[SuperMeta v5.10.0] セグメントインデックス: [${boundariesForGroup.map(b => b.index).join(', ')}]`, 'debug');
-                                log(`[SuperMeta v5.10.0] payloadIndexリスト: [${boundariesForGroup.map(b => b.payloadIndex).join(', ')}]`, 'debug');
+                                log(`[SuperMeta v5.10.0] Segment indices: [${boundariesForGroup.map(b => b.index).join(', ')}]`, 'debug');
+                                log(`[SuperMeta v5.10.0] payloadIndex list: [${boundariesForGroup.map(b => b.payloadIndex).join(', ')}]`, 'debug');
                             }
                             
                             return { segmentBoundaries: boundariesForGroup };
@@ -15558,7 +15558,7 @@ Do you want to continue?`;
                         level: 2,
                         totalChunks: fileMetadata.recovery.totalChunks,
                         hierarchy: {
-                            chunksPerMeta: 2,  // 実験的な値（実際のchunksPerMetaは160）
+                            chunksPerMeta: 2,  // Experimental value (actual chunksPerMeta is 160)
                             metasPerSuper: singleMetaTxs.length
                         }
                     },
@@ -15606,7 +15606,7 @@ Do you want to continue?`;
                 metaPayload.set(salt, 0);
                 metaPayload.set(encryptedMetaData, salt.length);
                 
-                log(`[SuperMeta] スーパーメタデータサイズ: ${metaDataBytes.length} bytes`, 'debug');
+                log(`[SuperMeta] Super metadata size: ${metaDataBytes.length} bytes`, 'debug');
                 
                 // Upload to blockchain
                 const utxoResponse = await NetworkState.rpcClient.getUtxosByAddresses([UserState.address.toString()]);
@@ -15640,7 +15640,7 @@ Do you want to continue?`;
                 await pendingTx.sign([UserState.privateKey]);
                 const superMetaTxId = await pendingTx.submit(NetworkState.rpcClient);
                 
-                log(`[SuperMeta] スーパーメタTxID: ${superMetaTxId}`, 'success');
+                log(`[SuperMeta] Super meta TxID: ${superMetaTxId}`, 'success');
                 
                 // Add to monitoring list for WebSocket
                 NetworkState.ws.monitoredTransactions.set(superMetaTxId, {
@@ -15760,7 +15760,7 @@ Do you want to continue?`;
                     if (fileInfoElement) {
                         fileInfoElement.innerHTML += fileListHtml;
                         
-                        // v4.6.31: DOM操作でボタンを挿入
+                        // v4.6.31: Insert button via DOM manipulation
                         
                         if (window.pendingButtons && window.pendingButtons.length > 0) {
                             window.pendingButtons.forEach(({ id, container }, index) => {
@@ -15832,14 +15832,14 @@ Do you want to continue?`;
                 // Password processing (v4.6.26: Improved DOM manipulation safety)
                 const passwordSection = document.getElementById('passwordSection');
                 if (dirMetadata.auth?.passwordIncluded) {
-                    // 既存の要素を安全に操作
+                    // Safely manipulate existing elements
                     const passwordInput = document.getElementById('downloadPassword');
                     if (passwordInput) {
                         passwordInput.style.display = 'none';
                         passwordInput.value = dirMetadata.auth.password;
                     }
                     
-                    // パスワード値を保持しながらUIを更新
+                    // Update UI while preserving password value
                     const savedPassword = dirMetadata.auth.password;
                     // XSS fix: Escape password value in HTML attribute
                     passwordSection.innerHTML = '<p>✅ Password included in file (auto-filled)</p>' +
@@ -15885,7 +15885,7 @@ Do you want to continue?`;
                             fileItem.totalSize = entry.totalSize || 0;
                         } else {
                             // Add file-specific fields
-                            fileItem.size = entry.fileSize || entry.size || 0;  // v5.12.59: fileSizeを優先
+                            fileItem.size = entry.fileSize || entry.size || 0;  // v5.12.59: Prioritize fileSize
                         }
                         
                         FileState.fileList.push(fileItem);
@@ -15986,7 +15986,7 @@ Do you want to continue?`;
                             skippedFiles++;
                             log(`[Bulk Download] Skip (exists): ${entry.path || entry.name}`, 'info');
                             document.getElementById('downloadStatus').textContent = 
-                                `${completedFiles + skippedFiles}/${totalFiles} ファイル (${skippedFiles}個スキップ)`;
+                                `${completedFiles + skippedFiles}/${totalFiles} files (${skippedFiles} skipped)`;
                             continue;
                         }
                         
@@ -16079,7 +16079,7 @@ Do you want to continue?`;
                 document.getElementById('downloadProgress').style.display = 'block';
                 document.getElementById('downloadStatus').textContent = 'Fetching metadata...';
                 
-                // メタデータ取得
+                // Get metadata
                 const metadata = await NetworkState.downloadManager.fetchMetadata(metaTxId, blockId, password);
                 
                 // v4.7.8: Add folder structure option
@@ -16096,7 +16096,7 @@ Do you want to continue?`;
                         document.getElementById('downloadProgressBar').style.width = progress.percent + '%';
                         document.getElementById('downloadProgressBar').textContent = progress.percent + '%';
                         document.getElementById('downloadStatus').textContent = 
-                            `チャンク ${progress.current}/${progress.total} をダウンロード中...`;
+                            `Downloading chunk ${progress.current}/${progress.total}...`;
                     },
                     onComplete: (blob, filename) => {
                         // Download complete (not called when using folder structure)
@@ -16179,7 +16179,7 @@ Do you want to continue?`;
                     // v4.6.36: Save to directory-specific variable
                     // v5.5.23: window.directoryMetadata -> FileState.directoryMetadata (1/2)
                     FileState.directoryMetadata = kaspaMetadata;
-                    window.currentDirectoryMetadata = kaspaMetadata; // v4.7.8: フォルダ構造用に保持
+                    window.currentDirectoryMetadata = kaspaMetadata; // v4.7.8: Keep for folder structure
                     FileState.kaspaMetadata = null; // Clear regular metadata
                     // v5.5.23: window.directoryMetadata -> FileState.directoryMetadata (2/2)
                     await loadDirectoryMetadata(FileState.directoryMetadata);
@@ -16197,12 +16197,12 @@ Do you want to continue?`;
                 const totalKAS = FileState.kaspaMetadata.metadata?.totalKAS || FileState.kaspaMetadata.recovery?.uploadCost || 0;
                 
                 document.getElementById('fileInfo').textContent = 
-                    `ファイル: ${FileState.kaspaMetadata.file.name}\n` +
-                    `サイズ: ${(FileState.kaspaMetadata.file.size/1024/1024).toFixed(2)}MB\n` +
-                    `チャンク: ${FileState.kaspaMetadata.chunks.length}\n` +
-                    `ネットワーク: ${network}\n` +
-                    `作成日時: ${new Date(createdAt).toLocaleString()}\n` +
-                    `コスト: ${totalKAS.toFixed(5)} KAS`;
+                    `File: ${FileState.kaspaMetadata.file.name}\n` +
+                    `Size: ${(FileState.kaspaMetadata.file.size/1024/1024).toFixed(2)}MB\n` +
+                    `Chunks: ${FileState.kaspaMetadata.chunks.length}\n` +
+                    `Network: ${network}\n` +
+                    `Created: ${new Date(createdAt).toLocaleString()}\n` +
+                    `Cost: ${totalKAS.toFixed(5)} KAS`;
                 
                 // Handle password
                 const passwordSection = document.getElementById('passwordSection');
@@ -16607,7 +16607,7 @@ Do you want to continue?`;
                     }
                 }
                 
-                // REST API fallback - RPCエラー時またはBlockIDなしの場合
+                // REST API fallback - On RPC error or no BlockID
                 if (!payload) {
                     // Fall back to REST API if no BlockID provided or REST API test mode
                     if (NetworkState.downloadManager && NetworkState.downloadManager.forceRestApi) {

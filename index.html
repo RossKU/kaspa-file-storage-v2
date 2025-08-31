@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.3.3</title>
+    <title>Kaspa P2P File Storage v6.3.5</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -1897,12 +1897,12 @@
             <div class="file-table-wrapper">
                 <table class="file-table">
                     <colgroup>
-                        <col style="width: 40px;">  <!-- チェックボックス -->
-                        <col style="width: 50px;">  <!-- アイコン -->
+                        <col style="width: 40px;">  <!-- Checkbox -->
+                        <col style="width: 50px;">  <!-- Icon -->
                         <col style="width: auto;">  <!-- File Name -->
-                        <col style="width: 100px;"> <!-- 容量 -->
+                        <col style="width: 100px;"> <!-- Capacity -->
                         <col style="width: 100px;"> <!-- MetaTxID -->
-                        <col style="width: 150px;"> <!-- UP日 -->
+                        <col style="width: 150px;"> <!-- Upload Date -->
                     </colgroup>
                     <thead>
                         <tr>
@@ -2581,7 +2581,7 @@
                 </div>
             </div>
             
-            <!-- Kaspaシステム再起動 (Moved from Debug Tab) -->
+            <!-- Kaspa System Restart (Moved from Debug Tab) -->
             <div class="metric-box" style="margin-top: 20px;">
                 <h3>🔄 Kaspa System Restart</h3>
                 <p style="font-size: 13px; color: var(--text-secondary); margin: 10px 0;">
@@ -2595,7 +2595,7 @@
                 </button>
                 <div id="restartStatus" style="margin-top: 10px; padding: 10px; 
                      background: var(--bg-secondary); border-radius: 5px; display: none;">
-                    <!-- ステータス表示エリア -->
+                    <!-- Status Display Area -->
                 </div>
             </div>
             
@@ -2700,7 +2700,7 @@
                 </div>
                 
                 <div id="multiWsConnections" style="margin: 10px 0;">
-                    <!-- Connectリストがここに表示される -->
+                    <!-- Connection list will be displayed here -->
                 </div>
                 
                 <div style="display: flex; gap: 10px; margin-top: 15px;">
@@ -2710,7 +2710,7 @@
                 </div>
                 
                 <div id="multiWsLog" style="margin-top: 15px; max-height: 200px; overflow-y: auto; padding: 10px; background: var(--background-dark); border-radius: 5px; font-size: 12px; font-family: monospace;">
-                    <!-- ログがここに表示される -->
+                    <!-- Logs will be displayed here -->
                 </div>
             </div>
         </div>
@@ -2836,9 +2836,9 @@
             <h2>🐛 Debug Log</h2>
             <div class="log-container" id="systemLog"></div>
             <div style="margin-top: 12px; display: flex; gap: 8px;">
-                <button onclick="copyLog()">ログをコピー</button>
-                <button onclick="exportLogs()">ログをJSON形式でエクスポート</button>
-                <button onclick="exportLogsAsText()">ログをテキスト形式でエクスポート</button>
+                <button onclick="copyLog()">Copy Logs</button>
+                <button onclick="exportLogs()">Export Logs as JSON</button>
+                <button onclick="exportLogsAsText()">Export Logs as Text</button>
                 <button onclick="clearLog()">Clear Logs</button>
             </div>
         </div>
@@ -2959,7 +2959,7 @@
                 });
                 NetworkState.blockEventFilter.targetNodes = targets;
                 
-                const targetText = targets.length === 0 ? '全ノード' : targets.join(', ');
+                const targetText = targets.length === 0 ? 'All Nodes' : targets.join(', ');
                 log(`🎯 [BlockFilter] Target nodes: ${targetText}`, 'info');
             },
             
@@ -3352,7 +3352,7 @@
                         `File: ${metaInfo.fileName || 'Unknown'}\n` +
                         `Progress: ${metaInfo.completedChunks || '?'}/${metaInfo.totalChunks || '?'} chunks\n` +
                         `Last Update: ${metaInfo.lastUpdate ? new Date(metaInfo.lastUpdate).toLocaleString() : 'Unknown'}\n\n` +
-                        'これを使用しますか？\n\n' +
+                        'Use this?\n\n' +
                         'Select "Cancel" to load from file.'
                     );
                     
@@ -7754,7 +7754,7 @@ Do you want to continue?`;
                 a.click();
                 URL.revokeObjectURL(url);
                 
-                log('ログをエクスポートしました', 'success');
+                log('Logs exported', 'success');
             },
             
             exportLogsAsText: function() {
@@ -7768,7 +7768,7 @@ Do you want to continue?`;
                         second: '2-digit',
                         fractionalSecondDigits: 3  // ミリ秒3桁
                     });
-                    const typeStr = log.type.toUpperCase().padEnd(7); // 幅を揃える
+                    const typeStr = log.type.toUpperCase().padEnd(7); // Align width
                     return `[${time}] [${typeStr}] ${log.message}`;
                 });
                 
@@ -7780,7 +7780,7 @@ Do you want to continue?`;
                 a.click();
                 URL.revokeObjectURL(url);
                 
-                log('ログをテキスト形式でエクスポートしました', 'success');
+                log('Logs exported as text', 'success');
             },
             
             clearLog: function() {
@@ -7815,12 +7815,12 @@ Do you want to continue?`;
                 const preview = text && text.length > 20 ? text.substring(0, 20) + '...' : text;
                 // Use window.log to ensure it's accessible
                 if (typeof log !== 'undefined') {
-                    log(`[DEBUG] copyToClipboard が呼び出されました: ${preview}`, 'debug');
+                    log(`[DEBUG] copyToClipboard called: ${preview}`, 'debug');
                 }
                 try {
                     await navigator.clipboard.writeText(text);
                     if (typeof log !== 'undefined') {
-                        log('クリップボードにコピーしました', 'success');
+                        log('Copied to clipboard', 'success');
                     }
                     return true;
                 } catch (error) {
@@ -7957,7 +7957,7 @@ Do you want to continue?`;
                         
                         const reader = new FileReader();
                         reader.onload = async function(event) {
-                            log('FileReader.onload が呼び出されました', 'info');
+                            log('FileReader.onload called', 'info');
                             try {
                                 const kaspaContent = event.target.result;
                                 const kaspaData = JSON.parse(kaspaContent);
@@ -8291,7 +8291,7 @@ Do you want to continue?`;
                     localStorage.removeItem(test);
                     return true;
                 } catch (e) {
-                    log('[Storage] LocalStorage使用不可', 'warning');
+                    log('[Storage] LocalStorage unavailable', 'warning');
                     return false;
                 }
             }
@@ -8341,11 +8341,11 @@ Do you want to continue?`;
         function isNetworkError(error) {
             // WASM error objects cannot be JSON.stringified, so log using alternative method
             if (typeof error === 'string') {
-                log(`[DEBUG-isNetworkError] 入力: "${error}" (文字列)`, 'debug');
+                log(`[DEBUG-isNetworkError] Input: "${error}" (string)`, 'debug');
             } else if (typeof error === 'object' && error !== null) {
-                log(`[DEBUG-isNetworkError] 入力: ${error.message || '[messageなし]'} (${error.constructor?.name || 'object'})`, 'debug');
+                log(`[DEBUG-isNetworkError] Input: ${error.message || '[no message]'} (${error.constructor?.name || 'object'})`, 'debug');
             } else {
-                log(`[DEBUG-isNetworkError] 入力: ${error} (${typeof error})`, 'debug');
+                log(`[DEBUG-isNetworkError] Input: ${error} (${typeof error})`, 'debug');
             }
             
             if (!error) {
@@ -8355,7 +8355,7 @@ Do you want to continue?`;
             
             // Handle both string errors and error objects
             const message = (typeof error === 'string' ? error : error.message || '').toLowerCase();
-            log(`[DEBUG-isNetworkError] 検査対象メッセージ: "${message}"`, 'debug');
+            log(`[DEBUG-isNetworkError] Target message: "${message}"`, 'debug');
             
             const result = message.includes('network') || 
                    message.includes('connection') || 
@@ -8365,7 +8365,7 @@ Do you want to continue?`;
                    message.includes('disconnected') ||
                    message.includes('websocket');  // Phase 0-F: Added WebSocket check
             
-            log(`[DEBUG-isNetworkError] 結果: ${result}`, 'debug');
+            log(`[DEBUG-isNetworkError] Result: ${result}`, 'debug');
             return result;
         }
         
@@ -8403,7 +8403,7 @@ Do you want to continue?`;
                 if (NetworkState.rpcClient) {
                     try {
                         await NetworkState.rpcClient.disconnect();
-                        log('[ConnectionManager] RPCConnectをDisconnectしました', 'info');
+                        log('[ConnectionManager] RPC connection disconnected', 'info');
                     } catch (disconnectError) {
                         log(`[ConnectionManager] RPC disconnect error: ${disconnectError.message}`, 'debug');
                     }
@@ -8440,7 +8440,7 @@ Do you want to continue?`;
                 
                 // Phase 0-O: Support unlimited retries
                 if (this.maxReconnectAttempts !== null && this.reconnectAttempts >= this.maxReconnectAttempts) {
-                    log('[ConnectionManager] 最大再Connect試行回数に到達', 'error');
+                    log('[ConnectionManager] Maximum reconnection attempts reached', 'error');
                     return;
                 }
                 
@@ -8448,7 +8448,7 @@ Do you want to continue?`;
                 const attemptInfo = this.maxReconnectAttempts === null 
                     ? `${this.reconnectAttempts + 1}` 
                     : `${this.reconnectAttempts + 1}/${this.maxReconnectAttempts}`;
-                log(`[ConnectionManager] ${delay}ms後に再Connectを試行します（${attemptInfo}）`, 'info');
+                log(`[ConnectionManager] Attempting reconnection in ${delay}ms (${attemptInfo})`, 'info');
                 
                 this.reconnectTimer = setTimeout(() => {
                     this.attemptReconnect();
@@ -8459,13 +8459,13 @@ Do you want to continue?`;
             async attemptReconnect() {
                 // v5.7.7: Prevent concurrent reconnection attempts
                 if (this.isReconnecting) {
-                    log('[ConnectionManager] 既に再Connectedです', 'debug');
+                    log('[ConnectionManager] Already reconnected', 'debug');
                     return;
                 }
                 
                 this.isReconnecting = true;
                 this.reconnectAttempts++;
-                log(`[ConnectionManager] 再Connect試行 #${this.reconnectAttempts}`, 'info');
+                log(`[ConnectionManager] Reconnection attempt #${this.reconnectAttempts}`, 'info');
                 
                 try {
                     // v5.7.5: Always create new RPC client on reconnect
@@ -8522,7 +8522,7 @@ Do you want to continue?`;
             // Handle successful reconnection
             async handleReconnected() {
                 // Phase 0-D: Improved connection state management
-                log('[ConnectionManager] Connectが安定しました', 'info');
+                log('[ConnectionManager] Connection stabilized', 'info');
                 log(`[DEBUG] handleReconnected started - uploadSessionActive: ${FileState.uploadSessionActive}`, 'debug');
                 
                 this.isConnected = true;
@@ -8542,8 +8542,8 @@ Do you want to continue?`;
                 
                 // Auto-resume upload if in progress
                 log(`[DEBUG-RESUME] Auto-resume condition check started`, 'debug');
-                log(`[DEBUG-RESUME] ProgressManager存在: ${!!FileState.progressManager}`, 'debug');
-                log(`[DEBUG-RESUME] progress存在: ${!!FileState.progressManager?.progress}`, 'debug');
+                log(`[DEBUG-RESUME] ProgressManager exists: ${!!FileState.progressManager}`, 'debug');
+                log(`[DEBUG-RESUME] progress exists: ${!!FileState.progressManager?.progress}`, 'debug');
                 log(`[DEBUG-RESUME] needsMetaTx: ${FileState.needsMetaTx}`, 'debug');
                 
                 if (FileState.progressManager?.progress) {
@@ -8624,7 +8624,7 @@ Do you want to continue?`;
                         // Normal chunk resume or chunks + meta-tx
                         setTimeout(async () => {
                             if (FileState.currentFile && window.pendingProgress) {
-                                log('[ConnectionManager] processAndUploadを呼び出します...', 'info');
+                                log('[ConnectionManager] Calling processAndUpload...', 'info');
                                 log(`[DEBUG] Before auto-resume - uploadSessionActive: ${FileState.uploadSessionActive}`, 'debug');
                                 await processAndUpload();
                                 // Phase 0-M: Move completion message after processAndUpload to ensure proper timing
@@ -8646,7 +8646,7 @@ Do you want to continue?`;
                 } else {
                     log(`[DEBUG-RESUME] Auto-resume conditions not met`, 'debug');
                     if (!FileState.progressManager) {
-                        log(`[DEBUG-RESUME]   理由: ProgressManagerが存在しない`, 'debug');
+                        log(`[DEBUG-RESUME]   Reason: ProgressManager does not exist`, 'debug');
                     } else if (!FileState.progressManager.progress) {
                         log(`[DEBUG-RESUME]   Reason: progress data does not exist`, 'debug');
                     } else if (FileState.progressManager.progress._progress.completedChunks >= FileState.progressManager.progress.recovery.totalChunks && !FileState.needsMetaTx) {
@@ -8735,7 +8735,7 @@ Do you want to continue?`;
                 } else {
                     // For smaller files, get actual byte count
                     fullFileData = await this.file.arrayBuffer();
-                    actualFileSize = fullFileData.byteLength; // 実際のバイト数を測定
+                    actualFileSize = fullFileData.byteLength; // Measure actual byte count
                     
                     // Log size difference if any
                     if (actualFileSize !== this.file.size) {
@@ -8763,14 +8763,14 @@ Do you want to continue?`;
                     // File information
                     file: {
                         name: this.file.name,
-                        size: actualFileSize, // 実際のバイト数を使用
+                        size: actualFileSize, // Use actual byte count
                         mimeType: this.file.type || 'application/octet-stream',
                         sha256: fullFileHash, // Full 64-char hash
                         encrypted: true,
                         compression: {
                             algorithm: "none",
                             enabled: false,
-                            originalSize: actualFileSize, // 実際のバイト数を使用
+                            originalSize: actualFileSize, // Use actual byte count
                             compressedSize: null
                         }
                     },
@@ -8786,7 +8786,7 @@ Do you want to continue?`;
                     
                     // Recovery section
                     recovery: {
-                        totalChunks: Math.ceil(actualFileSize / this.chunkSize), // 実際のバイト数を使用
+                        totalChunks: Math.ceil(actualFileSize / this.chunkSize), // Use actual byte count
                         chunkSize: this.chunkSize,
                         checksum: fullFileHash,
                         uploadCost: 0
@@ -8839,7 +8839,7 @@ Do you want to continue?`;
                 
                 // Check file name
                 if (fileInfo.name !== this.file.name) {
-                    log(`File Nameが一致しません: ${fileInfo.name} != ${this.file.name}`, 'error');
+                    log(`File Name does not match: ${fileInfo.name} != ${this.file.name}`, 'error');
                     return false;
                 }
                 
@@ -8852,7 +8852,7 @@ Do you want to continue?`;
                 if (sizeDiff > 1024) {
                     log(`File size differs significantly: recorded=${fileInfo.size} bytes, current=${currentFileSize} bytes (diff: ${sizeDiff} bytes)`, 'error');
                     if (this.actualFileSize && this.actualFileSize !== this.file.size) {
-                        log(`注: File API=${this.file.size}バイト, 実測=${this.actualFileSize}バイト`, 'info');
+                        log(`Note: File API=${this.file.size} bytes, Actual=${this.actualFileSize} bytes`, 'info');
                     }
                     return false;
                 }
@@ -8956,7 +8956,7 @@ Do you want to continue?`;
                     }
                     
                     // Save to file if workspace is available
-                    log(`[DEBUG] workspaceHandle存在チェック: ${WorkspaceState.handle ? 'あり' : 'なし'}`, 'debug');
+                    log(`[DEBUG] workspaceHandle existence check: ${WorkspaceState.handle ? 'exists' : 'none'}`, 'debug');
                     if (WorkspaceState.handle) {
                         try {
                             // v5.5.27: More robust file handle operations
@@ -9404,7 +9404,7 @@ Do you want to continue?`;
                         log(`[ParallelDownloader] Payload ${work.index} RPC failed, falling back to REST API: ${rpcError.message}`, 'warning');
                         
                         try {
-                            // REST API Kill スイッチチェック
+                            // REST API Kill switch check
                             if (!NetworkState.restApiControl.globalEnabled || NetworkState.restApiControl.temporaryKilled) {
                                 throw new Error('REST API is disabled');
                             }
@@ -9868,19 +9868,19 @@ Do you want to continue?`;
         // Generate safe filename with CID
         function generateSafeFilename(originalName, cid) {
             const ext = '.kaspa';
-            const maxLength = 240; // 安全マージン
+            const maxLength = 240; // Safety margin
             
-            // 1. 通常パターン
+            // 1. Normal pattern
             let filename = `${originalName}.${cid}${ext}`;
             
-            // 2. 長すぎる場合は元File Nameを短縮
+            // 2. Shorten original File Name if too long
             if (filename.length > maxLength) {
                 const availableLength = maxLength - cid.length - ext.length - 2;
                 const truncated = originalName.substring(0, availableLength);
                 filename = `${truncated}..${cid}${ext}`;
             }
             
-            // 3. それでも長い場合はCIDのみ
+            // 3. Use only CID if still too long
             if (filename.length > maxLength) {
                 filename = `file.${cid}${ext}`;
             }
@@ -9911,14 +9911,14 @@ Do you want to continue?`;
                     
                 } catch (error) {
                     if (error.name === 'AbortError') {
-                        log(`タイムアウト (${timeout}ms): ${url}`, 'warning');
+                        log(`Timeout (${timeout}ms): ${url}`, 'warning');
                     } else {
                         log(`Network error: ${error.message}`, 'warning');
                     }
                     
                     if (attempt < retries) {
                         const waitTime = attempt * 1000; // 1s, 2s, 3s
-                        log(`${waitTime/1000}秒後にリトライ (${attempt}/${retries})...`, 'info');
+                        log(`Retrying in ${waitTime/1000} seconds (${attempt}/${retries})...`, 'info');
                         await new Promise(resolve => setTimeout(resolve, waitTime));
                     } else {
                         throw error;
@@ -10000,7 +10000,7 @@ Do you want to continue?`;
                         // Skip trash/system files
                         if (shouldSkipFile(entry.name)) {
                             skippedCount++;
-                            log(`スキップ: ${entry.name}`, 'debug');
+                            log(`Skip: ${entry.name}`, 'debug');
                             continue;
                         }
                         
@@ -10198,7 +10198,7 @@ Do you want to continue?`;
                     `File: ${metaInfo.fileName || 'Unknown'}\n` +
                     `Progress: ${metaInfo.completedChunks || '?'}/${metaInfo.totalChunks || '?'} chunks\n` +
                     `Last update: ${metaInfo.lastUpdate ? new Date(metaInfo.lastUpdate).toLocaleString() : 'Unknown'}\n\n` +
-                    'これを使用しますか？\n\n' +
+                    'Use this?\n\n' +
                     'Select "Cancel" to load from file.'
                 );
                 
@@ -10718,7 +10718,7 @@ Do you want to continue?`;
                     
                     // Skip RPC if REST API test mode
                     if (this.forceRestApi) {
-                        log(`[DownloadManager] REST APIテストモード - RPCをスキップ`, 'debug');
+                        log(`[DownloadManager] REST API test mode - Skipping RPC`, 'debug');
                         throw new Error('REST API test mode - skip RPC');
                     }
                     
@@ -10728,7 +10728,7 @@ Do you want to continue?`;
                         const archiveClient = await NetworkState.archiveManager.getOptimalClient();
                         if (archiveClient) {
                             rpcClient = archiveClient;
-                            log(`[DownloadManager] アーカイブノード強制使用モード - アーカイブノードを使用`, 'debug');
+                            log(`[DownloadManager] Archive node force mode - Using archive node`, 'debug');
                         }
                     }
                     
@@ -10802,7 +10802,7 @@ Do you want to continue?`;
                     
                     // Skip RPC if REST API test mode
                     if (this.forceRestApi) {
-                        log(`[DownloadManager] REST APIテストモード - RPCをスキップ`, 'debug');
+                        log(`[DownloadManager] REST API test mode - Skipping RPC`, 'debug');
                         throw new Error('REST API test mode - skip RPC');
                     }
                     
@@ -10812,7 +10812,7 @@ Do you want to continue?`;
                         const archiveClient = await NetworkState.archiveManager.getOptimalClient();
                         if (archiveClient) {
                             rpcClient = archiveClient;
-                            log(`[DownloadManager] アーカイブノード強制使用モード - アーカイブノードを使用`, 'debug');
+                            log(`[DownloadManager] Archive node force mode - Using archive node`, 'debug');
                         }
                     }
                     
@@ -10921,7 +10921,7 @@ Do you want to continue?`;
                     let blob = null;
                     if (!addToListOnly) {
                         log(`[DownloadManager DEBUG] chunks[0]: ${metadata.chunks[0]?.substring(0, 16)}...`, 'debug');
-                        log(`[DownloadManager DEBUG] chunks配列長: ${metadata.chunks?.length}`, 'debug');
+                        log(`[DownloadManager DEBUG] chunks array length: ${metadata.chunks?.length}`, 'debug');
                         log(`[DownloadManager DEBUG] chunkStructure.type: ${metadata.chunkStructure?.type}`, 'debug');
                         
                         // v5.3.16: Debug logs
@@ -11310,7 +11310,7 @@ Do you want to continue?`;
                             // v4.7.9: Use provided targetHandle or show picker
                             if (folderStructure.targetHandle) {
                                 targetHandle = folderStructure.targetHandle;
-                                log('[DownloadManager] 提供されたtargetHandleを使用', 'info');
+                                log('[DownloadManager] Using provided targetHandle', 'info');
                             } else {
                                 // Show directory picker
                                 const dirHandle = await window.showDirectoryPicker({
@@ -11407,7 +11407,7 @@ Do you want to continue?`;
                                 e.metaTxId === metaTxId
                             );
                         } else if (metadata.chunks && metadata.chunks.length > 0) {
-                            // chunks[0]ベースの重複チェック（metaTxIdがない場合）
+                            // chunks[0] based duplicate check (when no metaTxId)
                             kenvEntry = FileState.kenvManager.entries.find(e => 
                                 e.firstChunkTxId === metadata.chunks[0]
                             );
@@ -11470,7 +11470,7 @@ Do you want to continue?`;
                                 kenvEntry.variableChunk = comp.variableChunk || false;
                             }
                             
-                            // PayloadSplit情報
+                            // PayloadSplit information
                             kenvEntry.payloadSplit = metadata.metadata?.payloadSplit || false;
                         }
                         
@@ -11563,7 +11563,7 @@ Do you want to continue?`;
             
             // Update statistics display
             document.getElementById('archiveStats').textContent = 
-                `探索: ${manager.stats.totalAttempts} | 発見: ${activeCount}/${manager.stats.uniqueNodes.size} (${discoveryRate}%) | ${nodesPerMin} nodes/min`;
+                `Search: ${manager.stats.totalAttempts} | Found: ${activeCount}/${manager.stats.uniqueNodes.size} (${discoveryRate}%) | ${nodesPerMin} nodes/min`;
             
             // Update health bar
             let healthBar = '[';
@@ -11694,7 +11694,7 @@ Do you want to continue?`;
                         label.innerHTML = `
                             Force Archive Node<br>
                             <small style="color: var(--warning-color);">
-                                アーカイブノードを探索中... (${manager.stats.totalAttempts}回試行)
+                                Searching for archive nodes... (${manager.stats.totalAttempts} attempts)
                             </small>
                         `;
                     } else if (manager.consecutiveNonArchive >= manager.maxConsecutiveNonArchive) {
@@ -11708,7 +11708,7 @@ Do you want to continue?`;
                         label.innerHTML = `
                             Force Archive Node<br>
                             <small style="color: var(--text-secondary);">
-                                アーカイブノードが見つかりません
+                                Archive nodes not found
                             </small>
                         `;
                     }
@@ -11717,7 +11717,7 @@ Do you want to continue?`;
                     label.innerHTML = `
                         Force Archive Node<br>
                         <small style="color: var(--success-color);">
-                            ${nodeCount}個のアーカイブノードが利用可能
+                            ${nodeCount} archive nodes available
                         </small>
                     `;
                 }
@@ -11794,12 +11794,12 @@ Do you want to continue?`;
                     log('Data not found on regular node. Using archive node.', 'info');
                     
                     if (!NetworkState.archiveManager || NetworkState.archiveManager.connections.size === 0) {
-                        throw new Error('利用可能なアーカイブノードがありません');
+                        throw new Error('No available archive nodes');
                     }
                     
                     const archiveClient = await NetworkState.archiveManager.getOptimalClient();
                     if (!archiveClient) {
-                        throw new Error('健全なアーカイブノードが見つかりません');
+                        throw new Error('No healthy archive nodes found');
                     }
                     
                     const nodeId = NetworkState.archiveManager.getNodeIdByClient(archiveClient);
@@ -11868,7 +11868,7 @@ Do you want to continue?`;
             // Disable upload button
             updateUploadButtonState(false);
             
-            log('ウォレットDisconnect', 'info');
+            log('Wallet disconnected', 'info');
         };
         
         AppState.updateTransactionAmount = function() {
@@ -11900,7 +11900,7 @@ Do you want to continue?`;
                 
                 // Import WASM SDK
                 NetworkState.kaspa = await import('./kaspa-core.js');
-                log('kaspa-core.jsをインポートしました');
+                log('kaspa-core.js imported');
                 
                 // Initialize WASM binary
                 // v5.7.13: Use new initialization format to avoid deprecated parameters warning
@@ -11923,7 +11923,7 @@ Do you want to continue?`;
                     networkId: config.network
                 });
                 
-                log('RPCConnectを試行中...');
+                log('Attempting RPC connection...');
                 await NetworkState.rpcClient.connect();
                 
                 // Test connection
@@ -11941,7 +11941,7 @@ Do you want to continue?`;
                 if (UserState.address) {
                     const { entries } = await NetworkState.rpcClient.getUtxosByAddresses([UserState.address.toString()]);
                     balance = entries.reduce((sum, utxo) => sum + Number(utxo.amount), 0) / 1e8;
-                    log(`残高: ${balance} KAS`, 'info');
+                    log(`Balance: ${balance} KAS`, 'info');
                 }
                 
                 // Update UI
@@ -11957,7 +11957,7 @@ Do you want to continue?`;
                 } else {
                     document.getElementById('initStatus').innerHTML = `
                         <p class="success">✅ System initialization complete</p>
-                        <p style="color: #ffcc66;">⚠️ ウォレットDisconnected</p>
+                        <p style="color: #ffcc66;">⚠️ Wallet Disconnected</p>
                         <p>Please connect wallet from Status tab</p>
                     `;
                 }
@@ -12433,7 +12433,7 @@ Do you want to continue?`;
             } catch (error) {
                 // Handle connection errors
                 if (error.message && error.message.includes('not connected')) {
-                    log('WebSocketConnectがDisconnectされました。再Connectを試みます...', 'warning');
+                    log('WebSocket connection disconnected. Attempting reconnection...', 'warning');
                     
                     // Reconnect
                     await NetworkState.rpcClient.connect();
@@ -12717,18 +12717,18 @@ Do you want to continue?`;
         function calculateSafePayloadSize(rawChunkSize) {
             // v4.7.30: Dynamic chunk size optimization (phase 2)
             const KASPA_MAX_PAYLOAD = 24000; // Kaspa payload limit
-            const AES_GCM_OVERHEAD = 16;     // AES-256-GCM認証タグ
-            const SAFETY_MARGIN = 1000;      // 安全マージン（約1KB）
+            const AES_GCM_OVERHEAD = 16;     // AES-256-GCM authentication tag
+            const SAFETY_MARGIN = 1000;      // Safety margin (about 1KB)
             
             // Maximum safe payload = 24000 - 16 - 1000 = 22984 bytes ≈ 22.4KB
             const MAX_SAFE_CHUNK_SIZE = KASPA_MAX_PAYLOAD - AES_GCM_OVERHEAD - SAFETY_MARGIN;
             
             // v4.7.30: Stage 2 - Verification with 22KB fixed value (no change)
             if (rawChunkSize >= 22528) { // 22KB = 22 * 1024
-                return 22528; // 22KBに制限
+                return 22528; // Limited to 22KB
             }
             
-            return rawChunkSize; // それ以下はそのまま
+            return rawChunkSize; // Keep as is if less
         }
         
         // v4.7.30: Compression ratio prediction by file type
@@ -12781,7 +12781,7 @@ Do you want to continue?`;
             // Calculate maximum size before compression
             const maxOriginalSize = Math.floor(MAX_COMPRESSED_SIZE / compressionRatio);
             
-            // 要求されたサイズと計算された最大サイズの小さい方を選択
+            // Select the smaller of requested size and calculated maximum size
             const optimalSize = Math.min(baseChunkSize, maxOriginalSize);
             
             // Log output (only for 22KB or more)
@@ -12906,7 +12906,7 @@ Do you want to continue?`;
             } catch (error) {
                 // v4.7.57: Add error handling
                 log(`[processFileWithPayloadSplit] Error: ${error.message}`, 'error');
-                log(`[processFileWithPayloadSplit] スタック: ${error.stack}`, 'error');
+                log(`[processFileWithPayloadSplit] Stack: ${error.stack}`, 'error');
                 throw error;
             } finally {
                 // v5.3.6: End upload session
@@ -12914,7 +12914,7 @@ Do you want to continue?`;
                 // FileState.uploadSessionActive = false; // v5.5.35: Using FileState
                 log('[INFO] Payload split processing completed', 'info');
                 
-                // Phase 0-C: 10秒タイマーもprocessAndUploadに移動
+                // Phase 0-C: 10 second timer also moved to processAndUpload
                 // setTimeout(async () => {
                 //     if (!FileState.uploadSessionActive && NetworkState.ws.monitoredTransactions.size === 0) { // v5.5.35: Using FileState
                 //         log('[DEBUG] 10 seconds passed since upload completion - considering stopping monitoring', 'debug');
@@ -13168,7 +13168,7 @@ Do you want to continue?`;
             const uploadProgressInit = document.getElementById('uploadProgress');
             if (uploadProgressInit) {
                 uploadProgressInit.style.display = 'block';
-                log('[DEBUG] uploadProgress要素を表示しました', 'debug');
+                log('[DEBUG] uploadProgress element displayed', 'debug');
                 
                 // v5.11.126: Reset upload status UI
                 uploadStatusUI.reset();
@@ -13288,7 +13288,7 @@ Do you want to continue?`;
                     
                     if (requestedChunkSize >= 22528) {
                         log(`🚀 Dynamic optimization: Using ${(actualChunkSize/1024).toFixed(1)}KB chunks`, 'warning');
-                        log('📊 ペイロード効率: ' + ((actualChunkSize / 23984) * 100).toFixed(1) + '% (理論最大値に対して)', 'info');
+                        log('📊 Payload efficiency: ' + ((actualChunkSize / 23984) * 100).toFixed(1) + '% (vs theoretical maximum)', 'info');
                         log('⚠️ This feature is experimental. If problems occur, please select 20KB', 'warning');
                     } else {
                         log(`🧪 Experimental feature: Using ${(actualChunkSize/1024).toFixed(1)}KB chunks`, 'warning');
@@ -13488,10 +13488,10 @@ Do you want to continue?`;
                         FileState.preparedPayloads = null;
                         
                         // Log estimation
-                        log(`📊 見積もり承認済み: ${totalTxCount}トランザクション, ${estimatedCost.toFixed(6)} KAS`, 'info');
+                        log(`📊 Estimate approved: ${totalTxCount} transactions, ${estimatedCost.toFixed(6)} KAS`, 'info');
                     } else {
                         // Resume: Log without confirmation
-                        log(`🔄 Resuming: ${totalTxCount}トランザクション (${FileState.progressManager.progress._progress.completedChunks}/${payloadCount} completed)`, 'info');
+                        log(`🔄 Resuming: ${totalTxCount} transactions (${FileState.progressManager.progress._progress.completedChunks}/${payloadCount} completed)`, 'info');
                     }
                     
                     // Start WebSocket monitoring after confirmation
@@ -13599,7 +13599,7 @@ Do you want to continue?`;
                                 await pendingTx.sign([UserState.privateKey]);
                                 txid = await pendingTx.submit(NetworkState.rpcClient);
                                 
-                                log(`ペイロード ${i + 1} TxID: ${txid.substring(0, 16)}...`, 'success');
+                                log(`Payload ${i + 1} TxID: ${txid.substring(0, 16)}...`, 'success');
                                 
                                 // Add to monitoring
                                 FileState.uploadingChunksCount++; // v5.5.36: Using FileState
@@ -13646,7 +13646,7 @@ Do you want to continue?`;
                                         if (!NetworkState.restApiControl.globalEnabled || NetworkState.restApiControl.temporaryKilled) {
                                             NetworkState.restApiControl.skipCount++;
                                             NetworkState.restApiControl.lastSkipped = Date.now();
-                                            log(`🚫 [REST API Kill] REST APIスキップ (無効化中) - スキップ回数: ${NetworkState.restApiControl.skipCount}`, 'debug');
+                                            log(`🚫 [REST API Kill] REST API skipped (disabled) - Skip count: ${NetworkState.restApiControl.skipCount}`, 'debug');
                                             // Update UI stats
                                             if (typeof DebugHandlers !== 'undefined' && DebugHandlers.updateRestApiStats) {
                                                 DebugHandlers.updateRestApiStats();
@@ -13698,7 +13698,7 @@ Do you want to continue?`;
                                 if (chunkStatusElement) {
                                     chunkStatusElement.innerHTML = '<span class="success">✅ Complete</span>';
                                 } else {
-                                    log(`[ERROR] chunk-status-${i} 要素が見つかりません`, 'error');
+                                    log(`[ERROR] chunk-status-${i} element not found`, 'error');
                                 }
                                 const uploadTime = Date.now() - uploadStartTime;
                                 log(`Payload ${i + 1} upload complete (${(uploadTime/1000).toFixed(1)} seconds)`);
@@ -13788,7 +13788,7 @@ Do you want to continue?`;
                                         `Change amount in Settings tab and try again.`;
                                     
                                     // ログにも記録
-                                    log(`❌ Storage mass超過: UTXO ${utxoCount}個 (ペイロード ${i + 1}/${FileState.payloadCount})`, 'error');
+                                    log(`❌ Storage mass exceeded: ${utxoCount} UTXOs (Payload ${i + 1}/${FileState.payloadCount})`, 'error');
                                     log(`💡 Recommended: Set amount to ${recommendedAmount} KAS or more`, 'warning');
                                     
                                     // アラート表示
@@ -13807,7 +13807,7 @@ Do you want to continue?`;
                                 }
                                 log(`[DEBUG] Error type: ${typeof error}`, 'debug');
                                 if (error?.stack) {
-                                    log(`[DEBUG] スタックトレース: ${error.stack}`, 'debug');
+                                    log(`[DEBUG] Stack trace: ${error.stack}`, 'debug');
                                 }
                                 
                                 if (retries >= config.retryCount) {
@@ -13851,7 +13851,7 @@ Do you want to continue?`;
                             progressBar.style.width = percentage + '%';
                             progressBar.textContent = percentage + '%';
                         } else {
-                            log('[ERROR] uploadProgressBar要素が見つかりません！', 'error');
+                            log('[ERROR] uploadProgressBar element not found!', 'error');
                         }
                         
                         // Add or update payload info
@@ -15523,7 +15523,7 @@ Do you want to continue?`;
                 }
                 
                 if (!metaBlockId) {
-                    log(`[SuperMeta] 警告: BlockID取得がタイムアウトしました`, 'warning');
+                    log(`[SuperMeta] Warning: BlockID retrieval timed out`, 'warning');
                     // Continue without BlockID (REST API fallback will be available)
                 }
                 
@@ -15669,9 +15669,9 @@ Do you want to continue?`;
                         if (monitorData.blockId) {
                             superMetaBlockId = monitorData.blockId;
                             superMetaBlockTime = monitorData.blockTime || null;
-                            log(`[SuperMeta] スーパーメタBlockID取得: ${superMetaBlockId.substring(0, 16)}...`, 'success');
+                            log(`[SuperMeta] Super meta BlockID obtained: ${superMetaBlockId.substring(0, 16)}...`, 'success');
                             if (superMetaBlockTime) {
-                                log(`[SuperMeta] スーパーメタBlockTime取得: ${superMetaBlockTime.toISOString()}`, 'debug');
+                                log(`[SuperMeta] Super meta BlockTime obtained: ${superMetaBlockTime.toISOString()}`, 'debug');
                             }
                             break;
                         }
@@ -15689,7 +15689,7 @@ Do you want to continue?`;
                             if (txInfo && txInfo.blockHash) {
                                 superMetaBlockId = txInfo.blockHash;
                                 superMetaBlockTime = Date.now();
-                                log(`[SuperMeta] RPC経由でスーパーメタBlockID取得: ${superMetaBlockId.substring(0, 16)}...`);
+                                log(`[SuperMeta] Super meta BlockID obtained via RPC: ${superMetaBlockId.substring(0, 16)}...`);
                                 break;
                             }
                         } catch (err) {
@@ -15703,7 +15703,7 @@ Do you want to continue?`;
                 }
                 
                 if (!superMetaBlockId) {
-                    log(`[SuperMeta] 警告: BlockID取得がタイムアウトしました`, 'warning');
+                    log(`[SuperMeta] Warning: BlockID retrieval timed out`, 'warning');
                 }
                 
                 return {
@@ -15715,7 +15715,7 @@ Do you want to continue?`;
                 };
                 
             } catch (error) {
-                log(`[SuperMeta] スーパーメタデータ生成エラー: ${error.message}`, 'error');
+                log(`[SuperMeta] Super metadata generation error: ${error.message}`, 'error');
                 throw error;
             }
         }
@@ -15812,16 +15812,16 @@ Do you want to continue?`;
                         // v4.6.32: Debug button display confirmation
                         setTimeout(() => {
                             const allButtons = fileInfoElement.querySelectorAll('button');
-                            log(`[DEBUG] 最終的なボタン数: ${allButtons.length}個`, 'warning');
+                            log(`[DEBUG] Final button count: ${allButtons.length}`, 'warning');
                             allButtons.forEach((btn, i) => {
-                                log(`[DEBUG] ボタン${i}: ${btn.textContent}, display: ${window.getComputedStyle(btn).display}, visibility: ${window.getComputedStyle(btn).visibility}`, 'debug');
+                                log(`[DEBUG] Button ${i}: ${btn.textContent}, display: ${window.getComputedStyle(btn).display}, visibility: ${window.getComputedStyle(btn).visibility}`, 'debug');
                             });
                             
                             // Check placeholder
                             const placeholders = fileInfoElement.querySelectorAll('span[id^="buttons_"]');
-                            log(`[DEBUG] プレースホルダー数: ${placeholders.length}個`, 'debug');
+                            log(`[DEBUG] Placeholder count: ${placeholders.length}`, 'debug');
                             placeholders.forEach((ph, i) => {
-                                log(`[DEBUG] プレースホルダー${i}: ID=${ph.id}, 子要素数=${ph.children.length}`, 'debug');
+                                log(`[DEBUG] Placeholder ${i}: ID=${ph.id}, child element count=${ph.children.length}`, 'debug');
                             });
                         }, 500);
                     }
@@ -16038,7 +16038,7 @@ Do you want to continue?`;
                 }, 3000);
                 
             } catch (error) {
-                log(`[一括ダウンロード] エラー: ${error.message}`, 'error');
+                log(`[Batch Download] Error: ${error.message}`, 'error');
                 document.getElementById('downloadProgress').style.display = 'none';
             }
         };
@@ -16071,7 +16071,7 @@ Do you want to continue?`;
                 }
                 
                 if (!NetworkState.downloadManager.isReady()) {
-                    log('[DownloadManager] 現在ダウンロード中です', 'warning');
+                    log('[DownloadManager] Currently downloading', 'warning');
                     return;
                 }
                 
@@ -16116,7 +16116,7 @@ Do you want to continue?`;
                 }
                 
             } catch (error) {
-                log(`[DownloadManager] エラー: ${error.message}`, 'error');
+                log(`[DownloadManager] Error: ${error.message}`, 'error');
                 document.getElementById('downloadProgress').style.display = 'none';
             }
         };
@@ -16159,10 +16159,10 @@ Do you want to continue?`;
                 log('Loading file content...', 'info');
                 const content = await file.text();
                 log(`File content length: ${content.length} characters`, 'info');
-                log(`最初の100文字: ${content.substring(0, 100)}...`, 'info');
+                log(`First 100 characters: ${content.substring(0, 100)}...`, 'info');
                 
                 kaspaMetadata = JSON.parse(content);
-                log('JSON parse成功', 'info');
+                log('JSON parse successful', 'info');
                 log(`kaspaMetadata.version: ${FileState.kaspaMetadata.version}`, 'info');
                 log(`kaspaMetadata.type: ${FileState.kaspaMetadata.type}`, 'info');
                 log(`kaspaMetadata.chunks: ${FileState.kaspaMetadata.chunks?.length || 0} chunks`, 'info');
@@ -16225,7 +16225,7 @@ Do you want to continue?`;
                 log('.kaspa file loaded successfully', 'success');
                 
             } catch (error) {
-                log(`.kaspaファイル読み込みエラー: ${error.message}`, 'error');
+                log(`.kaspa file loading error: ${error.message}`, 'error');
             }
         };
 
@@ -16424,7 +16424,7 @@ Do you want to continue?`;
                 metaTxId = parts[0];
                 blockId = parts[1];
                 password = parts[2];
-                log(`TxID:BlockID:Password形式で復元: ${metaTxId.substring(0, 16)}...:${blockId.substring(0, 16)}...:****`, 'info');
+                log(`Restored in TxID:BlockID:Password format: ${metaTxId.substring(0, 16)}...:${blockId.substring(0, 16)}...:****`, 'info');
                 
                 // Auto-fill password field for user visibility
                 document.getElementById('metaTxPassword').value = password;
@@ -16433,7 +16433,7 @@ Do you want to continue?`;
                 metaTxId = parts[0];
                 blockId = parts[1];
                 password = passwordFromField;
-                log(`TxID:BlockID形式で復元: ${metaTxId.substring(0, 16)}...:${blockId.substring(0, 16)}...`, 'info');
+                log(`Restored in TxID:BlockID format: ${metaTxId.substring(0, 16)}...:${blockId.substring(0, 16)}...`, 'info');
             } else {
                 // Format: TxID only
                 metaTxId = parts[0];
@@ -16686,12 +16686,12 @@ Do you want to continue?`;
                         }
                     }
                 } catch (apiError) {
-                    log(`Explorer APIエラー: ${apiError.message}`, 'warning');
+                    log(`Explorer API error: ${apiError.message}`, 'warning');
                 }
                 
                 // If Explorer API failed or payload is incomplete, try RPC
                 if (!payload || payload.length < 100) {
-                    log('Explorer APIのペイロードが不完全、RPC経由で再試行...', 'warning');
+                    log('Explorer API payload incomplete, retrying via RPC...', 'warning');
                     
                     try {
                         // Get transaction via RPC
@@ -16836,7 +16836,7 @@ Do you want to continue?`;
                         if (metaData.chunkStructure?.type === 'super') {
                             log('[SuperMeta] Super metadata detected', 'info');
                             log(`[SuperMeta] Number of metadata: ${metaData.chunks.length}`, 'info');
-                            log(`[SuperMeta] 総チャンク数: ${metaData.chunkStructure.totalChunks}`, 'info');
+                            log(`[SuperMeta] Total chunks: ${metaData.chunkStructure.totalChunks}`, 'info');
                             
                             // Download all intermediate metadata
                             const singleMetadatas = [];

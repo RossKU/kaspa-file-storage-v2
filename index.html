@@ -3016,7 +3016,7 @@
                 if (skipCountEl) skipCountEl.textContent = NetworkState.restApiControl.skipCount;
                 // if (globalSkipCountEl) globalSkipCountEl.textContent = NetworkState.restApiControl.skipCount; // deleted
                 if (lastSkipEl && NetworkState.restApiControl.lastSkipped) {
-                    lastSkipEl.textContent = new Date(NetworkState.restApiControl.lastSkipped).toLocaleTimeString('ja-JP');
+                    lastSkipEl.textContent = new Date(NetworkState.restApiControl.lastSkipped).toLocaleTimeString();
                 }
             },
             
@@ -4279,7 +4279,7 @@
             
             addEvent(message, icon = '📌') {
                 const event = {
-                    time: new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+                    time: new Date().toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
                     message,
                     icon
                 };
@@ -7762,7 +7762,7 @@ Do you want to continue?`;
                 const textLines = logs.map(log => {
                     // Extract time part from ISO format (with milliseconds)
                     const date = new Date(log.timestamp);
-                    const time = date.toLocaleTimeString('ja-JP', {
+                    const time = date.toLocaleTimeString(undefined, {
                         hour: '2-digit',
                         minute: '2-digit',
                         second: '2-digit',
@@ -18128,7 +18128,7 @@ Do you want to continue?`;
                                         const countEl = document.getElementById('filter-blocked-count');
                                         const lastEl = document.getElementById('filter-last-blocked');
                                         if (countEl) countEl.textContent = NetworkState.blockEventFilter.blockedCount;
-                                        if (lastEl) lastEl.textContent = new Date().toLocaleTimeString('ja-JP');
+                                        if (lastEl) lastEl.textContent = new Date().toLocaleTimeString();
                                         
                                         return; // Block event is filtered out
                                     }
@@ -18219,7 +18219,7 @@ Do you want to continue?`;
                             const countEl = document.getElementById('filter-blocked-count');
                             const lastEl = document.getElementById('filter-last-blocked');
                             if (countEl) countEl.textContent = NetworkState.blockEventFilter.blockedCount;
-                            if (lastEl) lastEl.textContent = new Date().toLocaleTimeString('ja-JP');
+                            if (lastEl) lastEl.textContent = new Date().toLocaleTimeString();
                             
                             return; // Block event is filtered out
                         }
@@ -20709,7 +20709,7 @@ Do you want to continue?`;
             const formatDate = (date) => {
                 if (!date) return 'Unknown';
                 const d = new Date(date);
-                return d.toLocaleDateString('ja-JP') + ' ' + d.toLocaleTimeString('ja-JP');
+                return d.toLocaleDateString() + ' ' + d.toLocaleTimeString();
             };
             
             const formatSize = (bytes) => {

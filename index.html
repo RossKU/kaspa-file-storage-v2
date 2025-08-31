@@ -3042,7 +3042,7 @@
                     
                     // Show processing message - XSS fix: Use safe DOM manipulation
                     resultDiv.style.display = 'block';
-                    messageDiv.innerHTML = ''; // Clear existing content
+                    messageDiv.textContent = ''; // v6.3.8: Safe clear using textContent
                     messageDiv.appendChild(document.createTextNode('⏳ Processing UTXO consolidation...'));
                     
                     log('🔄 Starting UTXO consolidation...', 'info');
@@ -3118,7 +3118,7 @@
                     }
                     
                     // Success message - XSS fix: Use safe DOM manipulation
-                    messageDiv.innerHTML = ''; // Clear existing content
+                    messageDiv.textContent = ''; // v6.3.8: Safe clear using textContent
                     messageDiv.appendChild(document.createTextNode('✅ Consolidation successful!'));
                     messageDiv.appendChild(document.createElement('br'));
                     messageDiv.appendChild(document.createTextNode(`TxID: ${txid.substring(0, 16)}...`));
@@ -3170,7 +3170,7 @@
                     // Enhanced error handling
                     const errorMsg = error?.message || error?.toString() || JSON.stringify(error) || 'Unknown error';
                     // XSS fix: Use safe DOM manipulation for error message
-                    messageDiv.innerHTML = ''; // Clear existing content
+                    messageDiv.textContent = ''; // v6.3.8: Safe clear using textContent
                     messageDiv.appendChild(document.createTextNode(`❌ Consolidation failed: ${errorMsg}`));
                     log(`❌ UTXO consolidation failed: ${errorMsg}`, 'error');
                     
@@ -7791,10 +7791,10 @@ Do you want to continue?`;
                 if (confirm('Clear all logs?')) {
                     AppState.history.systemLogs = [];
                     if (logContainer) {
-                        logContainer.innerHTML = '';
+                        logContainer.textContent = ''; // v6.3.8: Safe clear
                     }
                     if (monitorLogContainer) {
-                        monitorLogContainer.innerHTML = '';
+                        monitorLogContainer.textContent = ''; // v6.3.8: Safe clear
                     }
                     log('Log cleared', 'info');
                 }
@@ -15927,26 +15927,47 @@ Do you want to continue?`;
                         }, 500);
                     }
                 } else {
-                    document.getElementById('fileInfo').innerHTML += '<br><strong>⚠️ No file list information available</strong>';
+                    // v6.3.8: Replace innerHTML with safe DOM manipulation
+                    const fileInfo = document.getElementById('fileInfo');
+                    const br = document.createElement('br');
+                    const strong = document.createElement('strong');
+                    strong.textContent = '⚠️ No file list information available';
+                    fileInfo.appendChild(br);
+                    fileInfo.appendChild(strong);
                 }
                 
                 // Password processing (v4.6.26: Improved DOM manipulation safety)
+                // v6.3.8: Replace innerHTML with safe DOM manipulation
                 const passwordSection = document.getElementById('passwordSection');
                 if (dirMetadata.auth?.passwordIncluded) {
-                    // Safely manipulate existing elements
-                    const passwordInput = document.getElementById('downloadPassword');
-                    if (passwordInput) {
-                        passwordInput.style.display = 'none';
-                        passwordInput.value = dirMetadata.auth.password;
+                    // Clear existing content safely
+                    while (passwordSection.firstChild) {
+                        passwordSection.removeChild(passwordSection.firstChild);
                     }
                     
-                    // Update UI while preserving password value
-                    const savedPassword = dirMetadata.auth.password;
-                    // XSS fix: Escape password value in HTML attribute
-                    passwordSection.innerHTML = '<p>✅ Password included in file (auto-filled)</p>' +
-                        `<input type="hidden" id="downloadPassword" value="${escapeHtml(savedPassword)}">`;
+                    // Create message element
+                    const message = document.createElement('p');
+                    message.textContent = '✅ Password included in file (auto-filled)';
+                    passwordSection.appendChild(message);
+                    
+                    // Create hidden input element
+                    const hiddenInput = document.createElement('input');
+                    hiddenInput.type = 'hidden';
+                    hiddenInput.id = 'downloadPassword';
+                    hiddenInput.value = dirMetadata.auth.password; // No escaping needed with direct property assignment
+                    passwordSection.appendChild(hiddenInput);
                 } else {
-                    passwordSection.innerHTML = '<input type="password" id="downloadPassword" placeholder="Enter password">';
+                    // Clear existing content safely
+                    while (passwordSection.firstChild) {
+                        passwordSection.removeChild(passwordSection.firstChild);
+                    }
+                    
+                    // Create password input element
+                    const passwordInput = document.createElement('input');
+                    passwordInput.type = 'password';
+                    passwordInput.id = 'downloadPassword';
+                    passwordInput.placeholder = 'Enter password';
+                    passwordSection.appendChild(passwordInput);
                 }
                 
                 // v4.7.9: Set download button for bulk folder download
@@ -20218,22 +20239,65 @@ Do you want to continue?`;
             const metaTxId = entry.metaTxId ? entry.metaTxId.substring(0, 8) + '...' : '-';
             const uploadDate = entry.created ? formatDate(entry.created) : '-';
             
-            // Add title attributes for tooltip display (6 columns)
-            // XSS fix: Escape user-controlled data only, keep emojis intact
-            tr.innerHTML = `
-                <td><input type="checkbox" class="file-checkbox" data-id="${escapeHtml(entry.id)}" onchange="updateFileActions()"></td>
-                <td title="Type: ${escapeHtml(entry.type)}${passwordIcon ? '\nPassword: ' + (entry.password ? 'Saved' : 'Required') : ''}">
-                    <span class="file-icon">${icon}</span>
-                    ${passwordIcon ? `<span style="font-size: 0.8em; vertical-align: super;">${passwordIcon}</span>` : ''}
-                </td>
-                <td title="${escapeHtml(entry.name)}">
-                    <span>${escapeHtml(entry.name)}</span>
-                    <span style="margin-left: 5px; font-size: 0.8em;">${statusIcon}</span>
-                </td>
-                <td title="${size}">${size}</td>
-                <td title="${escapeHtml(entry.metaTxId || '-')}">${metaTxId}</td>
-                <td title="${uploadDate}">${uploadDate}</td>
-            `;
+            // v6.3.8: Replace innerHTML with safe DOM manipulation
+            // Create table cells safely
+            
+            // Cell 1: Checkbox
+            const td1 = document.createElement('td');
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.className = 'file-checkbox';
+            checkbox.dataset.id = entry.id;
+            checkbox.onchange = updateFileActions;
+            td1.appendChild(checkbox);
+            tr.appendChild(td1);
+            
+            // Cell 2: Type icon
+            const td2 = document.createElement('td');
+            td2.title = `Type: ${entry.type}${passwordIcon ? '\nPassword: ' + (entry.password ? 'Saved' : 'Required') : ''}`;
+            const iconSpan = document.createElement('span');
+            iconSpan.className = 'file-icon';
+            iconSpan.textContent = icon;
+            td2.appendChild(iconSpan);
+            if (passwordIcon) {
+                const pwdSpan = document.createElement('span');
+                pwdSpan.style.fontSize = '0.8em';
+                pwdSpan.style.verticalAlign = 'super';
+                pwdSpan.textContent = passwordIcon;
+                td2.appendChild(pwdSpan);
+            }
+            tr.appendChild(td2);
+            
+            // Cell 3: Name
+            const td3 = document.createElement('td');
+            td3.title = entry.name;
+            const nameSpan = document.createElement('span');
+            nameSpan.textContent = entry.name;
+            td3.appendChild(nameSpan);
+            const statusSpan = document.createElement('span');
+            statusSpan.style.marginLeft = '5px';
+            statusSpan.style.fontSize = '0.8em';
+            statusSpan.textContent = statusIcon;
+            td3.appendChild(statusSpan);
+            tr.appendChild(td3);
+            
+            // Cell 4: Size
+            const td4 = document.createElement('td');
+            td4.title = size;
+            td4.textContent = size;
+            tr.appendChild(td4);
+            
+            // Cell 5: Meta TX ID
+            const td5 = document.createElement('td');
+            td5.title = entry.metaTxId || '-';
+            td5.textContent = metaTxId;
+            tr.appendChild(td5);
+            
+            // Cell 6: Upload date
+            const td6 = document.createElement('td');
+            td6.title = uploadDate;
+            td6.textContent = uploadDate;
+            tr.appendChild(td6);
             
             // Add click handler for row selection
             tr.addEventListener('click', (e) => {

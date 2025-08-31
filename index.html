@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v6.3.1</title>
+    <title>Kaspa P2P File Storage v6.3.3</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -1392,18 +1392,18 @@
         }
         .share-menu {
             position: absolute;
-            bottom: 100%; /* 上向き表示（維持） */
-            left: 50%; /* 中央配置 */
-            transform: translateX(-50%); /* 中央揃え */
+            bottom: 100%; /* Display upward (maintain) */
+            left: 50%; /* Center placement */
+            transform: translateX(-50%); /* Center alignment */
             background: var(--bg-secondary);
             border: 1px solid var(--border-color);
             border-radius: 8px;
             padding: 8px;
             display: none;
-            min-width: 240px; /* 20%拡張: 200px → 240px */
+            min-width: 240px; /* 20% expansion: 200px → 240px */
             box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-            margin-bottom: 8px; /* 下マージン（維持） */
-            white-space: nowrap; /* テキストの改行を防止 */
+            margin-bottom: 8px; /* Bottom margin (maintain) */
+            white-space: nowrap; /* Prevent text wrapping */
         }
         .share-menu.show {
             display: block;
@@ -1411,7 +1411,7 @@
         .share-option {
             display: block;
             width: 100%;
-            padding: 10px 16px; /* パディング増加で見やすく */
+            padding: 10px 16px; /* Increase padding for better visibility */
             text-align: left;
             border: none;
             background: transparent;
@@ -1419,7 +1419,7 @@
             cursor: pointer;
             border-radius: 4px;
             font-size: 14px;
-            white-space: nowrap; /* テキストの改行を防止 */
+            white-space: nowrap; /* Prevent text wrapping */
         }
         .share-option:hover {
             background: var(--bg-primary);
@@ -8521,7 +8521,7 @@ Do you want to continue?`;
             
             // Handle successful reconnection
             async handleReconnected() {
-                // Phase 0-D: 改善されたConnect状態管理
+                // Phase 0-D: Improved connection state management
                 log('[ConnectionManager] Connectが安定しました', 'info');
                 log(`[DEBUG] handleReconnected started - uploadSessionActive: ${FileState.uploadSessionActive}`, 'debug');
                 
@@ -13345,7 +13345,7 @@ Do you want to continue?`;
                     await startMonitoring();
                 } else {
                     log('WebSocket monitoring is already running', 'info');
-                    // log(`現在監視中のトランザクション数: ${NetworkState.ws.monitoredTransactions.size}`, 'info');
+                    // log(`Currently monitoring transactions: ${NetworkState.ws.monitoredTransactions.size}`, 'info');
                 }
                 */
                 
@@ -18089,7 +18089,7 @@ Do you want to continue?`;
                 
                 // v5.6.4: Debug logging before WebSocket subscription
                 log(`[DEBUG] State before WebSocket subscription - RPCConnect: ${NetworkState.rpcClient ? 'enabled' : 'disabled'}, ` +
-                    `WebSocket内部状態: ${NetworkState.ws.connected ? 'Connected' : 'Disconnected'}`, 'debug');
+                    `WebSocket internal state: ${NetworkState.ws.connected ? 'Connected' : 'Disconnected'}`, 'debug');
                 
                 await NetworkState.rpcClient.subscribeBlockAdded();
                 NetworkState.ws.connected = true;  // v5.6.4: Mark WebSocket as connected
@@ -18122,7 +18122,7 @@ Do you want to continue?`;
                                     if (shouldFilter) {
                                         NetworkState.blockEventFilter.blockedCount++;
                                         NetworkState.blockEventFilter.lastBlocked = Date.now();
-                                        log(`🚫 [BlockFilter] BlockID受信したが無視: ${nodeId} (フィルター済み: ${NetworkState.blockEventFilter.blockedCount}件)`, 'debug');
+                                        log(`🚫 [BlockFilter] BlockID received but ignored: ${nodeId} (filtered: ${NetworkState.blockEventFilter.blockedCount} items)`, 'debug');
                                         
                                         // Update UI
                                         const countEl = document.getElementById('filter-blocked-count');
@@ -18148,10 +18148,10 @@ Do you want to continue?`;
                                                 existing.foundAt = new Date();
                                                 existing.receivedAt = Date.now();
                                                 
-                                                log(`🏆 [補助RPC-${i+1}] 最速でBlockID検出: ${blockId.substring(0, 16)}...`, 'success');
+                                                log(`🏆 [Auxiliary RPC-${i+1}] Fastest BlockID detection: ${blockId.substring(0, 16)}...`, 'success');
                                                 NetworkState.rpcScores.aux[i]++;
                                                 const totalAux = NetworkState.rpcScores.aux.reduce((a, b) => a + b, 0);
-                                                log(`[スコア] メイン: ${NetworkState.rpcScores.main}, 補助合計: ${totalAux} (各: ${NetworkState.rpcScores.aux.join(', ')})`, 'info');
+                                                log(`[Score] Main: ${NetworkState.rpcScores.main}, Auxiliary total: ${totalAux} (each: ${NetworkState.rpcScores.aux.join(', ')})`, 'info');
                                                 
                                                 setTimeout(checkMonitoringStop, 100);
                                             }
@@ -18163,12 +18163,12 @@ Do you want to continue?`;
                             log(`[Auxiliary RPC-${i+1}] Monitoring started`, 'success');
                             
                         } catch (error) {
-                            log(`[補助RPC-${i+1}] Connectエラー: ${error.message}`, 'warning');
+                            log(`[Auxiliary RPC-${i+1}] Connection error: ${error.message}`, 'warning');
                         }
                     }, i * 1000); // Each node starts 1 second after the previous
                 }
                 
-                log('Block Addedイベントを購読しました', 'success');
+                log('Subscribed to Block Added event', 'success');
                 log('Starting block-added event monitoring via WebSocket', 'info');
                 log(`[DEBUG] WebSocket subscription complete - navigator.onLine: ${navigator.onLine}`, 'debug');
                 
@@ -18184,7 +18184,7 @@ Do you want to continue?`;
                     // v5.7.4: Removed v5.7.1 workaround - no longer needed since v5.7.3 
                     // removes all event listeners in stopMonitoring
                     
-                    log('[WebSocket] Disconnectイベントを検出', 'warning');
+                    log('[WebSocket] Disconnect event detected', 'warning');
                     NetworkState.ws.connected = false;
                     
                     // Notify ConnectionManager
@@ -18213,7 +18213,7 @@ Do you want to continue?`;
                         if (shouldFilter) {
                             NetworkState.blockEventFilter.blockedCount++;
                             NetworkState.blockEventFilter.lastBlocked = Date.now();
-                            log(`🚫 [BlockFilter] BlockID受信したが無視: メインRPC (フィルター済み: ${NetworkState.blockEventFilter.blockedCount}件)`, 'debug');
+                            log(`🚫 [BlockFilter] BlockID received but ignored: Main RPC (filtered: ${NetworkState.blockEventFilter.blockedCount} items)`, 'debug');
                             
                             // Update UI
                             const countEl = document.getElementById('filter-blocked-count');
@@ -18268,14 +18268,14 @@ Do you want to continue?`;
                                         existing.foundAt = new Date();
                                         existing.receivedAt = Date.now();  // v5.11.117: Track receive time for better cleanup
                                     
-                                    log(`[DEBUG] WebSocket: 監視中のトランザクション検出！ TxID: ${txId.substring(0, 16)}... BlockID: ${blockId.substring(0, 16)}...`, 'debug');
+                                    log(`[DEBUG] WebSocket: Monitored transaction detected! TxID: ${txId.substring(0, 16)}... BlockID: ${blockId.substring(0, 16)}...`, 'debug');
                                     log(`[DEBUG] WebSocket: Saved block time - Time: ${blockTime.toISOString()}`, 'debug');
                                     myTransactionFound = true;
                                     
                                         // v5.11.141: Track main RPC score (moved inside duplicate check)
                                         NetworkState.rpcScores.main++;
                                         const totalAux = NetworkState.rpcScores.aux.reduce((a, b) => a + b, 0);
-                                        log(`[メインRPC] BlockID検出 - スコア: メイン: ${NetworkState.rpcScores.main}, 補助合計: ${totalAux}`, 'info');
+                                        log(`[Main RPC] BlockID detected - Score: Main: ${NetworkState.rpcScores.main}, Auxiliary total: ${totalAux}`, 'info');
                                     }
                                     
                                     // v5.4.52: Removed pendingBlockIds callback mechanism - using direct polling instead
@@ -18292,23 +18292,23 @@ Do you want to continue?`;
                         
                         // Only log if we found our transaction or if it's a small block
                         if (myTransactionFound) {
-                            log(`✅ WebSocket: ブロック ${blockId.substring(0, 16)}... で監視中のトランザクションを確認`, 'success');
+                            log(`✅ WebSocket: Confirmed monitored transaction in block ${blockId.substring(0, 16)}...`, 'success');
                         } else if (block.transactions.length <= 5) {
                             // Only log small blocks to reduce noise
-                            // log(`WebSocket: ブロック ${blockId.substring(0, 16)}... に ${block.transactions.length} トランザクション`, 'debug');
+                            // log(`WebSocket: Block ${blockId.substring(0, 16)}... contains ${block.transactions.length} transactions`, 'debug');
                         }
                     }
                 });
                 
-                // log(`現在監視中のトランザクション数: ${NetworkState.ws.monitoredTransactions.size}`, 'info');
+                // log(`Currently monitoring transactions: ${NetworkState.ws.monitoredTransactions.size}`, 'info');
                 
             } catch (error) {
-                log(`WebSocket監視エラー: ${error.message}`, 'error');
+                log(`WebSocket monitoring error: ${error.message}`, 'error');
                 NetworkState.ws.monitorActive = false;
                 NetworkState.ws.connected = false;
                 
                 // v5.6.6: Use ConnectionManager for error handling
-                log(`[DEBUG-WS] WebSocket監視でエラー発生 - ConnectionManager.handleErrorを呼び出します`, 'debug');
+                log(`[DEBUG-WS] Error occurred in WebSocket monitoring - Calling ConnectionManager.handleError`, 'debug');
                 await ConnectionManager.handleError(error, 'WebSocket監視');
                 log(`[DEBUG-WS] ConnectionManager.handleError complete`, 'debug');
             }
@@ -18390,13 +18390,13 @@ Do you want to continue?`;
         
         // Restart monitoring after network recovery
         async function restartMonitoring() {
-            // Phase 0-D: 改善されたConnect状態管理
+            // Phase 0-D: Improved connection state management
             if (!NetworkState.ws.monitorActive) {
                 log('[Monitor] Already stopped, no restart needed', 'debug');
                 return;
             }
             
-            log('[Monitor] WebSocket監視を再構築します', 'info');
+            log('[Monitor] Rebuilding WebSocket monitoring', 'info');
             
             // v6.2.72: Log waiting transactions before restart
             if (NetworkState.ws.monitoredTransactions.size > 0) {
@@ -18411,7 +18411,7 @@ Do you want to continue?`;
             // Stop processing
             await stopMonitoring();
             
-            // WebSocketが本当に準備できるまで待つ
+            // Wait until WebSocket is really ready
             if (NetworkState.rpcClient && NetworkState.rpcClient.isConnected) {
                 // Phase 0-D: Remove unnecessary wait, check status instead
                 log('[Monitor] RPC connection confirmed, starting monitoring', 'debug');
@@ -18431,11 +18431,11 @@ Do you want to continue?`;
                                     // Update the monitoring list with found BlockID
                                     data.blockId = txInfo.blockHash[0];
                                     data.receivedAt = Date.now();
-                                    log(`[Monitor] RPC経由でBlockID取得: ${txId.substring(0, 16)}... → ${data.blockId.substring(0, 16)}...`, 'success');
+                                    log(`[Monitor] BlockID obtained via RPC: ${txId.substring(0, 16)}... → ${data.blockId.substring(0, 16)}...`, 'success');
                                 }
                             } catch (err) {
                                 // Transaction might not be confirmed yet
-                                log(`[Monitor] TxID ${txId.substring(0, 16)}... はまだ未確定`, 'debug');
+                                log(`[Monitor] TxID ${txId.substring(0, 16)}... is still unconfirmed`, 'debug');
                             }
                         }
                     }
@@ -18534,7 +18534,7 @@ Do you want to continue?`;
                 
                 return metadata;
             } catch (error) {
-                log(`[downloadFromTxId] エラー: ${error.message}`, 'error');
+                log(`[downloadFromTxId] Error: ${error.message}`, 'error');
                 throw error;
             }
         }
@@ -18577,7 +18577,7 @@ Do you want to continue?`;
                 error: event.error,
                 stack: event.error?.stack
             });
-            log(`エラー: ${event.message} (${event.filename}:${event.lineno})`, 'error');
+            log(`Error: ${event.message} (${event.filename}:${event.lineno})`, 'error');
         });
 
         window.addEventListener('unhandledrejection', (event) => {
@@ -18594,7 +18594,7 @@ Do you want to continue?`;
                 const used = Math.round(performance.memory.usedJSHeapSize / 1048576);
                 const total = Math.round(performance.memory.totalJSHeapSize / 1048576);
                 const limit = Math.round(performance.memory.jsHeapSizeLimit / 1048576);
-                // 正しい計算: 使用量÷限度=使用率
+                // Correct calculation: usage ÷ limit = usage rate
                 const percent = Math.round((used / limit) * 100);
                 
                 if (percent > 90) {
@@ -18705,9 +18705,9 @@ Do you want to continue?`;
     
     <!-- Multi-Wallet Phase 1 Integration -->
     <script>
-        // グローバル変数として定義
+        // Define as global variable
 
-        // 安全なインライン実装
+        // Safe inline implementation
         class SimpleWalletManager {
             constructor() {
                 this.subWallets = [];
@@ -18719,16 +18719,16 @@ Do you want to continue?`;
                 try {
                     console.log(`[MultiWallet] Generating test wallet ${index}...`);
                     
-                    // Kaspa WASM SDKチェック
+                    // Kaspa WASM SDK check
                     if (!NetworkState.kaspa) {
-                        throw new Error('Kaspa WASM not initialized. Please run "Kaspaシステム再起動" first.');
+                        throw new Error('Kaspa WASM not initialized. Please run "Kaspa System Restart" first.');
                     }
                     
                     if (!NetworkState.kaspa.PrivateKey) {
                         throw new Error('PrivateKey class not available in Kaspa WASM.');
                     }
                     
-                    // デバッグ情報
+                    // Debug information
                     console.log('[MultiWallet] Available kaspa methods:', Object.keys(NetworkState.kaspa));
                     
                     const privateKey = new NetworkState.kaspa.PrivateKey();
@@ -18737,15 +18737,15 @@ Do you want to continue?`;
                     const publicKey = privateKey.toPublicKey();
                     console.log('[MultiWallet] Public key generated successfully');
                     
-                    // Network detection - より安全な方法
-                    let networkType = config.defaultNetwork; // デフォルト (v5.11.101)
+                    // Network detection - safer method
+                    let networkType = config.defaultNetwork; // Default (v5.11.101)
                     
-                    // グローバル変数をチェック
+                    // Check global variables
                     if (typeof NETWORK !== 'undefined' && NETWORK) {
                         networkType = NETWORK;
                         console.log('[MultiWallet] Using global NETWORK:', networkType);
                     } else {
-                        // 既存のRPC設定から推定
+                        // Infer from existing RPC settings
                         const networkSelect = document.getElementById('networkSelect');
                         if (networkSelect && networkSelect.value) {
                             networkType = networkSelect.value;
@@ -18755,15 +18755,15 @@ Do you want to continue?`;
                     
                     console.log('[MultiWallet] Final network type:', networkType);
                     
-                    // アドレス生成 - 既存システムと同じ方法を使用
+                    // Address generation - use same method as existing system
                     let address;
                     try {
-                        // 方法1: グローバルNETWORK変数を使用（既存システムと同じ）
+                        // Method 1: Use global NETWORK variable (same as existing system)
                         if (typeof NETWORK !== 'undefined' && NETWORK) {
                             address = privateKey.toAddress(NETWORK).toString();
                             console.log('[MultiWallet] Address generated with global NETWORK:', address);
                         }
-                        // 方法2: networkTypeを使用 (v5.11.101)
+                        // Method 2: Use networkType (v5.11.101)
                         else {
                             address = privateKey.toAddress(networkType).toString();
                             console.log('[MultiWallet] Address generated with networkType:', address);
@@ -19174,7 +19174,7 @@ Do you want to continue?`;
             if (!file) return;
             
             FileState.currentFile = file;
-            log(`ファイル選択: ${file.name} (${(file.size/1024).toFixed(1)}KB)`);
+            log(`File selected: ${file.name} (${(file.size/1024).toFixed(1)}KB)`);
             
             // Generate thumbnail for image files
             if (file.type.startsWith('image/') && file.size <= 100 * 1024 * 1024) { // 100MB limit
@@ -19333,7 +19333,7 @@ Do you want to continue?`;
                 const publicKey = UserState.privateKey.toPublicKey();
                 UserState.address = publicKey.toAddress(config.network);
                 
-                log(`ウォレットConnect: ${UserState.address.toString()}`, 'success');
+                log(`Wallet connected: ${UserState.address.toString()}`, 'success');
                 
                 // Update UI
                 document.getElementById('walletAddress').textContent = UserState.address.toString();
@@ -19357,7 +19357,7 @@ Do you want to continue?`;
                 document.getElementById('walletConnectBtn').textContent = 'Disconnect';
                 
             } catch (error) {
-                log(`ウォレットConnectエラー: ${error.message}`, 'error');
+                log(`Wallet connection error: ${error.message}`, 'error');
                 alert(`Error: ${error.message}`);
             }
         };
@@ -19374,12 +19374,12 @@ Do you want to continue?`;
                     return;
                 }
                 
-                // CSVヘッダー（v5.11.67: 47カラム - saltを追加）
+                // CSV header (v5.11.67: 47 columns - salt added)
                 const headers = 'id,type,version,created,network,name,path,metaTxId,metaTxBlockId,firstChunkTxId,uploadDate,blockTime,uploadedBy,source,status,fileSize,originalSize,compressedSize,mimeType,sha256,encrypted,compressionAlgorithm,compressionEnabled,variableChunk,payloadSplit,cid,totalChunks,chunkCount,chunkSize,segmentCount,totalFiles,fileCount,directoryCount,entryCount,checksum,uploadCost,uploadDuration,chunkStructureType,chunkLevel,totalGroups,passwordIncluded,password,externalRef,tags,notes,authWarning,salt';
                 
                 let csvContent = headers + '\n';
                 
-                // Convert entries to CSV format（saveKentryFileと同じロジック）
+                // Convert entries to CSV format (same logic as saveKentryFile)
                 entries.forEach(entry => {
                     const row = [
                         entry.id || '',
@@ -19430,7 +19430,7 @@ Do you want to continue?`;
                         entry.authWarning || '',
                         entry.salt || ''
                     ].map(val => {
-                        // CSV用にエスケープ
+                        // Escape for CSV
                         const str = String(val);
                         if (str.includes(',') || str.includes('"') || str.includes('\n')) {
                             return `"${str.replace(/"/g, '""')}"`;
@@ -19438,10 +19438,10 @@ Do you want to continue?`;
                         return str;
                     });
                     
-                    // 固定47カラムの後に可変カラムを追加
+                    // Add variable columns after fixed 47 columns
                     csvContent += row.join(',');
                     
-                    // チャンクペア追加（tx1,blk1,tx2,blk2,...）
+                    // Add chunk pairs (tx1,blk1,tx2,blk2,...)
                     if (entry._chunks && entry._chunkBlockIds) {
                         for (let i = 0; i < entry._chunks.length; i++) {
                             csvContent += ',' + (entry._chunks[i] || '');
@@ -19449,10 +19449,10 @@ Do you want to continue?`;
                         }
                     }
                     
-                    // セグメントバウンダリー追加
+                    // Add segment boundaries
                     if (entry._segmentBoundaries && entry._segmentBoundaries.length > 0) {
                         for (const boundary of entry._segmentBoundaries) {
-                            csvContent += ',seg';  // マーカー
+                            csvContent += ',seg';  // Marker
                             csvContent += ',' + (boundary.index || '');
                             csvContent += ',' + (boundary.offset || '');
                             csvContent += ',' + (boundary.size || '');
@@ -19462,7 +19462,7 @@ Do you want to continue?`;
                         }
                     }
                     
-                    // ディレクトリメタデータ追加
+                    // Add directory metadata
                     if (entry.directoryMetadata && entry.type === 'kaspa-directory') {
                         const dirMeta = entry.directoryMetadata;
                         if (dirMeta.entries && Array.isArray(dirMeta.entries)) {
@@ -19731,7 +19731,7 @@ Do you want to continue?`;
             dialog.innerHTML = `
                 <h3>Add Entry</h3>
                 <div style="margin-bottom:15px">
-                    <label style="display:block;margin-bottom:5px">タイプ:</label>
+                    <label style="display:block;margin-bottom:5px">Type:</label>
                     <select id="addEntryType" onchange="updateAddEntryForm()" style="width:100%;padding:8px">
                         <option value="file">📄 File</option>
                         <option value="directory">📁 Directory</option>
@@ -19752,7 +19752,7 @@ Do you want to continue?`;
                 </div>
                 <div style="margin-top:15px;text-align:right">
                     <button onclick="this.parentElement.parentElement.remove()">Cancel</button>
-                    <button onclick="addEntryToList();this.parentElement.parentElement.remove()" style="margin-left:10px">追加</button>
+                    <button onclick="addEntryToList();this.parentElement.parentElement.remove()" style="margin-left:10px">Add</button>
                 </div>
             `;
             document.body.appendChild(dialog);
@@ -19785,9 +19785,9 @@ Do you want to continue?`;
                     return;
                 }
                 
-                // KENVにエントリーを追加
+                // Add entry to KENV
                 if (info.includes(':')) {
-                    // オンチェーンモード（TxID:BlockID:Pass形式）
+                    // On-chain mode (TxID:BlockID:Pass format)
                     const parts = info.split(':');
                     const [metaTxId, blockId, password] = parts;
                     
@@ -19796,9 +19796,9 @@ Do you want to continue?`;
                     entry.metaTxBlockId = blockId;
                     entry.password = password || null;
                     
-                    log(`[KENV] オンチェーンエントリー追加: ${metaTxId}`, 'info');
+                    log(`[KENV] On-chain entry added: ${metaTxId}`, 'info');
                     
-                    // バックグラウンドで検証
+                    // Verify in background
                     setTimeout(() => {
                         FileState.kenvManager.verifyAndCompleteEntry(entry);
                         updateFileListFromKENV();
@@ -19812,18 +19812,18 @@ Do you want to continue?`;
                     
                     log(`[KENV] Added .kaspa file entry: ${filename}`, 'info');
                     
-                    // バックグラウンドで検証
+                    // Verify in background
                     setTimeout(() => {
                         FileState.kenvManager.verifyAndCompleteEntry(entry);
                         updateFileListFromKENV();
                     }, 100);
                     
                 } else {
-                    log('[KENV] 無効な形式です。TxID:BlockID:Pass または .kaspa URLを入力してください', 'error');
+                    log('[KENV] Invalid format. Please enter TxID:BlockID:Pass or .kaspa URL', 'error');
                     return;
                 }
                 
-                // UIを更新
+                // Update UI
                 updateFileListFromKENV();
                 
             } else {
@@ -19845,7 +19845,7 @@ Do you want to continue?`;
                     entry.metaTxBlockId = parts[1];
                     entry.password = parts[2] || null;
                     
-                    // バックグラウンドで検証
+                    // Verify in background
                     setTimeout(() => {
                         FileState.kenvManager.verifyAndCompleteEntry(entry);
                         updateFileListFromKENV();
@@ -19854,7 +19854,7 @@ Do you want to continue?`;
                 
                 log(`[KENV] Added directory entry: ${dirName}`, 'info');
                 
-                // UIを更新
+                // Update UI
                 updateFileListFromKENV();
             }
         };
@@ -20004,15 +20004,15 @@ Do you want to continue?`;
                 // Save to LocalStorage
                 try {
                     await FileState.kenvManager.saveAll();
-                    log(`[KENV] ${selectedIds.length}個のエントリーを削除しました`, 'success');
+                    log(`[KENV] Deleted ${selectedIds.length} entries`, 'success');
                 } catch (error) {
-                    log(`[KENV] 削除エラー: ${error.message}`, 'error');
+                    log(`[KENV] Deletion error: ${error.message}`, 'error');
                 }
                 
-                // 選択をクリア
+                // Clear selection
                 FileState.selectedFiles.clear();
                 
-                // UIを更新
+                // Update UI
                 updateFileListFromKENV();
                 updateFileActions();
             }
@@ -20200,14 +20200,14 @@ Do you want to continue?`;
         
         // Show entry details (placeholder)
         window.showEntryDetails = function(entry) {
-            log(`[KENV] エントリー詳細: ${entry.name}`, 'info');
+            log(`[KENV] Entry details: ${entry.name}`, 'info');
             // TODO: Implement detail view modal
         };
         
         // Search KENV files by name
         window.searchKENVFiles = function(query) {
             if (!query || query.length < 1) {
-                // 空の場合はすべて表示
+                // Show all if empty
                 updateFileListFromKENV();
                 return;
             }
@@ -20223,7 +20223,7 @@ Do you want to continue?`;
                 }
             });
             
-            // 結果を表示
+            // Show results
             if (results.length === 0) {
                 tbody.innerHTML = `
                     <tr>
@@ -20491,13 +20491,13 @@ Do you want to continue?`;
             try {
                 switch (action) {
                     case 'txid-password':
-                        // TxID:BlockID:Password形式でコピー
+                        // Copy in TxID:BlockID:Password format
                         if (!kenvEntry.metaTxId) {
-                            log('メタトランザクションIDが存在しません', 'error');
+                            log('Meta transaction ID does not exist', 'error');
                             return;
                         }
                         if (!kenvEntry.password) {
-                            log('パスワードが保存されていません', 'error');
+                            log('Password is not saved', 'error');
                             return;
                         }
                         const blockId = kenvEntry.metaTxBlockId || '';
@@ -20507,25 +20507,25 @@ Do you want to continue?`;
                         break;
                         
                     case 'txid-no-password':
-                        // TxID:BlockID形式でコピー
+                        // Copy in TxID:BlockID format
                         if (!kenvEntry.metaTxId) {
-                            log('メタトランザクションIDが存在しません', 'error');
+                            log('Meta transaction ID does not exist', 'error');
                             return;
                         }
                         const blockIdOnly = kenvEntry.metaTxBlockId || '';
                         const textNoPass = blockIdOnly ? `${kenvEntry.metaTxId}:${blockIdOnly}` : kenvEntry.metaTxId;
                         await window.copyToClipboard(textNoPass);
-                        log(blockIdOnly ? 'TxID:BlockID形式でコピーしました' : 'TxIDをコピーしました', 'success');
+                        log(blockIdOnly ? 'Copied in TxID:BlockID format' : 'Copied TxID', 'success');
                         break;
                         
                     case 'password':
-                        // パスワードのみコピー
+                        // Copy password only
                         if (!kenvEntry.password) {
-                            log('パスワードが保存されていません', 'error');
+                            log('Password is not saved', 'error');
                             return;
                         }
                         await window.copyToClipboard(kenvEntry.password);
-                        log('パスワードをコピーしました', 'success');
+                        log('Password copied', 'success');
                         break;
                         
                     case 'kaspa-password':
@@ -20535,7 +20535,7 @@ Do you want to continue?`;
                         break;
                         
                     default:
-                        log(`不明なアクション: ${action}`, 'error');
+                        log(`Unknown action: ${action}`, 'error');
                 }
             } catch (error) {
                 log(`Share error: ${error.message}`, 'error');
@@ -20625,7 +20625,7 @@ Do you want to continue?`;
             dialog.className = 'password-dialog';
             dialog.innerHTML = `
                 <h3>Enter Password</h3>
-                <p>パスワードが設定されていないようです。<br>パスワードを入力してリストへ登録しますか？</p>
+                <p>It seems no password is set.<br>Would you like to enter a password and register it to the list?</p>
                 <input type="password" id="addFilePassword" placeholder="Password (optional)">
                 <div class="password-dialog-buttons">
                     <button onclick="cancelAddFile()">Cancel</button>
@@ -20707,7 +20707,7 @@ Do you want to continue?`;
             
             // Create info content
             const formatDate = (date) => {
-                if (!date) return '不明';
+                if (!date) return 'Unknown';
                 const d = new Date(date);
                 return d.toLocaleDateString('ja-JP') + ' ' + d.toLocaleTimeString('ja-JP');
             };
@@ -20855,7 +20855,7 @@ Do you want to continue?`;
                     cursor: pointer;
                     font-size: 16px;
                     width: 100%;
-                ">閉じる</button>
+                ">Close</button>
             `;
             
             modal.appendChild(modalContent);
@@ -20885,7 +20885,7 @@ Do you want to continue?`;
             auxConnections: [],
             isActive: false,
             detectedBlocks: new Map(),
-            blockCounts: new Map(), // v5.11.137-fix: 各ノードのブロック受信数
+            blockCounts: new Map(), // v5.11.137-fix: Block reception count for each node
             statsInterval: null, // v5.11.137-fix: 統計表示用タイマー
             
             async start() {

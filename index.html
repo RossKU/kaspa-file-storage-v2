@@ -8052,12 +8052,12 @@ Do you want to continue?`;
             },
             
             // Tab switching
-            switchTab: function(tab) {
+            switchTab: function(tab, updateHash = true) {
                 // Check if debug tab is requested but not visible
                 if (tab === 'debug') {
                     const debugNavItem = document.getElementById('debug-nav-item');
                     if (debugNavItem && debugNavItem.style.display === 'none') {
-                        console.warn('Debug tab is hidden. Enable debug mode by adding ?debug to the URL or calling enableDebugMode() in console.');
+                        console.warn('Debug tab is hidden. Enable debug mode by adding #debug to the URL or calling enableDebugMode() in console.');
                         return;
                     }
                 }
@@ -8069,6 +8069,15 @@ Do you want to continue?`;
                 // Update tab contents
                 document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
                 document.getElementById(tab + '-tab')?.classList.add('active');
+                
+                // Update URL hash if requested (default true)
+                if (updateHash) {
+                    // Only update hash if it's different to avoid unnecessary history entries
+                    const newHash = `#${tab}`;
+                    if (window.location.hash !== newHash) {
+                        window.location.hash = tab;
+                    }
+                }
                 
                 // Close sidebar on mobile after selection
                 if (window.innerWidth <= 768) {
@@ -8121,31 +8130,30 @@ Do you want to continue?`;
         // Expose UIHandlers to window for debugging (can be removed later)
         window.UIHandlers = UIHandlers;
         
-        // Debug mode detection
+        // URL Hash Navigation and Debug Mode
         (function() {
-            // Check URL parameters for debug mode
-            const urlParams = new URLSearchParams(window.location.search);
-            const hashParams = window.location.hash.includes('#debug');
-            const isDebugMode = urlParams.has('debug') || hashParams;
+            // Valid tab names
+            const validTabs = ['status', 'file', 'download', 'upload', 'dirbuilder', 'debug', 'settings'];
             
-            // Show debug tab if in debug mode
-            if (isDebugMode) {
+            // Parse hash to get tab name
+            function getTabFromHash() {
+                const hash = window.location.hash.replace('#', '').toLowerCase();
+                return validTabs.includes(hash) ? hash : null;
+            }
+            
+            // Handle debug mode visibility
+            function handleDebugMode() {
+                const urlParams = new URLSearchParams(window.location.search);
+                const hashParams = window.location.hash === '#debug';
+                const isDebugMode = urlParams.has('debug') || hashParams;
+                
                 const debugNavItem = document.getElementById('debug-nav-item');
                 if (debugNavItem) {
-                    debugNavItem.style.display = 'flex';
+                    if (isDebugMode) {
+                        debugNavItem.style.display = 'flex';
+                    }
                 }
                 
-                // Also make debug tab accessible via console
-                window.enableDebugMode = function() {
-                    const debugNavItem = document.getElementById('debug-nav-item');
-                    if (debugNavItem) {
-                        debugNavItem.style.display = 'flex';
-                        console.log('Debug mode enabled. Debug tab is now visible.');
-                    }
-                };
-                
-                console.log('Debug mode activated via URL parameter');
-            } else {
                 // Provide function to enable debug mode from console
                 window.enableDebugMode = function() {
                     const debugNavItem = document.getElementById('debug-nav-item');
@@ -8156,6 +8164,52 @@ Do you want to continue?`;
                     }
                     return false;
                 };
+                
+                return isDebugMode;
+            }
+            
+            // Initial load - handle hash navigation
+            function handleInitialHash() {
+                const isDebugMode = handleDebugMode();
+                const tabFromHash = getTabFromHash();
+                
+                if (tabFromHash) {
+                    // Special handling for debug tab
+                    if (tabFromHash === 'debug' && !isDebugMode) {
+                        // Enable debug mode if accessing via hash
+                        const debugNavItem = document.getElementById('debug-nav-item');
+                        if (debugNavItem) {
+                            debugNavItem.style.display = 'flex';
+                        }
+                    }
+                    
+                    // Switch to the tab after a short delay to ensure DOM is ready
+                    setTimeout(() => {
+                        UIHandlers.switchTab(tabFromHash, false); // false = don't update hash
+                    }, 100);
+                }
+            }
+            
+            // Handle browser back/forward navigation
+            window.addEventListener('hashchange', function() {
+                const tabFromHash = getTabFromHash();
+                if (tabFromHash) {
+                    // Special handling for debug tab
+                    if (tabFromHash === 'debug') {
+                        const debugNavItem = document.getElementById('debug-nav-item');
+                        if (debugNavItem && debugNavItem.style.display === 'none') {
+                            debugNavItem.style.display = 'flex';
+                        }
+                    }
+                    UIHandlers.switchTab(tabFromHash, false); // false = don't update hash
+                }
+            });
+            
+            // Call initial hash handler
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', handleInitialHash);
+            } else {
+                handleInitialHash();
             }
         })();
         

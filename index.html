@@ -4349,12 +4349,26 @@
                 document.getElementById('archiveConnectedNodes').textContent = '0/5';
                 document.getElementById('archiveAvgResponse').textContent = '-';
                 document.getElementById('archiveCheckingNode').textContent = 'Waiting';
-                document.getElementById('archiveEventLog').innerHTML = '<div class="archive-event-item">Reset complete - You can restart with the search button</div>';
+                // v6.3.14: DOM manipulation for archive event log
+                const archiveEventLog = document.getElementById('archiveEventLog');
+                while (archiveEventLog.firstChild) {
+                    archiveEventLog.removeChild(archiveEventLog.firstChild);
+                }
+                const eventDiv = document.createElement('div');
+                eventDiv.className = 'archive-event-item';
+                eventDiv.textContent = 'Reset complete - You can restart with the search button';
+                archiveEventLog.appendChild(eventDiv);
                 
                 // Clear archive list
                 const archiveList = document.getElementById('archiveList');
                 if (archiveList) {
-                    archiveList.innerHTML = '<div>No archive nodes found yet</div>';
+                    // v6.3.14: DOM manipulation for archive list
+                    while (archiveList.firstChild) {
+                        archiveList.removeChild(archiveList.firstChild);
+                    }
+                    const noNodesDiv = document.createElement('div');
+                    noNodesDiv.textContent = 'No archive nodes found yet';
+                    archiveList.appendChild(noNodesDiv);
                 }
                 
                 this.addEvent('Reset complete', '✅');
@@ -12004,7 +12018,14 @@ Do you want to continue?`;
             // Update init status if visible
             const initStatus = document.getElementById('initStatus');
             if (initStatus && initStatus.style.display !== 'none') {
-                initStatus.innerHTML = `<p class="error">❌ Wallet disconnected</p>`;
+                // v6.3.14: DOM manipulation for wallet status
+                while (initStatus.firstChild) {
+                    initStatus.removeChild(initStatus.firstChild);
+                }
+                const errorP = document.createElement('p');
+                errorP.className = 'error';
+                errorP.textContent = '❌ Wallet disconnected';
+                initStatus.appendChild(errorP);
             }
             
             // Disable upload button
@@ -13685,7 +13706,14 @@ Do you want to continue?`;
                         // Update status
                         const uploadingStatusElement = document.getElementById(`chunk-status-${i}`);
                         if (uploadingStatusElement) {
-                            uploadingStatusElement.innerHTML = '<span class="uploading">Uploading...</span>';
+                            // v6.3.14: DOM manipulation for upload status
+                            while (uploadingStatusElement.firstChild) {
+                                uploadingStatusElement.removeChild(uploadingStatusElement.firstChild);
+                            }
+                            const uploadSpan = document.createElement('span');
+                            uploadSpan.className = 'uploading';
+                            uploadSpan.textContent = 'Uploading...';
+                            uploadingStatusElement.appendChild(uploadSpan);
                         } else {
                             log(`[ERROR] chunk-status-${i} element not found (at upload start)`, 'error');
                         }
@@ -13838,7 +13866,14 @@ Do you want to continue?`;
                                 // Update status
                                 const chunkStatusElement = document.getElementById(`chunk-status-${i}`);
                                 if (chunkStatusElement) {
-                                    chunkStatusElement.innerHTML = '<span class="success">✅ Complete</span>';
+                                    // v6.3.14: DOM manipulation for chunk success status
+                                    while (chunkStatusElement.firstChild) {
+                                        chunkStatusElement.removeChild(chunkStatusElement.firstChild);
+                                    }
+                                    const successSpan = document.createElement('span');
+                                    successSpan.className = 'success';
+                                    successSpan.textContent = '✅ Complete';
+                                    chunkStatusElement.appendChild(successSpan);
                                 } else {
                                     log(`[ERROR] chunk-status-${i} element not found`, 'error');
                                 }
@@ -13955,7 +13990,14 @@ Do you want to continue?`;
                                 if (retries >= config.retryCount) {
                                     const chunkStatusElement = document.getElementById(`chunk-status-${i}`);
                                     if (chunkStatusElement) {
-                                        chunkStatusElement.innerHTML = '<span class="error">❌ Failed</span>';
+                                        // v6.3.14: DOM manipulation for chunk error status
+                                        while (chunkStatusElement.firstChild) {
+                                            chunkStatusElement.removeChild(chunkStatusElement.firstChild);
+                                        }
+                                        const errorSpan = document.createElement('span');
+                                        errorSpan.className = 'error';
+                                        errorSpan.textContent = '❌ Failed';
+                                        chunkStatusElement.appendChild(errorSpan);
                                     } else {
                                         log(`[ERROR] chunk-status-${i} element not found (during error)`, 'error');
                                     }

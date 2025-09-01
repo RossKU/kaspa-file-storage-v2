@@ -9922,7 +9922,15 @@ Do you want to continue?`;
                 html += `<div style="font-size: 0.85em; color: var(--text-secondary);">Avg TX: ${avgTx}/block | Uptime: ${elapsed} seconds</div>`;
             }
             
-            contentDiv.innerHTML = html;
+            // v6.3.19: DOM manipulation for WebSocket stats
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = html;
+            while (contentDiv.firstChild) {
+                contentDiv.removeChild(contentDiv.firstChild);
+            }
+            while (tempDiv.firstChild) {
+                contentDiv.appendChild(tempDiv.firstChild);
+            }
         }
 
         // Check REST API health and update display
@@ -16034,7 +16042,12 @@ Do you want to continue?`;
                     const fileInfoElement = document.getElementById('fileInfo');
                     
                     if (fileInfoElement) {
-                        fileInfoElement.innerHTML += fileListHtml;
+                        // v6.3.19: DOM manipulation for file list append
+                        const tempDiv = document.createElement('div');
+                        tempDiv.innerHTML = fileListHtml;
+                        while (tempDiv.firstChild) {
+                            fileInfoElement.appendChild(tempDiv.firstChild);
+                        }
                         
                         // v4.6.31: Insert button via DOM manipulation
                         
@@ -21554,7 +21567,15 @@ Do you want to continue?`;
                     html += `<li>${conn.nodeId}${archiveBlocks}${receivedInfo}</li>`;
                 }
                 html += '</ul>';
-                container.innerHTML = html;
+                // v6.3.19: DOM manipulation for connections list
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = html;
+                while (container.firstChild) {
+                    container.removeChild(container.firstChild);
+                }
+                while (tempDiv.firstChild) {
+                    container.appendChild(tempDiv.firstChild);
+                }
             },
             
             reset() {
@@ -21593,9 +21614,13 @@ Do you want to continue?`;
                 
                 const timestamp = new Date().toLocaleTimeString();
                 const color = type === 'success' ? '#4CAF50' : type === 'error' ? '#f44336' : type === 'debug' ? '#888' : '#fff';
-                const entry = `<div style="color: ${color}">[${timestamp}] ${message}</div>`;
+                // v6.3.19: DOM manipulation for log entry
+                const entryDiv = document.createElement('div');
+                entryDiv.style.color = color;
+                entryDiv.textContent = `[${timestamp}] ${message}`;
                 
-                logDiv.innerHTML = entry + logDiv.innerHTML;
+                // Prepend new entry
+                logDiv.insertBefore(entryDiv, logDiv.firstChild);
                 
                 // Maximum 100 lines
                 const lines = logDiv.getElementsByTagName('div');

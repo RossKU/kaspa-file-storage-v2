@@ -5422,7 +5422,7 @@
                         .replace(/\//g, '_')
                         .replace(/=/g, '.');
                 } catch (error) {
-                    console.error('[KENV] directoryMetadata encoding error:', error);
+                    ;
                     return '';
                 }
             },
@@ -5439,7 +5439,7 @@
                     const jsonStr = decodeURIComponent(atob(base64));
                     return JSON.parse(jsonStr);
                 } catch (error) {
-                    console.error('[KENV] directoryMetadata decoding error:', error);
+                    ;
                     return null;
                 }
             },
@@ -6118,7 +6118,7 @@ Do you want to continue?`;
                         '.kaspa file without password generated', 'success');
                         
                 } catch (error) {
-                    console.error('.kaspa file generation error:', error);
+                    ;
                     log(`.kaspa file generation error: ${error.message}`, 'error');
                 }
             }
@@ -6309,11 +6309,11 @@ Do you want to continue?`;
             showStatus(message, type = 'info') {
                 // Console log with appropriate level
                 if (type === 'error') {
-                    console.error(`[DirectoryBuilder] ${message}`);
+                    ;
                 } else if (type === 'warning') {
-                    console.warn(`[DirectoryBuilder] ${message}`);
+                    ;
                 } else {
-                    console.log(`[DirectoryBuilder] ${message}`);
+                    ;
                 }
                 
                 // Use global log function if available
@@ -6652,7 +6652,7 @@ Do you want to continue?`;
                     
                 } catch (error) {
                     this.showStatus(`Error: ${error.message}`, 'error');
-                    console.error('addFromTxId error:', error);
+                    ;
                 }
             },
             
@@ -6862,7 +6862,7 @@ Do you want to continue?`;
             
             // v6.2.48: Rebuild intermediate folders - A approach (Entry restoration)
             rebuildIntermediateFolders() {
-                console.log('[DirectoryBuilder] Rebuilding intermediate folders...');
+                ;
                 const startCount = this.entries.length;
                 
                 // Collect all paths that should exist
@@ -6882,7 +6882,7 @@ Do you want to continue?`;
                     }
                 });
                 
-                console.log(`[DirectoryBuilder] Found ${requiredPaths.size} required paths`);
+                ;
                 
                 // Check which paths are missing and add them as virtual folders
                 const addedFolders = [];
@@ -6916,15 +6916,15 @@ Do you want to continue?`;
                         
                         this.entries.push(virtualFolder);
                         addedFolders.push(path);
-                        console.log(`[DirectoryBuilder] Added virtual folder: ${path}`);
+                        ;
                     }
                 });
                 
                 const endCount = this.entries.length;
-                console.log(`[DirectoryBuilder] Rebuild complete. Added ${endCount - startCount} intermediate folders`);
+                ;
                 
                 if (addedFolders.length > 0) {
-                    console.log('[DirectoryBuilder] Added folders:', addedFolders);
+                    ;
                 }
                 
                 return addedFolders.length;
@@ -7149,7 +7149,7 @@ Do you want to continue?`;
                     return entry.id;
                 } catch (error) {
                     this.showStatus(`KENV save error: ${error.message}`, 'error');
-                    console.error('[DirectoryBuilder] KENV save error:', error);
+                    ;
                     return null;
                 }
             },
@@ -7349,7 +7349,7 @@ Do you want to continue?`;
             // v6.2.49: Remove entry with cascade deletion
             removeEntry(index) {
                 if (index < 0 || index >= this.entries.length) {
-                    console.warn(`[DirectoryBuilder] Invalid index: ${index}`);
+                    ;
                     return;
                 }
                 
@@ -7357,7 +7357,7 @@ Do you want to continue?`;
                 const targetPath = targetEntry.path ? `${targetEntry.path}/${targetEntry.name}` : targetEntry.name;
                 const targetType = targetEntry.type;
                 
-                console.log(`[DirectoryBuilder] Removing ${targetType}: ${targetPath}`);
+                ;
                 
                 // If it's a directory, we need to remove all children
                 if (targetType === 'directory' || targetType === 'folder') {
@@ -7377,19 +7377,19 @@ Do you want to continue?`;
                         // If entry's path starts with targetPath, it's a child
                         if (entry.path && entry.path.startsWith(targetPath)) {
                             toRemove.push(idx);
-                            console.log(`[DirectoryBuilder] - Also removing child: ${entryFullPath}`);
+                            ;
                         }
                         // Also check if the entry's full path starts with targetPath
                         else if (entryFullPath.startsWith(targetPath + '/')) {
                             toRemove.push(idx);
-                            console.log(`[DirectoryBuilder] - Also removing nested: ${entryFullPath}`);
+                            ;
                         }
                     });
                     
                     // Sort indices in descending order to remove from end to start
                     toRemove.sort((a, b) => b - a);
                     
-                    console.log(`[DirectoryBuilder] Removing ${toRemove.length} entries total`);
+                    ;
                     
                     // Remove all marked entries
                     toRemove.forEach(idx => {
@@ -7406,7 +7406,7 @@ Do you want to continue?`;
                 // Update the tree view and preview
                 this.updatePreview();
                 this.updateButtonStates();
-                console.log(`[DirectoryBuilder] Removal complete. Remaining entries: ${this.entries.length}`);
+                ;
             }
         };
         
@@ -7542,7 +7542,7 @@ Do you want to continue?`;
                 enumerable: true
             });
         } catch (e) {
-            console.warn('progressManager proxy already defined:', e);
+            ;
         }
         
         // v5.5.1: Define getter/setter for directoryMetadata
@@ -7557,7 +7557,7 @@ Do you want to continue?`;
                 enumerable: true
             });
         } catch (e) {
-            console.warn('directoryMetadata proxy already defined:', e);
+            ;
         }
         
         // v5.5.4: Define getter/setter for processedChunks
@@ -7572,7 +7572,7 @@ Do you want to continue?`;
                 enumerable: true
             });
         } catch (e) {
-            console.warn('processedChunks proxy already defined:', e);
+            ;
         }
 
         // v5.5.5: Define getter/setter for currentFile
@@ -7608,7 +7608,7 @@ Do you want to continue?`;
                 enumerable: true
             });
         } catch (e) {
-            console.warn('kaspaMetadata proxy already defined:', e);
+            ;
         }
         
         // v5.5.34: isUploadingFile backward compatibility proxy
@@ -7622,7 +7622,7 @@ Do you want to continue?`;
                 enumerable: true
             });
         } catch (e) {
-            console.warn('isUploadingFile proxy already defined:', e);
+            ;
         }
         
         // v5.5.35: uploadSessionActive backward compatibility proxy
@@ -7636,7 +7636,7 @@ Do you want to continue?`;
                 enumerable: true
             });
         } catch (e) {
-            console.warn('uploadSessionActive proxy already defined:', e);
+            ;
         }
         
         // v5.5.36: uploadingChunksCount backward compatibility proxy
@@ -7650,7 +7650,7 @@ Do you want to continue?`;
                 enumerable: true
             });
         } catch (e) {
-            console.warn('uploadingChunksCount proxy already defined:', e);
+            ;
         }
         
         // v5.5.37: uploadingMetaTx backward compatibility proxy
@@ -7664,7 +7664,7 @@ Do you want to continue?`;
                 enumerable: true
             });
         } catch (e) {
-            console.warn('uploadingMetaTx proxy already defined:', e);
+            ;
         }
         
         // v5.5.38-phase2: uploadingDirMeta backward compatibility proxy (careful migration)
@@ -7674,7 +7674,7 @@ Do you want to continue?`;
                     // v5.5.38-phase2: Track reads with debug log
                     const value = FileState.uploadingDirMeta;
                     if (value !== window._uploadingDirMetaGlobal) {
-                        console.warn(`[v5.5.38] Proxy detected mismatch: global=${window._uploadingDirMetaGlobal}, FileState=${value}`);
+                        ;
                     }
                     return value; 
                 },
@@ -7682,7 +7682,7 @@ Do you want to continue?`;
                     // v5.5.38-phase2: Update both (for safety)
                     FileState.uploadingDirMeta = value;
                     window._uploadingDirMetaGlobal = value;
-                    console.log(`[v5.5.38] uploadingDirMeta set via proxy: ${value}`);
+                    ;
                 },
                 configurable: true,
                 enumerable: true
@@ -7690,7 +7690,7 @@ Do you want to continue?`;
             // Save original global variable with alias (initial value is false)
             window._uploadingDirMetaGlobal = false;
         } catch (e) {
-            console.warn('uploadingDirMeta proxy already defined:', e);
+            ;
         }
         
         // v5.5.39: pendingProgress backward compatibility proxy
@@ -7704,7 +7704,7 @@ Do you want to continue?`;
                 enumerable: true
             });
         } catch (e) {
-            console.warn('pendingProgress proxy already defined:', e);
+            ;
         }
         
         // v5.5.39: currentFileCID backward compatibility proxy
@@ -7718,7 +7718,7 @@ Do you want to continue?`;
                 enumerable: true
             });
         } catch (e) {
-            console.warn('currentFileCID proxy already defined:', e);
+            ;
         }
         
         // v5.5.39: currentFileCIDFull backward compatibility proxy
@@ -7732,7 +7732,7 @@ Do you want to continue?`;
                 enumerable: true
             });
         } catch (e) {
-            console.warn('currentFileCIDFull proxy already defined:', e);
+            ;
         }
         
         // v5.5.39: multiWalletTestMode backward compatibility proxy
@@ -7746,7 +7746,7 @@ Do you want to continue?`;
                 enumerable: true
             });
         } catch (e) {
-            console.warn('multiWalletTestMode proxy already defined:', e);
+            ;
         }
         
         // v5.5.39: simpleWalletManager backward compatibility proxy
@@ -7760,7 +7760,7 @@ Do you want to continue?`;
                 enumerable: true
             });
         } catch (e) {
-            console.warn('simpleWalletManager proxy already defined:', e);
+            ;
         }
         
         // v5.5.20: currentPassword backward compatibility proxy
@@ -7777,7 +7777,7 @@ Do you want to continue?`;
             });
         } catch (e) {
             // Skip if already defined
-            console.warn('currentPassword proxy already defined:', e);
+            ;
         }
         
         // ===== Utility Handlers Object (v5.11.28) =====
@@ -8120,7 +8120,7 @@ Do you want to continue?`;
                 if (tab === 'debug') {
                     const debugNavItem = document.getElementById('debug-nav-item');
                     if (debugNavItem && debugNavItem.style.display === 'none') {
-                        console.warn('Debug tab is hidden. Enable debug mode by adding #debug to the URL or calling enableDebugMode() in console.');
+                        ;
                         return;
                     }
                 }
@@ -8222,7 +8222,7 @@ Do you want to continue?`;
                     const debugNavItem = document.getElementById('debug-nav-item');
                     if (debugNavItem) {
                         debugNavItem.style.display = 'flex';
-                        console.log('Debug mode enabled. Debug tab is now visible.');
+                        ;
                         return true;
                     }
                     return false;
@@ -8407,7 +8407,7 @@ Do you want to continue?`;
                         try {
                             return JSON.parse(value);
                         } catch (e) {
-                            console.error(`Invalid JSON in ${key}:`, e);
+                            ;
                             // Delete corrupted data
                             localStorage.removeItem(key);
                             return null;
@@ -8415,7 +8415,7 @@ Do you want to continue?`;
                     }
                     return value;
                 } catch (e) {
-                    console.error(`Storage access error for ${key}:`, e);
+                    ;
                     return null;
                 }
             }
@@ -9115,7 +9115,7 @@ Do you want to continue?`;
                         // v4.7.25: Remove save notifications
                     } catch (err) {
                         // v4.7.25: Remove error log for localStorage
-                        console.error(`localStorage save error: ${err.message}`);
+                        ;
                         log(`[ERROR] localStorage save error: ${err.message}`, 'error');
                     }
                     
@@ -9172,7 +9172,7 @@ Do you want to continue?`;
                             // v4.7.25: Remove save notifications and status update
                         } catch (err) {
                             // v4.7.25: Remove error log for file save
-                            console.error(`File save error: ${err.message}`);
+                            ;
                             log(`[ERROR] File save error: ${err.message}`, 'error');
                             log(`[ERROR] Error details: ${err.stack}`, 'error');
                             
@@ -9187,7 +9187,7 @@ Do you want to continue?`;
                     }
                 } catch (error) {
                     // v4.7.25: Remove error log for progress save
-                    console.error(`Progress save error: ${error.message}`);
+                    ;
                     log(`[ERROR] Progress save error: ${error.message}`, 'error');
                     log(`[ERROR] Error details: ${error.stack}`, 'error');
                 }
@@ -9234,7 +9234,7 @@ Do you want to continue?`;
                 const total = this.progress.recovery.totalChunks;
                 const progressPercent = (completed / total * 100);
                 
-                console.log(`ProgressManager Stats: ${completed}/${total} completed (${progressPercent.toFixed(1)}%)`);
+                ;
                 
                 return {
                     completedChunks: completed,
@@ -9891,7 +9891,7 @@ Do you want to continue?`;
                         }
                     }
                 } catch (e) {
-                    console.log('Could not parse URL:', e);
+                    ;
                 }
             }
             
@@ -12375,7 +12375,7 @@ Do you want to continue?`;
                 }
                 
             } catch (error) {
-                console.error('Error removing passwords:', error);
+                ;
                 alert(`❌ Failed to remove passwords: ${error.message}`);
                 log(`Password removal failed: ${error.message}`, 'error');
             }
@@ -12952,7 +12952,7 @@ Do you want to continue?`;
             } catch (error) {
                 log(`Decryption error (chunk ${chunkIndex}): ${error.message || error}`, 'error');
                 log(`Data size: ${data.length} bytes`, 'error');
-                console.error('Decryption error details:', error);
+                ;
                 throw error;
             }
         }
@@ -14540,8 +14540,8 @@ Do you want to continue?`;
                             }
                             
                             log(`Chunk ${i + 1} error (attempt ${retries}/${config.retryCount}): ${error.message || error}`, 'error');
-                            console.error('Detailed error:', error);
-                            console.error('Stack trace:', error.stack);
+                            ;
+                            ;
                             
                             // Phase 0-F-2: Manage counter on error
                             if (FileState.uploadingChunksCount > 0) {
@@ -14849,7 +14849,7 @@ Do you want to continue?`;
                 log(`[DEBUG-CATCH] Reached processAndUpload catch block`, 'debug');
                 const errorMessage = error?.message || error?.toString() || 'Unknown error';
                 log(`Upload error: ${errorMessage}`, 'error');
-                console.error('Upload error:', error);
+                ;
                 // Log WASM error details (without JSON.stringify)
                 if (typeof error === 'object' && error !== null) {
                     log(`[DEBUG] Error object: ${error.message || '[no message]'} (${error.constructor?.name || 'object'})`, 'debug');
@@ -15307,7 +15307,7 @@ Do you want to continue?`;
                                 };
                             } catch (e) {
                                 log(`UTXO formatting error: ${e.message}`, 'error');
-                                console.error('UTXO:', utxo);
+                                ;
                                 throw e;
                             }
                         });
@@ -15623,7 +15623,7 @@ Do you want to continue?`;
                 }
                 
                 log(`Meta transaction creation error: ${error.message || error}`, 'error');
-                console.error('Meta-tx creation error:', error);
+                ;
                 
                 // v6.2.71: Set networkErrorOccurred flag for network errors (same as regular chunks)
                 if (isNetworkError(error)) {
@@ -15633,7 +15633,7 @@ Do you want to continue?`;
                 
                 // Try to log more details
                 if (error.stack) {
-                    console.error('Error stack:', error.stack);
+                    ;
                 }
                 
                 // v6.2.75: Return false on error
@@ -16729,21 +16729,17 @@ Do you want to continue?`;
             alert(`❌ ${message}\n\n${details.join('\n')}`);
             
             // Debug logging
-            console.log('[Download Error] showDownloadError called with:', message, details);
+            ;
             
             // Display error in progress window
             const progressDiv = document.getElementById('downloadProgress');
             const statusDiv = document.getElementById('downloadStatus');
             const progressBar = document.getElementById('downloadProgressBar');
             
-            console.log('[Download Error] Elements found:', {
-                progressDiv: !!progressDiv,
-                statusDiv: !!statusDiv,
-                progressBar: !!progressBar
-            });
+            // v6.3.23: Removed console.log for production
             
             if (progressDiv) {
-                console.log('[Download Error] Progress div found, forcing visibility');
+                ;
                 // Force display even if hidden
                 progressDiv.style.display = 'block';
                 progressDiv.style.visibility = 'visible';
@@ -16792,7 +16788,7 @@ Do you want to continue?`;
                         statusDiv.appendChild(detailsContainer);
                     }
                 } else {
-                    console.error('[showDownloadError] Status div not found!');
+                    ;
                 }
                 
                 // Auto-hide after 15 seconds
@@ -16813,7 +16809,7 @@ Do you want to continue?`;
                     }
                 }, 15000);
             } else {
-                console.error('[showDownloadError] Progress div not found! Showing alert as fallback.');
+                ;
                 // Fallback: Show alert if progress div doesn't exist
                 alert(`❌ ${message}\n\n${details.join('\n')}`);
             }
@@ -17105,7 +17101,7 @@ Do you want to continue?`;
                         // Check if we have transaction with payload in a different format
                         if (!payload && data.subnetwork_id === "0000000000000000000000000000000000000000") {
                             log(`Checking for payload in transaction data...`, 'info');
-                            console.log('Full transaction data:', data);
+                            ;
                         }
                     }
                 } catch (apiError) {
@@ -17229,7 +17225,7 @@ Do you want to continue?`;
                             }
                             
                             // Log for debugging
-                            console.error('Decryption error:', e);
+                            ;
                             const payloadPreview = Array.from(payload.slice(0, 32)).map(b => b.toString(16).padStart(2, '0')).join(' ');
                             log(`Payload hex preview: ${payloadPreview}`, 'debug');
                             throw e;
@@ -17841,7 +17837,7 @@ Do you want to continue?`;
                             
                         } catch (error) {
                             log(`Chunk ${i + 1} error: ${error.message || error}`, 'error');
-                            console.error(`Chunk ${i + 1} detailed error:`, error);
+                            ;
                             throw error;
                         }
                     }
@@ -19035,19 +19031,12 @@ Do you want to continue?`;
 
         // Global error handler
         window.addEventListener('error', (event) => {
-            console.error('Global error caught:', {
-                message: event.message,
-                filename: event.filename,
-                lineno: event.lineno,
-                colno: event.colno,
-                error: event.error,
-                stack: event.error?.stack
-            });
+            // v6.3.23: Removed console.error for production
             log(`Error: ${event.message} (${event.filename}:${event.lineno})`, 'error');
         });
 
         window.addEventListener('unhandledrejection', (event) => {
-            console.error('Unhandled promise rejection:', event.reason);
+            ;
             log(`Unhandled Promise error: ${event.reason}`, 'error');
         });
 
@@ -19073,7 +19062,7 @@ Do you want to continue?`;
 
         // Cleanup on page unload
         window.addEventListener('beforeunload', (event) => {
-            console.log('Page unloading - cleaning up resources');
+            ;
             
             // Stop memory monitoring
             if (memoryMonitorInterval) {
@@ -19082,20 +19071,20 @@ Do you want to continue?`;
             
             // Close WebSocket connections
             if (NetworkState.ws.connection && NetworkState.ws.connection.readyState === WebSocket.OPEN) {
-                console.log('Closing WebSocket connection');
+                ;
                 NetworkState.ws.connection.close();
             }
             
             // Log final debug info
             const finalDebugInfo = collectDebugInfo();
-            console.log('=== FINAL DEBUG INFO ===', finalDebugInfo);
+            ;
         });
 
         // Auto-initialize WASM on page load
         window.addEventListener('DOMContentLoaded', async function() {
             // Log debug info at startup
             const debugInfo = collectDebugInfo();
-            console.log('=== DEBUG INFO ===', debugInfo);
+            ;
             log(`Debug information: ${JSON.stringify(debugInfo, null, 2)}`, 'debug');
             
             log('Page loaded - Auto-initializing system', 'info');
@@ -19137,7 +19126,7 @@ Do you want to continue?`;
                 // Start memory monitoring after successful initialization
                 startMemoryMonitoring();
             } catch (error) {
-                console.error('Initialization error:', error);
+                ;
                 log(`Initialization error: ${error.message}`, 'error');
             }
             
@@ -19183,7 +19172,7 @@ Do you want to continue?`;
 
             generateTestWallet(index) {
                 try {
-                    console.log(`[MultiWallet] Generating test wallet ${index}...`);
+                    ;
                     
                     // Kaspa WASM SDK check
                     if (!NetworkState.kaspa) {
@@ -19195,13 +19184,13 @@ Do you want to continue?`;
                     }
                     
                     // Debug information
-                    console.log('[MultiWallet] Available kaspa methods:', Object.keys(NetworkState.kaspa));
+                    ;
                     
                     const privateKey = new NetworkState.kaspa.PrivateKey();
-                    console.log('[MultiWallet] Private key generated successfully');
+                    ;
                     
                     const publicKey = privateKey.toPublicKey();
-                    console.log('[MultiWallet] Public key generated successfully');
+                    ;
                     
                     // Network detection - safer method
                     let networkType = config.defaultNetwork; // Default (v5.11.101)
@@ -19209,17 +19198,17 @@ Do you want to continue?`;
                     // Check global variables
                     if (typeof NETWORK !== 'undefined' && NETWORK) {
                         networkType = NETWORK;
-                        console.log('[MultiWallet] Using global NETWORK:', networkType);
+                        ;
                     } else {
                         // Infer from existing RPC settings
                         const networkSelect = document.getElementById('networkSelect');
                         if (networkSelect && networkSelect.value) {
                             networkType = networkSelect.value;
-                            console.log('[MultiWallet] Using networkSelect value:', networkType);
+                            ;
                         }
                     }
                     
-                    console.log('[MultiWallet] Final network type:', networkType);
+                    ;
                     
                     // Address generation - use same method as existing system
                     let address;
@@ -19227,31 +19216,31 @@ Do you want to continue?`;
                         // Method 1: Use global NETWORK variable (same as existing system)
                         if (typeof NETWORK !== 'undefined' && NETWORK) {
                             address = privateKey.toAddress(NETWORK).toString();
-                            console.log('[MultiWallet] Address generated with global NETWORK:', address);
+                            ;
                         }
                         // Method 2: Use networkType (v5.11.101)
                         else {
                             address = privateKey.toAddress(networkType).toString();
-                            console.log('[MultiWallet] Address generated with networkType:', address);
+                            ;
                         }
                     } catch (addrError) {
-                        console.error('[MultiWallet] Primary address generation failed:', addrError);
+                        ;
                         
                         // Fallback 1: Try without arguments (default network)
                         try {
                             address = privateKey.toAddress().toString();
-                            console.log('[MultiWallet] Address generated with default network:', address);
+                            ;
                         } catch (fallback1Error) {
-                            console.error('[MultiWallet] Fallback 1 failed:', fallback1Error);
+                            ;
                             
                             // Fallback 2: Try to create address directly from public key
                             try {
                                 // As a last resort, use string representation of public key
                                 const pubKeyStr = publicKey.toString();
                                 address = `testnet:${pubKeyStr.substring(0, 62)}`;
-                                console.log('[MultiWallet] Temporary address generated:', address);
+                                ;
                             } catch (fallback2Error) {
-                                console.error('[MultiWallet] All fallbacks failed:', fallback2Error);
+                                ;
                                 throw new Error(`Complete address generation failure: ${addrError.message}`);
                             }
                         }
@@ -19266,21 +19255,17 @@ Do you want to continue?`;
                         status: 'new'
                     };
                     
-                    console.log(`[MultiWallet] ✓ Generated wallet ${index}:`, {
-                        id: wallet.id,
-                        address: wallet.address,
-                        network: wallet.network
-                    });
+                    // v6.3.23: Removed console.log for production
                     
                     return wallet;
                 } catch (error) {
-                    console.error('[MultiWallet] Wallet generation error:', error);
+                    ;
                     throw new Error(`Wallet generation failed: ${error.message}`);
                 }
             }
 
             generateMultipleWallets(count) {
-                console.log(`Generating ${count} test wallets...`);
+                ;
                 const newWallets = [];
                 
                 for (let i = 0; i < count; i++) {
@@ -19291,7 +19276,7 @@ Do you want to continue?`;
                 }
                 
                 this.subWallets = newWallets;
-                console.log(`✓ Successfully generated ${newWallets.length} wallets`);
+                ;
                 return newWallets;
             }
 
@@ -19311,10 +19296,10 @@ Do you want to continue?`;
                     };
                     
                     localStorage.setItem('multiWalletTest_public', JSON.stringify(publicData));
-                    console.log('✓ Wallet data saved to localStorage');
+                    ;
                     return true;
                 } catch (error) {
-                    console.error('Save error:', error);
+                    ;
                     return false;
                 }
             }
@@ -19322,36 +19307,36 @@ Do you want to continue?`;
 
         // Test functions
         function testPhase1_Basic() {
-            console.log('\n=== Phase 1 Basic Test ===');
+            ;
             
             try {
                 // Initialize managers
                 simpleWalletManager = new SimpleWalletManager();
-                console.log('✓ Manager initialized');
+                ;
                 
                 // Generate 2 wallets
                 const wallets = simpleWalletManager.generateMultipleWallets(2);
                 
                 if (wallets.length === 2) {
-                    console.log('✓ Successfully generated 2 wallets');
+                    ;
                 } else {
                     throw new Error('Failed to generate wallets');
                 }
                 
                 // Save test
                 const saved = simpleWalletManager.saveToLocalStorage();
-                console.log(`Save result: ${saved ? 'SUCCESS' : 'FAILED'}`);
+                ;
                 
                 return { success: true, wallets: wallets };
             } catch (error) {
-                console.error('Test failed:', error);
+                ;
                 throw error;
             }
         }
 
         function clearTestData() {
             localStorage.removeItem('multiWalletTest_public');
-            console.log('✓ Test data cleared');
+            ;
         }
 
         // UI functions
@@ -19377,7 +19362,7 @@ Do you want to continue?`;
                 
             } catch (error) {
                 statusEl.textContent += `\n❌ Error: ${error.message}\n`;
-                console.error('Phase 1 test error:', error);
+                ;
             }
         }
 
@@ -19533,7 +19518,7 @@ Do you want to continue?`;
             
             // Check if elements exist
             if (!preview || !defaultPrompt || !fileName || !fileSize) {
-                console.warn('Thumbnail preview elements not found');
+                ;
                 return;
             }
             
@@ -19767,7 +19752,7 @@ Do you want to continue?`;
             const globalBackup = window._uploadingDirMetaGlobal;
             
             if (proxyValue !== directValue || proxyValue !== globalBackup) {
-                console.warn(`[v5.5.38] State mismatch detected: proxy=${proxyValue}, direct=${directValue}, backup=${globalBackup}`);
+                ;
             }
             
             return {
@@ -19990,7 +19975,7 @@ Do you want to continue?`;
                 
                 log(`Exported ${entries.length} entries to ${filename}`, 'success');
             } catch (error) {
-                console.error('Export error:', error);
+                ;
                 log(`Export failed: ${error.message}`, 'error');
             }
         };
@@ -20197,7 +20182,7 @@ Do you want to continue?`;
                 event.target.value = '';
                 
             } catch (error) {
-                console.error('Import error:', error);
+                ;
                 log(`Import failed: ${error.message}`, 'error');
                 event.target.value = '';
             }
@@ -20617,7 +20602,7 @@ Do you want to continue?`;
             // Determine icon and status
             // v6.2.19: Debug log for type checking
             if (entry.name.includes('test') || entry.type === 'kaspa-directory') {
-                console.log(`[FileTab] Entry: ${entry.name}, Type: ${entry.type}`);
+                ;
             }
             const icon = entry.type === 'kaspa-directory' ? '📁' : 
                         getFileIcon(entry.name);

@@ -20152,6 +20152,73 @@ Do you want to continue?`;
         // ===== KENV File Tab Integration (v5.11.38) =====
         
         // Update file list from KENV data
+        // v6.3.10: FileList DOM helper for safe empty state rendering
+        const FileListDOM = {
+            // Create empty state row with DOM manipulation
+            createEmptyState(message, showAddButton = false) {
+                const tr = document.createElement('tr');
+                const td = document.createElement('td');
+                td.colSpan = 6;
+                td.style.textAlign = 'center';
+                td.style.padding = '40px';
+                td.style.color = 'var(--text-secondary)';
+                
+                // Icon container
+                const iconDiv = document.createElement('div');
+                iconDiv.style.fontSize = '48px';
+                iconDiv.style.marginBottom = '10px';
+                iconDiv.textContent = '📂';
+                
+                // Message container
+                const messageDiv = document.createElement('div');
+                messageDiv.textContent = message;
+                
+                td.appendChild(iconDiv);
+                td.appendChild(messageDiv);
+                
+                // Optional Add File button
+                if (showAddButton) {
+                    const buttonDiv = document.createElement('div');
+                    buttonDiv.style.marginTop = '10px';
+                    const button = document.createElement('button');
+                    button.textContent = '+ Add File';
+                    button.style.padding = '5px 15px';
+                    button.onclick = addFile;
+                    buttonDiv.appendChild(button);
+                    td.appendChild(buttonDiv);
+                }
+                
+                tr.appendChild(td);
+                return tr;
+            },
+            
+            // Create search result empty state
+            createSearchEmptyState(query) {
+                const tr = document.createElement('tr');
+                const td = document.createElement('td');
+                td.colSpan = 9;
+                td.style.textAlign = 'center';
+                td.style.padding = '40px';
+                td.style.color = 'var(--text-secondary)';
+                td.textContent = `🔍 No files found matching "${query}"`;
+                tr.appendChild(td);
+                return tr;
+            },
+            
+            // Create filter empty state
+            createFilterEmptyState() {
+                const tr = document.createElement('tr');
+                const td = document.createElement('td');
+                td.colSpan = 9;
+                td.style.textAlign = 'center';
+                td.style.padding = '40px';
+                td.style.color = 'var(--text-secondary)';
+                td.textContent = '🔍 No matching files';
+                tr.appendChild(td);
+                return tr;
+            }
+        };
+        
         window.updateFileListFromKENV = function() {
             const tbody = document.getElementById('fileListBody');
             if (!tbody) return;
@@ -20162,18 +20229,9 @@ Do you want to continue?`;
             const sortedEntries = FileState.kenvManager.kindex.sortIndexes.name;
             
             if (sortedEntries.length === 0) {
-                // Show empty state
-                tbody.innerHTML = `
-                    <tr>
-                        <td colspan="6" style="text-align: center; padding: 40px; color: var(--text-secondary);">
-                            <div style="font-size: 48px; margin-bottom: 10px;">📂</div>
-                            <div>No files</div>
-                            <div style="margin-top: 10px;">
-                                <button onclick="addFile()" style="padding: 5px 15px;">+ Add File</button>
-                            </div>
-                        </td>
-                    </tr>
-                `;
+                // Show empty state using DOM manipulation (v6.3.10)
+                const emptyRow = FileListDOM.createEmptyState('No files', true);
+                tbody.appendChild(emptyRow);
                 return;
             }
             
@@ -20390,13 +20448,9 @@ Do you want to continue?`;
             
             // Show results
             if (results.length === 0) {
-                tbody.innerHTML = `
-                    <tr>
-                        <td colspan="9" style="text-align: center; padding: 40px; color: var(--text-secondary);">
-                            🔍 No files found matching "${query}"
-                        </td>
-                    </tr>
-                `;
+                // Use DOM manipulation for empty state (v6.3.10)
+                const emptyRow = FileListDOM.createSearchEmptyState(query);
+                tbody.appendChild(emptyRow);
             } else {
                 results.forEach(({ entry }) => {
                     const row = createKENVTableRow(entry);
@@ -20564,13 +20618,9 @@ Do you want to continue?`;
             
             // 表示
             if (filteredLineNumbers.length === 0) {
-                tbody.innerHTML = `
-                    <tr>
-                        <td colspan="9" style="text-align: center; padding: 40px; color: var(--text-secondary);">
-                            🔍 No matching files
-                        </td>
-                    </tr>
-                `;
+                // Use DOM manipulation for empty state (v6.3.10)
+                const emptyRow = FileListDOM.createFilterEmptyState();
+                tbody.appendChild(emptyRow);
             } else {
                 filteredLineNumbers.forEach(lineNum => {
                     const entry = FileState.kenvManager.entries[lineNum];

@@ -16651,18 +16651,26 @@ Do you want to continue?`;
                         const errorMsg = rpcError.message?.toLowerCase() || '';
                         
                         if (errorMsg.includes('not found') || errorMsg.includes('cannot find')) {
+                            // v6.3.11: Don't show error immediately - wait for REST API fallback result
+                            log(`[RPC] Transaction not found - falling back to REST API`, 'warning');
+                            /*
                             showDownloadError('Transaction not found', [
                                 'TxID or BlockID may be incorrect',
                                 'Transaction might not be confirmed yet',
                                 `Current network: ${config.network} (check if correct)`,
                                 'Try again with REST API (BlockID not required)'
                             ]);
+                            */
                         } else if (errorMsg.includes('pruned')) {
+                            // v6.3.11: Don't show error immediately - attempt archive node or REST API
+                            log(`[RPC] Data has been pruned - attempting archive node or REST API`, 'warning');
+                            /*
                             showDownloadError('Data has been pruned', [
                                 'This node does not have old block data',
                                 'Enable Archive Node Discovery in Settings tab',
                                 'Or use REST API fallback (remove BlockID)'
                             ]);
+                            */
                         } else {
                             log(`[RPC] Error: ${rpcError.message}`, 'error');
                         }
@@ -16855,7 +16863,16 @@ Do you want to continue?`;
                 }
                 
                 if (!payload) {
-                    throw new Error('Meta transaction payload not found');
+                    // v6.3.11: Show error only when both RPC and REST API have failed
+                    showDownloadError('Download failed - All methods attempted', [
+                        'Both RPC and REST API could not retrieve the transaction',
+                        'Possible causes:',
+                        '• Transaction ID may be incorrect',
+                        '• Transaction not yet confirmed',
+                        `• Current network: ${config.network}`,
+                        'Please verify your transaction details and try again'
+                    ]);
+                    throw new Error('Meta transaction payload not found after all attempts');
                 }
                 
                 log(`Payload retrieved successfully: ${payload.length} bytes`, 'info');

@@ -14197,7 +14197,15 @@ Do you want to continue?`;
                     }
                     
                     // Update status
-                    document.getElementById(`chunk-status-${i}`).innerHTML = '<span class="uploading">Uploading...</span>';
+                    // v6.3.16: DOM manipulation for chunk upload status
+                    const statusEl1 = document.getElementById(`chunk-status-${i}`);
+                    while (statusEl1.firstChild) {
+                        statusEl1.removeChild(statusEl1.firstChild);
+                    }
+                    const uploadSpan1 = document.createElement('span');
+                    uploadSpan1.className = 'uploading';
+                    uploadSpan1.textContent = 'Uploading...';
+                    statusEl1.appendChild(uploadSpan1);
                     
                     // Upload to blockchain with retry
                     let txid = null;
@@ -14379,7 +14387,15 @@ Do you want to continue?`;
                             }
                             
                             // Update status
-                            document.getElementById(`chunk-status-${i}`).innerHTML = '<span class="success">✅ Complete</span>';
+                            // v6.3.16: DOM manipulation for chunk success status
+                            const statusEl2 = document.getElementById(`chunk-status-${i}`);
+                            while (statusEl2.firstChild) {
+                                statusEl2.removeChild(statusEl2.firstChild);
+                            }
+                            const successSpan1 = document.createElement('span');
+                            successSpan1.className = 'success';
+                            successSpan1.textContent = '✅ Complete';
+                            statusEl2.appendChild(successSpan1);
                             log(`Chunk ${i + 1} upload complete`);
                             
                             // Get block time from monitored transactions
@@ -14470,7 +14486,15 @@ Do you want to continue?`;
                             }
                             
                             if (retries >= config.retryCount) {
-                                document.getElementById(`chunk-status-${i}`).innerHTML = '<span class="error">❌ Failed</span>';
+                                // v6.3.16: DOM manipulation for chunk error status
+                                const statusEl3 = document.getElementById(`chunk-status-${i}`);
+                                while (statusEl3.firstChild) {
+                                    statusEl3.removeChild(statusEl3.firstChild);
+                                }
+                                const errorSpan1 = document.createElement('span');
+                                errorSpan1.className = 'error';
+                                errorSpan1.textContent = '❌ Failed';
+                                statusEl3.appendChild(errorSpan1);
                                 FileState.progressManager.markChunkFailed(i);
                                 log(`Chunk ${i + 1} upload failed - saving progress`);
                                 await FileState.progressManager.saveProgress(); // Save progress on failure
@@ -16467,9 +16491,13 @@ Do you want to continue?`;
                     document.getElementById('downloadPassword').value = FileState.kaspaMetadata.auth.password;
                     
                     // Show info message
+                    // v6.3.16: DOM manipulation for password info
                     const infoDiv = document.createElement('div');
                     infoDiv.className = 'metric-box';
-                    infoDiv.innerHTML = '<p class="success">✅ Password is included in .kaspa file</p>';
+                    const successP = document.createElement('p');
+                    successP.className = 'success';
+                    successP.textContent = '✅ Password is included in .kaspa file';
+                    infoDiv.appendChild(successP);
                     passwordSection.insertBefore(infoDiv, passwordSection.firstChild);
                 } else {
                     // Show password input

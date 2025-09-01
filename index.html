@@ -8036,10 +8036,24 @@ Do you want to continue?`;
                         // Add resume status to file info
                         const fileSize = document.getElementById('fileSize');
                         if (fileSize) {
-                            fileSize.innerHTML = `${(file.size / 1024 / 1024).toFixed(2)} MB<br>
-                                <span style="color: var(--success-color); font-size: 0.85em;">
-                                    Resume: ${resumeStats.completed}/${resumeStats.total} chunks (${resumeStats.percentage || Math.round(resumeStats.completed/resumeStats.total*100)}%)
-                                </span>`;
+                            // v6.3.12: DOM manipulation for file size and resume status
+                            while (fileSize.firstChild) {
+                                fileSize.removeChild(fileSize.firstChild);
+                            }
+                            
+                            // Add file size text
+                            const sizeText = document.createTextNode(`${(file.size / 1024 / 1024).toFixed(2)} MB`);
+                            fileSize.appendChild(sizeText);
+                            
+                            // Add line break
+                            fileSize.appendChild(document.createElement('br'));
+                            
+                            // Add resume status span
+                            const resumeSpan = document.createElement('span');
+                            resumeSpan.style.color = 'var(--success-color)';
+                            resumeSpan.style.fontSize = '0.85em';
+                            resumeSpan.textContent = `Resume: ${resumeStats.completed}/${resumeStats.total} chunks (${resumeStats.percentage || Math.round(resumeStats.completed/resumeStats.total*100)}%)`;
+                            fileSize.appendChild(resumeSpan);
                         }
                     }
                 } else {
@@ -13971,7 +13985,13 @@ Do you want to continue?`;
                         }
                         
                         if (payloadInfo) {
-                            payloadInfo.innerHTML = `<strong>Progress: ${completedChunks}/${totalPayloads} payloads</strong>`;
+                            // v6.3.12: DOM manipulation instead of innerHTML
+                            while (payloadInfo.firstChild) {
+                                payloadInfo.removeChild(payloadInfo.firstChild);
+                            }
+                            const strong = document.createElement('strong');
+                            strong.textContent = `Progress: ${completedChunks}/${totalPayloads} payloads`;
+                            payloadInfo.appendChild(strong);
                         }
                     }
                     
@@ -16516,7 +16536,10 @@ Do you want to continue?`;
                         progressBar.textContent = '0%';
                     }
                     if (statusDiv) {
-                        statusDiv.innerHTML = '';
+                        // v6.3.12: Clear content safely
+                        while (statusDiv.firstChild) {
+                            statusDiv.removeChild(statusDiv.firstChild);
+                        }
                     }
                 }, 15000);
             } else {

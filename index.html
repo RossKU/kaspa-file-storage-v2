@@ -3720,14 +3720,28 @@
                     const restartStatus = document.getElementById('restartStatus');
                     if (restartStatus) {
                         restartStatus.style.display = 'block';
-                        restartStatus.innerHTML = `
-                            <div style="color: var(--success-color); font-weight: bold;">
-                                ✅ Restart Complete
-                            </div>
-                            <div style="font-size: 12px; color: var(--text-secondary); margin-top: 5px;">
-                                WASM SDK and Kaspa core.js have been successfully restarted
-                            </div>
-                        `;
+                        
+                        // v6.3.13: DOM manipulation instead of innerHTML
+                        while (restartStatus.firstChild) {
+                            restartStatus.removeChild(restartStatus.firstChild);
+                        }
+                        
+                        // Create success message div
+                        const successDiv = document.createElement('div');
+                        successDiv.style.color = 'var(--success-color)';
+                        successDiv.style.fontWeight = 'bold';
+                        successDiv.textContent = '✅ Restart Complete';
+                        
+                        // Create detail message div
+                        const detailDiv = document.createElement('div');
+                        detailDiv.style.fontSize = '12px';
+                        detailDiv.style.color = 'var(--text-secondary)';
+                        detailDiv.style.marginTop = '5px';
+                        detailDiv.textContent = 'WASM SDK and Kaspa core.js have been successfully restarted';
+                        
+                        restartStatus.appendChild(successDiv);
+                        restartStatus.appendChild(detailDiv);
+                        
                         // Hide after 5 seconds
                         setTimeout(() => {
                             restartStatus.style.display = 'none';
@@ -9739,15 +9753,28 @@ Do you want to continue?`;
             const logContainer = document.getElementById('systemLog');
             const entry = document.createElement('div');
             entry.className = 'log-entry';
-            // Escape HTML and preserve newlines for display
-            const escapedMessage = logEntry.message
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;')
-                .replace(/'/g, '&#039;')
-                .replace(/\n/g, '<br>');
-            entry.innerHTML = `<span class="log-time">[${logEntry.time}]</span> <span class="log-${type}">${escapedMessage}</span>`;
+            // v6.3.13: DOM manipulation for log entries
+            // Create time span
+            const timeSpan = document.createElement('span');
+            timeSpan.className = 'log-time';
+            timeSpan.textContent = `[${logEntry.time}]`;
+            
+            // Create message span with proper escaping
+            const messageSpan = document.createElement('span');
+            messageSpan.className = `log-${type}`;
+            
+            // Handle message with line breaks (textContent auto-escapes HTML)
+            const messageParts = logEntry.message.split('\n');
+            messageParts.forEach((part, index) => {
+                if (index > 0) {
+                    messageSpan.appendChild(document.createElement('br'));
+                }
+                messageSpan.appendChild(document.createTextNode(part));
+            });
+            
+            entry.appendChild(timeSpan);
+            entry.appendChild(document.createTextNode(' '));
+            entry.appendChild(messageSpan);
             logContainer.appendChild(entry);
             logContainer.scrollTop = logContainer.scrollHeight;
         }

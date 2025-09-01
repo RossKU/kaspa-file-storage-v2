@@ -6764,7 +6764,24 @@ Do you want to continue?`;
                     return html;
                 };
                 
-                container.innerHTML = renderNode(tree);
+                // v6.3.21: DOM manipulation for tree rendering
+                while (container.firstChild) {
+                    container.removeChild(container.firstChild);
+                }
+                
+                // Convert recursive HTML builder to DOM elements
+                const createNodeElement = (nodeHtml) => {
+                    const tempDiv = document.createElement('div');
+                    tempDiv.innerHTML = nodeHtml;
+                    return tempDiv;
+                };
+                
+                const treeHtml = renderNode(tree);
+                const treeElements = createNodeElement(treeHtml);
+                
+                while (treeElements.firstChild) {
+                    container.appendChild(treeElements.firstChild);
+                }
             },
             
             selectNode(path, type) {
@@ -20165,7 +20182,8 @@ Do you want to continue?`;
         window.addFile = async function() {
             const dialog = document.createElement('div');
             dialog.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--bg-secondary);padding:20px;border-radius:8px;z-index:1000;width:450px';
-            dialog.innerHTML = `
+            // v6.3.21: DOM manipulation for dialog content
+            const dialogContent = `
                 <h3>Add Entry</h3>
                 <div style="margin-bottom:15px">
                     <label style="display:block;margin-bottom:5px">Type:</label>
@@ -20192,6 +20210,11 @@ Do you want to continue?`;
                     <button onclick="addEntryToList();this.parentElement.parentElement.remove()" style="margin-left:10px">Add</button>
                 </div>
             `;
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = dialogContent;
+            while (tempDiv.firstChild) {
+                dialog.appendChild(tempDiv.firstChild);
+            }
             document.body.appendChild(dialog);
         };
         
@@ -21080,7 +21103,8 @@ Do you want to continue?`;
             
             const dialog = document.createElement('div');
             dialog.className = 'password-dialog';
-            dialog.innerHTML = `
+            // v6.3.21: DOM manipulation for password dialog
+            const passwordDialogContent = `
                 <h3>Enter Password</h3>
                 <p>Please enter file password:</p>
                 <input type="password" id="filePassword" placeholder="Password">
@@ -21089,6 +21113,11 @@ Do you want to continue?`;
                     <button onclick="submitPassword('${action}')">OK</button>
                 </div>
             `;
+            const tempPasswordDiv = document.createElement('div');
+            tempPasswordDiv.innerHTML = passwordDialogContent;
+            while (tempPasswordDiv.firstChild) {
+                dialog.appendChild(tempPasswordDiv.firstChild);
+            }
             
             document.body.appendChild(overlay);
             document.body.appendChild(dialog);
@@ -21153,7 +21182,8 @@ Do you want to continue?`;
             
             const dialog = document.createElement('div');
             dialog.className = 'password-dialog';
-            dialog.innerHTML = `
+            // v6.3.21: DOM manipulation for add file password dialog
+            const addFileDialogContent = `
                 <h3>Enter Password</h3>
                 <p>It seems no password is set.<br>Would you like to enter a password and register it to the list?</p>
                 <input type="password" id="addFilePassword" placeholder="Password (optional)">
@@ -21162,6 +21192,11 @@ Do you want to continue?`;
                     <button onclick="confirmAddFile('${fileInfo.id}', '${originalInfo}')">Register</button>
                 </div>
             `;
+            const tempAddFileDiv = document.createElement('div');
+            tempAddFileDiv.innerHTML = addFileDialogContent;
+            while (tempAddFileDiv.firstChild) {
+                dialog.appendChild(tempAddFileDiv.firstChild);
+            }
             
             // Store fileInfo temporarily
             window.tempFileInfo = fileInfo;
@@ -21373,7 +21408,8 @@ Do you want to continue?`;
                 animation: slideUp 0.3s;
             `;
             
-            modalContent.innerHTML = `
+            // v6.3.21: DOM manipulation for modal content
+            const modalContentHtml = `
                 ${content}
                 <button onclick="document.getElementById('infoModal').remove()" style="
                     margin-top: 20px;
@@ -21387,6 +21423,11 @@ Do you want to continue?`;
                     width: 100%;
                 ">Close</button>
             `;
+            const tempModalDiv = document.createElement('div');
+            tempModalDiv.innerHTML = modalContentHtml;
+            while (tempModalDiv.firstChild) {
+                modalContent.appendChild(tempModalDiv.firstChild);
+            }
             
             modal.appendChild(modalContent);
             document.body.appendChild(modal);

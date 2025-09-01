@@ -17746,14 +17746,25 @@ Do you want to continue?`;
                 // Success UI display
                 const statusEl = document.getElementById('downloadStatus');
                 if (statusEl) {
-                    statusEl.innerHTML = `
-                        <div style="color: #4caf50; font-weight: bold;">
-                            ✅ Download complete!
-                        </div>
-                        <div style="color: #66bb6a; font-size: 0.9em; margin-top: 5px;">
-                            ${FileState.kaspaMetadata.file.name} saved
-                        </div>
-                    `;
+                    // v6.3.17: DOM manipulation for download success status
+                    while (statusEl.firstChild) {
+                        statusEl.removeChild(statusEl.firstChild);
+                    }
+                    
+                    // Success message
+                    const successDiv = document.createElement('div');
+                    successDiv.style.color = '#4caf50';
+                    successDiv.style.fontWeight = 'bold';
+                    successDiv.textContent = '✅ Download complete!';
+                    statusEl.appendChild(successDiv);
+                    
+                    // File name message
+                    const fileDiv = document.createElement('div');
+                    fileDiv.style.color = '#66bb6a';
+                    fileDiv.style.fontSize = '0.9em';
+                    fileDiv.style.marginTop = '5px';
+                    fileDiv.textContent = `${FileState.kaspaMetadata.file.name} saved`;
+                    statusEl.appendChild(fileDiv);
                 }
                 
                 // Also make progress bar green
@@ -17800,12 +17811,27 @@ Do you want to continue?`;
                 // UI display
                 const statusEl = document.getElementById('downloadStatus');
                 if (statusEl) {
-                    statusEl.innerHTML = `
-                        <div style="color: #f44336; font-weight: bold;">
-                            ${userMessage}
-                        </div>
-                        ${hint ? `<div style="color: #ff9800; font-size: 0.9em; margin-top: 5px;">💡 ${hint}</div>` : ''}
-                    `;
+                    // v6.3.17: DOM manipulation for download error status
+                    while (statusEl.firstChild) {
+                        statusEl.removeChild(statusEl.firstChild);
+                    }
+                    
+                    // Error message
+                    const errorDiv = document.createElement('div');
+                    errorDiv.style.color = '#f44336';
+                    errorDiv.style.fontWeight = 'bold';
+                    errorDiv.textContent = userMessage;
+                    statusEl.appendChild(errorDiv);
+                    
+                    // Hint message (if provided)
+                    if (hint) {
+                        const hintDiv = document.createElement('div');
+                        hintDiv.style.color = '#ff9800';
+                        hintDiv.style.fontSize = '0.9em';
+                        hintDiv.style.marginTop = '5px';
+                        hintDiv.textContent = `💡 ${hint}`;
+                        statusEl.appendChild(hintDiv);
+                    }
                 }
                 
                 // Make progress bar red too
@@ -19525,13 +19551,27 @@ Do you want to continue?`;
                         } else {
                             window.pendingProgress = progress;
                             const resumeDetails = document.getElementById('resumeDetails');
-                            // XSS fix: Escape file name
-                            resumeDetails.innerHTML = `
-                                <p><strong>File:</strong> ${escapeHtml(file.name)}</p>
-                                <p><strong>CID:</strong> ${escapeHtml(progress.cid)}</p>
-                                <p><strong>Progress:</strong> ${progress._progress.completedChunks}/${progress.recovery.totalChunks} chunks</p>
-                                <p><strong>Completion Rate:</strong> ${((progress._progress.completedChunks / progress.recovery.totalChunks) * 100).toFixed(1)}%</p>
-                            `;
+                            // v6.3.17: DOM manipulation for resume details
+                            while (resumeDetails.firstChild) {
+                                resumeDetails.removeChild(resumeDetails.firstChild);
+                            }
+                            
+                            // Create paragraphs for each detail
+                            const details = [
+                                { label: 'File:', value: file.name },
+                                { label: 'CID:', value: progress.cid },
+                                { label: 'Progress:', value: `${progress._progress.completedChunks}/${progress.recovery.totalChunks} chunks` },
+                                { label: 'Completion Rate:', value: `${((progress._progress.completedChunks / progress.recovery.totalChunks) * 100).toFixed(1)}%` }
+                            ];
+                            
+                            details.forEach(detail => {
+                                const p = document.createElement('p');
+                                const strong = document.createElement('strong');
+                                strong.textContent = detail.label;
+                                p.appendChild(strong);
+                                p.appendChild(document.createTextNode(' ' + detail.value));
+                                resumeDetails.appendChild(p);
+                            });
                             document.getElementById('resumeInfo').style.display = 'block';
                             log(`📂 Resumable progress detected: ${progress._progress.completedChunks}/${progress.recovery.totalChunks} chunks completed`, 'info');
                         }

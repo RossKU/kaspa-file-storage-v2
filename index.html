@@ -11770,7 +11770,16 @@ Do you want to continue?`;
                     detailsHtml = `Response: ${stats.avgResponseTime.toFixed(0)}ms`;
                 }
                 
-                document.getElementById('archiveDetails').innerHTML = detailsHtml;
+                // v6.3.20: DOM manipulation for archive details
+                const archiveDetailsEl = document.getElementById('archiveDetails');
+                while (archiveDetailsEl.firstChild) {
+                    archiveDetailsEl.removeChild(archiveDetailsEl.firstChild);
+                }
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = detailsHtml;
+                while (tempDiv.firstChild) {
+                    archiveDetailsEl.appendChild(tempDiv.firstChild);
+                }
             } else {
                 document.getElementById('archiveIndicator').className = 
                     'status-indicator-large status-disconnected';
@@ -11820,7 +11829,15 @@ Do you want to continue?`;
                     
                     html += `<div>N${idx+1}: ${type}${blocks ? '/' + blocks : ''}${daysInfo}/${node.avgResponseTime.toFixed(0)}ms ${status}</div>`;
                 });
-                detailsDiv.innerHTML = html;
+                // v6.3.20: DOM manipulation for details div
+                while (detailsDiv.firstChild) {
+                    detailsDiv.removeChild(detailsDiv.firstChild);
+                }
+                const tempDetailsDiv = document.createElement('div');
+                tempDetailsDiv.innerHTML = html;
+                while (tempDetailsDiv.firstChild) {
+                    detailsDiv.appendChild(tempDetailsDiv.firstChild);
+                }
             }
             
             // Update event log
@@ -11830,7 +11847,15 @@ Do you want to continue?`;
                 manager.eventLog.slice(-5).reverse().forEach(event => {
                     html += `<div>[${event.time}] ${event.icon} ${event.message}</div>`;
                 });
-                eventLogDiv.innerHTML = html;
+                // v6.3.20: DOM manipulation for event log
+                while (eventLogDiv.firstChild) {
+                    eventLogDiv.removeChild(eventLogDiv.firstChild);
+                }
+                const tempEventDiv = document.createElement('div');
+                tempEventDiv.innerHTML = html;
+                while (tempEventDiv.firstChild) {
+                    eventLogDiv.appendChild(tempEventDiv.firstChild);
+                }
             }
             
             // Update checking status
@@ -13747,12 +13772,20 @@ Do you want to continue?`;
                         // Create UI element
                         const chunkDiv = document.createElement('div');
                         chunkDiv.className = 'chunk-item';
-                        chunkDiv.innerHTML = `
-                            <div>Payload ${i + 1}/${payloads.length} (${(payloads[i].length/1024).toFixed(1)}KB)</div>
-                            <div class="chunk-status pending" id="chunk-status-${i}">
-                                <span>Waiting</span>
-                            </div>
-                        `;
+                        // v6.3.20: DOM manipulation for chunk UI
+                        const payloadDiv = document.createElement('div');
+                        payloadDiv.textContent = `Payload ${i + 1}/${payloads.length} (${(payloads[i].length/1024).toFixed(1)}KB)`;
+                        chunkDiv.appendChild(payloadDiv);
+                        
+                        const statusDiv = document.createElement('div');
+                        statusDiv.className = 'chunk-status pending';
+                        statusDiv.id = `chunk-status-${i}`;
+                        
+                        const statusSpan = document.createElement('span');
+                        statusSpan.textContent = 'Waiting';
+                        statusDiv.appendChild(statusSpan);
+                        
+                        chunkDiv.appendChild(statusDiv);
                         chunksList.appendChild(chunkDiv);
                         
                         // Update status
@@ -14172,12 +14205,20 @@ Do you want to continue?`;
                     const chunkDiv = document.createElement('div');
                     chunkDiv.className = 'chunk-item';
                     const sizeInfo = `(${(chunk.length/1024).toFixed(1)}KB)`;
-                    chunkDiv.innerHTML = `
-                        <div>Chunk ${i + 1}/${totalChunks} ${sizeInfo}</div>
-                        <div class="chunk-status pending" id="chunk-status-${i}">
-                            <span>Waiting</span>
-                        </div>
-                    `;
+                    // v6.3.20: DOM manipulation for chunk UI
+                    const chunkInfoDiv = document.createElement('div');
+                    chunkInfoDiv.textContent = `Chunk ${i + 1}/${totalChunks} ${sizeInfo}`;
+                    chunkDiv.appendChild(chunkInfoDiv);
+                    
+                    const chunkStatusDiv = document.createElement('div');
+                    chunkStatusDiv.className = 'chunk-status pending';
+                    chunkStatusDiv.id = `chunk-status-${i}`;
+                    
+                    const chunkStatusSpan = document.createElement('span');
+                    chunkStatusSpan.textContent = 'Waiting';
+                    chunkStatusDiv.appendChild(chunkStatusSpan);
+                    
+                    chunkDiv.appendChild(chunkStatusDiv);
                     chunksList.appendChild(chunkDiv);
                     
                     // Process chunk

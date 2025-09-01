@@ -11788,7 +11788,14 @@ Do you want to continue?`;
             // Compact node details
             const detailsDiv = document.getElementById('archiveNodeDetails');
             if (stats.nodes.length === 0) {
-                detailsDiv.innerHTML = '<div style="color: var(--text-secondary);">Waiting for connection...</div>';
+                // v6.3.15: DOM manipulation for waiting message
+                while (detailsDiv.firstChild) {
+                    detailsDiv.removeChild(detailsDiv.firstChild);
+                }
+                const waitingDiv = document.createElement('div');
+                waitingDiv.style.color = 'var(--text-secondary)';
+                waitingDiv.textContent = 'Waiting for connection...';
+                detailsDiv.appendChild(waitingDiv);
             } else {
                 let html = '';
                 stats.nodes.forEach((node, idx) => {
@@ -11847,35 +11854,51 @@ Do you want to continue?`;
                     toggle.checked = false; // Reset when disabled
                     
                     if (manager.isDiscovering) {
-                        label.innerHTML = `
-                            Force Archive Node<br>
-                            <small style="color: var(--warning-color);">
-                                Searching for archive nodes... (${manager.stats.totalAttempts} attempts)
-                            </small>
-                        `;
+                        // v6.3.15: DOM manipulation for label
+                        while (label.firstChild) {
+                            label.removeChild(label.firstChild);
+                        }
+                        label.appendChild(document.createTextNode('Force Archive Node'));
+                        label.appendChild(document.createElement('br'));
+                        const small1 = document.createElement('small');
+                        small1.style.color = 'var(--warning-color)';
+                        small1.textContent = `Searching for archive nodes... (${manager.stats.totalAttempts} attempts)`;
+                        label.appendChild(small1);
                     } else if (manager.consecutiveNonArchive >= manager.maxConsecutiveNonArchive) {
-                        label.innerHTML = `
-                            Force Archive Node<br>
-                            <small style="color: var(--error-color);">
-                                Archive node not found (${manager.maxConsecutiveNonArchive} consecutive failures)
-                            </small>
-                        `;
+                        // v6.3.15: DOM manipulation for label
+                        while (label.firstChild) {
+                            label.removeChild(label.firstChild);
+                        }
+                        label.appendChild(document.createTextNode('Force Archive Node'));
+                        label.appendChild(document.createElement('br'));
+                        const small2 = document.createElement('small');
+                        small2.style.color = 'var(--error-color)';
+                        small2.textContent = `Archive node not found (${manager.maxConsecutiveNonArchive} consecutive failures)`;
+                        label.appendChild(small2);
                     } else {
-                        label.innerHTML = `
-                            Force Archive Node<br>
-                            <small style="color: var(--text-secondary);">
-                                Archive nodes not found
-                            </small>
-                        `;
+                        // v6.3.15: DOM manipulation for label
+                        while (label.firstChild) {
+                            label.removeChild(label.firstChild);
+                        }
+                        label.appendChild(document.createTextNode('Force Archive Node'));
+                        label.appendChild(document.createElement('br'));
+                        const small3 = document.createElement('small');
+                        small3.style.color = 'var(--text-secondary)';
+                        small3.textContent = 'Archive nodes not found';
+                        label.appendChild(small3);
                     }
                 } else {
                     toggle.disabled = false;
-                    label.innerHTML = `
-                        Force Archive Node<br>
-                        <small style="color: var(--success-color);">
-                            ${nodeCount} archive nodes available
-                        </small>
-                    `;
+                    // v6.3.15: DOM manipulation for label
+                    while (label.firstChild) {
+                        label.removeChild(label.firstChild);
+                    }
+                    label.appendChild(document.createTextNode('Force Archive Node'));
+                    label.appendChild(document.createElement('br'));
+                    const small4 = document.createElement('small');
+                    small4.style.color = 'var(--success-color)';
+                    small4.textContent = `${nodeCount} archive nodes available`;
+                    label.appendChild(small4);
                 }
             }
         }
@@ -12111,18 +12134,39 @@ Do you want to continue?`;
                 window.kaspa = NetworkState.kaspa;
                 document.getElementById('initStatus').style.display = 'block';
                 
+                // v6.3.15: DOM manipulation for init status
+                const initStatusEl = document.getElementById('initStatus');
+                while (initStatusEl.firstChild) {
+                    initStatusEl.removeChild(initStatusEl.firstChild);
+                }
+                
+                // Success message
+                const successP = document.createElement('p');
+                successP.className = 'success';
+                successP.textContent = '✅ System initialization complete';
+                initStatusEl.appendChild(successP);
+                
                 if (UserState.address) {
-                    document.getElementById('initStatus').innerHTML = `
-                        <p class="success">✅ System initialization complete</p>
-                        <p>Address: ${UserState.address.toString()}</p>
-                        <p>Balance: ${balance} KAS</p>
-                    `;
+                    // Address
+                    const addressP = document.createElement('p');
+                    addressP.textContent = `Address: ${UserState.address.toString()}`;
+                    initStatusEl.appendChild(addressP);
+                    
+                    // Balance
+                    const balanceP = document.createElement('p');
+                    balanceP.textContent = `Balance: ${balance} KAS`;
+                    initStatusEl.appendChild(balanceP);
                 } else {
-                    document.getElementById('initStatus').innerHTML = `
-                        <p class="success">✅ System initialization complete</p>
-                        <p style="color: #ffcc66;">⚠️ Wallet Disconnected</p>
-                        <p>Please connect wallet from Status tab</p>
-                    `;
+                    // Warning
+                    const warningP = document.createElement('p');
+                    warningP.style.color = '#ffcc66';
+                    warningP.textContent = '⚠️ Wallet Disconnected';
+                    initStatusEl.appendChild(warningP);
+                    
+                    // Instructions
+                    const instructP = document.createElement('p');
+                    instructP.textContent = 'Please connect wallet from Status tab';
+                    initStatusEl.appendChild(instructP);
                 }
                 
                 document.getElementById('testBtn').disabled = false;

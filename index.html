@@ -8015,8 +8015,11 @@ Do you want to continue?`;
                                     
                                     window.kaspaMetadata = kaspaData;
                                     document.getElementById('metaTxId').value = kaspaData.metadata.metaTxId || '';
-                                    document.getElementById('downloadPassword').value = '';
-                                    document.getElementById('downloadPassword').placeholder = kaspaData.auth?.passwordIncluded ? 
+                                    // v6.3.22: Fixed to handle both password fields
+                                    const pwdField = document.getElementById('downloadPasswordDirectory') || document.getElementById('downloadPassword');
+                                    if (pwdField) {
+                                        pwdField.value = '';
+                                        pwdField.placeholder = kaspaData.auth?.passwordIncluded ? 
                                         'Password is included in .kaspa file' : 'Enter password';
                                     
                                     // Call appropriate function based on context
@@ -14957,7 +14960,9 @@ Do you want to continue?`;
                 // v6.2.79: Keep ProgressManager for SuperMeta processing
                 if (!FileState.networkErrorOccurred) {
                     // Check if SuperMeta processing might be needed
-                    const useMetaTx = document.getElementById('generateMetaTx').checked;
+                    // v6.3.22: Fixed checkbox ID bug - should be 'useMetaTx' not 'generateMetaTx'
+                    const metaTxCheckbox = document.getElementById('useMetaTx');
+                    const useMetaTx = metaTxCheckbox ? metaTxCheckbox.checked : false;
                     let shouldKeepProgressManager = false;
                     
                     if (useMetaTx && FileState.progressManager) {
@@ -16199,7 +16204,8 @@ Do you want to continue?`;
                     // Create hidden input element
                     const hiddenInput = document.createElement('input');
                     hiddenInput.type = 'hidden';
-                    hiddenInput.id = 'downloadPassword';
+                    // v6.3.22: Fixed duplicate ID - use unique ID for directory password
+                    hiddenInput.id = 'downloadPasswordDirectory';
                     hiddenInput.value = dirMetadata.auth.password; // No escaping needed with direct property assignment
                     passwordSection.appendChild(hiddenInput);
                 } else {
@@ -16211,7 +16217,8 @@ Do you want to continue?`;
                     // Create password input element
                     const passwordInput = document.createElement('input');
                     passwordInput.type = 'password';
-                    passwordInput.id = 'downloadPassword';
+                    // v6.3.22: Fixed duplicate ID - use unique ID for directory password input
+                    passwordInput.id = 'downloadPasswordDirectory';
                     passwordInput.placeholder = 'Enter password';
                     passwordSection.appendChild(passwordInput);
                 }
@@ -16288,7 +16295,9 @@ Do you want to continue?`;
             
             try {
                 // Get password
-                let password = document.getElementById('downloadPassword').value;
+                // v6.3.22: Check both password fields (original and directory-specific)
+                let passwordField = document.getElementById('downloadPasswordDirectory') || document.getElementById('downloadPassword');
+                let password = passwordField ? passwordField.value : '';
                 if (!password && dirMetadata.auth?.password) {
                     password = dirMetadata.auth.password;
                 }
@@ -16576,8 +16585,12 @@ Do you want to continue?`;
                 const passwordSection = document.getElementById('passwordSection');
                 if (FileState.kaspaMetadata.auth?.passwordIncluded) {
                     // Keep the password input field but hide it
-                    document.getElementById('downloadPassword').style.display = 'none';
-                    document.getElementById('downloadPassword').value = FileState.kaspaMetadata.auth.password;
+                    // v6.3.22: Fixed to use correct password field
+                    const pwdField = document.getElementById('downloadPasswordDirectory') || document.getElementById('downloadPassword');
+                    if (pwdField) {
+                        pwdField.style.display = 'none';
+                        pwdField.value = FileState.kaspaMetadata.auth.password;
+                    }
                     
                     // Show info message
                     // v6.3.16: DOM manipulation for password info
@@ -16590,7 +16603,11 @@ Do you want to continue?`;
                     passwordSection.insertBefore(infoDiv, passwordSection.firstChild);
                 } else {
                     // Show password input
-                    document.getElementById('downloadPassword').style.display = 'block';
+                    // v6.3.22: Fixed to use correct password field
+                    const pwdField = document.getElementById('downloadPasswordDirectory') || document.getElementById('downloadPassword');
+                    if (pwdField) {
+                        pwdField.style.display = 'block';
+                    }
                 }
                 
                 document.getElementById('downloadSection').style.display = 'block';
@@ -17455,8 +17472,12 @@ Do you want to continue?`;
                             `Meta TxID: ${metaTxId.substring(0, 16)}...`;
                         
                         // Set password for download
-                        document.getElementById('downloadPassword').value = password;
-                        document.getElementById('downloadPassword').style.display = 'none';
+                        // v6.3.22: Fixed to handle both password fields
+                        const pwdField = document.getElementById('downloadPasswordDirectory') || document.getElementById('downloadPassword');
+                        if (pwdField) {
+                            pwdField.value = password;
+                            pwdField.style.display = 'none';
+                        }
                         
                         // Show download section
                         document.getElementById('downloadSection').style.display = 'block';
@@ -17479,7 +17500,9 @@ Do you want to continue?`;
 
         // Download file
         FileState.fileOperationHandlers.downloadFile = async function() {
-            let password = document.getElementById('downloadPassword').value;
+            // v6.3.22: Check both password fields
+            let passwordField = document.getElementById('downloadPassword');
+            let password = passwordField ? passwordField.value : '';
             log(`Password field value: ${password ? 'Has input' : 'Empty'}`, 'debug');
             
             if (FileState.kaspaMetadata.auth?.passwordIncluded && FileState.kaspaMetadata.auth?.password) {
@@ -17971,7 +17994,9 @@ Do you want to continue?`;
 
             try {
                 // Get password
-                let password = document.getElementById('downloadPassword').value;
+                // v6.3.22: Check both password fields
+                let passwordField = document.getElementById('downloadPasswordDirectory') || document.getElementById('downloadPassword');
+                let password = passwordField ? passwordField.value : '';
                 if (metadata.auth?.passwordIncluded && metadata.auth?.password) {
                     password = metadata.auth.password;
                 }

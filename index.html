@@ -15988,15 +15988,33 @@ Do you want to continue?`;
                 const fileCount = dirMetadata.directory?.fileCount || 0;
                 const dirCount = dirMetadata.directory?.directoryCount || 0;
                 
-                // XSS fix: Escape directory name (user input)
-                document.getElementById('fileInfo').innerHTML = 
-                    `<strong>📁 Directory: ${escapeHtml(dirMetadata.directory.name)}</strong><br>` +
-                    `Type: ${escapeHtml(dirMetadata.type)}<br>` +
-                    `Version: ${escapeHtml(dirMetadata.version)}<br>` +
-                    `Files: ${fileCount}<br>` +
-                    `Directories: ${dirCount}<br>` +
-                    `Total Size: ${(totalSize/1024/1024).toFixed(2)}MB<br>` +
-                    `Created: ${new Date(dirMetadata.created).toLocaleString()}<br>`;
+                // v6.3.18-fixed: DOM manipulation for file info with null checks
+                const fileInfoEl = document.getElementById('fileInfo');
+                while (fileInfoEl.firstChild) {
+                    fileInfoEl.removeChild(fileInfoEl.firstChild);
+                }
+                
+                // Directory name (bold) with null check
+                const strong = document.createElement('strong');
+                const dirName = dirMetadata.directory?.name || 'Unknown';
+                strong.textContent = `📁 Directory: ${dirName}`;
+                fileInfoEl.appendChild(strong);
+                fileInfoEl.appendChild(document.createElement('br'));
+                
+                // Info items
+                const infoItems = [
+                    { label: 'Type: ', value: dirMetadata.type || 'Unknown' },
+                    { label: 'Version: ', value: dirMetadata.version || 'Unknown' },
+                    { label: 'Files: ', value: fileCount },
+                    { label: 'Directories: ', value: dirCount },
+                    { label: 'Total Size: ', value: `${(totalSize/1024/1024).toFixed(2)}MB` },
+                    { label: 'Created: ', value: dirMetadata.created ? new Date(dirMetadata.created).toLocaleString() : 'Unknown' }
+                ];
+                
+                infoItems.forEach(item => {
+                    fileInfoEl.appendChild(document.createTextNode(item.label + item.value));
+                    fileInfoEl.appendChild(document.createElement('br'));
+                });
                 
                 // v5.11.114: Show only hierarchical tree view
                 if (dirMetadata.entries && dirMetadata.entries.length > 0) {
@@ -16649,19 +16667,41 @@ Do you want to continue?`;
                     progressBar.textContent = 'Error';
                 }
                 
-                // Build error message HTML
-                let errorHtml = `<div style="color: #e74c3c; font-weight: bold; margin-bottom: 10px;">❌ ${message}</div>`;
-                if (details.length > 0) {
-                    errorHtml += '<div style="font-size: 14px;">';
-                    errorHtml += '<div style="font-weight: bold; margin-bottom: 5px;">📝 Possible causes:</div>';
-                    details.forEach((detail, index) => {
-                        errorHtml += `<div style="margin-left: 20px; margin-bottom: 3px;">${index + 1}. ${detail}</div>`;
-                    });
-                    errorHtml += '</div>';
-                }
-                
+                // v6.3.18-fixed: DOM manipulation for error message (careful bracket structure)
                 if (statusDiv) {
-                    statusDiv.innerHTML = errorHtml;
+                    while (statusDiv.firstChild) {
+                        statusDiv.removeChild(statusDiv.firstChild);
+                    }
+                    
+                    // Error message
+                    const errorDiv = document.createElement('div');
+                    errorDiv.style.color = '#e74c3c';
+                    errorDiv.style.fontWeight = 'bold';
+                    errorDiv.style.marginBottom = '10px';
+                    errorDiv.textContent = `❌ ${message}`;
+                    statusDiv.appendChild(errorDiv);
+                    
+                    // Details if provided
+                    if (details && details.length > 0) {
+                        const detailsContainer = document.createElement('div');
+                        detailsContainer.style.fontSize = '14px';
+                        
+                        const causesTitle = document.createElement('div');
+                        causesTitle.style.fontWeight = 'bold';
+                        causesTitle.style.marginBottom = '5px';
+                        causesTitle.textContent = '📝 Possible causes:';
+                        detailsContainer.appendChild(causesTitle);
+                        
+                        details.forEach((detail, index) => {
+                            const detailDiv = document.createElement('div');
+                            detailDiv.style.marginLeft = '20px';
+                            detailDiv.style.marginBottom = '3px';
+                            detailDiv.textContent = `${index + 1}. ${detail}`;
+                            detailsContainer.appendChild(detailDiv);
+                        });
+                        
+                        statusDiv.appendChild(detailsContainer);
+                    }
                 } else {
                     console.error('[showDownloadError] Status div not found!');
                 }

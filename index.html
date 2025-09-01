@@ -2445,7 +2445,7 @@
                 <div id="workspaceStatus" style="margin-top: 15px; padding: 12px; background: var(--bg-secondary); border-radius: 5px;">
                     <div id="workspaceDisplay" style="font-size: 14px; margin-bottom: 10px;">
                         Workspace: <span id="workspaceName" style="font-weight: bold;">Not Set (Browser Storage)</span>
-                        <span id="workspaceHelp" onclick="alert('Kaspa P2P File Storage - About Workspace\\n\\nWhen you set a workspace:\\n✓ Progress is automatically saved to files\\n✓ Downloaded files are organized\\n✓ Progress remains even after closing browser\\n\\nWithout workspace setting:\\n✓ Progress is saved in browser\\n✓ No automatic file downloads')" style="cursor: pointer; margin-left: 5px; color: var(--accent-color);">❓</span>
+                        <span id="workspaceHelp" onclick="showModal('About Workspace', '<p><strong>Kaspa P2P File Storage - Workspace</strong></p><p><strong>When you set a workspace:</strong><br>✓ Progress is automatically saved to files<br>✓ Downloaded files are organized<br>✓ Progress remains even after closing browser</p><p><strong>Without workspace setting:</strong><br>✓ Progress is saved in browser<br>✓ No automatic file downloads</p>')" style="cursor: pointer; margin-left: 5px; color: var(--accent-color);">❓</span>
                     </div>
                     <button onclick="setupWorkspace()" id="workspaceBtn" style="width: 100%; padding: 10px; background: var(--accent-color); color: var(--button-text-on-accent); border: none; border-radius: 5px; cursor: pointer;">
                         Select Workspace
@@ -3558,7 +3558,7 @@
                 
                 const thresholdM = parseFloat(input.value);
                 if (isNaN(thresholdM) || thresholdM <= 0) {
-                    alert('Invalid threshold');
+                    log('Invalid threshold', 'error');
                     input.value = manager.archiveThreshold / 1000000;
                     return;
                 }
@@ -3574,7 +3574,7 @@
                 
                 const maxConsecutive = parseInt(input.value);
                 if (isNaN(maxConsecutive) || maxConsecutive < 10 || maxConsecutive > 1000) {
-                    alert('Invalid value (Please enter between 10-1000)');
+                    log('Invalid value (Please enter between 10-1000)', 'error');
                     input.value = manager.maxConsecutiveNonArchive;
                     return;
                 }
@@ -3781,10 +3781,10 @@
                     const apiTime = Date.now() - apiStart;
                     log(`Explorer API response time: ${apiTime}ms`, 'success');
                     
-                    alert(`Connection test successful!\nRPC: ${rpcTime}ms\nAPI: ${apiTime}ms`);
+                    log(`Connection test successful! RPC: ${rpcTime}ms, API: ${apiTime}ms`, 'success');
                 } catch (error) {
                     log(`Connection test error: ${error.message}`, 'error');
-                    alert(`Connection test failed: ${error.message}`);
+                    log(`Connection test failed: ${error.message}`, 'error');
                 }
             },
             
@@ -3802,7 +3802,7 @@
                 // For new connection, check private key
                 const privateKey = privateKeyInput.value.trim();
                 if (!privateKey) {
-                    alert('Please enter your private key');
+                    log('Please enter your private key', 'error');
                     return;
                 }
                 
@@ -3896,11 +3896,11 @@
                     
                     // More specific error messages for common issues
                     if (errorMessage.includes('Invalid private key')) {
-                        alert('Error: Invalid private key. Please enter in correct format.');
+                        log('Error: Invalid private key. Please enter in correct format.', 'error');
                     } else if (errorMessage.includes('not initialized')) {
-                        alert('Error: System not initialized. Please run "Restart Kaspa System" from Settings tab.');
+                        log('Error: System not initialized. Please run "Restart Kaspa System" from Settings tab.', 'error');
                     } else {
-                        alert(`Error: ${errorMessage}`);
+                        log(`Error: ${errorMessage}`, 'error');
                     }
                 }
             }
@@ -6400,7 +6400,7 @@ Do you want to continue?`;
                 
                 const parts = txInfo.split(':');
                 if (parts.length < 2) {
-                    alert('Invalid format. Please enter in TxID:BlockID:Password format.');
+                    log('Invalid format. Please enter in TxID:BlockID:Password format.', 'error');
                     return;
                 }
                 
@@ -6493,7 +6493,7 @@ Do you want to continue?`;
                 
                 const parts = entry.split(':');
                 if (parts.length < 2) {
-                    alert('Invalid format. Please enter in TxID:BlockID:Password format.');
+                    log('Invalid format. Please enter in TxID:BlockID:Password format.', 'error');
                     return;
                 }
                 
@@ -7851,7 +7851,7 @@ Do you want to continue?`;
                 ).join('\n');
                 
                 navigator.clipboard.writeText(logText).then(() => {
-                    alert('Log copied to clipboard');
+                    log('Log copied to clipboard', 'success');
                 });
             },
             
@@ -8037,20 +8037,20 @@ Do you want to continue?`;
                                     if (typeof displayDirectoryContents === 'function') {
                                         displayDirectoryContents(kaspaData);
                                     } else {
-                                        alert('Directory display function is not available');
+                                        log('Directory display function is not available', 'error');
                                     }
                                 } else {
-                                    alert('Unsupported Kaspa file format');
+                                    log('Unsupported Kaspa file format', 'error');
                                 }
                             } catch (error) {
                                 log(`Kaspa file load error: ${error.message}`, 'error');
-                                alert('Failed to load Kaspa file');
+                                log('Failed to load Kaspa file', 'error');
                             }
                         };
                         reader.readAsText(file);
                     } else {
                         log('Not a .kaspa file', 'warning');
-                        alert('Please drop a .kaspa file');
+                        log('Please drop a .kaspa file', 'error');
                     }
                 } else {
                     log('Dropped file is not a .kaspa file', 'error');
@@ -12116,7 +12116,7 @@ Do you want to continue?`;
             const amountInKas = parseFloat(input.value);
             
             if (isNaN(amountInKas) || amountInKas < 0.001 || amountInKas > 100) {
-                alert('Please set transaction amount between 0.001 KAS and 100 KAS');
+                log('Please set transaction amount between 0.001 KAS and 100 KAS', 'error');
                 return;
             }
             
@@ -12360,10 +12360,10 @@ Do you want to continue?`;
                 
                 // Show result
                 if (removedCount > 0) {
-                    alert(`✅ Successfully removed passwords from ${removedCount} entries.\n\nYou will need to enter passwords manually when downloading files.`);
+                    log(`✅ Successfully removed passwords from ${removedCount} entries. You will need to enter passwords manually when downloading files.`, 'success');
                     log(`Removed passwords from ${removedCount} entries`, 'success');
                 } else {
-                    alert('No saved passwords found.');
+                    log('No saved passwords found.', 'info');
                     log('No passwords to remove', 'info');
                 }
                 
@@ -12376,7 +12376,7 @@ Do you want to continue?`;
                 
             } catch (error) {
                 ;
-                alert(`❌ Failed to remove passwords: ${error.message}`);
+                log(`❌ Failed to remove passwords: ${error.message}`, 'error');
                 log(`Password removal failed: ${error.message}`, 'error');
             }
         }
@@ -13963,7 +13963,7 @@ Do you want to continue?`;
                                                    `TxID: ${txid.substring(0, 16)}...\n\n` +
                                                    `Progress is saved automatically.\n` +
                                                    `Please resume after network stabilizes.`;
-                                    alert(errorMsg);
+                                    log(errorMsg, 'error');
                                     log(`Upload stopped: 5 minute timeout (TxID: ${txid.substring(0, 16)}...)`, 'error');
                                     
                                     throw new Error('Network timeout - upload stopped after 5 minutes');
@@ -14075,7 +14075,7 @@ Do you want to continue?`;
                                     log(`💡 Recommended: Set amount to ${recommendedAmount} KAS or more`, 'warning');
                                     
                                     // Show alert
-                                    alert(userMessage);
+                                    log(userMessage, 'error');
                                     
                                     // Stop immediately without retry (no need to save progress)
                                     throw new Error(`Storage mass exceeded with ${utxoCount} UTXOs - stopping upload`);
@@ -14450,7 +14450,7 @@ Do you want to continue?`;
                                                `TxID: ${txid.substring(0, 16)}...\n\n` +
                                                `Progress is automatically saved.\n` +
                                                `Please resume after network stabilizes.`;
-                                alert(errorMsg);
+                                log(errorMsg, 'error');
                                 log(`Upload stopped: 5-minute timeout (TxID: ${txid.substring(0, 16)}...)`, 'error');
                                 
                                 throw new Error('Network timeout - upload stopped after 5 minutes');
@@ -16289,7 +16289,7 @@ Do you want to continue?`;
             // Check workspace handle
             if (!WorkspaceState.handle) {
                 log('Workspace not configured. Please configure it first.', 'error');
-                alert('Workspace is not set.\nPlease select a workspace from the "Settings" button at the top of the screen.');
+                log('Workspace is not set. Please select a workspace from the "Settings" button at the top of the screen.', 'error');
                 await setupWorkspace();
                 return;
             }
@@ -16726,7 +16726,7 @@ Do you want to continue?`;
         // v6.2.81: Enhanced download error display function with better visibility
         window.showDownloadError = function(message, details = []) {
             // Immediate alert to ensure user sees the error
-            alert(`❌ ${message}\n\n${details.join('\n')}`);
+            log(`❌ ${message} - ${details.join(', ')}`, 'error');
             
             // Debug logging
             ;
@@ -16811,7 +16811,7 @@ Do you want to continue?`;
             } else {
                 ;
                 // Fallback: Show alert if progress div doesn't exist
-                alert(`❌ ${message}\n\n${details.join('\n')}`);
+                log(`❌ ${message} - ${details.join(', ')}`, 'error');
             }
             
             // Also log to console with enhanced formatting
@@ -19775,7 +19775,7 @@ Do you want to continue?`;
             const privateKey = privateKeyInput.value.trim();
             
             if (!privateKey) {
-                alert('Please enter your private key');
+                log('Please enter your private key', 'error');
                 return;
             }
             
@@ -19823,7 +19823,7 @@ Do you want to continue?`;
                 
             } catch (error) {
                 log(`Wallet connection error: ${error.message}`, 'error');
-                alert(`Error: ${error.message}`);
+                log(`Error: ${error.message}`, 'error');
             }
         };
         */
@@ -21258,7 +21258,7 @@ Do you want to continue?`;
             showSelectedFileDetails: function() {
             const selectedIds = Array.from(FileState.selectedFiles);
             if (selectedIds.length !== 1) {
-                alert('Please select only one file for information display');
+                log('Please select only one file for information display', 'error');
                 return;
             }
             
@@ -21277,7 +21277,7 @@ Do you want to continue?`;
             }
             
             if (!file) {
-                alert('File information not found');
+                log('File information not found', 'error');
                 return;
             }
             

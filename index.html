@@ -6222,7 +6222,7 @@ Do you want to continue?`;
                         
                         // Add padding and prefix
                         if (level > 0) {
-                            html += `<span style="font-family: monospace; white-space: pre; color: var(--text-secondary);">${prefix}</span>`;
+                            html += `<span style="font-family: monospace; white-space: pre; color: var(--text-secondary);">${escapeHtml(prefix)}</span>`;
                         }
                         
                         html += `${icon} ${escapeHtml(node.name)}`;
@@ -6234,13 +6234,13 @@ Do you want to continue?`;
                         
                         // Add size info for files
                         if (node.type === 'file' && node.size) {
-                            html += ` <span style="color: var(--text-secondary); font-size: 12px;">(${(node.size / 1024).toFixed(1)}KB)</span>`;
+                            html += ` <span style="color: var(--text-secondary); font-size: 12px;">(${escapeHtml((node.size / 1024).toFixed(1))}KB)</span>`;
                         }
                         
                         // Add copy and download buttons for files
                         if (node.type === 'file' && node.metaTxId) {
                             const btnId = `btns_${node.metaTxId.substring(0, 8)}_${Date.now()}`;
-                            html += ` <span id="${btnId}" style="margin-left: auto;"></span>`;
+                            html += ` <span id="${escapeHtml(btnId)}" style="margin-left: auto;"></span>`;
                             
                             // Store button data for later rendering - v6.2.51: Fix duplicate buttons
                             if (!window.pendingTreeButtons) window.pendingTreeButtons = [];
@@ -6691,7 +6691,7 @@ Do you want to continue?`;
                         
                         // Add padding and prefix
                         if (level > 0) {
-                            html += `<span style="font-family: monospace; white-space: pre; color: var(--text-secondary);">${prefix}</span>`;
+                            html += `<span style="font-family: monospace; white-space: pre; color: var(--text-secondary);">${escapeHtml(prefix)}</span>`;
                         }
                         
                         html += `${icon} ${escapeHtml(node.name)}`;
@@ -6703,7 +6703,7 @@ Do you want to continue?`;
                         
                         // Add size info for files
                         if (node.type === 'file' && node.size) {
-                            html += ` <span style="color: var(--text-secondary); font-size: 12px;">(${(node.size / 1024).toFixed(1)}KB)</span>`;
+                            html += ` <span style="color: var(--text-secondary); font-size: 12px;">(${escapeHtml((node.size / 1024).toFixed(1))}KB)</span>`;
                         }
                         
                         // Add delete button inline
@@ -6711,7 +6711,7 @@ Do you want to continue?`;
                             (e.path ? `${e.path}/${e.name}` : e.name) === node.fullPath
                         );
                         if (index !== -1) {
-                            html += ` <button onclick="event.stopPropagation(); DirectoryBuilderState.removeEntry(${index})" 
+                            html += ` <button onclick="event.stopPropagation(); DirectoryBuilderState.removeEntry(${escapeHtml(index)})" 
                                      style="margin-left: auto; padding: 2px 6px; font-size: 12px; background: var(--error-color); 
                                             color: var(--sidebar-text); border: none; border-radius: 3px; cursor: pointer;" 
                                      title="Delete">✕</button>`;
@@ -6743,7 +6743,7 @@ Do you want to continue?`;
                             // Add "add here" option for directories
                             if (isSelected && (node.type === 'directory' || node.type === 'folder' || node.type === 'root')) {
                                 html += `<div style="padding: 4px 2px; color: var(--text-secondary);">`;
-                                html += `<span style="font-family: monospace; white-space: pre;">${newPrefix}└─ </span>[Add here...]`;
+                                html += `<span style="font-family: monospace; white-space: pre;">${escapeHtml(newPrefix)}└─ </span>[Add here...]`;
                                 html += '</div>';
                             }
                         }
@@ -6756,7 +6756,7 @@ Do you want to continue?`;
                         } else {
                             const newPrefix = level === 0 ? '' : parentPrefix + (isLast ? '   ' : '│  ');
                             html += `<div style="padding: 4px 2px; color: var(--text-secondary);">`;
-                            html += `<span style="font-family: monospace; white-space: pre;">${newPrefix}└─ </span>[Add here...]`;
+                            html += `<span style="font-family: monospace; white-space: pre;">${escapeHtml(newPrefix)}└─ </span>[Add here...]`;
                             html += '</div>';
                         }
                     }
@@ -9931,16 +9931,16 @@ Do you want to continue?`;
             
             if (lastReceived !== null) {
                 if (lastReceived < 10) {
-                    html += `<div>Last received: ${lastReceived} seconds ago</div>`;
+                    html += `<div>Last received: ${escapeHtml(lastReceived)} seconds ago</div>`;
                 } else {
-                    html += `<div style="color: var(--error-color);">⚠️ Last received: ${lastReceived} seconds ago</div>`;
+                    html += `<div style="color: var(--error-color);">⚠️ Last received: ${escapeHtml(lastReceived)} seconds ago</div>`;
                 }
             }
             
             // Show average TX count if available
             if (WSBlockStats.txCounts.length > 0) {
                 const avgTx = (WSBlockStats.txCounts.reduce((a, b) => a + b, 0) / WSBlockStats.txCounts.length).toFixed(1);
-                html += `<div style="font-size: 0.85em; color: var(--text-secondary);">Avg TX: ${avgTx}/block | Uptime: ${elapsed} seconds</div>`;
+                html += `<div style="font-size: 0.85em; color: var(--text-secondary);">Avg TX: ${escapeHtml(avgTx)}/block | Uptime: ${escapeHtml(elapsed)} seconds</div>`;
             }
             
             // v6.3.19: DOM manipulation for WebSocket stats
@@ -11845,10 +11845,10 @@ Do you want to continue?`;
                     let daysInfo = '';
                     if (node.blockCount) {
                         const days = calculateDaysFromBlocks(node.blockCount);
-                        daysInfo = ` (${days}days+)`;
+                        daysInfo = ` (${escapeHtml(days)}days+)`;
                     }
                     
-                    html += `<div>N${idx+1}: ${type}${blocks ? '/' + blocks : ''}${daysInfo}/${node.avgResponseTime.toFixed(0)}ms ${status}</div>`;
+                    html += `<div>N${idx+1}: ${escapeHtml(type)}${blocks ? '/' + escapeHtml(blocks) : ''}${daysInfo}/${escapeHtml(node.avgResponseTime.toFixed(0))}ms ${status}</div>`;
                 });
                 // v6.3.20: DOM manipulation for details div
                 while (detailsDiv.firstChild) {
@@ -11866,7 +11866,7 @@ Do you want to continue?`;
             if (manager.eventLog && manager.eventLog.length > 0) {
                 let html = '';
                 manager.eventLog.slice(-5).reverse().forEach(event => {
-                    html += `<div>[${event.time}] ${event.icon} ${event.message}</div>`;
+                    html += `<div>[${escapeHtml(event.time)}] ${escapeHtml(event.icon)} ${escapeHtml(event.message)}</div>`;
                 });
                 // v6.3.20: DOM manipulation for event log
                 while (eventLogDiv.firstChild) {
@@ -21654,10 +21654,10 @@ Do you want to continue?`;
                 
                 let html = '<strong>Connected nodes:</strong><ul style="margin: 5px 0; padding-left: 20px;">';
                 for (const conn of this.auxConnections) {
-                    const archiveBlocks = conn.stats?.blockCount ? ` (${conn.stats.blockCount} blocks)` : '';
+                    const archiveBlocks = conn.stats?.blockCount ? ` (${escapeHtml(conn.stats.blockCount)} blocks)` : '';
                     const receivedCount = this.blockCounts.get(conn.nodeId) || 0;
-                    const receivedInfo = receivedCount > 0 ? ` | 📊 Received: ${receivedCount}` : '';
-                    html += `<li>${conn.nodeId}${archiveBlocks}${receivedInfo}</li>`;
+                    const receivedInfo = receivedCount > 0 ? ` | 📊 Received: ${escapeHtml(receivedCount)}` : '';
+                    html += `<li>${escapeHtml(conn.nodeId)}${archiveBlocks}${receivedInfo}</li>`;
                 }
                 html += '</ul>';
                 // v6.3.19: DOM manipulation for connections list

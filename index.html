@@ -1712,7 +1712,7 @@
                     <span class="nav-item-icon">🛠️</span>
                     <span class="nav-item-text">Dir Builder</span>
                 </div>
-                <div class="nav-item" onclick="UIHandlers.switchTab('debug')" data-tooltip="Debug" id="debug-nav-item" style="display: none;">
+                <div class="nav-item" onclick="UIHandlers.switchTab('debug')" data-tooltip="Debug" id="debug-nav-item">
                     <span class="nav-item-icon">🐛</span>
                     <span class="nav-item-text">Debug</span>
                 </div>
@@ -2685,6 +2685,28 @@
 
     <!-- Debug Tab -->
     <div id="debug-tab" class="tab-content">
+        <!-- v7.0.2: WASM SDK Security Investigation -->
+        <div class="container">
+            <h2>🔐 WASM SDK Security Features Investigation</h2>
+            <div class="metric-box" style="padding: 15px;">
+                <p style="margin-bottom: 10px; color: var(--text-secondary);">
+                    Investigate available security methods in Kaspa WASM SDK for protecting Private Keys
+                </p>
+                
+                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                    <button onclick="WASMSecurityTest.checkPendingTxMethods()" id="checkTxMethodsBtn">Check Transaction Methods</button>
+                    <button onclick="WASMSecurityTest.checkPrivateKeyMethods()" id="checkPrivKeyBtn">Check PrivateKey Methods</button>
+                    <button onclick="WASMSecurityTest.testExternalSigning()" id="testExtSignBtn">Test External Signing</button>
+                    <button onclick="WASMSecurityTest.testFreeMethod()" id="testFreeBtn">Test free() Method</button>
+                    <button onclick="WASMSecurityTest.clearResults()">Clear Results</button>
+                </div>
+                
+                <div id="wasmTestResults" style="margin-top: 15px; padding: 15px; background: var(--background-dark); border-radius: 5px; font-family: monospace; font-size: 12px; max-height: 400px; overflow-y: auto; white-space: pre-wrap;">
+                    <div style="color: #888;">Click buttons above to investigate WASM SDK capabilities...</div>
+                </div>
+            </div>
+        </div>
+        
         <!-- v5.12.76: System Initialization moved to Settings tab -->
         
         <!-- v5.11.137: Multi WebSocket Test -->
@@ -21687,6 +21709,213 @@ Do you want to continue?`;
                 log(`[KENV] Initialization error: ${error.message}`, 'error');
             });
         });
+        
+        // v7.0.2: WASM SDK Security Investigation
+        window.WASMSecurityTest = {
+            resultsElement: null,
+            
+            init() {
+                this.resultsElement = document.getElementById('wasmTestResults');
+            },
+            
+            log(message, type = 'info') {
+                if (!this.resultsElement) this.init();
+                const timestamp = new Date().toLocaleTimeString();
+                const color = type === 'success' ? '#4CAF50' : 
+                            type === 'error' ? '#f44336' : 
+                            type === 'warning' ? '#ff9800' : '#2196F3';
+                
+                const line = `[${timestamp}] <span style="color: ${color}">${message}</span>\n`;
+                this.resultsElement.innerHTML += line;
+                this.resultsElement.scrollTop = this.resultsElement.scrollHeight;
+            },
+            
+            async checkPendingTxMethods() {
+                this.log('=== Checking PendingTransaction Methods ===', 'info');
+                
+                try {
+                    // First check if we have transactions
+                    if (!NetworkState.kaspa) {
+                        this.log('❌ Kaspa SDK not initialized', 'error');
+                        return;
+                    }
+                    
+                    // Create a minimal test transaction
+                    const testTx = await NetworkState.kaspa.createTransactions({
+                        entries: [],
+                        outputs: [{
+                            address: 'kaspatest:qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqkx9awp4e',
+                            amount: 100000000n
+                        }],
+                        changeAddress: 'kaspatest:qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqkx9awp4e',
+                        priorityFee: 0n,
+                        networkId: 'testnet-10'
+                    }).catch(err => {
+                        this.log(`Note: Cannot create real tx without UTXOs (expected)`, 'warning');
+                        return null;
+                    });
+                    
+                    if (testTx && testTx.transactions && testTx.transactions[0]) {
+                        const tx = testTx.transactions[0];
+                        this.log('✅ Got PendingTransaction object', 'success');
+                        
+                        // Check all properties and methods
+                        const props = Object.getOwnPropertyNames(tx);
+                        const proto = Object.getOwnPropertyNames(Object.getPrototypeOf(tx));
+                        
+                        this.log(`\nDirect properties: ${props.join(', ')}`, 'info');
+                        this.log(`\nPrototype methods:`, 'info');
+                        
+                        // Check for specific security-related methods
+                        const securityMethods = [
+                            'getScriptHashes', 'setSignatures', 'free', 
+                            'sign', 'submit', 'id', 'toString'
+                        ];
+                        
+                        for (const method of proto) {
+                            const type = typeof tx[method];
+                            if (type === 'function') {
+                                const isSecurityRelated = securityMethods.includes(method);
+                                const marker = isSecurityRelated ? '⭐' : '';
+                                this.log(`  ${marker} ${method}() - ${type}`, isSecurityRelated ? 'success' : 'info');
+                            }
+                        }
+                        
+                        // Test specific methods
+                        this.log('\n--- Testing Methods ---', 'info');
+                        
+                        if (typeof tx.free === 'function') {
+                            this.log('✅ free() method exists!', 'success');
+                        } else {
+                            this.log('❌ free() method not found', 'error');
+                        }
+                        
+                        if (typeof tx.getScriptHashes === 'function') {
+                            this.log('✅ getScriptHashes() exists! External signing possible!', 'success');
+                        } else {
+                            this.log('⚠️ getScriptHashes() not found', 'warning');
+                        }
+                        
+                        if (typeof tx.setSignatures === 'function') {
+                            this.log('✅ setSignatures() exists! Can apply external signatures!', 'success');
+                        } else {
+                            this.log('⚠️ setSignatures() not found', 'warning');
+                        }
+                    }
+                    
+                } catch (error) {
+                    this.log(`Error: ${error.message}`, 'error');
+                }
+            },
+            
+            async checkPrivateKeyMethods() {
+                this.log('=== Checking PrivateKey Methods ===', 'info');
+                
+                try {
+                    if (!NetworkState.kaspa) {
+                        this.log('❌ Kaspa SDK not initialized', 'error');
+                        return;
+                    }
+                    
+                    // Create a test private key
+                    const testKey = new NetworkState.kaspa.PrivateKey('0000000000000000000000000000000000000000000000000000000000000001');
+                    this.log('✅ Created test PrivateKey', 'success');
+                    
+                    // Check all methods
+                    const props = Object.getOwnPropertyNames(testKey);
+                    const proto = Object.getOwnPropertyNames(Object.getPrototypeOf(testKey));
+                    
+                    this.log(`\nDirect properties: ${props.join(', ')}`, 'info');
+                    this.log(`\nPrototype methods:`, 'info');
+                    
+                    for (const method of proto) {
+                        const type = typeof testKey[method];
+                        if (type === 'function') {
+                            this.log(`  ${method}() - ${type}`, 'info');
+                        }
+                    }
+                    
+                    // Test free method
+                    if (typeof testKey.free === 'function') {
+                        this.log('\n✅ free() method exists on PrivateKey!', 'success');
+                        this.log('Calling free() to clean up test key...', 'info');
+                        testKey.free();
+                        this.log('✅ free() called successfully', 'success');
+                    } else {
+                        this.log('\n❌ free() method not found on PrivateKey', 'error');
+                    }
+                    
+                } catch (error) {
+                    this.log(`Error: ${error.message}`, 'error');
+                }
+            },
+            
+            async testExternalSigning() {
+                this.log('=== Testing External Signing Capability ===', 'info');
+                
+                try {
+                    if (!UserState.address) {
+                        this.log('⚠️ Wallet not connected. Please connect wallet first.', 'warning');
+                        return;
+                    }
+                    
+                    this.log('This would test getScriptHashes() and setSignatures() with real transaction', 'info');
+                    this.log('Implementation pending...', 'warning');
+                    
+                } catch (error) {
+                    this.log(`Error: ${error.message}`, 'error');
+                }
+            },
+            
+            async testFreeMethod() {
+                this.log('=== Testing free() Memory Cleanup ===', 'info');
+                
+                try {
+                    if (!NetworkState.kaspa) {
+                        this.log('❌ Kaspa SDK not initialized', 'error');
+                        return;
+                    }
+                    
+                    // Test with PrivateKey
+                    this.log('\n1. Testing PrivateKey.free()', 'info');
+                    const key1 = new NetworkState.kaspa.PrivateKey('0000000000000000000000000000000000000000000000000000000000000001');
+                    this.log('Created PrivateKey object', 'info');
+                    
+                    if (typeof key1.free === 'function') {
+                        key1.free();
+                        this.log('✅ PrivateKey.free() executed successfully', 'success');
+                        
+                        // Try to use after free (should fail)
+                        try {
+                            key1.toPublicKey();
+                            this.log('⚠️ Object still usable after free()', 'warning');
+                        } catch (err) {
+                            this.log('✅ Object properly destroyed after free()', 'success');
+                        }
+                    } else {
+                        this.log('❌ PrivateKey.free() not available', 'error');
+                    }
+                    
+                    this.log('\n2. Memory protection recommendation:', 'info');
+                    this.log('Always use try-finally pattern:', 'info');
+                    this.log(`
+try {
+    const key = new PrivateKey(secret);
+    await tx.sign([key]);
+} finally {
+    key?.free();  // Always cleanup
+}`, 'warning');
+                    
+                } catch (error) {
+                    this.log(`Error: ${error.message}`, 'error');
+                }
+            },
+            
+            clearResults() {
+                if (!this.resultsElement) this.init();
+                this.resultsElement.innerHTML = '<div style="color: #888;">Results cleared. Click buttons to investigate...</div>';
+            }
+        };
         
         // v5.11.137: Multi WebSocket Test (Experimental)
         window.MultiWebSocketTest = {

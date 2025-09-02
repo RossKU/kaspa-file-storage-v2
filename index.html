@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v7.0.1</title>
+    <title>Kaspa P2P File Storage v7.0.3</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -3137,14 +3137,24 @@
                     try {
                         privateKey = await SecureWallet.getKey();
                         keyObj = new NetworkState.kaspa.PrivateKey(privateKey);
+                        // Clear privateKey string immediately
+                        privateKey = null;
                     } catch (error) {
                         if (error.message.includes('Wallet locked')) {
                             throw new Error('Wallet locked - please reconnect your wallet');
                         }
                         throw error;
                     }
-                    await tx.sign([keyObj]);
-                    // keyObj will be garbage collected
+                    
+                    try {
+                        await tx.sign([keyObj]);
+                    } finally {
+                        // Always free WASM memory
+                        if (keyObj && typeof keyObj.free === 'function') {
+                            keyObj.free();
+                        }
+                        keyObj = null;
+                    }
                     const txid = await tx.submit(NetworkState.rpcClient);
                     
                     if (!txid) {
@@ -12864,12 +12874,23 @@ Do you want to continue?`;
         
         async function sendTransaction(transaction) {
             // Sign transaction
+            let keyObj = null;
             try {
                 // Securely retrieve and use private key
                 const privateKey = await SecureWallet.getKey();
-                const keyObj = new NetworkState.kaspa.PrivateKey(privateKey);
-                await transaction.sign([keyObj]);
-                // keyObj will be garbage collected
+                keyObj = new NetworkState.kaspa.PrivateKey(privateKey);
+                // Clear privateKey string immediately
+                privateKey = null;
+                
+                try {
+                    await transaction.sign([keyObj]);
+                } finally {
+                    // Always free WASM memory
+                    if (keyObj && typeof keyObj.free === 'function') {
+                        keyObj.free();
+                    }
+                    keyObj = null;
+                }
             } catch (error) {
                 if (error.message.includes('Wallet locked')) {
                     alert('⚠️ Wallet locked. Please reconnect your wallet.');
@@ -14072,8 +14093,18 @@ Do you want to continue?`;
                                 // Securely retrieve and use private key
                                 const privateKey = await SecureWallet.getKey();
                                 const keyObj = new NetworkState.kaspa.PrivateKey(privateKey);
-                                await pendingTx.sign([keyObj]);
-                                // keyObj will be garbage collected
+                                // Clear privateKey string immediately
+                                privateKey = null;
+                                
+                                try {
+                                    await pendingTx.sign([keyObj]);
+                                } finally {
+                                    // Always free WASM memory
+                                    if (keyObj && typeof keyObj.free === 'function') {
+                                        keyObj.free();
+                                    }
+                                    keyObj = null;
+                                }
                                 txid = await pendingTx.submit(NetworkState.rpcClient);
                                 
                                 log(`Payload ${i + 1} TxID: ${txid.substring(0, 16)}...`, 'success');
@@ -14530,10 +14561,21 @@ Do you want to continue?`;
                             // Sign the transaction
                             log(`Signing transaction...`);
                             // Securely retrieve and use private key
-                                const privateKey = await SecureWallet.getKey();
-                                const keyObj = new NetworkState.kaspa.PrivateKey(privateKey);
+                            let keyObj = null;
+                            const privateKey = await SecureWallet.getKey();
+                            keyObj = new NetworkState.kaspa.PrivateKey(privateKey);
+                            // Clear privateKey string immediately
+                            privateKey = null;
+                            
+                            try {
                                 await pendingTx.sign([keyObj]);
-                                // keyObj will be garbage collected
+                            } finally {
+                                // Always free WASM memory
+                                if (keyObj && typeof keyObj.free === 'function') {
+                                    keyObj.free();
+                                }
+                                keyObj = null;
+                            }
                             
                             // Submit to network
                             log(`Sending to network...`);
@@ -15544,10 +15586,21 @@ Do you want to continue?`;
                         
                         const pendingTx = result.transactions[0];
                         // Securely retrieve and use private key
-                                const privateKey = await SecureWallet.getKey();
-                                const keyObj = new NetworkState.kaspa.PrivateKey(privateKey);
-                                await pendingTx.sign([keyObj]);
-                                // keyObj will be garbage collected
+                        let keyObj = null;
+                        const privateKey = await SecureWallet.getKey();
+                        keyObj = new NetworkState.kaspa.PrivateKey(privateKey);
+                        // Clear privateKey string immediately
+                        privateKey = null;
+                        
+                        try {
+                            await pendingTx.sign([keyObj]);
+                        } finally {
+                            // Always free WASM memory
+                            if (keyObj && typeof keyObj.free === 'function') {
+                                keyObj.free();
+                            }
+                            keyObj = null;
+                        }
                         
                         // v6.2.64: Get transaction ID before submission for error recovery
                         const txId = pendingTx.id;
@@ -15970,10 +16023,21 @@ Do you want to continue?`;
                 
                 const pendingTx = result.transactions[0];
                 // Securely retrieve and use private key
-                                const privateKey = await SecureWallet.getKey();
-                                const keyObj = new NetworkState.kaspa.PrivateKey(privateKey);
-                                await pendingTx.sign([keyObj]);
-                                // keyObj will be garbage collected
+                let keyObj = null;
+                const privateKey = await SecureWallet.getKey();
+                keyObj = new NetworkState.kaspa.PrivateKey(privateKey);
+                // Clear privateKey string immediately
+                privateKey = null;
+                
+                try {
+                    await pendingTx.sign([keyObj]);
+                } finally {
+                    // Always free WASM memory
+                    if (keyObj && typeof keyObj.free === 'function') {
+                        keyObj.free();
+                    }
+                    keyObj = null;
+                }
                 
                 // Debug: Check transaction before submission
                 log(`[SuperMeta] Before transaction submission - payload size: ${metaPayload.length} bytes`, 'debug');
@@ -16181,10 +16245,21 @@ Do you want to continue?`;
                 
                 const pendingTx = result.transactions[0];
                 // Securely retrieve and use private key
-                                const privateKey = await SecureWallet.getKey();
-                                const keyObj = new NetworkState.kaspa.PrivateKey(privateKey);
-                                await pendingTx.sign([keyObj]);
-                                // keyObj will be garbage collected
+                let keyObj = null;
+                const privateKey = await SecureWallet.getKey();
+                keyObj = new NetworkState.kaspa.PrivateKey(privateKey);
+                // Clear privateKey string immediately
+                privateKey = null;
+                
+                try {
+                    await pendingTx.sign([keyObj]);
+                } finally {
+                    // Always free WASM memory
+                    if (keyObj && typeof keyObj.free === 'function') {
+                        keyObj.free();
+                    }
+                    keyObj = null;
+                }
                 const superMetaTxId = await pendingTx.submit(NetworkState.rpcClient);
                 
                 log(`[SuperMeta] Super meta TxID: ${superMetaTxId}`, 'success');

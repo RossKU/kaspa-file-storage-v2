@@ -3031,7 +3031,7 @@
                 
                 try {
                     // Check wallet connection
-                    if (!UserState.address || !UserState.privateKey) {
+                    if (!UserState.address || !SecureWallet.isAvailable()) {
                         throw new Error('Wallet not connected');
                     }
                     
@@ -3110,7 +3110,19 @@
                     
                     // Sign and send transaction
                     const tx = result.transactions[0];
-                    await tx.sign([UserState.privateKey]);
+                    // Securely retrieve and use private key
+                    let privateKey, keyObj;
+                    try {
+                        privateKey = await SecureWallet.getKey();
+                        keyObj = new NetworkState.kaspa.PrivateKey(privateKey);
+                    } catch (error) {
+                        if (error.message.includes('Wallet locked')) {
+                            throw new Error('Wallet locked - please reconnect your wallet');
+                        }
+                        throw error;
+                    }
+                    await tx.sign([keyObj]);
+                    // keyObj will be garbage collected
                     const txid = await tx.submit(NetworkState.rpcClient);
                     
                     if (!txid) {
@@ -3232,7 +3244,7 @@
             if (!refreshBtn) return;
             
             // Check wallet connection
-            if (!UserState.address || !UserState.privateKey) {
+            if (!UserState.address || !SecureWallet.isAvailable()) {
                 log('Wallet not connected', 'warning');
                 return;
             }
@@ -3299,6 +3311,149 @@
                     refreshBtn.textContent = originalText;
                     refreshBtn.disabled = false;
                 }, 2000);
+            }
+        };
+        
+        // ===== Secure Wallet Implementation (v7.0.0) =====
+        // Private key encryption for enhanced security
+        const SecureWallet = {
+            tempPassword: null,  // Memory only - cleared on reload
+            
+            // Store private key with auto-generated encryption
+            async store(privateKey) {
+                try {
+                    // Generate random password for this session
+                    this.tempPassword = crypto.randomUUID();
+                    
+                    // Encrypt and store in sessionStorage
+                    const encrypted = await this.encrypt(privateKey, this.tempPassword);
+                    sessionStorage.setItem('encKey', encrypted);
+                    
+                    // Clear the plain text immediately
+                    privateKey = null;
+                    return true;
+                } catch (error) {
+                    console.error('Failed to store key securely:', error);
+                    return false;
+                }
+            },
+            
+            // Retrieve and decrypt private key
+            async getKey() {
+                if (!this.tempPassword) {
+                    throw new Error('Wallet locked - please reconnect');
+                }
+                
+                const encrypted = sessionStorage.getItem('encKey');
+                if (!encrypted) {
+                    throw new Error('No key stored');
+                }
+                
+                return await this.decrypt(encrypted, this.tempPassword);
+            },
+            
+            // Clear all stored data
+            clear() {
+                this.tempPassword = null;
+                sessionStorage.removeItem('encKey');
+            },
+            
+            // Check if wallet is available
+            isAvailable() {
+                return this.tempPassword !== null && sessionStorage.getItem('encKey') !== null;
+            },
+            
+            // Encrypt text using Web Crypto API
+            async encrypt(text, password) {
+                const enc = new TextEncoder();
+                const dec = new TextDecoder();
+                
+                // Generate salt and IV
+                const salt = crypto.getRandomValues(new Uint8Array(16));
+                const iv = crypto.getRandomValues(new Uint8Array(12));
+                
+                // Derive key from password
+                const keyMaterial = await crypto.subtle.importKey(
+                    'raw',
+                    enc.encode(password),
+                    'PBKDF2',
+                    false,
+                    ['deriveKey']
+                );
+                
+                const key = await crypto.subtle.deriveKey(
+                    {
+                        name: 'PBKDF2',
+                        salt: salt,
+                        iterations: 100000,
+                        hash: 'SHA-256'
+                    },
+                    keyMaterial,
+                    { name: 'AES-GCM', length: 256 },
+                    false,
+                    ['encrypt']
+                );
+                
+                // Encrypt the text
+                const encrypted = await crypto.subtle.encrypt(
+                    { name: 'AES-GCM', iv: iv },
+                    key,
+                    enc.encode(text)
+                );
+                
+                // Combine salt, iv, and encrypted data
+                const combined = new Uint8Array(salt.length + iv.length + encrypted.byteLength);
+                combined.set(salt, 0);
+                combined.set(iv, salt.length);
+                combined.set(new Uint8Array(encrypted), salt.length + iv.length);
+                
+                // Return base64 encoded
+                return btoa(String.fromCharCode(...combined));
+            },
+            
+            // Decrypt text using Web Crypto API
+            async decrypt(encryptedBase64, password) {
+                const enc = new TextEncoder();
+                const dec = new TextDecoder();
+                
+                // Decode from base64
+                const combined = Uint8Array.from(atob(encryptedBase64), c => c.charCodeAt(0));
+                
+                // Extract salt, iv, and encrypted data
+                const salt = combined.slice(0, 16);
+                const iv = combined.slice(16, 28);
+                const encrypted = combined.slice(28);
+                
+                // Derive key from password
+                const keyMaterial = await crypto.subtle.importKey(
+                    'raw',
+                    enc.encode(password),
+                    'PBKDF2',
+                    false,
+                    ['deriveKey']
+                );
+                
+                const key = await crypto.subtle.deriveKey(
+                    {
+                        name: 'PBKDF2',
+                        salt: salt,
+                        iterations: 100000,
+                        hash: 'SHA-256'
+                    },
+                    keyMaterial,
+                    { name: 'AES-GCM', length: 256 },
+                    false,
+                    ['decrypt']
+                );
+                
+                // Decrypt the data
+                const decrypted = await crypto.subtle.decrypt(
+                    { name: 'AES-GCM', iv: iv },
+                    key,
+                    encrypted
+                );
+                
+                return dec.decode(decrypted);
             }
         };
         
@@ -3792,7 +3947,7 @@
                 const privateKeyInput = document.getElementById('walletPrivateKey');
                 
                 // Check if already connected (for disconnect)
-                if (UserState.privateKey) {
+                if (SecureWallet.isAvailable()) {
                     // Disconnect current wallet
                     AppState.disconnectWallet();
                     privateKeyInput.value = '';
@@ -3812,12 +3967,22 @@
                         throw new Error('Kaspa SDK not initialized - Please restart the system');
                     }
                     
-                    // Create wallet from private key (correct API usage)
-                    // v5.11.104: Add debug logging
+                    // Create wallet from private key (secure implementation v7.0.0)
+                    // Store encrypted key and derive address
                     log(`Private key length: ${privateKey.length} characters`, 'debug');
-                    UserState.privateKey = new NetworkState.kaspa.PrivateKey(privateKey);
-                    const publicKey = UserState.privateKey.toPublicKey();
+                    
+                    // Store private key securely
+                    const stored = await SecureWallet.store(privateKey);
+                    if (!stored) {
+                        throw new Error('Failed to securely store private key');
+                    }
+                    
+                    // Create temporary key object to derive address (will be garbage collected)
+                    const tempPrivKey = new NetworkState.kaspa.PrivateKey(privateKey);
+                    const publicKey = tempPrivKey.toPublicKey();
                     UserState.address = publicKey.toAddress(config.network);
+                    
+                    // UserState.privateKey remains null for security
                     
                     log(`Wallet connected: ${UserState.address.toString()}`, 'success');
                     
@@ -7203,7 +7368,7 @@ Do you want to continue?`;
                 
                 // v6.2.1: Pre-upload checks
                 // Check wallet connection
-                if (!UserState.address || !UserState.privateKey) {
+                if (!UserState.address || !SecureWallet.isAvailable()) {
                     this.showStatus('Wallet not connected', 'error');
                     return;
                 }
@@ -7441,13 +7606,8 @@ Do you want to continue?`;
             }
         });
         
-        // Define getter/setter for privateKey
-        Object.defineProperty(window, 'privateKey', {
-            get() { return UserState.privateKey; },
-            set(value) { 
-                UserState.privateKey = value;
-            }
-        });
+        // Private key access removed for security (v7.0.0)
+        // Use SecureWallet.getKey() instead
         
         // Define getter/setter for address
         Object.defineProperty(window, 'address', {
@@ -12059,7 +12219,9 @@ Do you want to continue?`;
         }
         
         AppState.disconnectWallet = function() {
-            UserState.privateKey = null;
+            // Clear secure wallet storage
+            SecureWallet.clear();
+            UserState.privateKey = null;  // Already null, but kept for clarity
             UserState.address = null;
             
             // Update UI - Both status tab and settings tab
@@ -12680,7 +12842,20 @@ Do you want to continue?`;
         
         async function sendTransaction(transaction) {
             // Sign transaction
-            await transaction.sign([UserState.privateKey]);
+            try {
+                // Securely retrieve and use private key
+                const privateKey = await SecureWallet.getKey();
+                const keyObj = new NetworkState.kaspa.PrivateKey(privateKey);
+                await transaction.sign([keyObj]);
+                // keyObj will be garbage collected
+            } catch (error) {
+                if (error.message.includes('Wallet locked')) {
+                    alert('⚠️ Wallet locked. Please reconnect your wallet.');
+                    document.getElementById('walletPrivateKey')?.focus();
+                    throw new Error('Wallet locked - reconnection required');
+                }
+                throw error;
+            }
             
             // Submit transaction with error handling
             try {
@@ -13872,7 +14047,11 @@ Do you want to continue?`;
                                 }
                                 
                                 const pendingTx = result.transactions[0];
-                                await pendingTx.sign([UserState.privateKey]);
+                                // Securely retrieve and use private key
+                                const privateKey = await SecureWallet.getKey();
+                                const keyObj = new NetworkState.kaspa.PrivateKey(privateKey);
+                                await pendingTx.sign([keyObj]);
+                                // keyObj will be garbage collected
                                 txid = await pendingTx.submit(NetworkState.rpcClient);
                                 
                                 log(`Payload ${i + 1} TxID: ${txid.substring(0, 16)}...`, 'success');
@@ -14328,7 +14507,11 @@ Do you want to continue?`;
                             
                             // Sign the transaction
                             log(`Signing transaction...`);
-                            await pendingTx.sign([UserState.privateKey]);
+                            // Securely retrieve and use private key
+                                const privateKey = await SecureWallet.getKey();
+                                const keyObj = new NetworkState.kaspa.PrivateKey(privateKey);
+                                await pendingTx.sign([keyObj]);
+                                // keyObj will be garbage collected
                             
                             // Submit to network
                             log(`Sending to network...`);
@@ -15338,7 +15521,11 @@ Do you want to continue?`;
                         }
                         
                         const pendingTx = result.transactions[0];
-                        await pendingTx.sign([UserState.privateKey]);
+                        // Securely retrieve and use private key
+                                const privateKey = await SecureWallet.getKey();
+                                const keyObj = new NetworkState.kaspa.PrivateKey(privateKey);
+                                await pendingTx.sign([keyObj]);
+                                // keyObj will be garbage collected
                         
                         // v6.2.64: Get transaction ID before submission for error recovery
                         const txId = pendingTx.id;
@@ -15760,7 +15947,11 @@ Do you want to continue?`;
                 });
                 
                 const pendingTx = result.transactions[0];
-                await pendingTx.sign([UserState.privateKey]);
+                // Securely retrieve and use private key
+                                const privateKey = await SecureWallet.getKey();
+                                const keyObj = new NetworkState.kaspa.PrivateKey(privateKey);
+                                await pendingTx.sign([keyObj]);
+                                // keyObj will be garbage collected
                 
                 // Debug: Check transaction before submission
                 log(`[SuperMeta] Before transaction submission - payload size: ${metaPayload.length} bytes`, 'debug');
@@ -15967,7 +16158,11 @@ Do you want to continue?`;
                 });
                 
                 const pendingTx = result.transactions[0];
-                await pendingTx.sign([UserState.privateKey]);
+                // Securely retrieve and use private key
+                                const privateKey = await SecureWallet.getKey();
+                                const keyObj = new NetworkState.kaspa.PrivateKey(privateKey);
+                                await pendingTx.sign([keyObj]);
+                                // keyObj will be garbage collected
                 const superMetaTxId = await pendingTx.submit(NetworkState.rpcClient);
                 
                 log(`[SuperMeta] Super meta TxID: ${superMetaTxId}`, 'success');
@@ -19802,7 +19997,7 @@ Do you want to continue?`;
             }
             
             // Check if already connected
-            if (UserState.privateKey) {
+            if (SecureWallet.isAvailable()) {
                 // Disconnect current wallet
                 AppState.disconnectWallet();
                 privateKeyInput.value = '';
@@ -19815,10 +20010,19 @@ Do you want to continue?`;
                     throw new Error('Kaspa SDK not initialized - Please initialize the system');
                 }
                 
-                // Create wallet from private key (correct API usage)
-                UserState.privateKey = new NetworkState.kaspa.PrivateKey(privateKey);
-                const publicKey = UserState.privateKey.toPublicKey();
+                // Create wallet from private key (secure implementation v7.0.0)
+                // Store encrypted key and derive address
+                const stored = await SecureWallet.store(privateKey);
+                if (!stored) {
+                    throw new Error('Failed to securely store private key');
+                }
+                
+                // Create temporary key object to derive address (will be garbage collected)
+                const tempPrivKey = new NetworkState.kaspa.PrivateKey(privateKey);
+                const publicKey = tempPrivKey.toPublicKey();
                 UserState.address = publicKey.toAddress(config.network);
+                
+                // UserState.privateKey remains null for security
                 
                 log(`Wallet connected: ${UserState.address.toString()}`, 'success');
                 

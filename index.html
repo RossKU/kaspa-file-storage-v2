@@ -8016,7 +8016,7 @@ Do you want to continue?`;
                                     window.kaspaMetadata = kaspaData;
                                     document.getElementById('metaTxId').value = kaspaData.metadata.metaTxId || '';
                                     // v6.3.22: Fixed to handle both password fields
-                                    const pwdField = document.getElementById('downloadPasswordDirectory') || document.getElementById('downloadPassword');
+                                    const pwdField = document.getElementById('downloadPasswordDirectory-hidden') || document.getElementById('downloadPasswordDirectory') || document.getElementById('downloadPassword');
                                     if (pwdField) {
                                         pwdField.value = '';
                                         pwdField.placeholder = kaspaData.auth?.passwordIncluded ? 
@@ -13800,7 +13800,7 @@ Do you want to continue?`;
                         
                         const statusDiv = document.createElement('div');
                         statusDiv.className = 'chunk-status pending';
-                        statusDiv.id = `chunk-status-${i}`;
+                        statusDiv.id = `kaspa-chunk-status-${i}`;
                         
                         const statusSpan = document.createElement('span');
                         statusSpan.textContent = 'Waiting';
@@ -13810,7 +13810,7 @@ Do you want to continue?`;
                         chunksList.appendChild(chunkDiv);
                         
                         // Update status
-                        const uploadingStatusElement = document.getElementById(`chunk-status-${i}`);
+                        const uploadingStatusElement = document.getElementById(`kaspa-chunk-status-${i}`);
                         if (uploadingStatusElement) {
                             // v6.3.14: DOM manipulation for upload status
                             while (uploadingStatusElement.firstChild) {
@@ -13821,7 +13821,7 @@ Do you want to continue?`;
                             uploadSpan.textContent = 'Uploading...';
                             uploadingStatusElement.appendChild(uploadSpan);
                         } else {
-                            log(`[ERROR] chunk-status-${i} element not found (at upload start)`, 'error');
+                            log(`[ERROR] kaspa-chunk-status-${i} element not found (at upload start)`, 'error');
                         }
                         
                         const payloadBytes = payloads[i];
@@ -13970,7 +13970,7 @@ Do you want to continue?`;
                                 }
                                 
                                 // Update status
-                                const chunkStatusElement = document.getElementById(`chunk-status-${i}`);
+                                const chunkStatusElement = document.getElementById(`kaspa-chunk-status-${i}`);
                                 if (chunkStatusElement) {
                                     // v6.3.14: DOM manipulation for chunk success status
                                     while (chunkStatusElement.firstChild) {
@@ -13981,7 +13981,7 @@ Do you want to continue?`;
                                     successSpan.textContent = '✅ Complete';
                                     chunkStatusElement.appendChild(successSpan);
                                 } else {
-                                    log(`[ERROR] chunk-status-${i} element not found`, 'error');
+                                    log(`[ERROR] kaspa-chunk-status-${i} element not found`, 'error');
                                 }
                                 const uploadTime = Date.now() - uploadStartTime;
                                 log(`Payload ${i + 1} upload complete (${(uploadTime/1000).toFixed(1)} seconds)`);
@@ -14094,7 +14094,7 @@ Do you want to continue?`;
                                 }
                                 
                                 if (retries >= config.retryCount) {
-                                    const chunkStatusElement = document.getElementById(`chunk-status-${i}`);
+                                    const chunkStatusElement = document.getElementById(`kaspa-chunk-status-${i}`);
                                     if (chunkStatusElement) {
                                         // v6.3.14: DOM manipulation for chunk error status
                                         while (chunkStatusElement.firstChild) {
@@ -14105,7 +14105,7 @@ Do you want to continue?`;
                                         errorSpan.textContent = '❌ Failed';
                                         chunkStatusElement.appendChild(errorSpan);
                                     } else {
-                                        log(`[ERROR] chunk-status-${i} element not found (during error)`, 'error');
+                                        log(`[ERROR] kaspa-chunk-status-${i} element not found (during error)`, 'error');
                                     }
                                     FileState.progressManager.markChunkFailed(i);
                                     await FileState.progressManager.saveProgress();
@@ -14233,7 +14233,7 @@ Do you want to continue?`;
                     
                     const chunkStatusDiv = document.createElement('div');
                     chunkStatusDiv.className = 'chunk-status pending';
-                    chunkStatusDiv.id = `chunk-status-${i}`;
+                    chunkStatusDiv.id = `compressed-chunk-status-${i}`;
                     
                     const chunkStatusSpan = document.createElement('span');
                     chunkStatusSpan.textContent = 'Waiting';
@@ -14268,7 +14268,7 @@ Do you want to continue?`;
                     
                     // Update status
                     // v6.3.16: DOM manipulation for chunk upload status
-                    const statusEl1 = document.getElementById(`chunk-status-${i}`);
+                    const statusEl1 = document.getElementById(`compressed-chunk-status-${i}`);
                     while (statusEl1.firstChild) {
                         statusEl1.removeChild(statusEl1.firstChild);
                     }
@@ -14458,7 +14458,7 @@ Do you want to continue?`;
                             
                             // Update status
                             // v6.3.16: DOM manipulation for chunk success status
-                            const statusEl2 = document.getElementById(`chunk-status-${i}`);
+                            const statusEl2 = document.getElementById(`compressed-chunk-status-${i}`);
                             while (statusEl2.firstChild) {
                                 statusEl2.removeChild(statusEl2.firstChild);
                             }
@@ -14557,7 +14557,7 @@ Do you want to continue?`;
                             
                             if (retries >= config.retryCount) {
                                 // v6.3.16: DOM manipulation for chunk error status
-                                const statusEl3 = document.getElementById(`chunk-status-${i}`);
+                                const statusEl3 = document.getElementById(`compressed-chunk-status-${i}`);
                                 while (statusEl3.firstChild) {
                                     statusEl3.removeChild(statusEl3.firstChild);
                                 }
@@ -16205,8 +16205,8 @@ Do you want to continue?`;
                     // Create hidden input element
                     const hiddenInput = document.createElement('input');
                     hiddenInput.type = 'hidden';
-                    // v6.3.22: Fixed duplicate ID - use unique ID for directory password
-                    hiddenInput.id = 'downloadPasswordDirectory';
+                    // v6.3.25: Fixed duplicate ID - use unique ID for hidden password field
+                    hiddenInput.id = 'downloadPasswordDirectory-hidden';
                     hiddenInput.value = dirMetadata.auth.password; // No escaping needed with direct property assignment
                     passwordSection.appendChild(hiddenInput);
                 } else {
@@ -16297,7 +16297,7 @@ Do you want to continue?`;
             try {
                 // Get password
                 // v6.3.22: Check both password fields (original and directory-specific)
-                let passwordField = document.getElementById('downloadPasswordDirectory') || document.getElementById('downloadPassword');
+                let passwordField = document.getElementById('downloadPasswordDirectory-hidden') || document.getElementById('downloadPasswordDirectory') || document.getElementById('downloadPassword');
                 let password = passwordField ? passwordField.value : '';
                 if (!password && dirMetadata.auth?.password) {
                     password = dirMetadata.auth.password;
@@ -16587,7 +16587,7 @@ Do you want to continue?`;
                 if (FileState.kaspaMetadata.auth?.passwordIncluded) {
                     // Keep the password input field but hide it
                     // v6.3.22: Fixed to use correct password field
-                    const pwdField = document.getElementById('downloadPasswordDirectory') || document.getElementById('downloadPassword');
+                    const pwdField = document.getElementById('downloadPasswordDirectory-hidden') || document.getElementById('downloadPasswordDirectory') || document.getElementById('downloadPassword');
                     if (pwdField) {
                         pwdField.style.display = 'none';
                         pwdField.value = FileState.kaspaMetadata.auth.password;
@@ -16605,7 +16605,7 @@ Do you want to continue?`;
                 } else {
                     // Show password input
                     // v6.3.22: Fixed to use correct password field
-                    const pwdField = document.getElementById('downloadPasswordDirectory') || document.getElementById('downloadPassword');
+                    const pwdField = document.getElementById('downloadPasswordDirectory-hidden') || document.getElementById('downloadPasswordDirectory') || document.getElementById('downloadPassword');
                     if (pwdField) {
                         pwdField.style.display = 'block';
                     }
@@ -17470,7 +17470,7 @@ Do you want to continue?`;
                         
                         // Set password for download
                         // v6.3.22: Fixed to handle both password fields
-                        const pwdField = document.getElementById('downloadPasswordDirectory') || document.getElementById('downloadPassword');
+                        const pwdField = document.getElementById('downloadPasswordDirectory-hidden') || document.getElementById('downloadPasswordDirectory') || document.getElementById('downloadPassword');
                         if (pwdField) {
                             pwdField.value = password;
                             pwdField.style.display = 'none';
@@ -17497,8 +17497,8 @@ Do you want to continue?`;
 
         // Download file
         FileState.fileOperationHandlers.downloadFile = async function() {
-            // v6.3.22: Check both password fields
-            let passwordField = document.getElementById('downloadPassword');
+            // v6.3.25: Check all password fields including hidden
+            let passwordField = document.getElementById('downloadPasswordDirectory-hidden') || document.getElementById('downloadPasswordDirectory') || document.getElementById('downloadPassword');
             let password = passwordField ? passwordField.value : '';
             log(`Password field value: ${password ? 'Has input' : 'Empty'}`, 'debug');
             
@@ -17992,7 +17992,7 @@ Do you want to continue?`;
             try {
                 // Get password
                 // v6.3.22: Check both password fields
-                let passwordField = document.getElementById('downloadPasswordDirectory') || document.getElementById('downloadPassword');
+                let passwordField = document.getElementById('downloadPasswordDirectory-hidden') || document.getElementById('downloadPasswordDirectory') || document.getElementById('downloadPassword');
                 let password = passwordField ? passwordField.value : '';
                 if (metadata.auth?.passwordIncluded && metadata.auth?.password) {
                     password = metadata.auth.password;

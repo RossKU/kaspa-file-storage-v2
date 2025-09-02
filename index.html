@@ -19473,10 +19473,22 @@ Do you want to continue?`;
         
         // Thumbnail generation function
         window.generateThumbnail = function(file) {
+            log(`[DEBUG] generateThumbnail called for: ${file.name}`, 'debug');
             const reader = new FileReader();
+            
+            reader.onerror = function(error) {
+                log(`[ERROR] FileReader error: ${error}`, 'error');
+                showFileInfo(file, null);
+            };
             
             reader.onload = function(e) {
                 const img = new Image();
+                
+                img.onerror = function() {
+                    log(`[WARN] Could not generate thumbnail for: ${file.name}`, 'warn');
+                    showFileInfo(file, null);
+                };
+                
                 img.onload = function() {
                     // Create canvas for resizing
                     const canvas = document.createElement('canvas');
@@ -19518,7 +19530,8 @@ Do you want to continue?`;
             
             // Check if elements exist
             if (!preview || !defaultPrompt || !fileName || !fileSize) {
-                ;
+                log(`[ERROR] Missing elements in showFileInfo - preview: ${!!preview}, defaultPrompt: ${!!defaultPrompt}, fileName: ${!!fileName}, fileSize: ${!!fileSize}`, 'error');
+                log(`[ERROR] File info: name="${file?.name}", size=${file?.size}`, 'error');
                 return;
             }
             
@@ -19530,8 +19543,10 @@ Do you want to continue?`;
             label.classList.add('has-file');
             
             // Set file info
+            log(`[DEBUG] Setting file info - name: "${file.name}", size: ${file.size}`, 'debug');
             fileName.textContent = file.name;
             fileSize.textContent = `${(file.size / 1024 / 1024).toFixed(2)} MB`;
+            log(`[DEBUG] File info set - fileName element: ${fileName.textContent}, fileSize element: ${fileSize.textContent}`, 'debug');
             
             // Set thumbnail or file type icon
             if (thumbnailUrl) {
@@ -19628,10 +19643,17 @@ Do you want to continue?`;
             log(`File selected: ${file.name} (${(file.size/1024).toFixed(1)}KB)`);
             
             // Generate thumbnail for image files
-            if (file.type.startsWith('image/') && file.size <= 100 * 1024 * 1024) { // 100MB limit
+            log(`[DEBUG] File type: "${file.type}", size: ${file.size}`, 'debug');
+            const isImageFile = file.type.startsWith('image/') && 
+                               !file.type.includes('photoshop') && 
+                               !file.name.toLowerCase().endsWith('.psd');
+            
+            if (isImageFile && file.size <= 100 * 1024 * 1024) { // 100MB limit
+                log('[DEBUG] Generating thumbnail for image file', 'debug');
                 generateThumbnail(file);
             } else {
                 // Show file info without thumbnail
+                log('[DEBUG] Showing file info without thumbnail', 'debug');
                 showFileInfo(file, null);
             }
             

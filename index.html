@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v7.0.5</title>
+    <meta http-equiv="Content-Security-Policy-Report-Only" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://* https://*.kaspa.org; img-src 'self' data: blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none';">
+    <title>Kaspa P2P File Storage v7.0.6</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -2703,6 +2704,28 @@
                 
                 <div id="wasmTestResults" style="margin-top: 15px; padding: 15px; background: var(--background-dark); border-radius: 5px; font-family: monospace; font-size: 12px; max-height: 400px; overflow-y: auto; white-space: pre-wrap;">
                     <div style="color: #888;">Click buttons above to investigate WASM SDK capabilities...</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- v7.0.6: CSP Violation Monitor -->
+        <div class="container">
+            <h2>🛡️ CSP Violation Monitor</h2>
+            <div class="metric-box" style="padding: 15px;">
+                <p style="margin-bottom: 10px; color: var(--text-secondary);">
+                    Monitors Content Security Policy violations (Report-Only mode)
+                </p>
+                
+                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                    <button onclick="CSPMonitor.clear()">Clear Violations</button>
+                    <button onclick="CSPMonitor.copyToClipboard()">Copy to Clipboard</button>
+                    <span id="cspViolationCount" style="padding: 8px 12px; background: var(--button-bg); border-radius: 5px;">
+                        Violations: 0
+                    </span>
+                </div>
+                
+                <div id="cspViolationLog" style="margin-top: 15px; padding: 15px; background: var(--background-dark); border-radius: 5px; font-family: monospace; font-size: 12px; max-height: 400px; overflow-y: auto; white-space: pre-wrap;">
+                    <div style="color: #888;">No CSP violations detected yet...</div>
                 </div>
             </div>
         </div>
@@ -21783,7 +21806,84 @@ Do you want to continue?`;
             }).catch(error => {
                 log(`[KENV] Initialization error: ${error.message}`, 'error');
             });
+            
+            // v7.0.6: Initialize CSP Monitor
+            if (window.CSPMonitor) {
+                CSPMonitor.init();
+            }
         });
+        
+        // v7.0.6: CSP Violation Monitor
+        window.CSPMonitor = {
+            violations: [],
+            logElement: null,
+            countElement: null,
+            
+            init() {
+                this.logElement = document.getElementById('cspViolationLog');
+                this.countElement = document.getElementById('cspViolationCount');
+                
+                // Listen for CSP violations
+                document.addEventListener('securitypolicyviolation', (e) => {
+                    this.logViolation(e);
+                });
+            },
+            
+            logViolation(e) {
+                const violation = {
+                    time: new Date().toLocaleTimeString(),
+                    directive: e.violatedDirective,
+                    blockedURI: e.blockedURI || 'inline',
+                    sourceFile: e.sourceFile || 'unknown',
+                    lineNumber: e.lineNumber || 'N/A',
+                    sample: e.sample || 'N/A'
+                };
+                
+                this.violations.push(violation);
+                this.updateDisplay();
+            },
+            
+            updateDisplay() {
+                if (!this.logElement || !this.countElement) return;
+                
+                this.countElement.textContent = `Violations: ${this.violations.length}`;
+                
+                if (this.violations.length === 0) {
+                    this.logElement.innerHTML = '<div style="color: #888;">No CSP violations detected yet...</div>';
+                    return;
+                }
+                
+                const logs = this.violations.map(v => {
+                    return `[${v.time}] ${v.directive}
+  Blocked: ${v.blockedURI}
+  Source: ${v.sourceFile}:${v.lineNumber}
+  Sample: ${v.sample}
+─────────────────────────`;
+                }).reverse().join('\n');
+                
+                this.logElement.textContent = logs;
+                this.logElement.scrollTop = 0;
+            },
+            
+            clear() {
+                this.violations = [];
+                this.updateDisplay();
+            },
+            
+            copyToClipboard() {
+                if (this.violations.length === 0) {
+                    alert('No violations to copy');
+                    return;
+                }
+                
+                const text = JSON.stringify(this.violations, null, 2);
+                navigator.clipboard.writeText(text).then(() => {
+                    alert('Violations copied to clipboard');
+                }).catch(() => {
+                    alert('Failed to copy to clipboard');
+                });
+            }
+        };
         
         // v7.0.2: WASM SDK Security Investigation
         window.WASMSecurityTest = {

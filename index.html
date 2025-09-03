@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-    <title>Kaspa P2P File Storage v7.0.3</title>
+    <title>Kaspa P2P File Storage v7.0.4</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -3147,13 +3147,24 @@
                     }
                     
                     try {
+                        console.log('[DEBUG] Before sign - keyObj:', keyObj);
+                        console.log('[DEBUG] typeof keyObj.free:', typeof keyObj?.free);
                         await tx.sign([keyObj]);
+                        console.log('[DEBUG] Sign completed successfully');
                     } finally {
+                        console.log('[DEBUG] Finally block reached');
+                        console.log('[DEBUG] keyObj exists:', !!keyObj);
+                        console.log('[DEBUG] typeof keyObj.free:', typeof keyObj?.free);
                         // Always free WASM memory
                         if (keyObj && typeof keyObj.free === 'function') {
+                            console.log('[DEBUG] Calling keyObj.free()...');
                             keyObj.free();
+                            console.log('[DEBUG] ✅ free() called successfully');
+                        } else {
+                            console.log('[DEBUG] ⚠️ free() not called - condition not met');
                         }
                         keyObj = null;
+                        console.log('[DEBUG] keyObj set to null');
                     }
                     const txid = await tx.submit(NetworkState.rpcClient);
                     

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Content-Security-Policy-Report-Only" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://* https://*.kaspa.org https://*.kaspa.green https://*.kaspa.blue; img-src 'self' data: blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none';">
-    <title>Kaspa P2P File Storage v7.0.10</title>
+    <title>Kaspa P2P File Storage v7.0.11</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -17428,8 +17428,8 @@ Do you want to continue?`;
                     log('Explorer API payload incomplete, retrying via RPC...', 'warning');
                     
                     try {
-                        // Get transaction via RPC
-                        const txResponse = await NetworkState.rpcClient.getTransaction({
+                        // Get transaction via RPC - NOT AVAILABLE IN WASM SDK
+                        /* const txResponse = await NetworkState.rpcClient.getTransaction({
                             transactionId: metaTxId,
                             includeBlockInfo: true
                         });
@@ -17459,7 +17459,8 @@ Do you want to continue?`;
                                     log(`RPC verbose base64 payload: ${payload.length} bytes`, 'info');
                                 }
                             }
-                        }
+                        } */
+                        log('RPC getTransaction is not available in WASM SDK - skipping', 'info');
                     } catch (rpcError) {
                         log(`RPC retrieval error: ${rpcError.message}`, 'error');
                     }

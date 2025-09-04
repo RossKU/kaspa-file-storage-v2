@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Content-Security-Policy-Report-Only" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://* https://*.kaspa.org https://*.kaspa.green https://*.kaspa.blue; img-src 'self' data: blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none';">
-    <title>Kaspa P2P File Storage v7.0.12</title>
+    <title>Kaspa P2P File Storage v7.0.13</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -12221,9 +12221,11 @@ Do you want to continue?`;
             setInterval(updateArchiveNodeStatus, 2000);
         }
         
-        // Enhanced getTransaction with archive node fallback
+        // Enhanced getTransaction with archive node fallback - DISABLED
         async function getTransactionWithArchive(txId, blockId = null) {
-            const startTime = Date.now();
+            // getTransaction is not available in WASM SDK
+            // This function cannot work without it
+            /* const startTime = Date.now();
             
             // First try with normal RPC client
             try {
@@ -12270,7 +12272,9 @@ Do you want to continue?`;
                     }
                 }
                 throw error;
-            }
+            } */
+            log('getTransactionWithArchive: Not available in WASM SDK', 'info');
+            return null;
         }
         
         AppState.disconnectWallet = function() {
@@ -12998,8 +13002,8 @@ Do you want to continue?`;
                 // After config.restApiWaitTime (10 seconds), try RPC
                 if (waitTime >= config.restApiWaitTime && NetworkState.rpcClient) {
                     try {
-                        log(`${config.restApiWaitTime/1000} seconds elapsed - attempting RPC verification...`);
-                        const txInfo = await NetworkState.rpcClient.getTransaction({
+                        log(`${config.restApiWaitTime/1000} seconds elapsed - RPC verification skipped (getTransaction not available)`);
+                        /* const txInfo = await NetworkState.rpcClient.getTransaction({
                             transactionId: txid,
                             includeBlockInfo: true
                         });
@@ -13008,10 +13012,11 @@ Do you want to continue?`;
                             blockId = txInfo.blockHash;
                             log(`BlockID obtained via RPC: ${blockId.substring(0, 16)}...`);
                             return blockId;
-                        }
+                        } */
+                        // Continue with REST API polling since RPC getTransaction is not available
                     } catch (err) {
                         // Transaction might not be confirmed yet
-                        log(`RPC verification error: ${err.message}`, 'debug');
+                        log(`RPC verification skipped: ${err.message}`, 'debug');
                     }
                 }
                 
@@ -16131,8 +16136,8 @@ Do you want to continue?`;
                     // v6.2.61: After 10 seconds, try RPC (same as regular chunks)
                     if (waitTime >= config.restApiWaitTime && NetworkState.rpcClient) {
                         try {
-                            log(`[SuperMeta] ${config.restApiWaitTime/1000} seconds elapsed - Attempting RPC intermediate meta confirmation...`);
-                            const txInfo = await NetworkState.rpcClient.getTransaction({
+                            log(`[SuperMeta] ${config.restApiWaitTime/1000} seconds elapsed - RPC confirmation skipped (getTransaction not available)`);
+                            /* const txInfo = await NetworkState.rpcClient.getTransaction({
                                 transactionId: metaTxId,
                                 includeBlockInfo: true
                             });
@@ -16141,10 +16146,11 @@ Do you want to continue?`;
                                 metaBlockId = txInfo.blockHash;
                                 log(`[SuperMeta] Intermediate meta BlockID obtained via RPC: ${metaBlockId.substring(0, 16)}...`);
                                 break;
-                            }
+                            } */
+                            // Continue with REST API polling since RPC getTransaction is not available
                         } catch (err) {
                             // Transaction might not be confirmed yet
-                            log(`[SuperMeta] RPC confirmation error: ${err.message}`, 'debug');
+                            log(`[SuperMeta] RPC confirmation skipped: ${err.message}`, 'debug');
                         }
                     }
                     
@@ -16325,8 +16331,8 @@ Do you want to continue?`;
                     // v6.2.61: After 10 seconds, try RPC (same as regular chunks)
                     if (waitTime >= config.restApiWaitTime && NetworkState.rpcClient) {
                         try {
-                            log(`[SuperMeta] ${config.restApiWaitTime/1000} seconds elapsed - Attempting RPC super meta confirmation...`);
-                            const txInfo = await NetworkState.rpcClient.getTransaction({
+                            log(`[SuperMeta] ${config.restApiWaitTime/1000} seconds elapsed - RPC super meta confirmation skipped (getTransaction not available)`);
+                            /* const txInfo = await NetworkState.rpcClient.getTransaction({
                                 transactionId: superMetaTxId,
                                 includeBlockInfo: true
                             });
@@ -16336,10 +16342,11 @@ Do you want to continue?`;
                                 superMetaBlockTime = Date.now();
                                 log(`[SuperMeta] Super meta BlockID obtained via RPC: ${superMetaBlockId.substring(0, 16)}...`);
                                 break;
-                            }
+                            } */
+                            // Continue with REST API polling since RPC getTransaction is not available
                         } catch (err) {
                             // Transaction might not be confirmed yet
-                            log(`[SuperMeta] RPC confirmation error: ${err.message}`, 'debug');
+                            log(`[SuperMeta] RPC confirmation skipped: ${err.message}`, 'debug');
                         }
                     }
                     
@@ -19214,14 +19221,15 @@ Do you want to continue?`;
                     for (const [txId, data] of NetworkState.ws.monitoredTransactions.entries()) {
                         if (!data.blockId) {
                             try {
-                                // Try to get transaction info via RPC
-                                const txInfo = await NetworkState.rpcClient.getTransaction(txId, true);
+                                // Try to get transaction info via RPC - NOT AVAILABLE IN WASM SDK
+                                /* const txInfo = await NetworkState.rpcClient.getTransaction(txId, true);
                                 if (txInfo && txInfo.blockHash) {
                                     // Update the monitoring list with found BlockID
                                     data.blockId = txInfo.blockHash[0];
                                     data.receivedAt = Date.now();
                                     log(`[Monitor] BlockID obtained via RPC: ${txId.substring(0, 16)}... → ${data.blockId.substring(0, 16)}...`, 'success');
-                                }
+                                } */
+                                log(`[Monitor] RPC getTransaction not available - skipping transaction check`, 'debug');
                             } catch (err) {
                                 // Transaction might not be confirmed yet
                                 log(`[Monitor] TxID ${txId.substring(0, 16)}... is still unconfirmed`, 'debug');

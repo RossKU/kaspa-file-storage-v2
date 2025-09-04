@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://*.kaspa.org wss://*.kaspa.green wss://*.kaspa.blue wss://*.kaspa.stream wss://*.kaspa.red https://*.kaspa.org https://*.kaspa.green https://*.kaspa.blue https://*.kaspa.stream https://*.kaspa.red; img-src 'self' data: blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none';">
-    <title>Kaspa P2P File Storage v7.0.19</title>
+    <title>Kaspa P2P File Storage v7.0.20</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -10541,7 +10541,7 @@ Do you want to continue?`;
             const statusFolder = document.getElementById('workspaceFolderStatus');
             if (statusFolder) {
                 // XSS fix: Use safe DOM manipulation
-                statusFolder.innerHTML = ''; // Clear existing content
+                statusFolder.textContent = ''; // Clear existing content (XSS-safe)
                 const span = document.createElement('span');
                 if (WorkspaceState.handle) {
                     span.textContent = `📁 ${WorkspaceState.handle.name}`;
@@ -10724,7 +10724,7 @@ Do you want to continue?`;
                 
                 // XSS fix: Use safe DOM manipulation instead of innerHTML
                 const resumeDetails = document.getElementById('resumeDetails');
-                resumeDetails.innerHTML = ''; // Clear existing content
+                resumeDetails.textContent = ''; // Clear existing content (XSS-safe)
                 
                 // Create file info paragraph
                 const fileP = document.createElement('p');
@@ -13859,7 +13859,7 @@ Do you want to continue?`;
                 
                 // NEW: Process file with payload split approach
                 const chunksList = document.getElementById('chunksList');
-                chunksList.innerHTML = '';
+                chunksList.textContent = ''; // XSS-safe clear
                 
                 // Check if we need to use new approach
                 const useNewApproach = actualChunkSize >= 22528; // Use new approach for 22KB chunks
@@ -21920,8 +21920,18 @@ Do you want to continue?`;
                             type === 'error' ? '#f44336' : 
                             type === 'warning' ? '#ff9800' : '#2196F3';
                 
-                const line = `[${timestamp}] <span style="color: ${color}">${message}</span>\n`;
-                this.resultsElement.innerHTML += line;
+                // XSS-safe: Create DOM elements instead of innerHTML
+                const lineDiv = document.createElement('div');
+                const timestampSpan = document.createElement('span');
+                timestampSpan.textContent = `[${timestamp}] `;
+                lineDiv.appendChild(timestampSpan);
+                
+                const messageSpan = document.createElement('span');
+                messageSpan.style.color = color;
+                messageSpan.textContent = message;
+                lineDiv.appendChild(messageSpan);
+                
+                this.resultsElement.appendChild(lineDiv);
                 this.resultsElement.scrollTop = this.resultsElement.scrollHeight;
             },
             
@@ -22108,7 +22118,12 @@ try {
             
             clearResults() {
                 if (!this.resultsElement) this.init();
-                this.resultsElement.innerHTML = '<div style="color: #888;">Results cleared. Click buttons to investigate...</div>';
+                // XSS-safe: Use textContent and DOM manipulation
+                this.resultsElement.textContent = '';
+                const div = document.createElement('div');
+                div.style.color = '#888';
+                div.textContent = 'Results cleared. Click buttons to investigate...';
+                this.resultsElement.appendChild(div);
             }
         };
         

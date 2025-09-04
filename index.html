@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Content-Security-Policy-Report-Only" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://* https://*.kaspa.org https://*.kaspa.green https://*.kaspa.blue; img-src 'self' data: blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none';">
-    <title>Kaspa P2P File Storage v7.0.11</title>
+    <title>Kaspa P2P File Storage v7.0.12</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -17469,6 +17469,17 @@ Do you want to continue?`;
                 
                 if (!payload) {
                     // v6.3.11: Show error only when both RPC and REST API have failed
+                    // Ensure downloadSection is visible before showing error
+                    const downloadSection = document.getElementById('downloadSection');
+                    if (downloadSection) {
+                        downloadSection.style.display = 'block';
+                    }
+                    // Also ensure downloadProgress is visible
+                    const downloadProgress = document.getElementById('downloadProgress');
+                    if (downloadProgress) {
+                        downloadProgress.style.display = 'block';
+                    }
+                    
                     showDownloadError('Download failed - All methods attempted', [
                         'Both RPC and REST API could not retrieve the transaction',
                         'Possible causes:',

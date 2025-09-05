@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://*.kaspa.org wss://*.kaspa.green wss://*.kaspa.blue wss://*.kaspa.stream wss://*.kaspa.red https://*.kaspa.org https://*.kaspa.green https://*.kaspa.blue https://*.kaspa.stream https://*.kaspa.red; img-src 'self' data: blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none';">
-    <title>Kaspa P2P File Storage v7.0.23</title>
+    <title>Kaspa P2P File Storage v7.0.24</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -12286,8 +12286,10 @@ Do you want to continue?`;
                 maxConsecutiveInput.value = NetworkState.archiveManager.maxConsecutiveNonArchive;
             }
             
-            // Start periodic status updates
-            setInterval(updateArchiveNodeStatus, 2000);
+            // Start periodic status updates (v7.0.24: Store interval for cleanup)
+            if (NetworkState.archiveManager) {
+                NetworkState.archiveManager.statusInterval = setInterval(updateArchiveNodeStatus, 2000);
+            }
         }
         
         // Enhanced getTransaction with archive node fallback - DISABLED
@@ -18839,8 +18841,8 @@ Do you want to continue?`;
             // v5.6.6: Removed browser offline/online event listeners - using error-based detection instead
             // See ConnectionManager for new network management approach
             
-            // Periodic cleanup of old progress data
-            setInterval(() => {
+            // Periodic cleanup of old progress data (v7.0.24: Store interval for cleanup)
+            AppState.localStorageCleanupInterval = setInterval(() => {
                 const metadata = localStorage.getItem('kaspa-upload-metadata');
                 if (metadata) {
                     try {
@@ -19476,6 +19478,16 @@ Do you want to continue?`;
             // Stop memory monitoring
             if (memoryMonitorInterval) {
                 clearInterval(memoryMonitorInterval);
+            }
+            
+            // v7.0.24: Clear archive node status interval
+            if (NetworkState.archiveManager?.statusInterval) {
+                clearInterval(NetworkState.archiveManager.statusInterval);
+            }
+            
+            // v7.0.24: Clear localStorage cleanup interval
+            if (AppState.localStorageCleanupInterval) {
+                clearInterval(AppState.localStorageCleanupInterval);
             }
             
             // Close WebSocket connections

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://*.kaspa.org wss://*.kaspa.green wss://*.kaspa.blue wss://*.kaspa.stream wss://*.kaspa.red https://*.kaspa.org https://*.kaspa.green https://*.kaspa.blue https://*.kaspa.stream https://*.kaspa.red; img-src 'self' data: blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none';">
-    <title>Kaspa P2P File Storage v7.0.21</title>
+    <title>Kaspa P2P File Storage v7.0.22</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -2973,6 +2973,12 @@
             experimental: {
                 multiWalletTestMode: false,  // Multi-wallet test mode flag (v5.5.39)
                 simpleWalletManager: null    // Simple wallet manager instance (v5.5.39)
+            },
+            utxo: {
+                shouldShowConsolidation: false,  // v7.0.22: UTXO consolidation visibility state
+                count: 0,                        // v7.0.22: Current UTXO count
+                balance: null,                   // v7.0.22: Current balance
+                consolidationText: ''            // v7.0.22: Button text to display
             }
         };
         
@@ -3332,18 +3338,35 @@
                 document.getElementById('walletUtxoCount').textContent = utxoText + utxoWarning;
                 document.getElementById('settingsWalletUtxoCount').textContent = utxoText + utxoWarning;
                 
+                // v7.0.22: Update global UTXO state and consolidation button
+                AppState.utxo.count = utxoCount;
+                AppState.utxo.balance = balance;
+                AppState.utxo.shouldShowConsolidation = true;
+                
+                // Determine consolidation button text
+                if (utxoCount > 40) {
+                    AppState.utxo.consolidationText = `⚠️ Consolidate ${utxoCount} UTXOs`;
+                } else if (utxoCount > 1) {
+                    AppState.utxo.consolidationText = `Consolidate ${utxoCount} UTXOs`;
+                } else {
+                    AppState.utxo.consolidationText = 'Consolidation not needed';
+                }
+                
+                // Update consolidation section visibility (always, regardless of active tab)
+                const consolidationSection = document.getElementById('utxoConsolidationSection');
+                if (consolidationSection) {
+                    consolidationSection.style.display = 'block';
+                }
+                
                 // Update consolidation button
                 const consolidateBtn = document.getElementById('utxoConsolidateBtn');
                 if (consolidateBtn) {
                     consolidateBtn.disabled = (utxoCount <= 1);
+                    consolidateBtn.textContent = AppState.utxo.consolidationText;
                     if (utxoCount > 40) {
                         consolidateBtn.style.background = 'var(--warning-color)';
-                        consolidateBtn.textContent = `⚠️ Consolidate ${utxoCount} UTXOs`;
                     } else if (utxoCount > 1) {
                         consolidateBtn.style.background = 'var(--accent-color)';
-                        consolidateBtn.textContent = `Consolidate ${utxoCount} UTXOs`;
-                    } else {
-                        consolidateBtn.textContent = 'Consolidation not needed';
                     }
                 }
                 
@@ -4071,22 +4094,33 @@
                         document.getElementById('walletUtxoCount').textContent = utxoText + utxoWarning;
                         document.getElementById('settingsWalletUtxoCount').textContent = utxoText + utxoWarning;
                         
-                        // v6.2.14: Show/hide and enable/disable consolidation based on UTXO count
+                        // v7.0.22: Store UTXO state globally and update DOM regardless of active tab
+                        AppState.utxo.count = utxoCount;
+                        AppState.utxo.balance = balance;
+                        AppState.utxo.shouldShowConsolidation = true; // Always show when wallet connected
+                        
+                        // Determine consolidation button text and style
+                        if (utxoCount > 40) {
+                            AppState.utxo.consolidationText = `⚠️ Consolidate ${utxoCount} UTXOs`;
+                        } else if (utxoCount > 1) {
+                            AppState.utxo.consolidationText = `Consolidate ${utxoCount} UTXOs`;
+                        } else {
+                            AppState.utxo.consolidationText = 'Consolidation not needed';
+                        }
+                        
+                        // Always update DOM elements, regardless of which tab is active
                         const consolidationSection = document.getElementById('utxoConsolidationSection');
                         const consolidateBtn = document.getElementById('utxoConsolidateBtn');
                         if (consolidationSection) {
-                            consolidationSection.style.display = 'block';
-                            if (consolidateBtn) {
-                                consolidateBtn.disabled = (utxoCount <= 1);
-                                if (utxoCount > 40) {
-                                    consolidateBtn.style.background = 'var(--warning-color)';
-                                    consolidateBtn.textContent = `⚠️ Consolidate ${utxoCount} UTXOs`;
-                                } else if (utxoCount > 1) {
-                                    consolidateBtn.style.background = 'var(--accent-color)';
-                                    consolidateBtn.textContent = `Consolidate ${utxoCount} UTXOs`;
-                                } else {
-                                    consolidateBtn.textContent = 'Consolidation not needed';
-                                }
+                            consolidationSection.style.display = AppState.utxo.shouldShowConsolidation ? 'block' : 'none';
+                        }
+                        if (consolidateBtn) {
+                            consolidateBtn.disabled = (utxoCount <= 1);
+                            consolidateBtn.textContent = AppState.utxo.consolidationText;
+                            if (utxoCount > 40) {
+                                consolidateBtn.style.background = 'var(--warning-color)';
+                            } else if (utxoCount > 1) {
+                                consolidateBtn.style.background = 'var(--accent-color)';
                             }
                         }
                         
@@ -8375,12 +8409,32 @@ Do you want to continue?`;
                     }
                 }
                 
-                // Update theme dropdown when switching to settings
+                // Update theme dropdown and UTXO consolidation when switching to settings
                 if (tab === 'settings') {
                     const currentTheme = document.body.getAttribute('data-theme') || 'dark';
                     const themeSelect = document.getElementById('themeSelect');
                     if (themeSelect) {
                         themeSelect.value = currentTheme;
+                    }
+                    
+                    // v7.0.22: Apply saved UTXO consolidation state when switching to Settings tab
+                    if (AppState.utxo.shouldShowConsolidation) {
+                        const consolidationSection = document.getElementById('utxoConsolidationSection');
+                        const consolidateBtn = document.getElementById('utxoConsolidateBtn');
+                        
+                        if (consolidationSection) {
+                            consolidationSection.style.display = 'block';
+                        }
+                        
+                        if (consolidateBtn && AppState.utxo.count !== undefined) {
+                            consolidateBtn.disabled = (AppState.utxo.count <= 1);
+                            consolidateBtn.textContent = AppState.utxo.consolidationText;
+                            if (AppState.utxo.count > 40) {
+                                consolidateBtn.style.background = 'var(--warning-color)';
+                            } else if (AppState.utxo.count > 1) {
+                                consolidateBtn.style.background = 'var(--accent-color)';
+                            }
+                        }
                     }
                 }
             },
@@ -12298,7 +12352,12 @@ Do you want to continue?`;
             document.getElementById('settingsWalletStatus').textContent = 'Disconnected';
             document.getElementById('settingsWalletStatus').style.color = 'var(--text-secondary)';
             
-            // v6.2.14: Hide consolidation section when disconnected
+            // v7.0.22: Clear UTXO state and hide consolidation section when disconnected
+            AppState.utxo.shouldShowConsolidation = false;
+            AppState.utxo.count = 0;
+            AppState.utxo.balance = null;
+            AppState.utxo.consolidationText = '';
+            
             const consolidationSection = document.getElementById('utxoConsolidationSection');
             if (consolidationSection) {
                 consolidationSection.style.display = 'none';

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://*.kaspa.org wss://*.kaspa.green wss://*.kaspa.blue wss://*.kaspa.stream wss://*.kaspa.red https://*.kaspa.org https://*.kaspa.green https://*.kaspa.blue https://*.kaspa.stream https://*.kaspa.red; img-src 'self' data: blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none';">
-    <title>Kaspa P2P File Storage v7.0.22</title>
+    <title>Kaspa P2P File Storage v7.0.23</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -4077,64 +4077,79 @@
                     document.getElementById('settingsWalletStatus').textContent = 'Connected';
                     document.getElementById('settingsWalletStatus').style.color = 'var(--success-color)';
                     
-                    // Get balance
-                    if (NetworkState.rpcClient && NetworkState.rpcClient.isConnected) {
-                        const { entries } = await NetworkState.rpcClient.getUtxosByAddresses([addressString]);
-                        const balance = entries.reduce((sum, utxo) => sum + Number(utxo.amount), 0) / 1e8;
-                        const utxoCount = entries.length;
-                        const balanceText = `${balance.toFixed(8)} KAS`;
-                        
-                        // Update both tabs
-                        document.getElementById('walletBalance').textContent = balanceText;
-                        document.getElementById('settingsWalletBalance').textContent = balanceText;
-                        
-                        // v5.12.79: Display UTXO count
-                        const utxoText = `(UTXOs: ${utxoCount})`;
-                        const utxoWarning = utxoCount > 40 ? ' ⚠️' : '';
-                        document.getElementById('walletUtxoCount').textContent = utxoText + utxoWarning;
-                        document.getElementById('settingsWalletUtxoCount').textContent = utxoText + utxoWarning;
-                        
-                        // v7.0.22: Store UTXO state globally and update DOM regardless of active tab
-                        AppState.utxo.count = utxoCount;
-                        AppState.utxo.balance = balance;
-                        AppState.utxo.shouldShowConsolidation = true; // Always show when wallet connected
-                        
-                        // Determine consolidation button text and style
-                        if (utxoCount > 40) {
-                            AppState.utxo.consolidationText = `⚠️ Consolidate ${utxoCount} UTXOs`;
-                        } else if (utxoCount > 1) {
-                            AppState.utxo.consolidationText = `Consolidate ${utxoCount} UTXOs`;
-                        } else {
-                            AppState.utxo.consolidationText = 'Consolidation not needed';
-                        }
-                        
-                        // Always update DOM elements, regardless of which tab is active
-                        const consolidationSection = document.getElementById('utxoConsolidationSection');
-                        const consolidateBtn = document.getElementById('utxoConsolidateBtn');
-                        if (consolidationSection) {
-                            consolidationSection.style.display = AppState.utxo.shouldShowConsolidation ? 'block' : 'none';
-                        }
-                        if (consolidateBtn) {
-                            consolidateBtn.disabled = (utxoCount <= 1);
-                            consolidateBtn.textContent = AppState.utxo.consolidationText;
+                    // v7.0.23: Get balance with better error handling (no isConnected check)
+                    if (NetworkState.rpcClient) {
+                        try {
+                            const { entries } = await NetworkState.rpcClient.getUtxosByAddresses([addressString]);
+                            const balance = entries.reduce((sum, utxo) => sum + Number(utxo.amount), 0) / 1e8;
+                            const utxoCount = entries.length;
+                            const balanceText = `${balance.toFixed(8)} KAS`;
+                            
+                            // Update both tabs
+                            document.getElementById('walletBalance').textContent = balanceText;
+                            document.getElementById('settingsWalletBalance').textContent = balanceText;
+                            
+                            // v5.12.79: Display UTXO count
+                            const utxoText = `(UTXOs: ${utxoCount})`;
+                            const utxoWarning = utxoCount > 40 ? ' ⚠️' : '';
+                            document.getElementById('walletUtxoCount').textContent = utxoText + utxoWarning;
+                            document.getElementById('settingsWalletUtxoCount').textContent = utxoText + utxoWarning;
+                            
+                            // v7.0.22: Store UTXO state globally and update DOM regardless of active tab
+                            AppState.utxo.count = utxoCount;
+                            AppState.utxo.balance = balance;
+                            AppState.utxo.shouldShowConsolidation = true; // Always show when wallet connected
+                            
+                            // Determine consolidation button text and style
                             if (utxoCount > 40) {
-                                consolidateBtn.style.background = 'var(--warning-color)';
+                                AppState.utxo.consolidationText = `⚠️ Consolidate ${utxoCount} UTXOs`;
                             } else if (utxoCount > 1) {
-                                consolidateBtn.style.background = 'var(--accent-color)';
+                                AppState.utxo.consolidationText = `Consolidate ${utxoCount} UTXOs`;
+                            } else {
+                                AppState.utxo.consolidationText = 'Consolidation not needed';
+                            }
+                            
+                            // Always update DOM elements, regardless of which tab is active
+                            const consolidationSection = document.getElementById('utxoConsolidationSection');
+                            const consolidateBtn = document.getElementById('utxoConsolidateBtn');
+                            if (consolidationSection) {
+                                consolidationSection.style.display = AppState.utxo.shouldShowConsolidation ? 'block' : 'none';
+                            }
+                            if (consolidateBtn) {
+                                consolidateBtn.disabled = (utxoCount <= 1);
+                                consolidateBtn.textContent = AppState.utxo.consolidationText;
+                                if (utxoCount > 40) {
+                                    consolidateBtn.style.background = 'var(--warning-color)';
+                                } else if (utxoCount > 1) {
+                                    consolidateBtn.style.background = 'var(--accent-color)';
+                                }
+                            }
+                            
+                            // v6.2.52: Show refresh balance button
+                            const refreshBtn = document.getElementById('refreshBalanceBtn');
+                            if (refreshBtn) {
+                                refreshBtn.style.display = 'inline-block';
+                            }
+                            
+                            // Update upload button state
+                            updateUploadButtonState();
+                        } catch (error) {
+                            // RPC communication failed - show clickable refresh hint
+                            log(`Balance fetch error: ${error.message}`, 'warning');
+                            document.getElementById('walletBalance').textContent = 'Click refresh →';
+                            document.getElementById('settingsWalletBalance').textContent = 'Click refresh →';
+                            
+                            // Still show the refresh button for retry
+                            const refreshBtn = document.getElementById('refreshBalanceBtn');
+                            if (refreshBtn) {
+                                refreshBtn.style.display = 'inline-block';
+                                refreshBtn.style.borderColor = 'var(--warning-color)';
                             }
                         }
-                        
-                        // v6.2.52: Show refresh balance button
-                        const refreshBtn = document.getElementById('refreshBalanceBtn');
-                        if (refreshBtn) {
-                            refreshBtn.style.display = 'inline-block';
-                        }
-                        
-                        // Update upload button state
-                        updateUploadButtonState();
                     } else {
-                        document.getElementById('walletBalance').textContent = 'RPCDisconnected';
-                        document.getElementById('settingsWalletBalance').textContent = 'RPCDisconnected';
+                        // RPC client not initialized
+                        document.getElementById('walletBalance').textContent = 'RPC not ready';
+                        document.getElementById('settingsWalletBalance').textContent = 'RPC not ready';
                     }
                     
                     // Clear password input

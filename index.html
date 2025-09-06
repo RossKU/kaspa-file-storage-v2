@@ -10335,9 +10335,8 @@ Do you want to continue?`;
             combined.set(new Uint8Array(sample), 0);
             combined.set(new Uint8Array(sizeBuffer), sample.byteLength);
             
-            // Generate SHA-256 hash
-            const hashBuffer = await crypto.subtle.digest('SHA-256', combined);
-            const hashArray = new Uint8Array(hashBuffer);
+            // Generate SHA-256 hash using existing function
+            const hashArray = await sha256(combined, true);  // Get binary output
             
             // Create multihash (0x12 = sha256, 0x20 = 32 bytes)
             const multihash = new Uint8Array(2 + hashArray.length);
@@ -13329,10 +13328,17 @@ Do you want to continue?`;
             return new Uint8Array(atob(str).split('').map(c => c.charCodeAt(0)));
         }
 
-        // SHA256
-        async function sha256(data) {
+        // SHA256 - v7.0.32: Support binary output for CID generation
+        async function sha256(data, returnBinary = false) {
             const hash = await crypto.subtle.digest('SHA-256', data);
-            return Array.from(new Uint8Array(hash))
+            const hashArray = new Uint8Array(hash);
+            
+            if (returnBinary) {
+                return hashArray;  // Return binary array for CID generation
+            }
+            
+            // Return hex string for backward compatibility
+            return Array.from(hashArray)
                 .map(b => b.toString(16).padStart(2, '0'))
                 .join('');
         }

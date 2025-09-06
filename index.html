@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://*.kaspa.org wss://*.kaspa.green wss://*.kaspa.blue wss://*.kaspa.stream wss://*.kaspa.red https://*.kaspa.org https://*.kaspa.green https://*.kaspa.blue https://*.kaspa.stream https://*.kaspa.red; img-src 'self' data: blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none';">
-    <title>Kaspa P2P File Storage v7.0.26</title>
+    <title>Kaspa P2P File Storage v7.0.27</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -8812,7 +8812,8 @@ Do you want to continue?`;
                    message.includes('offline') ||
                    message.includes('timeout') ||
                    message.includes('disconnected') ||
-                   message.includes('websocket');  // Phase 0-F: Added WebSocket check
+                   message.includes('websocket') ||  // Phase 0-F: Added WebSocket check
+                   message.includes('orphan');  // v7.0.27: Handle orphan transactions as network errors
             
             log(`[DEBUG-isNetworkError] Result: ${result}`, 'debug');
             return result;

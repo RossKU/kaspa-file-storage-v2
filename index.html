@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://*.kaspa.org wss://*.kaspa.green wss://*.kaspa.blue wss://*.kaspa.stream wss://*.kaspa.red https://*.kaspa.org https://*.kaspa.green https://*.kaspa.blue https://*.kaspa.stream https://*.kaspa.red; img-src 'self' data: blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none';">
-    <title>Kaspa P2P File Storage v7.0.25</title>
+    <title>Kaspa P2P File Storage v7.0.26</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -18971,25 +18971,27 @@ Do you want to continue?`;
                 NetworkState.ws.connected = true;  // v5.6.4: Mark WebSocket as connected
                 
                 // v5.11.141: Create and subscribe 4 auxiliary RPC clients with staggered start
-                NetworkState.auxRpcClients = [];
-                const numAuxNodes = 4;
-                
-                for (let i = 0; i < numAuxNodes; i++) {
-                    setTimeout(async () => {
-                        try {
-                            log(`[Auxiliary RPC-${i+1}] Starting connection (${i}s delay)...`, 'info');
-                            
-                            const auxClient = new NetworkState.kaspa.RpcClient({
-                                resolver: new NetworkState.kaspa.Resolver(),
-                                networkId: config.network
-                            });
-                            
-                            await auxClient.connect();
-                            await auxClient.subscribeBlockAdded();
-                            NetworkState.auxRpcClients[i] = auxClient;
-                            
-                            // Set up listener with duplicate check
-                            auxClient.addEventListener('block-added', (event) => {
+                // v7.0.26: Only create aux clients if not already attached
+                if (!NetworkState.ws.listenersAttached) {
+                    NetworkState.auxRpcClients = [];
+                    const numAuxNodes = 4;
+                    
+                    for (let i = 0; i < numAuxNodes; i++) {
+                        setTimeout(async () => {
+                            try {
+                                log(`[Auxiliary RPC-${i+1}] Starting connection (${i}s delay)...`, 'info');
+                                
+                                const auxClient = new NetworkState.kaspa.RpcClient({
+                                    resolver: new NetworkState.kaspa.Resolver(),
+                                    networkId: config.network
+                                });
+                                
+                                await auxClient.connect();
+                                await auxClient.subscribeBlockAdded();
+                                NetworkState.auxRpcClients[i] = auxClient;
+                                
+                                // Set up listener with duplicate check
+                                auxClient.addEventListener('block-added', (event) => {
                                 // v5.12.1: Block event filter for auxiliary RPCs
                                 if (NetworkState.blockEventFilter.enabled) {
                                     const nodeId = `aux-${i+1}`;
@@ -19042,6 +19044,10 @@ Do you want to continue?`;
                             log(`[Auxiliary RPC-${i+1}] Connection error: ${error.message}`, 'warning');
                         }
                     }, i * 1000); // Each node starts 1 second after the previous
+                }
+                } else {
+                    // v7.0.26: Aux clients already exist, skip creation
+                    log('[DEBUG] Auxiliary RPC clients already exist - skipping creation', 'debug');
                 }
                 
                 log('Subscribed to Block Added event', 'success');

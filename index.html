@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://*.kaspa.org wss://*.kaspa.green wss://*.kaspa.blue wss://*.kaspa.stream wss://*.kaspa.red https://*.kaspa.org https://*.kaspa.green https://*.kaspa.blue https://*.kaspa.stream https://*.kaspa.red; img-src 'self' data: blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none';">
-    <title>Kaspa P2P File Storage v7.0.29</title>
+    <title>Kaspa P2P File Storage v7.0.30</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -4770,6 +4770,7 @@
             needsMetaTx: false,        // v6.2.73: Whether meta-tx needs to be sent after chunk upload
             metaTxAbortController: null,  // v6.2.74: AbortController for meta-tx BlockID waiting loop
             uploadStartTime: null,     // v7.0.29: Unified upload start timestamp
+            fileCreatedTime: null,     // v7.0.30: File creation/modification timestamp
             // v5.9.0: File selection management
             selectedFiles: new Set(),  // Set of selected file IDs
             
@@ -4946,7 +4947,7 @@
                     id: `${type}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
                     type: type,
                     version: null,
-                    created: new Date().toISOString(),
+                    created: FileState.fileCreatedTime || new Date().toISOString(),  // v7.0.30: Use file creation time if available
                     network: config.network || config.defaultNetwork, // v5.11.101
                     name: name,
                     path: null,
@@ -7208,7 +7209,7 @@ Do you want to continue?`;
                 const metadata = {
                     type: 'kaspa-directory',
                     version: '3.4.2',
-                    created: new Date().toISOString(),
+                    created: FileState.fileCreatedTime || new Date().toISOString(),  // v7.0.30: Use file creation time if available
                     network: config.network,
                     directory: {
                         name: name,
@@ -7269,7 +7270,7 @@ Do you want to continue?`;
                     const metadata = {
                         type: 'kaspa-directory',
                         version: '3.4.2',
-                        created: new Date().toISOString(),
+                        created: FileState.fileCreatedTime || new Date().toISOString(),  // v7.0.30: Use file creation time if available
                         network: config.network,
                         directory: {
                             name: this.name || 'Not set',
@@ -9208,7 +9209,7 @@ Do you want to continue?`;
                     // v3.3 compliant format
                     version: "3.4.3",  // v6.2.78: Updated to Format v3.4.3
                     type: "kaspa-file",
-                    created: new Date().toISOString(),
+                    created: FileState.fileCreatedTime || new Date().toISOString(),  // v7.0.30: Use file creation time if available
                     network: config.network,
                     
                     // File information
@@ -10708,7 +10709,7 @@ Do you want to continue?`;
                 // Basic info
                 version: "3.4.3",  // v6.2.78: Updated to Format v3.4.3
                 type: "kaspa-file",
-                created: new Date().toISOString(),
+                created: FileState.fileCreatedTime || new Date().toISOString(),  // v7.0.30: Use file creation time if available
                 network: config.network,
                 
                 // File information
@@ -12776,7 +12777,7 @@ Do you want to continue?`;
             const metadata = {
                 type: 'kaspa-directory',
                 version: '3.4.2',  // v5.10.20: Updated to v3.4.2 specification
-                created: new Date().toISOString(),
+                created: FileState.fileCreatedTime || new Date().toISOString(),  // v7.0.30: Use file creation time if available
                 network: config.network,
                 
                 // Encryption at top level (consistent with files)
@@ -14972,7 +14973,7 @@ Do you want to continue?`;
                 FileState.kaspaMetadata = {
                     type: 'kaspa-file',
                     version: "3.4.3",  // v6.2.78: Updated to Format v3.4.3 (SuperMeta progress support)
-                    created: new Date().toISOString(),
+                    created: FileState.fileCreatedTime || new Date().toISOString(),  // v7.0.30: Use file creation time if available
                     network: config.network,
                     
                     // Encryption at top level
@@ -15348,7 +15349,9 @@ Do you want to continue?`;
                         log('ProgressManager reset', 'debug');
                         // v7.0.29: Clear unified upload timestamp
                         FileState.uploadStartTime = null;
-                        log('[DEBUG] Upload start time cleared', 'debug');
+                        // v7.0.30: Clear file creation timestamp
+                        FileState.fileCreatedTime = null;
+                        log('[DEBUG] Upload start time and file created time cleared', 'debug');
                     }
                 } else {
                     log('Maintaining ProgressManager due to network error', 'info');
@@ -16028,7 +16031,7 @@ Do you want to continue?`;
                 const metaTxData = {
                     type: "kaspa-meta-tx",
                     version: "3.4.3",  // v6.2.78: Updated to Format v3.4.3
-                    created: new Date().toISOString(),
+                    created: FileState.fileCreatedTime || new Date().toISOString(),  // v7.0.30: Use file creation time if available
                     network: config.network,
                     
                     // Mark as intermediate metadata
@@ -16272,7 +16275,7 @@ Do you want to continue?`;
                 const superMetaTxData = {
                     type: "kaspa-meta-tx",
                     version: "3.4.3",  // v6.2.78: Updated to Format v3.4.3
-                    created: new Date().toISOString(),
+                    created: FileState.fileCreatedTime || new Date().toISOString(),  // v7.0.30: Use file creation time if available
                     network: config.network,
                     
                     // Mark as super metadata
@@ -19705,7 +19708,7 @@ Do you want to continue?`;
                         index: index,
                         address: address,
                         network: networkType,
-                        created: new Date().toISOString(),
+                        created: FileState.fileCreatedTime || new Date().toISOString(),  // v7.0.30: Use file creation time if available
                         status: 'new'
                     };
                     
@@ -20094,6 +20097,8 @@ Do you want to continue?`;
             if (!file) return;
             
             FileState.currentFile = file;
+            // v7.0.30: Capture file creation/modification time
+            FileState.fileCreatedTime = new Date(file.lastModified).toISOString();
             log(`File selected: ${file.name} (${(file.size/1024).toFixed(1)}KB)`);
             
             // Generate thumbnail for image files

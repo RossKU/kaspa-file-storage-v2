@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://*.kaspa.org wss://*.kaspa.green wss://*.kaspa.blue wss://*.kaspa.stream wss://*.kaspa.red https://*.kaspa.org https://*.kaspa.green https://*.kaspa.blue https://*.kaspa.stream https://*.kaspa.red; img-src 'self' data: blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none';">
-    <title>Kaspa P2P File Storage v7.0.27</title>
+    <title>Kaspa P2P File Storage v7.0.28</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -15348,12 +15348,8 @@ Do you want to continue?`;
                     log(`[DEBUG] FileState.currentFile retention status: ${FileState.currentFile ? FileState.currentFile.name : 'null'}`, 'debug');
                 }
                 
-                // v5.7.11: Clear network error flag AFTER ProgressManager check
-                // This ensures ProgressManager is retained during network errors
-                if (FileState.networkErrorOccurred) {
-                    log('[INFO] Clearing network error flag', 'info');
-                    FileState.networkErrorOccurred = false;
-                }
+                // v7.0.28: Removed incorrect flag clearing from finally block
+                // Flag should only be cleared after successful auto-resume (line 9082)
             }
         };
         

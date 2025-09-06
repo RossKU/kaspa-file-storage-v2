@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://*.kaspa.org wss://*.kaspa.green wss://*.kaspa.blue wss://*.kaspa.stream wss://*.kaspa.red https://*.kaspa.org https://*.kaspa.green https://*.kaspa.blue https://*.kaspa.stream https://*.kaspa.red; img-src 'self' data: blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none';">
-    <title>Kaspa P2P File Storage v7.0.30</title>
+    <title>Kaspa P2P File Storage v7.0.31</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -21134,7 +21134,7 @@ Do you want to continue?`;
                 return '-';
             })();
             const metaTxId = entry.metaTxId ? entry.metaTxId.substring(0, 8) + '...' : '-';
-            const uploadDate = entry.created ? formatDate(entry.created) : '-';
+            const uploadDate = entry.uploadDate ? formatDate(entry.uploadDate) : '-';  // v7.0.31: Show upload date instead of file creation date
             
             // v6.3.8: Replace innerHTML with safe DOM manipulation
             // Create table cells safely
@@ -21856,8 +21856,9 @@ Do you want to continue?`;
             
             infoHtml += `
                     <div>
-                        <strong>Upload Date:</strong> ${formatDate(file.created)}<br>
-                        <strong>Add Date:</strong> ${formatDate(file.uploadDate)}<br>
+                        <strong>File Created:</strong> ${formatDate(file.created)}<br>
+                        <strong>Uploaded:</strong> ${formatDate(file.uploadDate)}<br>
+                        <strong>Added to KENV:</strong> ${formatDate(file.downloadDate || file.uploadDate)}<br>
                         ${file.network ? `<strong>Network:</strong> ${file.network}<br>` : ''}
                         ${file.totalChunks ? `<strong>Total Chunks:</strong> ${file.totalChunks}<br>` : ''}
                         ${file.encrypted !== undefined ? `<strong>Encrypted:</strong> ${file.encrypted ? 'Yes' : 'No'}<br>` : ''}

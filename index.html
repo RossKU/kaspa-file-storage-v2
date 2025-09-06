@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://*.kaspa.org wss://*.kaspa.green wss://*.kaspa.blue wss://*.kaspa.stream wss://*.kaspa.red https://*.kaspa.org https://*.kaspa.green https://*.kaspa.blue https://*.kaspa.stream https://*.kaspa.red; img-src 'self' data: blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none';">
-    <title>Kaspa P2P File Storage v7.0.28</title>
+    <title>Kaspa P2P File Storage v7.0.29</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -4769,6 +4769,7 @@
             currentKenvEntryId: null,  // Current KENV entry ID for session (v5.12.13)
             needsMetaTx: false,        // v6.2.73: Whether meta-tx needs to be sent after chunk upload
             metaTxAbortController: null,  // v6.2.74: AbortController for meta-tx BlockID waiting loop
+            uploadStartTime: null,     // v7.0.29: Unified upload start timestamp
             // v5.9.0: File selection management
             selectedFiles: new Set(),  // Set of selected file IDs
             
@@ -4952,7 +4953,7 @@
                     metaTxId: null,
                     metaTxBlockId: null,
                     firstChunkTxId: null,
-                    uploadDate: new Date().toISOString(),
+                    uploadDate: FileState.uploadStartTime || new Date().toISOString(),  // v7.0.29: Use unified timestamp
                     blockTime: null,
                     uploadedBy: null,
                     source: source,
@@ -13773,6 +13774,12 @@ Do you want to continue?`;
                 FileState.uploadSessionActive = true; // v5.5.35: Using FileState
                 log('[INFO] Starting upload session (main)', 'info');
                 
+                // v7.0.29: Set unified upload timestamp (only on initial upload, not on auto-resume)
+                if (!FileState.uploadStartTime) {
+                    FileState.uploadStartTime = new Date().toISOString();
+                    log(`[DEBUG] Upload start time set: ${FileState.uploadStartTime}`, 'debug');
+                }
+                
                 // v5.11.16: Record initial balance
                 await FileState.costTracking.recordInitialBalance();
                 
@@ -15014,7 +15021,7 @@ Do you want to continue?`;
                     metadata: {
                         metaTxId: null, // Will be set if meta-tx is created
                         metaTxBlockId: null,
-                        uploadDate: new Date().toISOString(),
+                        uploadDate: FileState.uploadStartTime || new Date().toISOString(),  // v7.0.29: Use unified timestamp
                         blockTime: null,
                         uploadedBy: UserState.address?.toString() || null,
                         payloadSplit: useNewApproach, // Flag for new approach
@@ -15069,7 +15076,7 @@ Do you want to continue?`;
                     
                     // Set known information
                     kenvEntry.fileSize = currentFile.size;
-                    kenvEntry.uploadDate = new Date().toISOString();
+                    kenvEntry.uploadDate = FileState.uploadStartTime || new Date().toISOString();  // v7.0.29: Use unified timestamp
                     kenvEntry.uploadedBy = UserState.address?.toString() || null;
                     kenvEntry.sha256 = fileHash;
                     kenvEntry.encrypted = true;
@@ -15339,6 +15346,9 @@ Do you want to continue?`;
                     if (!shouldKeepProgressManager) {
                         FileState.progressManager = null;
                         log('ProgressManager reset', 'debug');
+                        // v7.0.29: Clear unified upload timestamp
+                        FileState.uploadStartTime = null;
+                        log('[DEBUG] Upload start time cleared', 'debug');
                     }
                 } else {
                     log('Maintaining ProgressManager due to network error', 'info');

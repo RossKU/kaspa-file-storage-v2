@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://*.kaspa.org wss://*.kaspa.green wss://*.kaspa.blue wss://*.kaspa.stream wss://*.kaspa.red https://*.kaspa.org https://*.kaspa.green https://*.kaspa.blue https://*.kaspa.stream https://*.kaspa.red; img-src 'self' data: blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none';">
-    <title>Kaspa P2P File Storage v7.0.24</title>
+    <title>Kaspa P2P File Storage v7.0.25</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -3715,7 +3715,8 @@
                 connected: false,       // WebSocket connection state
                 reconnectInterval: null,// Reconnection interval
                 monitorActive: false,   // WebSocket monitoring state
-                monitoredTransactions: new Map()  // v5.4.52: Moved from global scope
+                monitoredTransactions: new Map(),  // v5.4.52: Moved from global scope
+                listenersAttached: false  // v7.0.25: Prevent duplicate event listeners
             },
             // Network auto-recovery system (v5.6.0)
             reconnection: {
@@ -12591,6 +12592,9 @@ Do you want to continue?`;
                 if (NetworkState.rpcClient) {
                     try {
                         await NetworkState.rpcClient.disconnect();
+                        // v7.0.25: Reset listeners flag when RPC client is recreated
+                        NetworkState.ws.listenersAttached = false;
+                        log('[DEBUG] RPC client disconnected - listeners flag reset', 'debug');
                     } catch (err) {
                         // Ignore disconnect errors
                     }
@@ -19051,33 +19055,37 @@ Do you want to continue?`;
                 WSBlockStats.updateTimer = setInterval(updateWSBlockStats, 5000);
                 updateWSBlockStats(); // Initial update
                 
-                // Phase 0-O-3: WebSocket disconnect detection
-                NetworkState.rpcClient.addEventListener('disconnect', (event) => {
-                    // v5.7.4: Removed v5.7.1 workaround - no longer needed since v5.7.3 
-                    // removes all event listeners in stopMonitoring
+                // v7.0.25: Check if listeners are already attached to prevent duplicates
+                if (!NetworkState.ws.listenersAttached) {
+                    log('[DEBUG] Adding RPC event listeners (first time)', 'debug');
                     
-                    log('[WebSocket] Disconnect event detected', 'warning');
-                    NetworkState.ws.connected = false;
-                    
-                    // Notify ConnectionManager
-                    if (ConnectionManager.isConnected) {
-                        ConnectionManager.isConnected = false;
-                        ConnectionManager.lastError = new Error('WebSocket disconnected via event');
-                        updateNetworkStatus('offline', 'WebSocketDisconnect');
-                        updateRpcNodeInfo(); // Reset display
+                    // Phase 0-O-3: WebSocket disconnect detection
+                    NetworkState.rpcClient.addEventListener('disconnect', (event) => {
+                        // v5.7.4: Removed v5.7.1 workaround - no longer needed since v5.7.3 
+                        // removes all event listeners in stopMonitoring
                         
-                        // v6.2.63: Keep RPC client alive for REST API fallback
-                        // Keep RPC client even when WebSocket disconnects to enable REST API fallback
-                        if (NetworkState.rpcClient) {
-                            // NetworkState.rpcClient = null;  // v6.2.63: Commented out to enable REST API fallback
-                            log('[WebSocket] Disconnect detected - Keeping RPC client (for REST API fallback)', 'debug');
+                        log('[WebSocket] Disconnect event detected', 'warning');
+                        NetworkState.ws.connected = false;
+                        
+                        // Notify ConnectionManager
+                        if (ConnectionManager.isConnected) {
+                            ConnectionManager.isConnected = false;
+                            ConnectionManager.lastError = new Error('WebSocket disconnected via event');
+                            updateNetworkStatus('offline', 'WebSocketDisconnect');
+                            updateRpcNodeInfo(); // Reset display
+                            
+                            // v6.2.63: Keep RPC client alive for REST API fallback
+                            // Keep RPC client even when WebSocket disconnects to enable REST API fallback
+                            if (NetworkState.rpcClient) {
+                                // NetworkState.rpcClient = null;  // v6.2.63: Commented out to enable REST API fallback
+                                log('[WebSocket] Disconnect detected - Keeping RPC client (for REST API fallback)', 'debug');
+                            }
+                            
+                            ConnectionManager.scheduleReconnect();
                         }
-                        
-                        ConnectionManager.scheduleReconnect();
-                    }
-                });
-                
-                NetworkState.rpcClient.addEventListener('block-added', (event) => {
+                    });
+                    
+                    NetworkState.rpcClient.addEventListener('block-added', (event) => {
                     // v5.12.1: Block event filter for main RPC
                     if (NetworkState.blockEventFilter.enabled) {
                         const shouldFilter = NetworkState.blockEventFilter.targetNodes.length === 0 || 
@@ -19172,6 +19180,14 @@ Do you want to continue?`;
                     }
                 });
                 
+                    // v7.0.25: Mark listeners as attached
+                    NetworkState.ws.listenersAttached = true;
+                    log('[DEBUG] RPC event listeners successfully attached', 'debug');
+                } else {
+                    // v7.0.25: Listeners already attached, skip to prevent duplicates
+                    log('[DEBUG] RPC event listeners already attached - skipping duplicate registration', 'debug');
+                }
+                
                 // log(`Currently monitoring transactions: ${NetworkState.ws.monitoredTransactions.size}`, 'info');
                 
             } catch (error) {
@@ -19249,6 +19265,10 @@ Do you want to continue?`;
                     log(`[DEBUG] WebSocket stop completed - navigator.onLine: ${navigator.onLine}`, 'debug');
                 }
                 NetworkState.ws.monitorActive = false;
+                
+                // v7.0.25: Reset listeners flag when monitoring stops
+                NetworkState.ws.listenersAttached = false;
+                log('[DEBUG] RPC event listeners flag reset (ready for next startMonitoring)', 'debug');
                 
                 // v5.7.2: Reset counters after clearing timer
                 FileState.uploadingChunksCount = 0;

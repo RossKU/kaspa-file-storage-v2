@@ -4764,8 +4764,10 @@
             uploadingMetaTx: false,  // Whether meta-tx is being uploaded (v5.5.37)
             uploadingDirMeta: false,  // Whether directory meta is being uploaded (v5.5.38-safe)
             pendingProgress: null,    // Progress data for resume functionality (v5.5.39)
-            currentFileCID: null,     // Current file's short CID (v5.5.39)
-            currentFileCIDFull: null,  // Current file's full CID (v5.5.39)
+            currentFileCID: null,     // Current file's short CID (v5.5.39) - To be deprecated
+            currentFileCIDFull: null,  // Current file's full CID (v5.5.39) - To be deprecated
+            CID: null,                // v7.0.32: Full CIDv1 in Base32 (59 chars) - Primary
+            ShortCID: null,           // v7.0.32: Short CID (8 chars) for display
             currentKenvEntryId: null,  // Current KENV entry ID for session (v5.12.13)
             needsMetaTx: false,        // v6.2.73: Whether meta-tx needs to be sent after chunk upload
             metaTxAbortController: null,  // v6.2.74: AbortController for meta-tx BlockID waiting loop
@@ -8002,6 +8004,34 @@ Do you want to continue?`;
             ;
         }
         
+        // v7.0.32: CID backward compatibility proxy
+        try {
+            Object.defineProperty(window, 'CID', {
+                get() { return FileState.CID; },
+                set(value) { 
+                    FileState.CID = value;
+                },
+                configurable: true,
+                enumerable: true
+            });
+        } catch (e) {
+            ;
+        }
+        
+        // v7.0.32: ShortCID backward compatibility proxy  
+        try {
+            Object.defineProperty(window, 'ShortCID', {
+                get() { return FileState.ShortCID; },
+                set(value) { 
+                    FileState.ShortCID = value;
+                },
+                configurable: true,
+                enumerable: true
+            });
+        } catch (e) {
+            ;
+        }
+        
         // v5.5.39: multiWalletTestMode backward compatibility proxy
         try {
             Object.defineProperty(window, 'multiWalletTestMode', {
@@ -10354,10 +10384,10 @@ Do you want to continue?`;
             const base32 = toBase32(cidBytes);
             const fullCID = 'b' + base32; // 'b' = base32 multibase prefix
             
-            // Return full CID and display version
+            // Return CID and short version  
             return {
-                full: fullCID,                  // Full CIDv1 in Base32 (59 chars)
-                display: fullCID.slice(0, 12)   // First 12 characters for display
+                cid: fullCID,                    // Full CIDv1 in Base32 (59 chars) - Primary
+                shortCid: fullCID.slice(0, 8)    // First 8 characters for display
             };
         }
         
@@ -13835,18 +13865,28 @@ Do you want to continue?`;
                 
                 if (useRandomCid) {
                     fileCID = generateRandomCID();
-                    window.currentFileCIDFull = null; // No full CID for random mode
+                    // Set new variables
+                    window.CID = null;  // No full CID for random mode
+                    window.ShortCID = fileCID;
+                    // Keep old variables for compatibility
+                    window.currentFileCIDFull = null;
+                    window.currentFileCID = fileCID;
                     log(`Random CID generated: ${fileCID}`, 'info');
                 } else {
-                    // Generate content-based CID using v3.3 specification
+                    // Generate content-based CID using IPFS CIDv1 specification
                     const cidInfo = await generateFileCID(currentFile);
-                    fileCID = cidInfo.display;
-                    window.currentFileCIDFull = cidInfo.full; // Store full CID for metadata
-                    log(`IPFS CIDv1 generated: ${fileCID} (Full: ${cidInfo.full})`, 'info');
+                    fileCID = cidInfo.shortCid;  // Use 8-char short version
+                    
+                    // Set new variables (v7.0.32)
+                    window.CID = cidInfo.cid;  // Full CIDv1 (59 chars)
+                    window.ShortCID = cidInfo.shortCid;  // Short version (8 chars)
+                    
+                    // Keep old variables for compatibility
+                    window.currentFileCIDFull = cidInfo.cid;
+                    window.currentFileCID = fileCID;
+                    
+                    log(`IPFS CIDv1 generated: ${fileCID} (Full: ${cidInfo.cid})`, 'info');
                 }
-                
-                // Store CID for later use
-                window.currentFileCID = fileCID;
                 
                 // v5.5.28: Move ProgressManager initialization BEFORE processFileWithPayloadSplit
                 // This fixes the null reference error when accessing FileState.progressManager in processFileWithPayloadSplit

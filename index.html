@@ -3613,7 +3613,7 @@
                     // Extract CID from filename if available
                     const match = file.name.match(/\.([a-z0-9]{8})\.kprogress$/);
                     if (match && match[1]) {
-                        window.currentFileCID = match[1];
+                        window.ShortCID = match[1];  // v7.0.32: Use new variable
                         log(`Got CID from progress file: ${match[1]}`, 'info');
                     }
                     
@@ -4764,8 +4764,6 @@
             uploadingMetaTx: false,  // Whether meta-tx is being uploaded (v5.5.37)
             uploadingDirMeta: false,  // Whether directory meta is being uploaded (v5.5.38-safe)
             pendingProgress: null,    // Progress data for resume functionality (v5.5.39)
-            currentFileCID: null,     // Current file's short CID (v5.5.39) - To be deprecated
-            currentFileCIDFull: null,  // Current file's full CID (v5.5.39) - To be deprecated
             CID: null,                // v7.0.32: Full CIDv1 in Base32 (59 chars) - Primary
             ShortCID: null,           // v7.0.32: Short CID (8 chars) for display
             currentKenvEntryId: null,  // Current KENV entry ID for session (v5.12.13)
@@ -7968,34 +7966,6 @@ Do you want to continue?`;
                 get() { return FileState.pendingProgress; },
                 set(value) { 
                     FileState.pendingProgress = value;
-                },
-                configurable: true,
-                enumerable: true
-            });
-        } catch (e) {
-            ;
-        }
-        
-        // v5.5.39: currentFileCID backward compatibility proxy
-        try {
-            Object.defineProperty(window, 'currentFileCID', {
-                get() { return FileState.currentFileCID; },
-                set(value) { 
-                    FileState.currentFileCID = value;
-                },
-                configurable: true,
-                enumerable: true
-            });
-        } catch (e) {
-            ;
-        }
-        
-        // v5.5.39: currentFileCIDFull backward compatibility proxy
-        try {
-            Object.defineProperty(window, 'currentFileCIDFull', {
-                get() { return FileState.currentFileCIDFull; },
-                set(value) { 
-                    FileState.currentFileCIDFull = value;
                 },
                 configurable: true,
                 enumerable: true
@@ -13865,12 +13835,9 @@ Do you want to continue?`;
                 
                 if (useRandomCid) {
                     fileCID = generateRandomCID();
-                    // Set new variables
+                    // Set new variables (v7.0.32)
                     window.CID = null;  // No full CID for random mode
                     window.ShortCID = fileCID;
-                    // Keep old variables for compatibility
-                    window.currentFileCIDFull = null;
-                    window.currentFileCID = fileCID;
                     log(`Random CID generated: ${fileCID}`, 'info');
                 } else {
                     // Generate content-based CID using IPFS CIDv1 specification
@@ -13880,10 +13847,6 @@ Do you want to continue?`;
                     // Set new variables (v7.0.32)
                     window.CID = cidInfo.cid;  // Full CIDv1 (59 chars)
                     window.ShortCID = cidInfo.shortCid;  // Short version (8 chars)
-                    
-                    // Keep old variables for compatibility
-                    window.currentFileCIDFull = cidInfo.cid;
-                    window.currentFileCID = fileCID;
                     
                     log(`IPFS CIDv1 generated: ${fileCID} (Full: ${cidInfo.cid})`, 'info');
                 }
@@ -15171,7 +15134,7 @@ Do you want to continue?`;
                         kenvEntry.hasPassword = !!FileState.currentPassword;  // Flag that password exists
                     }
                     
-                    kenvEntry.cid = window.CID || window.currentFileCIDFull || '';  // v7.0.32: Store full CID
+                    kenvEntry.cid = window.CID || '';  // v7.0.32: Store full CID
                     kenvEntry.uploadCost = totalCost;
                     
                     // Get additional information from metadata
@@ -15613,7 +15576,7 @@ Do you want to continue?`;
                                 log(`[KENV] Save error: ${error.message}`, 'error');
                             });
                         } else {
-                            log(`[KENV] Entry for CID ${FileState.ShortCID || FileState.currentFileCID} not found`, 'warning');
+                            log(`[KENV] Entry for CID ${FileState.ShortCID} not found`, 'warning');
                         }
                     }
                     
@@ -15999,7 +15962,7 @@ Do you want to continue?`;
                             log(`[KENV] Save error: ${error.message}`, 'error');
                         });
                     } else {
-                        log(`[KENV] Entry for CID ${window.ShortCID || window.currentFileCID} not found`, 'warning');
+                        log(`[KENV] Entry for CID ${window.ShortCID} not found`, 'warning');
                     }
                 }
                 
@@ -20221,7 +20184,7 @@ Do you want to continue?`;
                     const firstChunkHash = await sha256(firstChunkData);
                     const calculatedCID = firstChunkHash.substring(0, 8);
                     
-                    if (progress.cid === calculatedCID || progress.cid === window.ShortCID || progress.cid === window.currentFileCID) {
+                    if (progress.cid === calculatedCID || progress.cid === window.ShortCID) {
                         if (progress._progress.completedChunks === progress.recovery.totalChunks) {
                             log(`✅ This file has already been uploaded`, 'success');
                             log(`📋 CID: ${progress.cid}`, 'info');
@@ -20271,7 +20234,7 @@ Do you want to continue?`;
             // Handle resume or new upload
             if (window.pendingProgress) {
                 const chunkSize = parseInt(document.getElementById('chunkSize').value) * 1024;
-                const cid = window.ShortCID || window.currentFileCID || window.pendingProgress.cid || null;
+                const cid = window.ShortCID || window.pendingProgress.cid || null;
                 // v5.5.24: window.progressManager -> FileState.progressManager (5/11)
                 FileState.progressManager = new ProgressManager(file, chunkSize, cid, 'upload');
                 

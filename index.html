@@ -15171,7 +15171,7 @@ Do you want to continue?`;
                         kenvEntry.hasPassword = !!FileState.currentPassword;  // Flag that password exists
                     }
                     
-                    kenvEntry.cid = window.currentFileCIDFull || window.currentFileCID || '';
+                    kenvEntry.cid = window.CID || window.currentFileCIDFull || '';  // v7.0.32: Store full CID
                     kenvEntry.uploadCost = totalCost;
                     
                     // Get additional information from metadata
@@ -15613,7 +15613,7 @@ Do you want to continue?`;
                                 log(`[KENV] Save error: ${error.message}`, 'error');
                             });
                         } else {
-                            log(`[KENV] Entry for CID ${FileState.currentFileCID} not found`, 'warning');
+                            log(`[KENV] Entry for CID ${FileState.ShortCID || FileState.currentFileCID} not found`, 'warning');
                         }
                     }
                     
@@ -15999,7 +15999,7 @@ Do you want to continue?`;
                             log(`[KENV] Save error: ${error.message}`, 'error');
                         });
                     } else {
-                        log(`[KENV] Entry for CID ${window.currentFileCID} not found`, 'warning');
+                        log(`[KENV] Entry for CID ${window.ShortCID || window.currentFileCID} not found`, 'warning');
                     }
                 }
                 
@@ -20221,7 +20221,7 @@ Do you want to continue?`;
                     const firstChunkHash = await sha256(firstChunkData);
                     const calculatedCID = firstChunkHash.substring(0, 8);
                     
-                    if (progress.cid === calculatedCID || progress.cid === window.currentFileCID) {
+                    if (progress.cid === calculatedCID || progress.cid === window.ShortCID || progress.cid === window.currentFileCID) {
                         if (progress._progress.completedChunks === progress.recovery.totalChunks) {
                             log(`✅ This file has already been uploaded`, 'success');
                             log(`📋 CID: ${progress.cid}`, 'info');
@@ -20271,7 +20271,7 @@ Do you want to continue?`;
             // Handle resume or new upload
             if (window.pendingProgress) {
                 const chunkSize = parseInt(document.getElementById('chunkSize').value) * 1024;
-                const cid = window.currentFileCID || window.pendingProgress.cid || null;
+                const cid = window.ShortCID || window.currentFileCID || window.pendingProgress.cid || null;
                 // v5.5.24: window.progressManager -> FileState.progressManager (5/11)
                 FileState.progressManager = new ProgressManager(file, chunkSize, cid, 'upload');
                 

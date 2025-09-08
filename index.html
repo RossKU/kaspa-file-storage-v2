@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://*.kaspa.org wss://*.kaspa.green wss://*.kaspa.blue wss://*.kaspa.stream wss://*.kaspa.red https://*.kaspa.org https://*.kaspa.green https://*.kaspa.blue https://*.kaspa.stream https://*.kaspa.red; img-src 'self' data: blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none';">
-    <title>Kaspa P2P File Storage v7.0.33</title>
+    <title>Kaspa P2P File Storage v7.0.34</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -3640,18 +3640,32 @@
                         const content = await progressFile.text();
                         const progress = JSON.parse(content);
                         
-                        // Verify CID matches (calculate from first chunk)
-                        const chunkSize = parseInt(document.getElementById('chunkSize').value) * 1024;
-                        const actualChunkSize = calculateSafePayloadSize(chunkSize);
-                        const firstChunkEnd = Math.min(actualChunkSize, file.size);
-                        const firstChunkBlob = file.slice(0, firstChunkEnd);
-                        const firstChunkArrayBuffer = await firstChunkBlob.arrayBuffer();
-                        const firstChunkData = new Uint8Array(firstChunkArrayBuffer);
-                        const firstChunkHash = await sha256(firstChunkData);
-                        const calculatedCID = firstChunkHash.substring(0, 8);
+                        // v7.0.34: Verify CID matches (use new hybrid approach)
+                        let cidMatches = false;
                         
-                        if (calculatedCID === progressInfo.cid) {
-                            log(`CID verification successful: ${calculatedCID}`, 'success');
+                        // First try using existing window.ShortCID if available (fast)
+                        if (window.ShortCID) {
+                            cidMatches = (window.ShortCID === progressInfo.cid);
+                            log(`CID verification using cached ShortCID: ${window.ShortCID}`, 'debug');
+                        } else {
+                            // Otherwise, generate CID using v7.0.33 method (accurate but slower)
+                            log(`Generating CID for verification...`, 'info');
+                            try {
+                                const cidInfo = await generateFileCID(file);
+                                cidMatches = (cidInfo.shortCid === progressInfo.cid);
+                                // Cache for future use - v7.0.34: Also set FileState
+                                window.CID = cidInfo.cid;
+                                window.ShortCID = cidInfo.shortCid;
+                                FileState.CID = cidInfo.cid;
+                                FileState.ShortCID = cidInfo.shortCid;
+                            } catch (error) {
+                                log(`CID generation error during verification: ${error.message}`, 'error');
+                                cidMatches = false;  // Can't verify, assume mismatch
+                            }
+                        }
+                        
+                        if (cidMatches) {
+                            log(`CID verification successful: ${progressInfo.cid}`, 'success');
                             
                             // Check if already completed
                             if (progress.metadata.completedChunks >= progress.metadata.totalChunks) {
@@ -3663,7 +3677,7 @@
                             window.pendingProgress = progress;
                             return { autoResume: true, progress };
                         } else {
-                            log(`CID mismatch: ${calculatedCID} != ${progressInfo.cid}`, 'warning');
+                            log(`CID mismatch: ${window.ShortCID || 'generated'} != ${progressInfo.cid}`, 'warning');
                         }
                     } catch (err) {
                         log(`Progress file read error: ${err.message}`, 'error');
@@ -7368,8 +7382,17 @@ Do you want to continue?`;
                                 JSON.parse(document.getElementById('dirbuilder-preview').textContent);
                 
                 // v5.11.18-fix8: Generate CID for filename
-                const cid = metadata.cid || generateRandomCID();
-                const filename = `${this.name}.${cid}.kaspa`;
+                // v7.0.34: Handle both string and object CID
+                let shortCid;
+                if (metadata.cid) {
+                    // Use first 8 chars if metadata.cid exists
+                    shortCid = metadata.cid.slice(0, 8);
+                } else {
+                    // Generate random CID if not present
+                    const randomCidInfo = generateRandomCID();
+                    shortCid = randomCidInfo.shortCid;
+                }
+                const filename = `${this.name}.${shortCid}.kaspa`;
                 
                 const blob = new Blob([JSON.stringify(metadata, null, 2)], { type: 'application/octet-stream' });
                 const url = URL.createObjectURL(blob);
@@ -10363,14 +10386,58 @@ Do you want to continue?`;
             };
         }
         
-        // Legacy random CID function (kept for compatibility)
+        // v7.0.34: Generate CID for directory metadata from entries only
+        async function generateDirectoryCID(entries) {
+            // Convert entries array to JSON and calculate hash
+            // This avoids circular reference with the CID field itself
+            const entriesJson = JSON.stringify(entries);
+            const entriesBytes = new TextEncoder().encode(entriesJson);
+            const hashArray = await sha256(entriesBytes, true);  // Get binary output
+            
+            // Create multihash (0x12 = sha256, 0x20 = 32 bytes)
+            const multihash = new Uint8Array(2 + hashArray.length);
+            multihash[0] = 0x12; // sha256
+            multihash[1] = 0x20; // 32 bytes
+            multihash.set(hashArray, 2);
+            
+            // Create CIDv1 (0x01 = version 1, 0x55 = raw codec)
+            const cidBytes = new Uint8Array(2 + multihash.length);
+            cidBytes[0] = 0x01; // CIDv1
+            cidBytes[1] = 0x55; // raw codec (0x55)
+            cidBytes.set(multihash, 2);
+            
+            // Encode to Base32 with 'b' prefix (multibase indicator)
+            const base32 = toBase32(cidBytes);
+            const fullCID = 'b' + base32; // 'b' = base32 multibase prefix
+            
+            log(`[Directory CID] Generated from entries: ${fullCID.slice(0, 8)}...`, 'debug');
+            
+            // Return CID and short version
+            return {
+                cid: fullCID,                    // Full CIDv1 in Base32 (59 chars)
+                shortCid: fullCID.slice(0, 8)    // First 8 characters for display
+            };
+        }
+        
+        // v7.0.34: Generate random CID in proper Base32 IPFS CIDv1 format
         function generateRandomCID() {
-            const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-            let result = '';
-            for (let i = 0; i < 8; i++) {
-                result += chars.charAt(Math.floor(Math.random() * chars.length));
+            // Base32 alphabet (RFC 4648) - excludes 0, 1, 8, 9
+            const base32chars = 'abcdefghijklmnopqrstuvwxyz234567';
+            
+            // Generate random 58 characters for Base32 body
+            // (Total CID = 'b' prefix + 58 chars = 59 chars)
+            let randomBase32 = '';
+            for (let i = 0; i < 58; i++) {
+                randomBase32 += base32chars.charAt(Math.floor(Math.random() * base32chars.length));
             }
-            return result;
+            
+            // Create full CID with 'b' prefix (Base32 multibase indicator)
+            const fullCID = 'b' + randomBase32;
+            
+            return {
+                cid: fullCID,                    // Full random CID (59 chars)
+                shortCid: fullCID.slice(0, 8)    // Short version for display
+            };
         }
 
         // Generate safe filename with CID
@@ -12792,22 +12859,10 @@ Do you want to continue?`;
         
         // Create directory metadata in .kaspa format
         async function createDirectoryMetadata(dirName, uploadedFiles, password) {
-            // Calculate merkle root of entries
-            const entriesData = JSON.stringify(uploadedFiles.map(f => ({
-                name: f.name,
-                metaTxId: f.metaTxId,
-                blockId: f.blockId,
-                size: f.size
-            })));
-            const merkleRoot = await sha256(new TextEncoder().encode(entriesData));
-            
-            // Generate salt from directory name + merkleRoot (deterministic and beautiful)
-            const saltData = new TextEncoder().encode(dirName + merkleRoot);
+            // v7.0.34: Simplified - Generate salt from directory name + timestamp
+            const saltData = new TextEncoder().encode(dirName + Date.now().toString());
             const saltHash = await sha256(saltData);
             const salt = new Uint8Array(saltHash.match(/.{2}/g).map(byte => parseInt(byte, 16))).slice(0, 16);
-            
-            // v5.11.127: CID generation removed - directory upload moved to DirectoryBuilder
-            const directoryCID = { full: '', display: '' }; // Placeholder
             
             const metadata = {
                 type: 'kaspa-directory',
@@ -12833,8 +12888,8 @@ Do you want to continue?`;
                     // v5.11.18-fix: merkleRoot moved to extensions.custom
                 },
                 
-                // v5.10.4: Add CID field (v3.3.0 specification)
-                cid: directoryCID.full,
+                // v7.0.34: CID will be calculated after metadata creation
+                cid: null,  // Placeholder - will be set after metadata creation
                 
                 entries: uploadedFiles,
                 
@@ -12864,11 +12919,15 @@ Do you want to continue?`;
                 // v5.10.5: Add extensions field for future compatibility
                 extensions: {
                     v4_5_6_compat: true,
-                    custom: {
-                        merkleRoot: merkleRoot  // Moved from directory for spec compliance
-                    }
+                    custom: {}  // v7.0.34: Removed merkleRoot - using entries array for CID
                 }
             };
+            
+            // v7.0.34: Calculate CID from entries to avoid circular reference
+            const cidInfo = await generateDirectoryCID(uploadedFiles);
+            metadata.cid = cidInfo.cid;  // Set full CID
+            
+            log(`[Directory] CID generated: ${cidInfo.shortCid} (Full: ${cidInfo.cid})`, 'info');
             
             return metadata;
         }
@@ -13836,21 +13895,40 @@ Do you want to continue?`;
                 log(`Chunk size setting: ${chunkSize / 1024} KB`);
                 
                 if (useRandomCid) {
-                    fileCID = generateRandomCID();
-                    // Set new variables (v7.0.32)
-                    window.CID = null;  // No full CID for random mode
-                    window.ShortCID = fileCID;
-                    log(`Random CID generated: ${fileCID}`, 'info');
+                    // v7.0.34: Generate proper Base32 random CID
+                    const randomCidInfo = generateRandomCID();
+                    fileCID = randomCidInfo.shortCid;  // Use short version for compatibility
+                    
+                    // Set new variables with full CID support
+                    window.CID = randomCidInfo.cid;  // Full random CID (59 chars)
+                    window.ShortCID = randomCidInfo.shortCid;
+                    FileState.CID = randomCidInfo.cid;
+                    FileState.ShortCID = randomCidInfo.shortCid;
+                    log(`Random CID generated: ${randomCidInfo.shortCid} (Full: ${randomCidInfo.cid})`, 'info');
                 } else {
                     // Generate content-based CID using IPFS CIDv1 specification
-                    const cidInfo = await generateFileCID(currentFile);
-                    fileCID = cidInfo.shortCid;  // Use 8-char short version
-                    
-                    // Set new variables (v7.0.32)
-                    window.CID = cidInfo.cid;  // Full CIDv1 (59 chars)
-                    window.ShortCID = cidInfo.shortCid;  // Short version (8 chars)
-                    
-                    log(`IPFS CIDv1 generated: ${fileCID} (Full: ${cidInfo.cid})`, 'info');
+                    try {
+                        const cidInfo = await generateFileCID(currentFile);
+                        fileCID = cidInfo.shortCid;  // Use 8-char short version
+                        
+                        // Set new variables (v7.0.32) - v7.0.34: Also set FileState
+                        window.CID = cidInfo.cid;  // Full CIDv1 (59 chars)
+                        window.ShortCID = cidInfo.shortCid;  // Short version (8 chars)
+                        FileState.CID = cidInfo.cid;
+                        FileState.ShortCID = cidInfo.shortCid;
+                        
+                        log(`IPFS CIDv1 generated: ${fileCID} (Full: ${cidInfo.cid})`, 'info');
+                    } catch (error) {
+                        log(`CID generation failed: ${error.message}. Falling back to random CID`, 'warning');
+                        // Fallback to random CID
+                        const fallbackCidInfo = generateRandomCID();
+                        fileCID = fallbackCidInfo.shortCid;
+                        window.CID = fallbackCidInfo.cid;
+                        window.ShortCID = fallbackCidInfo.shortCid;
+                        FileState.CID = fallbackCidInfo.cid;
+                        FileState.ShortCID = fallbackCidInfo.shortCid;
+                        log(`Fallback random CID generated: ${fallbackCidInfo.shortCid}`, 'info');
+                    }
                 }
                 
                 // v5.5.28: Move ProgressManager initialization BEFORE processFileWithPayloadSplit
@@ -15047,7 +15125,7 @@ Do you want to continue?`;
                     },
                     
                     // v3.3: Full CID for content-based identification
-                    cid: window.currentFileCIDFull || null,
+                    cid: window.CID || null,  // v7.0.34: Fixed - use window.CID instead of undefined currentFileCIDFull
                     
                     // Chunk information
                     // v5.5.22: window.processedChunks -> FileState.processedChunks (8-10/18)
@@ -15136,7 +15214,8 @@ Do you want to continue?`;
                         kenvEntry.hasPassword = !!FileState.currentPassword;  // Flag that password exists
                     }
                     
-                    kenvEntry.cid = window.CID || '';  // v7.0.32: Store full CID
+                    // v7.0.34: Store full CID if available, otherwise ShortCID for random mode
+                    kenvEntry.cid = window.CID || window.ShortCID || '';
                     kenvEntry.uploadCost = totalCost;
                     
                     // Get additional information from metadata
@@ -15337,6 +15416,11 @@ Do you want to continue?`;
                     // Reset file state
                     FileState.currentFile = null;
                     FileState.selectedFiles.clear();
+                    // v7.0.34: Reset CID fields
+                    FileState.CID = null;
+                    FileState.ShortCID = null;
+                    window.CID = null;
+                    window.ShortCID = null;
                     
                     // v5.12.19: Clear UI after successful upload
                     if (typeof clearFileSelection === 'function') {
@@ -20111,6 +20195,11 @@ Do you want to continue?`;
             fileInput.value = '';
             FileState.currentFile = null;
             FileState.selectedFiles.clear();
+            // v7.0.34: Clear CID fields
+            FileState.CID = null;
+            FileState.ShortCID = null;
+            window.CID = null;
+            window.ShortCID = null;
             
             // Reset thumbnail image
             const thumbnailImage = document.getElementById('thumbnailImage');
@@ -20176,17 +20265,31 @@ Do you want to continue?`;
                     const content = await progressFile.text();
                     const progress = JSON.parse(content);
                     
-                    // Verify CID matches (calculate from first chunk)
-                    const chunkSize = parseInt(document.getElementById('chunkSize').value) * 1024;
-                    const actualChunkSize = calculateSafePayloadSize(chunkSize);
-                    const firstChunkEnd = Math.min(actualChunkSize, file.size);
-                    const firstChunkBlob = file.slice(0, firstChunkEnd);
-                    const firstChunkArrayBuffer = await firstChunkBlob.arrayBuffer();
-                    const firstChunkData = new Uint8Array(firstChunkArrayBuffer);
-                    const firstChunkHash = await sha256(firstChunkData);
-                    const calculatedCID = firstChunkHash.substring(0, 8);
+                    // v7.0.34: Verify CID matches (use new hybrid approach)
+                    let cidMatches = false;
                     
-                    if (progress.cid === calculatedCID || progress.cid === window.ShortCID) {
+                    // First try using existing window.ShortCID if available (fast)
+                    if (window.ShortCID) {
+                        cidMatches = (progress.cid === window.ShortCID);
+                        log(`CID verification using cached ShortCID: ${window.ShortCID}`, 'debug');
+                    } else {
+                        // Otherwise, generate CID using v7.0.33 method (accurate but slower)
+                        log(`Generating CID for verification...`, 'info');
+                        try {
+                            const cidInfo = await generateFileCID(file);
+                            cidMatches = (progress.cid === cidInfo.shortCid);
+                            // Cache for future use - v7.0.34: Also set FileState
+                            window.CID = cidInfo.cid;
+                            window.ShortCID = cidInfo.shortCid;
+                            FileState.CID = cidInfo.cid;
+                            FileState.ShortCID = cidInfo.shortCid;
+                        } catch (error) {
+                            log(`CID generation error during resume: ${error.message}`, 'error');
+                            cidMatches = false;  // Can't verify, assume mismatch
+                        }
+                    }
+                    
+                    if (cidMatches) {
                         if (progress._progress.completedChunks === progress.recovery.totalChunks) {
                             log(`✅ This file has already been uploaded`, 'success');
                             log(`📋 CID: ${progress.cid}`, 'info');

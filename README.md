@@ -1,4 +1,4 @@
-# Kaspa P2P File Storage v5.11.118
+# Kaspa P2P File Storage
 
 A decentralized file storage system built on the Kaspa blockchain.
 

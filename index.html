@@ -5154,6 +5154,64 @@
             
             // ===== File save/load functions (v5.11.39: Phase 1-A) =====
             
+            // v7.0.35: Collect current settings from LocalStorage and UI
+            collectCurrentSettings() {
+                // Get current network ID
+                const networkSelect = document.getElementById('networkSelect');
+                const nodeTypeSelect = document.getElementById('nodeTypeSelect');
+                const currentNetwork = networkSelect ? networkSelect.value : 'testnet-10';
+                
+                // Collect all user settings
+                return {
+                    version: this.version,
+                    schemaVersion: this.schemaVersion,
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                    wallet: '',  // Will be populated from actual wallet connection
+                    settings: {
+                        upload: {
+                            chunkSize: parseInt(localStorage.getItem('chunkSize') || 
+                                      (document.getElementById('chunkSize')?.value) || '22'),
+                            useRandomCid: document.getElementById('useRandomCid')?.checked || false,
+                            savePasswords: localStorage.getItem('savePasswordEnabled') !== 'false'
+                        },
+                        download: {
+                            parallel: localStorage.getItem('kaspaParallelDownload') === 'true' ||
+                                     document.getElementById('parallelDownloadToggle')?.checked || false,
+                            retryCount: parseInt(document.getElementById('retryCount')?.value || '3'),
+                            timeout: parseInt(document.getElementById('timeout')?.value || '300')
+                        },
+                        network: {
+                            selected: currentNetwork,
+                            nodeType: nodeTypeSelect ? nodeTypeSelect.value : 'public',
+                            customRpc: document.getElementById('customRpcEndpoint')?.value || '',
+                            restApi: document.getElementById('restApiEnabled')?.checked !== false,
+                            archiveThreshold: parseFloat(localStorage.getItem(`archiveThreshold_${currentNetwork}`) || 
+                                             document.getElementById('archiveThresholdInput')?.value || '50'),
+                            archiveMaxConsecutive: parseInt(localStorage.getItem('archiveMaxConsecutive') || '10')
+                        },
+                        ui: {
+                            theme: localStorage.getItem('theme') || 
+                                   document.getElementById('themeSelect')?.value || 'dark',
+                            sidebarCollapsed: localStorage.getItem('sidebarCollapsed') === 'true',
+                            defaultSort: document.getElementById('kenvSortSelect')?.value || 'uploadDate',
+                            defaultFilter: document.getElementById('kenvFilterSelect')?.value || 'all'
+                        },
+                        transaction: {
+                            defaultAmount: parseFloat(localStorage.getItem('kaspaTransactionAmount') || 
+                                          document.getElementById('transactionAmountInput')?.value || '0.001')
+                        },
+                        debug: {
+                            chunksPerMeta: parseInt(localStorage.getItem('debugChunksPerMeta') || '160')
+                        }
+                    },
+                    workspace: {
+                        lastActivity: new Date().toISOString(),
+                        indexVersion: "2.0"
+                    }
+                };
+            },
+            
             // Save .kenv file
             async saveKenvFile() {
                 if (!WorkspaceState.handle) {
@@ -5162,61 +5220,8 @@
                 }
                 
                 try {
-                    // v7.0.34: Collect settings from LocalStorage and UI elements
-                    // Get current network ID
-                    const networkSelect = document.getElementById('networkSelect');
-                    const nodeTypeSelect = document.getElementById('nodeTypeSelect');
-                    const currentNetwork = networkSelect ? networkSelect.value : 'testnet-10';
-                    
-                    // Collect all user settings from LocalStorage and UI
-                    const kenvData = {
-                        version: this.version,
-                        schemaVersion: this.schemaVersion,
-                        createdAt: new Date().toISOString(),
-                        updatedAt: new Date().toISOString(),
-                        wallet: '',  // Will be populated from actual wallet connection
-                        settings: {
-                            upload: {
-                                chunkSize: parseInt(localStorage.getItem('chunkSize') || 
-                                          (document.getElementById('chunkSize')?.value) || '22'),
-                                useRandomCid: document.getElementById('useRandomCid')?.checked || false,
-                                savePasswords: localStorage.getItem('savePasswordEnabled') !== 'false'
-                            },
-                            download: {
-                                parallel: localStorage.getItem('kaspaParallelDownload') === 'true' ||
-                                         document.getElementById('parallelDownloadToggle')?.checked || false,
-                                retryCount: parseInt(document.getElementById('retryCount')?.value || '3'),
-                                timeout: parseInt(document.getElementById('timeout')?.value || '300')
-                            },
-                            network: {
-                                selected: currentNetwork,
-                                nodeType: nodeTypeSelect ? nodeTypeSelect.value : 'public',
-                                customRpc: document.getElementById('customRpcEndpoint')?.value || '',
-                                restApi: document.getElementById('restApiEnabled')?.checked !== false,
-                                archiveThreshold: parseFloat(localStorage.getItem(`archiveThreshold_${currentNetwork}`) || 
-                                                 document.getElementById('archiveThresholdInput')?.value || '50'),
-                                archiveMaxConsecutive: parseInt(localStorage.getItem('archiveMaxConsecutive') || '10')
-                            },
-                            ui: {
-                                theme: localStorage.getItem('theme') || 
-                                       document.getElementById('themeSelect')?.value || 'dark',
-                                sidebarCollapsed: localStorage.getItem('sidebarCollapsed') === 'true',
-                                defaultSort: document.getElementById('kenvSortSelect')?.value || 'uploadDate',
-                                defaultFilter: document.getElementById('kenvFilterSelect')?.value || 'all'
-                            },
-                            transaction: {
-                                defaultAmount: parseFloat(localStorage.getItem('kaspaTransactionAmount') || 
-                                              document.getElementById('transactionAmountInput')?.value || '0.001')
-                            },
-                            debug: {
-                                chunksPerMeta: parseInt(localStorage.getItem('debugChunksPerMeta') || '160')
-                            }
-                        },
-                        workspace: {
-                            lastActivity: new Date().toISOString(),
-                            indexVersion: "2.0"
-                        }
-                    };
+                    // v7.0.35: Use collectCurrentSettings function
+                    const kenvData = this.collectCurrentSettings();
                     
                     const fileHandle = await WorkspaceState.handle.getFileHandle(this.kenvFile, { create: true });
                     const writable = await fileHandle.createWritable();
@@ -20471,6 +20476,34 @@ Do you want to continue?`;
         */
         
         // ===== v6.2.43: KENV Export/Import Functions =====
+        
+        // v7.0.35: Export settings as .kenv file
+        window.exportSettings = function() {
+            try {
+                // Collect current settings
+                const settingsData = FileState.kenvManager.collectCurrentSettings();
+                
+                // Create blob and download
+                const blob = new Blob([JSON.stringify(settingsData, null, 2)], { 
+                    type: 'application/json' 
+                });
+                const url = URL.createObjectURL(blob);
+                
+                // Create download link
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `settings_${new Date().toISOString().split('T')[0]}.kenv`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                log('Settings exported successfully', 'success');
+            } catch (error) {
+                log(`Failed to export settings: ${error.message}`, 'error');
+            }
+        };
+        
         // Export KENV data as CSV (.kentry format)
         window.exportKENV = function() {
             try {

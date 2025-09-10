@@ -5162,53 +5162,24 @@
                 }
                 
                 try {
+                    // v7.0.34: Simplified .kenv structure - removed unused settings
                     const kenvData = {
                         version: this.version,
                         schemaVersion: this.schemaVersion,
-                        kaspaCompatVersion: this.kaspaCompatVersion,
                         createdAt: new Date().toISOString(),
                         updatedAt: new Date().toISOString(),
-                        wallet: UserState.address || '',
-                        encryption: {
-                            enabled: true,
-                            algorithm: "AES-256-GCM",
-                            iterations: 100000,
-                            passwordStorage: "encrypted"
-                        },
+                        wallet: '',  // Will be populated from actual wallet connection
                         settings: {
                             network: {
-                                parallelDownloadEnabled: AppState.settings.parallelDownloadEnabled,
+                                parallelDownloadEnabled: false,
                                 customRpcEndpoint: "",
                                 archiveNodeThreshold: 50
                             },
                             ui: {
-                                theme: document.body.getAttribute('data-theme') || 'dark',
-                                accentColor: "var(--accent-color)",
-                                language: "ja",
-                                defaultSort: "uploadDate",
-                                itemsPerPage: 100
-                            },
-                            storage: {
-                                autoSaveInterval: 300,
-                                csvEncryption: false,
-                                streamingChunkSize: 65536,
-                                externalFileThreshold: 10000,
-                                minimalMode: true,
-                                indexUpdateInterval: 60
-                            },
-                            technical: {
-                                kaspaMaxPayload: 24000,
-                                maxEncryptedSize: 22984,
-                                processSegmentSize: 1048576,
-                                chunksPerMeta: 160,
-                                maxChunksSupported: 25600,
-                                defaultChunkSize: 22528
+                                theme: 'dark'
                             }
                         },
                         workspace: {
-                            folderName: WorkspaceState.handle.name,
-                            totalEntries: this.entries.length,
-                            totalSize: this.kindex.stats.totalSize || 0,
                             lastActivity: new Date().toISOString(),
                             indexVersion: "2.0"
                         }

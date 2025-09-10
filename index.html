@@ -2264,7 +2264,19 @@
     <!-- Settings Tab -->
     <div id="settings-tab" class="tab-content">
         <div class="container">
-            <h2>⚙️ Settings</h2>
+            <!-- Title row with Export/Import buttons (v7.0.35) -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <h2 style="margin: 0;">⚙️ Settings</h2>
+                <div style="display: flex; gap: 8px;">
+                    <button onclick="exportSettings()" style="padding: 6px 16px; font-size: 14px; background: var(--button-bg); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 4px; cursor: pointer;">
+                        📤 Export Settings
+                    </button>
+                    <button onclick="document.getElementById('settingsImportInput').click()" style="padding: 6px 16px; font-size: 14px; background: var(--button-bg); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 4px; cursor: pointer;">
+                        📥 Import Settings
+                    </button>
+                    <input type="file" id="settingsImportInput" accept=".kenv" style="display: none;" onchange="importSettings(event)">
+                </div>
+            </div>
             
             <div class="metric-box">
                 <h3>Theme Settings</h3>
@@ -20501,6 +20513,97 @@ Do you want to continue?`;
                 log('Settings exported successfully', 'success');
             } catch (error) {
                 log(`Failed to export settings: ${error.message}`, 'error');
+            }
+        };
+        
+        // v7.0.35: Import settings from .kenv file
+        window.importSettings = async function(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            // Reset input for next use
+            event.target.value = '';
+            
+            try {
+                // Read file content
+                const content = await file.text();
+                const settingsData = JSON.parse(content);
+                
+                // Validate basic structure
+                if (!settingsData.settings) {
+                    throw new Error('Invalid settings file format');
+                }
+                
+                // Confirm with user
+                if (!confirm('This will replace all current settings. Continue?')) {
+                    return;
+                }
+                
+                // Apply settings to LocalStorage
+                const s = settingsData.settings;
+                
+                // Upload settings
+                if (s.upload) {
+                    if (s.upload.chunkSize !== undefined) {
+                        localStorage.setItem('chunkSize', s.upload.chunkSize.toString());
+                    }
+                    if (s.upload.savePasswords !== undefined) {
+                        localStorage.setItem('savePasswordEnabled', s.upload.savePasswords.toString());
+                    }
+                }
+                
+                // Download settings
+                if (s.download) {
+                    if (s.download.parallel !== undefined) {
+                        localStorage.setItem('kaspaParallelDownload', s.download.parallel.toString());
+                    }
+                }
+                
+                // Network settings
+                if (s.network) {
+                    if (s.network.archiveThreshold !== undefined && s.network.selected) {
+                        localStorage.setItem(`archiveThreshold_${s.network.selected}`, s.network.archiveThreshold.toString());
+                    }
+                    if (s.network.archiveMaxConsecutive !== undefined) {
+                        localStorage.setItem('archiveMaxConsecutive', s.network.archiveMaxConsecutive.toString());
+                    }
+                }
+                
+                // UI settings
+                if (s.ui) {
+                    if (s.ui.theme !== undefined) {
+                        localStorage.setItem('theme', s.ui.theme);
+                        // Apply theme immediately
+                        changeTheme(s.ui.theme);
+                    }
+                    if (s.ui.sidebarCollapsed !== undefined) {
+                        localStorage.setItem('sidebarCollapsed', s.ui.sidebarCollapsed.toString());
+                    }
+                }
+                
+                // Transaction settings
+                if (s.transaction) {
+                    if (s.transaction.defaultAmount !== undefined) {
+                        localStorage.setItem('kaspaTransactionAmount', s.transaction.defaultAmount.toString());
+                    }
+                }
+                
+                // Debug settings
+                if (s.debug) {
+                    if (s.debug.chunksPerMeta !== undefined) {
+                        localStorage.setItem('debugChunksPerMeta', s.debug.chunksPerMeta.toString());
+                    }
+                }
+                
+                log('Settings imported successfully. Refreshing page...', 'success');
+                
+                // Refresh page to apply all settings
+                setTimeout(() => {
+                    location.reload();
+                }, 1500);
+                
+            } catch (error) {
+                log(`Failed to import settings: ${error.message}`, 'error');
             }
         };
         

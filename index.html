@@ -5162,7 +5162,13 @@
                 }
                 
                 try {
-                    // v7.0.34: Simplified .kenv structure - removed unused settings
+                    // v7.0.34: Collect settings from LocalStorage and UI elements
+                    // Get current network ID
+                    const networkSelect = document.getElementById('networkSelect');
+                    const nodeTypeSelect = document.getElementById('nodeTypeSelect');
+                    const currentNetwork = networkSelect ? networkSelect.value : 'testnet-10';
+                    
+                    // Collect all user settings from LocalStorage and UI
                     const kenvData = {
                         version: this.version,
                         schemaVersion: this.schemaVersion,
@@ -5170,13 +5176,40 @@
                         updatedAt: new Date().toISOString(),
                         wallet: '',  // Will be populated from actual wallet connection
                         settings: {
+                            upload: {
+                                chunkSize: parseInt(localStorage.getItem('chunkSize') || 
+                                          (document.getElementById('chunkSize')?.value) || '22'),
+                                useRandomCid: document.getElementById('useRandomCid')?.checked || false,
+                                savePasswords: localStorage.getItem('savePasswordEnabled') !== 'false'
+                            },
+                            download: {
+                                parallel: localStorage.getItem('kaspaParallelDownload') === 'true' ||
+                                         document.getElementById('parallelDownloadToggle')?.checked || false,
+                                retryCount: parseInt(document.getElementById('retryCount')?.value || '3'),
+                                timeout: parseInt(document.getElementById('timeout')?.value || '300')
+                            },
                             network: {
-                                parallelDownloadEnabled: false,
-                                customRpcEndpoint: "",
-                                archiveNodeThreshold: 50
+                                selected: currentNetwork,
+                                nodeType: nodeTypeSelect ? nodeTypeSelect.value : 'public',
+                                customRpc: document.getElementById('customRpcEndpoint')?.value || '',
+                                restApi: document.getElementById('restApiEnabled')?.checked !== false,
+                                archiveThreshold: parseFloat(localStorage.getItem(`archiveThreshold_${currentNetwork}`) || 
+                                                 document.getElementById('archiveThresholdInput')?.value || '50'),
+                                archiveMaxConsecutive: parseInt(localStorage.getItem('archiveMaxConsecutive') || '10')
                             },
                             ui: {
-                                theme: 'dark'
+                                theme: localStorage.getItem('theme') || 
+                                       document.getElementById('themeSelect')?.value || 'dark',
+                                sidebarCollapsed: localStorage.getItem('sidebarCollapsed') === 'true',
+                                defaultSort: document.getElementById('kenvSortSelect')?.value || 'uploadDate',
+                                defaultFilter: document.getElementById('kenvFilterSelect')?.value || 'all'
+                            },
+                            transaction: {
+                                defaultAmount: parseFloat(localStorage.getItem('kaspaTransactionAmount') || 
+                                              document.getElementById('transactionAmountInput')?.value || '0.001')
+                            },
+                            debug: {
+                                chunksPerMeta: parseInt(localStorage.getItem('debugChunksPerMeta') || '160')
                             }
                         },
                         workspace: {

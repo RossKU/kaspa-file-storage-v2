@@ -21385,15 +21385,7 @@ Do you want to continue?`;
             const icon = entry.type === 'kaspa-directory' ? '📁' : 
                         getFileIcon(entry.name);
             
-            // v6.2.57: Add password status icon
-            let passwordIcon = '';
-            if (entry.encrypted || entry.hasPassword || entry.password) {
-                if (entry.password) {
-                    passwordIcon = '🔓';  // Password saved (unlocked)
-                } else if (entry.hasPassword) {
-                    passwordIcon = '🔒';  // Password required (locked)
-                }
-            }
+            // v6.2.57: Password status icon removed in v7.0.36
             
             const statusIcon = entry.status === 'verified' ? '✅' : 
                               entry.status === 'verifying' ? '⏳' : 
@@ -21439,18 +21431,11 @@ Do you want to continue?`;
             
             // Cell 2: Type icon
             const td2 = document.createElement('td');
-            td2.title = `Type: ${entry.type}${passwordIcon ? '\nPassword: ' + (entry.password ? 'Saved' : 'Required') : ''}`;
+            td2.title = `Type: ${entry.type}`;
             const iconSpan = document.createElement('span');
             iconSpan.className = 'file-icon';
             iconSpan.textContent = icon;
             td2.appendChild(iconSpan);
-            if (passwordIcon) {
-                const pwdSpan = document.createElement('span');
-                pwdSpan.style.fontSize = '0.8em';
-                pwdSpan.style.verticalAlign = 'super';
-                pwdSpan.textContent = passwordIcon;
-                td2.appendChild(pwdSpan);
-            }
             tr.appendChild(td2);
             
             // Cell 3: Name

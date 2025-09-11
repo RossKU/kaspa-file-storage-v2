@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://*.kaspa.org wss://*.kaspa.green wss://*.kaspa.blue wss://*.kaspa.stream wss://*.kaspa.red https://*.kaspa.org https://*.kaspa.green https://*.kaspa.blue https://*.kaspa.stream https://*.kaspa.red; img-src 'self' data: blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none';">
-    <title>Kaspa P2P File Storage v7.0.47</title>
+    <title>Kaspa P2P File Storage v7.0.48</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -11956,20 +11956,39 @@ Do you want to continue?`;
                                 log(`[DownloadManager DEBUG] Creating file: ${fileName}`, 'debug');
                                 log(`[DownloadManager DEBUG] targetHandle before getFileHandle: ${!!targetHandle}`, 'debug');
                                 
-                                const fileHandle = await targetHandle.getFileHandle(fileName, { create: true });
+                                // v7.0.48: Try different file handle creation strategy for Android
+                                const isAndroidUA = /Android/i.test(navigator.userAgent);
+                                let fileHandle;
+                                
+                                if (isAndroidUA) {
+                                    log(`[DownloadManager DEBUG] Android: Trying alternative file handle creation`, 'debug');
+                                    
+                                    // First, try to get existing file handle without creating
+                                    try {
+                                        fileHandle = await targetHandle.getFileHandle(fileName, { create: false });
+                                        log(`[DownloadManager DEBUG] Android: Existing file found, removing it`, 'debug');
+                                        await targetHandle.removeEntry(fileName);
+                                    } catch (e) {
+                                        log(`[DownloadManager DEBUG] Android: No existing file, proceeding`, 'debug');
+                                    }
+                                    
+                                    // Now create fresh file handle
+                                    fileHandle = await targetHandle.getFileHandle(fileName, { create: true });
+                                    log(`[DownloadManager DEBUG] Android: Fresh file handle created`, 'debug');
+                                    
+                                    // Add delay for Android
+                                    log(`[DownloadManager DEBUG] Android: Adding 100ms delay before createWritable`, 'debug');
+                                    await new Promise(resolve => setTimeout(resolve, 100));
+                                } else {
+                                    fileHandle = await targetHandle.getFileHandle(fileName, { create: true });
+                                }
+                                
                                 log(`[DownloadManager DEBUG] fileHandle created: ${!!fileHandle}`, 'debug');
                                 log(`[DownloadManager DEBUG] fileHandle.name: ${fileHandle?.name}`, 'debug');
                                 log(`[DownloadManager DEBUG] fileHandle.kind: ${fileHandle?.kind}`, 'debug');
                                 
                                 // v7.0.46: Try immediate createWritable to avoid state invalidation
-                                log(`[DownloadManager DEBUG] Attempting immediate createWritable to avoid Android WebView timeout`, 'debug');
-                                
-                                // v7.0.47: Add small delay for Android to stabilize handle
-                                const isAndroidUA = /Android/i.test(navigator.userAgent);
-                                if (isAndroidUA) {
-                                    log(`[DownloadManager DEBUG] Android detected, adding 50ms delay before createWritable`, 'debug');
-                                    await new Promise(resolve => setTimeout(resolve, 50));
-                                }
+                                log(`[DownloadManager DEBUG] Attempting createWritable`, 'debug');
                                 
                                 // v7.0.44: Add detailed error handling for createWritable
                                 let writable;
@@ -12006,7 +12025,13 @@ Do you want to continue?`;
                                     const startTime = Date.now();
                                     log(`[DownloadManager DEBUG] Starting createWritable at: ${startTime}`, 'debug');
                                     
-                                    writable = await fileHandle.createWritable();
+                                    // v7.0.48: Try createWritable with options for Android
+                                    if (isAndroidUA) {
+                                        log(`[DownloadManager DEBUG] Android: Using createWritable with keepExistingData: false`, 'debug');
+                                        writable = await fileHandle.createWritable({ keepExistingData: false });
+                                    } else {
+                                        writable = await fileHandle.createWritable();
+                                    }
                                     
                                     const endTime = Date.now();
                                     log(`[DownloadManager DEBUG] createWritable succeeded after ${endTime - startTime}ms`, 'debug');
@@ -12038,10 +12063,26 @@ Do you want to continue?`;
                                             }
                                             
                                             // Create file directly from the alternative handle
+                                            // v7.0.48: Try removing existing file first on Android
+                                            if (isAndroidUA) {
+                                                try {
+                                                    const existingFile = await altHandle.getFileHandle(fileName, { create: false });
+                                                    await altHandle.removeEntry(fileName);
+                                                    log(`[DownloadManager DEBUG] Alt approach: Removed existing file`, 'debug');
+                                                } catch (e) {
+                                                    log(`[DownloadManager DEBUG] Alt approach: No existing file`, 'debug');
+                                                }
+                                            }
+                                            
                                             const altFileHandle = await altHandle.getFileHandle(fileName, { create: true });
                                             log(`[DownloadManager DEBUG] Alt file handle created: ${!!altFileHandle}`, 'debug');
                                             
-                                            writable = await altFileHandle.createWritable();
+                                            // v7.0.48: Use keepExistingData: false for Android
+                                            if (isAndroidUA) {
+                                                writable = await altFileHandle.createWritable({ keepExistingData: false });
+                                            } else {
+                                                writable = await altFileHandle.createWritable();
+                                            }
                                             log(`[DownloadManager DEBUG] writable created with alt approach: ${!!writable}`, 'debug');
                                         } catch (altError) {
                                             log(`[DownloadManager ERROR] Alternative approach failed: ${altError.message}`, 'error');
@@ -12088,16 +12129,8 @@ Do you want to continue?`;
                                                 }, 1000);
                                             }, 100);
                                             
-                                            // Method 2: Try window.open as backup
-                                            if (isAndroidEnvironment) {
-                                                log(`[DownloadManager DEBUG] Trying window.open for Android`, 'debug');
-                                                try {
-                                                    window.open(url, '_blank');
-                                                    log(`[DownloadManager DEBUG] window.open executed`, 'debug');
-                                                } catch (openError) {
-                                                    log(`[DownloadManager ERROR] window.open failed: ${openError.message}`, 'error');
-                                                }
-                                            }
+                                            // Method 2: Skip window.open - it opens too many tabs
+                                            // v7.0.48: Removed window.open for Android to prevent multiple tabs opening
                                             
                                             // Method 3: Create visible download button as last resort
                                             log(`[DownloadManager INFO] Creating manual download button for user`, 'info');

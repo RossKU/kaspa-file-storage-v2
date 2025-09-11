@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://*.kaspa.org wss://*.kaspa.green wss://*.kaspa.blue wss://*.kaspa.stream wss://*.kaspa.red https://*.kaspa.org https://*.kaspa.green https://*.kaspa.blue https://*.kaspa.stream https://*.kaspa.red; img-src 'self' data: blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none';">
-    <title>Kaspa P2P File Storage v7.0.46</title>
+    <title>Kaspa P2P File Storage v7.0.47</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -11964,6 +11964,13 @@ Do you want to continue?`;
                                 // v7.0.46: Try immediate createWritable to avoid state invalidation
                                 log(`[DownloadManager DEBUG] Attempting immediate createWritable to avoid Android WebView timeout`, 'debug');
                                 
+                                // v7.0.47: Add small delay for Android to stabilize handle
+                                const isAndroidUA = /Android/i.test(navigator.userAgent);
+                                if (isAndroidUA) {
+                                    log(`[DownloadManager DEBUG] Android detected, adding 50ms delay before createWritable`, 'debug');
+                                    await new Promise(resolve => setTimeout(resolve, 50));
+                                }
+                                
                                 // v7.0.44: Add detailed error handling for createWritable
                                 let writable;
                                 try {
@@ -12042,9 +12049,13 @@ Do you want to continue?`;
                                             // v7.0.46: Final fallback - save blob to KENV and notify user
                                             log(`[DownloadManager WARNING] Attempting final fallback for Android WebView`, 'warning');
                                             
-                                            // Check if we're on Android WebView
-                                            const isAndroidWebView = /Android.*WebView|wv/.test(navigator.userAgent);
-                                            log(`[DownloadManager DEBUG] isAndroidWebView: ${isAndroidWebView}`, 'debug');
+                                            // Check if we're on Android (WebView or Chrome Mobile)
+                                            const isAndroid = /Android/i.test(navigator.userAgent);
+                                            const isMobileChrome = /Chrome.*Mobile/i.test(navigator.userAgent);
+                                            const isAndroidEnvironment = isAndroid || isMobileChrome;
+                                            log(`[DownloadManager DEBUG] isAndroid: ${isAndroid}`, 'debug');
+                                            log(`[DownloadManager DEBUG] isMobileChrome: ${isMobileChrome}`, 'debug');
+                                            log(`[DownloadManager DEBUG] isAndroidEnvironment: ${isAndroidEnvironment}`, 'debug');
                                             log(`[DownloadManager DEBUG] navigator.userAgent: ${navigator.userAgent}`, 'debug');
                                             
                                             // Try different download methods
@@ -12078,7 +12089,7 @@ Do you want to continue?`;
                                             }, 100);
                                             
                                             // Method 2: Try window.open as backup
-                                            if (isAndroidWebView) {
+                                            if (isAndroidEnvironment) {
                                                 log(`[DownloadManager DEBUG] Trying window.open for Android`, 'debug');
                                                 try {
                                                     window.open(url, '_blank');

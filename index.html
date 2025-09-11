@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://*.kaspa.org wss://*.kaspa.green wss://*.kaspa.blue wss://*.kaspa.stream wss://*.kaspa.red https://*.kaspa.org https://*.kaspa.green https://*.kaspa.blue https://*.kaspa.stream https://*.kaspa.red; img-src 'self' data: blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none';">
-    <title>Kaspa P2P File Storage v7.0.34</title>
+    <title>Kaspa P2P File Storage v7.0.43</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -11900,6 +11900,8 @@ Do you want to continue?`;
                     if (folderStructure && folderStructure.enabled && 'showDirectoryPicker' in window) {
                         try {
                             log('[DownloadManager] Starting download with folder structure', 'info');
+                            log(`[DownloadManager DEBUG] folderStructure.targetHandle exists: ${!!folderStructure.targetHandle}`, 'debug');
+                            log(`[DownloadManager DEBUG] showDirectoryPicker in window: ${'showDirectoryPicker' in window}`, 'debug');
                             
                             let targetHandle;
                             
@@ -11907,13 +11909,17 @@ Do you want to continue?`;
                             if (folderStructure.targetHandle) {
                                 targetHandle = folderStructure.targetHandle;
                                 log('[DownloadManager] Using provided targetHandle', 'info');
+                                log(`[DownloadManager DEBUG] targetHandle.name: ${targetHandle?.name || 'undefined'}`, 'debug');
+                                log(`[DownloadManager DEBUG] targetHandle.kind: ${targetHandle?.kind || 'undefined'}`, 'debug');
                             } else {
+                                log('[DownloadManager WARNING] No targetHandle provided, showing directory picker', 'warning');
                                 // Show directory picker
                                 const dirHandle = await window.showDirectoryPicker({
                                     suggestedName: folderStructure.basePath || 'download',
                                     mode: 'readwrite'
                                 });
                                 targetHandle = dirHandle;
+                                log(`[DownloadManager DEBUG] User selected directory: ${dirHandle?.name}`, 'debug');
                             }
                             
                             // Create or navigate to base directory
@@ -11947,9 +11953,19 @@ Do you want to continue?`;
                             // Save file
                             try {
                                 const fileName = metadata.file?.name || 'download';
+                                log(`[DownloadManager DEBUG] Creating file: ${fileName}`, 'debug');
+                                log(`[DownloadManager DEBUG] targetHandle before getFileHandle: ${!!targetHandle}`, 'debug');
+                                
                                 const fileHandle = await targetHandle.getFileHandle(fileName, { create: true });
+                                log(`[DownloadManager DEBUG] fileHandle created: ${!!fileHandle}`, 'debug');
+                                
                                 const writable = await fileHandle.createWritable();
+                                log(`[DownloadManager DEBUG] writable created: ${!!writable}`, 'debug');
+                                log(`[DownloadManager DEBUG] blob size: ${blob.size} bytes`, 'debug');
+                                
                                 await writable.write(blob);
+                                log(`[DownloadManager DEBUG] blob written to writable`, 'debug');
+                                
                                 await writable.close();
                                 log(`[DownloadManager] File save complete: ${folderStructure.filePath || fileName}`, 'success');
                                 
@@ -16617,6 +16633,10 @@ Do you want to continue?`;
             try {
                 log('Processing directory metadata...', 'info');
                 
+                // v7.0.43: Store directory metadata for individual downloads
+                window.currentDirectoryMetadata = dirMetadata;
+                log(`[Directory Builder DEBUG] window.currentDirectoryMetadata set: ${!!window.currentDirectoryMetadata}`, 'debug');
+                
                 // Display directory information
                 const totalSize = dirMetadata.directory?.totalSize || 0;
                 const fileCount = dirMetadata.directory?.fileCount || 0;
@@ -16944,12 +16964,19 @@ Do you want to continue?`;
                         const entryPassword = entry.password || password || '';
                         const metadata = await NetworkState.downloadManager.fetchMetadata(entry.metaTxId, entry.blockId, entryPassword);
                         
+                        // v7.0.43: Fix for Android WebView - pass created handle
+                        log(`[Bulk Download DEBUG] currentTargetHandle exists: ${!!currentTargetHandle}`, 'debug');
+                        log(`[Bulk Download DEBUG] currentTargetHandle.name: ${currentTargetHandle?.name || 'undefined'}`, 'debug');
+                        log(`[Bulk Download DEBUG] entry.path: ${entry.path || 'root'}`, 'debug');
+                        
                         const folderStructureOption = {
                             enabled: true,
-                            basePath: baseDirName, // Use directory name instead of handle
-                            filePath: entry.path || entry.name
-                            // v4.7.12: Remove targetHandle to force folder picker each time
+                            targetHandle: currentTargetHandle,  // v7.0.43: Use already created handle to avoid showDirectoryPicker
+                            basePath: null,  // Not needed when targetHandle is provided
+                            filePath: entry.name  // Only filename, path already handled by currentTargetHandle
                         };
+                        
+                        log(`[Bulk Download DEBUG] folderStructureOption.targetHandle: ${!!folderStructureOption.targetHandle}`, 'debug');
                         
                         await NetworkState.downloadManager.executeDownload(metadata, entryPassword, {
                             onProgress: (progress) => {
@@ -17023,11 +17050,19 @@ Do you want to continue?`;
                 const metadata = await NetworkState.downloadManager.fetchMetadata(metaTxId, blockId, password);
                 
                 // v4.7.8: Add folder structure option
+                // v7.0.43: Include targetHandle when workspace is set
                 const folderStructureOption = (filePath && window.currentDirectoryMetadata) ? {
                     enabled: true,
                     basePath: window.currentDirectoryMetadata.directory?.name || null,
-                    filePath: filePath
+                    filePath: filePath,
+                    targetHandle: WorkspaceState.handle || null  // v7.0.43: Pass workspace handle to avoid picker
                 } : null;
+                
+                log(`[Individual Download DEBUG] folderStructureOption enabled: ${!!folderStructureOption}`, 'debug');
+                log(`[Individual Download DEBUG] WorkspaceState.handle exists: ${!!WorkspaceState.handle}`, 'debug');
+                if (folderStructureOption) {
+                    log(`[Individual Download DEBUG] targetHandle in option: ${!!folderStructureOption.targetHandle}`, 'debug');
+                }
                 
                 // Execute download
                 await NetworkState.downloadManager.executeDownload(metadata, password, {

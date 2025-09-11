@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://*.kaspa.org wss://*.kaspa.green wss://*.kaspa.blue wss://*.kaspa.stream wss://*.kaspa.red https://*.kaspa.org https://*.kaspa.green https://*.kaspa.blue https://*.kaspa.stream https://*.kaspa.red; img-src 'self' data: blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none';">
-    <title>Kaspa P2P File Storage v7.0.44</title>
+    <title>Kaspa P2P File Storage v7.0.45</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -11973,8 +11973,38 @@ Do you want to continue?`;
                                     log(`[DownloadManager ERROR] createWritable failed: ${writeError.name}: ${writeError.message}`, 'error');
                                     log(`[DownloadManager DEBUG] Error stack: ${writeError.stack}`, 'debug');
                                     
-                                    // Try to get permission again
-                                    if (targetHandle.requestPermission) {
+                                    // v7.0.45: Try alternative approach - recreate file handle from original handle
+                                    const originalHandle = folderStructure.originalHandle || WorkspaceState.handle;
+                                    if (originalHandle && writeError.name === 'InvalidStateError') {
+                                        log(`[DownloadManager DEBUG] Trying alternative approach with original handle`, 'debug');
+                                        try {
+                                            // Build full path from original handle
+                                            let altHandle = originalHandle;
+                                            
+                                            // Navigate to the target directory if basePath exists
+                                            if (folderStructure.basePath) {
+                                                // Split path and create directories one by one
+                                                const pathParts = folderStructure.basePath.split('/').filter(p => p);
+                                                log(`[DownloadManager DEBUG] Creating path: ${pathParts.join('/')}`, 'debug');
+                                                
+                                                for (const part of pathParts) {
+                                                    altHandle = await altHandle.getDirectoryHandle(part, { create: true });
+                                                    log(`[DownloadManager DEBUG] Created/navigated to: ${part}`, 'debug');
+                                                }
+                                            }
+                                            
+                                            // Create file directly from the alternative handle
+                                            const altFileHandle = await altHandle.getFileHandle(fileName, { create: true });
+                                            log(`[DownloadManager DEBUG] Alt file handle created: ${!!altFileHandle}`, 'debug');
+                                            
+                                            writable = await altFileHandle.createWritable();
+                                            log(`[DownloadManager DEBUG] writable created with alt approach: ${!!writable}`, 'debug');
+                                        } catch (altError) {
+                                            log(`[DownloadManager ERROR] Alternative approach failed: ${altError.message}`, 'error');
+                                            throw writeError; // Throw original error
+                                        }
+                                    } else if (targetHandle.requestPermission) {
+                                        // Original permission retry logic
                                         log(`[DownloadManager DEBUG] Requesting permission again...`, 'debug');
                                         const permission = await targetHandle.requestPermission({ mode: 'readwrite' }).catch(e => {
                                             log(`[DownloadManager DEBUG] requestPermission failed: ${e.message}`, 'debug');
@@ -16938,9 +16968,20 @@ Do you want to continue?`;
                         log(`[Bulk Download DEBUG] WorkspaceState.handle permission: ${permission}`, 'debug');
                     }
                     
+                    // v7.0.45: Track handle chain creation
+                    log(`[Bulk Download DEBUG] Creating subdirectory handle from WorkspaceState.handle`, 'debug');
+                    log(`[Bulk Download DEBUG] WorkspaceState.handle isSameEntry: ${WorkspaceState.handle.isSameEntry ? 'available' : 'not available'}`, 'debug');
+                    
                     targetHandle = await WorkspaceState.handle.getDirectoryHandle(baseDirName, { create: true });
                     log(`[Bulk Download] Create/get base directory: ${baseDirName}`, 'info');
                     log(`[Bulk Download DEBUG] New targetHandle created from WorkspaceState.handle`, 'debug');
+                    log(`[Bulk Download DEBUG] targetHandle isSameEntry: ${targetHandle.isSameEntry ? 'available' : 'not available'}`, 'debug');
+                    
+                    // v7.0.45: Test if derived handle is still valid
+                    if (targetHandle.queryPermission) {
+                        const derivedPermission = await targetHandle.queryPermission({ mode: 'readwrite' }).catch(e => 'N/A');
+                        log(`[Bulk Download DEBUG] Derived targetHandle permission: ${derivedPermission}`, 'debug');
+                    }
                 } catch (e) {
                     log(`[Bulk Download] Base directory creation error: ${e.message}`, 'error');
                     log(`[Bulk Download DEBUG] Error stack: ${e.stack}`, 'debug');
@@ -17021,11 +17062,13 @@ Do you want to continue?`;
                             log(`[Bulk Download DEBUG] currentTargetHandle permission: ${permission}`, 'debug');
                         }
                         
+                        // v7.0.45: Pass both handles for fallback approach
                         const folderStructureOption = {
                             enabled: true,
                             targetHandle: currentTargetHandle,  // v7.0.43: Use already created handle to avoid showDirectoryPicker
-                            basePath: null,  // Not needed when targetHandle is provided
-                            filePath: entry.name  // Only filename, path already handled by currentTargetHandle
+                            basePath: entry.path ? `${baseDirName}/${entry.path}` : baseDirName,  // v7.0.45: Full path for fallback
+                            filePath: entry.name,  // Only filename, path already handled by currentTargetHandle
+                            originalHandle: WorkspaceState.handle  // v7.0.45: Original handle for fallback
                         };
                         
                         log(`[Bulk Download DEBUG] folderStructureOption.targetHandle: ${!!folderStructureOption.targetHandle}`, 'debug');

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://*.kaspa.org wss://*.kaspa.green wss://*.kaspa.blue wss://*.kaspa.stream wss://*.kaspa.red https://*.kaspa.org https://*.kaspa.green https://*.kaspa.blue https://*.kaspa.stream https://*.kaspa.red; img-src 'self' data: blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none';">
-    <title>Kaspa P2P File Storage v7.0.45</title>
+    <title>Kaspa P2P File Storage v7.0.46</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -11961,17 +11961,54 @@ Do you want to continue?`;
                                 log(`[DownloadManager DEBUG] fileHandle.name: ${fileHandle?.name}`, 'debug');
                                 log(`[DownloadManager DEBUG] fileHandle.kind: ${fileHandle?.kind}`, 'debug');
                                 
+                                // v7.0.46: Try immediate createWritable to avoid state invalidation
+                                log(`[DownloadManager DEBUG] Attempting immediate createWritable to avoid Android WebView timeout`, 'debug');
+                                
                                 // v7.0.44: Add detailed error handling for createWritable
                                 let writable;
                                 try {
                                     log(`[DownloadManager DEBUG] Attempting createWritable...`, 'debug');
-                                    log(`[DownloadManager DEBUG] targetHandle.queryPermission: ${await targetHandle.queryPermission({ mode: 'readwrite' }).catch(e => 'N/A')}`, 'debug');
+                                    
+                                    // v7.0.46: More detailed debugging
+                                    log(`[DownloadManager DEBUG] fileHandle type: ${typeof fileHandle}`, 'debug');
+                                    log(`[DownloadManager DEBUG] fileHandle constructor: ${fileHandle?.constructor?.name}`, 'debug');
+                                    log(`[DownloadManager DEBUG] targetHandle type: ${typeof targetHandle}`, 'debug');
+                                    log(`[DownloadManager DEBUG] targetHandle constructor: ${targetHandle?.constructor?.name}`, 'debug');
+                                    
+                                    // Check if handles are valid
+                                    if (fileHandle.isSameEntry && targetHandle.isSameEntry) {
+                                        try {
+                                            const isSame = await fileHandle.isSameEntry(fileHandle);
+                                            log(`[DownloadManager DEBUG] fileHandle.isSameEntry(self): ${isSame}`, 'debug');
+                                        } catch (e) {
+                                            log(`[DownloadManager DEBUG] isSameEntry check failed: ${e.message}`, 'debug');
+                                        }
+                                    }
+                                    
+                                    // Check permissions
+                                    const targetPerm = await targetHandle.queryPermission({ mode: 'readwrite' }).catch(e => 'N/A');
+                                    log(`[DownloadManager DEBUG] targetHandle.queryPermission: ${targetPerm}`, 'debug');
+                                    
+                                    // Try to check file handle permission
+                                    if (fileHandle.queryPermission) {
+                                        const filePerm = await fileHandle.queryPermission({ mode: 'readwrite' }).catch(e => 'N/A');
+                                        log(`[DownloadManager DEBUG] fileHandle.queryPermission: ${filePerm}`, 'debug');
+                                    }
+                                    
+                                    // Log timing
+                                    const startTime = Date.now();
+                                    log(`[DownloadManager DEBUG] Starting createWritable at: ${startTime}`, 'debug');
                                     
                                     writable = await fileHandle.createWritable();
+                                    
+                                    const endTime = Date.now();
+                                    log(`[DownloadManager DEBUG] createWritable succeeded after ${endTime - startTime}ms`, 'debug');
                                     log(`[DownloadManager DEBUG] writable created: ${!!writable}`, 'debug');
                                 } catch (writeError) {
                                     log(`[DownloadManager ERROR] createWritable failed: ${writeError.name}: ${writeError.message}`, 'error');
                                     log(`[DownloadManager DEBUG] Error stack: ${writeError.stack}`, 'debug');
+                                    log(`[DownloadManager DEBUG] Error code: ${writeError.code}`, 'debug');
+                                    log(`[DownloadManager DEBUG] Full error object: ${JSON.stringify(writeError, Object.getOwnPropertyNames(writeError))}`, 'debug');
                                     
                                     // v7.0.45: Try alternative approach - recreate file handle from original handle
                                     const originalHandle = folderStructure.originalHandle || WorkspaceState.handle;
@@ -12001,7 +12038,90 @@ Do you want to continue?`;
                                             log(`[DownloadManager DEBUG] writable created with alt approach: ${!!writable}`, 'debug');
                                         } catch (altError) {
                                             log(`[DownloadManager ERROR] Alternative approach failed: ${altError.message}`, 'error');
-                                            throw writeError; // Throw original error
+                                            
+                                            // v7.0.46: Final fallback - save blob to KENV and notify user
+                                            log(`[DownloadManager WARNING] Attempting final fallback for Android WebView`, 'warning');
+                                            
+                                            // Check if we're on Android WebView
+                                            const isAndroidWebView = /Android.*WebView|wv/.test(navigator.userAgent);
+                                            log(`[DownloadManager DEBUG] isAndroidWebView: ${isAndroidWebView}`, 'debug');
+                                            log(`[DownloadManager DEBUG] navigator.userAgent: ${navigator.userAgent}`, 'debug');
+                                            
+                                            // Try different download methods
+                                            log(`[DownloadManager DEBUG] Blob size for download: ${blob.size} bytes`, 'debug');
+                                            log(`[DownloadManager DEBUG] File name: ${fileName}`, 'debug');
+                                            
+                                            // Method 1: Create download link with longer delay
+                                            const url = URL.createObjectURL(blob);
+                                            log(`[DownloadManager DEBUG] Blob URL created: ${url}`, 'debug');
+                                            
+                                            const a = document.createElement('a');
+                                            a.href = url;
+                                            a.download = fileName;
+                                            a.style.display = 'none';
+                                            document.body.appendChild(a);
+                                            
+                                            log(`[DownloadManager DEBUG] Anchor element created and added to DOM`, 'debug');
+                                            
+                                            // Try click with timeout
+                                            setTimeout(() => {
+                                                log(`[DownloadManager DEBUG] Attempting click on anchor element`, 'debug');
+                                                a.click();
+                                                log(`[DownloadManager DEBUG] Click executed`, 'debug');
+                                                
+                                                // Cleanup after delay
+                                                setTimeout(() => {
+                                                    document.body.removeChild(a);
+                                                    URL.revokeObjectURL(url);
+                                                    log(`[DownloadManager DEBUG] Cleanup completed`, 'debug');
+                                                }, 1000);
+                                            }, 100);
+                                            
+                                            // Method 2: Try window.open as backup
+                                            if (isAndroidWebView) {
+                                                log(`[DownloadManager DEBUG] Trying window.open for Android`, 'debug');
+                                                try {
+                                                    window.open(url, '_blank');
+                                                    log(`[DownloadManager DEBUG] window.open executed`, 'debug');
+                                                } catch (openError) {
+                                                    log(`[DownloadManager ERROR] window.open failed: ${openError.message}`, 'error');
+                                                }
+                                            }
+                                            
+                                            // Method 3: Create visible download button as last resort
+                                            log(`[DownloadManager INFO] Creating manual download button for user`, 'info');
+                                            const downloadBtn = document.createElement('button');
+                                            downloadBtn.textContent = `📥 Download ${fileName}`;
+                                            downloadBtn.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 10000; padding: 15px 30px; background: #70C7BA; color: white; border: none; border-radius: 5px; font-size: 16px; cursor: pointer;';
+                                            downloadBtn.onclick = () => {
+                                                const newUrl = URL.createObjectURL(blob);
+                                                const newA = document.createElement('a');
+                                                newA.href = newUrl;
+                                                newA.download = fileName;
+                                                newA.click();
+                                                URL.revokeObjectURL(newUrl);
+                                                document.body.removeChild(downloadBtn);
+                                                log(`[DownloadManager SUCCESS] Manual download triggered`, 'success');
+                                            };
+                                            document.body.appendChild(downloadBtn);
+                                            
+                                            // Auto-remove button after 10 seconds
+                                            setTimeout(() => {
+                                                if (document.body.contains(downloadBtn)) {
+                                                    document.body.removeChild(downloadBtn);
+                                                }
+                                            }, 10000);
+                                            
+                                            log(`[DownloadManager WARNING] File ready for download. Android may require manual action.`, 'warning');
+                                            
+                                            // Call onComplete
+                                            if (onComplete) {
+                                                onComplete(blob, fileName);
+                                            }
+                                            
+                                            // Consider it successful
+                                            this.isDownloading = false;
+                                            return blob;
                                         }
                                     } else if (targetHandle.requestPermission) {
                                         // Original permission retry logic

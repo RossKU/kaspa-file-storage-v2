@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://*.kaspa.org wss://*.kaspa.green wss://*.kaspa.blue wss://*.kaspa.stream wss://*.kaspa.red https://*.kaspa.org https://*.kaspa.green https://*.kaspa.blue https://*.kaspa.stream https://*.kaspa.red; img-src 'self' data: blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none';">
-    <title>Kaspa P2P File Storage v7.0.48</title>
+    <title>Kaspa P2P File Storage v7.0.49</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -12028,6 +12028,21 @@ Do you want to continue?`;
                                     // v7.0.48: Try createWritable with options for Android
                                     if (isAndroidUA) {
                                         log(`[DownloadManager DEBUG] Android: Using createWritable with keepExistingData: false`, 'debug');
+                                        
+                                        // v7.0.49: Add more detailed handle state logging
+                                        log(`[DownloadManager DEBUG] Android: fileHandle methods available:`, 'debug');
+                                        log(`[DownloadManager DEBUG] - getFile: ${typeof fileHandle.getFile}`, 'debug');
+                                        log(`[DownloadManager DEBUG] - createWritable: ${typeof fileHandle.createWritable}`, 'debug');
+                                        log(`[DownloadManager DEBUG] - createSyncAccessHandle: ${typeof fileHandle.createSyncAccessHandle}`, 'debug');
+                                        
+                                        // Try to get file info before createWritable
+                                        try {
+                                            const file = await fileHandle.getFile();
+                                            log(`[DownloadManager DEBUG] Android: File info - size: ${file.size}, lastModified: ${file.lastModified}`, 'debug');
+                                        } catch (e) {
+                                            log(`[DownloadManager DEBUG] Android: Could not get file info: ${e.message}`, 'debug');
+                                        }
+                                        
                                         writable = await fileHandle.createWritable({ keepExistingData: false });
                                     } else {
                                         writable = await fileHandle.createWritable();
@@ -12041,6 +12056,17 @@ Do you want to continue?`;
                                     log(`[DownloadManager DEBUG] Error stack: ${writeError.stack}`, 'debug');
                                     log(`[DownloadManager DEBUG] Error code: ${writeError.code}`, 'debug');
                                     log(`[DownloadManager DEBUG] Full error object: ${JSON.stringify(writeError, Object.getOwnPropertyNames(writeError))}`, 'debug');
+                                    
+                                    // v7.0.49: Clean up 0-byte file on Android if createWritable fails
+                                    if (isAndroidUA && writeError.name === 'InvalidStateError') {
+                                        try {
+                                            log(`[DownloadManager DEBUG] Android: Cleaning up 0-byte file after createWritable failure`, 'debug');
+                                            await targetHandle.removeEntry(fileName);
+                                            log(`[DownloadManager DEBUG] Android: 0-byte file removed successfully`, 'debug');
+                                        } catch (removeError) {
+                                            log(`[DownloadManager DEBUG] Android: Could not remove 0-byte file: ${removeError.message}`, 'debug');
+                                        }
+                                    }
                                     
                                     // v7.0.45: Try alternative approach - recreate file handle from original handle
                                     const originalHandle = folderStructure.originalHandle || WorkspaceState.handle;
@@ -12086,6 +12112,24 @@ Do you want to continue?`;
                                             log(`[DownloadManager DEBUG] writable created with alt approach: ${!!writable}`, 'debug');
                                         } catch (altError) {
                                             log(`[DownloadManager ERROR] Alternative approach failed: ${altError.message}`, 'error');
+                                            
+                                            // v7.0.49: Clean up any 0-byte files after alternative approach failure
+                                            if (isAndroidUA) {
+                                                try {
+                                                    log(`[DownloadManager DEBUG] Android: Cleaning up 0-byte files after alt approach failure`, 'debug');
+                                                    // Try to remove from both handles
+                                                    try {
+                                                        await targetHandle.removeEntry(fileName);
+                                                        log(`[DownloadManager DEBUG] Android: Removed from targetHandle`, 'debug');
+                                                    } catch (e) {}
+                                                    try {
+                                                        await altHandle.removeEntry(fileName);
+                                                        log(`[DownloadManager DEBUG] Android: Removed from altHandle`, 'debug');
+                                                    } catch (e) {}
+                                                } catch (cleanupError) {
+                                                    log(`[DownloadManager DEBUG] Android: Cleanup error: ${cleanupError.message}`, 'debug');
+                                                }
+                                            }
                                             
                                             // v7.0.46: Final fallback - save blob to KENV and notify user
                                             log(`[DownloadManager WARNING] Attempting final fallback for Android WebView`, 'warning');

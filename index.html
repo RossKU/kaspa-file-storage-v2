@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://*.kaspa.org wss://*.kaspa.green wss://*.kaspa.blue wss://*.kaspa.stream wss://*.kaspa.red https://*.kaspa.org https://*.kaspa.green https://*.kaspa.blue https://*.kaspa.stream https://*.kaspa.red; img-src 'self' data: blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none';">
-    <title>Kaspa P2P File Storage v7.0.43</title>
+    <title>Kaspa P2P File Storage v7.0.44</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -11958,9 +11958,41 @@ Do you want to continue?`;
                                 
                                 const fileHandle = await targetHandle.getFileHandle(fileName, { create: true });
                                 log(`[DownloadManager DEBUG] fileHandle created: ${!!fileHandle}`, 'debug');
+                                log(`[DownloadManager DEBUG] fileHandle.name: ${fileHandle?.name}`, 'debug');
+                                log(`[DownloadManager DEBUG] fileHandle.kind: ${fileHandle?.kind}`, 'debug');
                                 
-                                const writable = await fileHandle.createWritable();
-                                log(`[DownloadManager DEBUG] writable created: ${!!writable}`, 'debug');
+                                // v7.0.44: Add detailed error handling for createWritable
+                                let writable;
+                                try {
+                                    log(`[DownloadManager DEBUG] Attempting createWritable...`, 'debug');
+                                    log(`[DownloadManager DEBUG] targetHandle.queryPermission: ${await targetHandle.queryPermission({ mode: 'readwrite' }).catch(e => 'N/A')}`, 'debug');
+                                    
+                                    writable = await fileHandle.createWritable();
+                                    log(`[DownloadManager DEBUG] writable created: ${!!writable}`, 'debug');
+                                } catch (writeError) {
+                                    log(`[DownloadManager ERROR] createWritable failed: ${writeError.name}: ${writeError.message}`, 'error');
+                                    log(`[DownloadManager DEBUG] Error stack: ${writeError.stack}`, 'debug');
+                                    
+                                    // Try to get permission again
+                                    if (targetHandle.requestPermission) {
+                                        log(`[DownloadManager DEBUG] Requesting permission again...`, 'debug');
+                                        const permission = await targetHandle.requestPermission({ mode: 'readwrite' }).catch(e => {
+                                            log(`[DownloadManager DEBUG] requestPermission failed: ${e.message}`, 'debug');
+                                            return null;
+                                        });
+                                        log(`[DownloadManager DEBUG] Permission result: ${permission}`, 'debug');
+                                        
+                                        if (permission === 'granted') {
+                                            writable = await fileHandle.createWritable();
+                                            log(`[DownloadManager DEBUG] writable created after permission request: ${!!writable}`, 'debug');
+                                        } else {
+                                            throw writeError;
+                                        }
+                                    } else {
+                                        throw writeError;
+                                    }
+                                }
+                                
                                 log(`[DownloadManager DEBUG] blob size: ${blob.size} bytes`, 'debug');
                                 
                                 await writable.write(blob);
@@ -16894,11 +16926,24 @@ Do you want to continue?`;
                 const baseDirName = dirMetadata.directory?.name || 'download';
                 let targetHandle = WorkspaceState.handle;
                 
+                // v7.0.44: Debug WorkspaceState.handle status
+                log(`[Bulk Download DEBUG] WorkspaceState.handle exists: ${!!WorkspaceState.handle}`, 'debug');
+                log(`[Bulk Download DEBUG] WorkspaceState.handle.name: ${WorkspaceState.handle?.name}`, 'debug');
+                log(`[Bulk Download DEBUG] WorkspaceState.handle.kind: ${WorkspaceState.handle?.kind}`, 'debug');
+                
                 try {
+                    // v7.0.44: Check permission before creating subdirectory
+                    if (WorkspaceState.handle.queryPermission) {
+                        const permission = await WorkspaceState.handle.queryPermission({ mode: 'readwrite' }).catch(e => 'N/A');
+                        log(`[Bulk Download DEBUG] WorkspaceState.handle permission: ${permission}`, 'debug');
+                    }
+                    
                     targetHandle = await WorkspaceState.handle.getDirectoryHandle(baseDirName, { create: true });
                     log(`[Bulk Download] Create/get base directory: ${baseDirName}`, 'info');
+                    log(`[Bulk Download DEBUG] New targetHandle created from WorkspaceState.handle`, 'debug');
                 } catch (e) {
                     log(`[Bulk Download] Base directory creation error: ${e.message}`, 'error');
+                    log(`[Bulk Download DEBUG] Error stack: ${e.stack}`, 'debug');
                 }
                 
                 // Process each entry
@@ -16967,7 +17012,14 @@ Do you want to continue?`;
                         // v7.0.43: Fix for Android WebView - pass created handle
                         log(`[Bulk Download DEBUG] currentTargetHandle exists: ${!!currentTargetHandle}`, 'debug');
                         log(`[Bulk Download DEBUG] currentTargetHandle.name: ${currentTargetHandle?.name || 'undefined'}`, 'debug');
+                        log(`[Bulk Download DEBUG] currentTargetHandle.kind: ${currentTargetHandle?.kind || 'undefined'}`, 'debug');
                         log(`[Bulk Download DEBUG] entry.path: ${entry.path || 'root'}`, 'debug');
+                        
+                        // v7.0.44: Check handle permission status
+                        if (currentTargetHandle.queryPermission) {
+                            const permission = await currentTargetHandle.queryPermission({ mode: 'readwrite' }).catch(e => 'N/A');
+                            log(`[Bulk Download DEBUG] currentTargetHandle permission: ${permission}`, 'debug');
+                        }
                         
                         const folderStructureOption = {
                             enabled: true,

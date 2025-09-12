@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://*.kaspa.org wss://*.kaspa.green wss://*.kaspa.blue wss://*.kaspa.stream wss://*.kaspa.red https://*.kaspa.org https://*.kaspa.green https://*.kaspa.blue https://*.kaspa.stream https://*.kaspa.red; img-src 'self' data: blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none';">
-    <title>Kaspa P2P File Storage v7.0.53</title>
+    <title>Kaspa P2P File Storage v7.0.54</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -17309,6 +17309,20 @@ Do you want to continue?`;
                 
                 log(`[Bulk Download Phase 1] Directory creation completed in ${Date.now() - phaseOneStart}ms`, 'info');
                 log(`[Bulk Download Phase 1] Created ${directoryHandles.size} unique directory paths`, 'info');
+                
+                // v7.0.54: Add stabilization wait for Android environments
+                const isAndroidUA = /Android/i.test(navigator.userAgent);
+                if (isAndroidUA && directoryHandles.size > 0) {
+                    const waitTime = 500; // 500ms wait for Android
+                    log(`[Bulk Download Phase 1.5] Android detected - waiting ${waitTime}ms for directory stabilization`, 'info');
+                    log(`[Bulk Download Phase 1.5] User Agent: ${navigator.userAgent}`, 'debug');
+                    
+                    await new Promise(resolve => setTimeout(resolve, waitTime));
+                    
+                    log(`[Bulk Download Phase 1.5] Stabilization wait completed`, 'info');
+                } else {
+                    log(`[Bulk Download Phase 1.5] No stabilization wait needed (${isAndroidUA ? 'no directories' : 'not Android'})`, 'debug');
+                }
                 
                 // v7.0.53: Phase 2 - Process files with already created directories
                 log(`[Bulk Download Phase 2] Starting file processing phase`, 'info');

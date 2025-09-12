@@ -17254,10 +17254,19 @@ Do you want to continue?`;
                 let skippedFiles = 0;
                 let errorFiles = 0;
                 
+                // v7.0.52: Add timing debug logs
+                const bulkStartTime = Date.now();
+                log(`[Bulk Download TIMING] Starting bulk download at ${bulkStartTime}`, 'debug');
+                log(`[Bulk Download TIMING] Total files to process: ${totalFiles}`, 'debug');
+                
                 document.getElementById('downloadProgress').style.display = 'block';
                 
                 for (const entry of entries) {
                     if (entry.type !== 'file') continue;
+                    
+                    // v7.0.52: Track individual file timing
+                    const fileStartTime = Date.now();
+                    log(`[Bulk Download TIMING] Processing file: ${entry.name} at +${fileStartTime - bulkStartTime}ms`, 'debug');
                     
                     try {
                         // Check if file already exists
@@ -17266,18 +17275,26 @@ Do you want to continue?`;
                         
                         // Create subdirectories if path exists
                         if (entry.path) {
+                            // v7.0.52: Track directory creation timing
+                            const dirCreationStart = Date.now();
+                            log(`[Bulk Download TIMING] Starting directory creation for path: ${entry.path}`, 'debug');
+                            
                             const pathParts = entry.path.split('/');
                             pathParts.pop(); // Remove filename
                             
                             for (const part of pathParts) {
                                 if (part) {
                                     try {
+                                        const beforeDir = Date.now();
                                         currentTargetHandle = await currentTargetHandle.getDirectoryHandle(part, { create: true });
+                                        log(`[Bulk Download TIMING] Created dir '${part}' in ${Date.now() - beforeDir}ms`, 'debug');
                                     } catch (e) {
                                         log(`[Bulk Download] Subdirectory creation error: ${part}`, 'error');
                                     }
                                 }
                             }
+                            
+                            log(`[Bulk Download TIMING] Directory creation completed in ${Date.now() - dirCreationStart}ms`, 'debug');
                         }
                         
                         // Check if file exists
@@ -17308,7 +17325,11 @@ Do you want to continue?`;
                         
                         // v5.11.18-fix13: Use individual entry password first, then directory password
                         const entryPassword = entry.password || password || '';
+                        
+                        // v7.0.52: Track metadata fetch timing
+                        const metadataStart = Date.now();
                         const metadata = await NetworkState.downloadManager.fetchMetadata(entry.metaTxId, entry.blockId, entryPassword);
+                        log(`[Bulk Download TIMING] Metadata fetched in ${Date.now() - metadataStart}ms`, 'debug');
                         
                         // v7.0.43: Fix for Android WebView - pass created handle
                         log(`[Bulk Download DEBUG] currentTargetHandle exists: ${!!currentTargetHandle}`, 'debug');
@@ -17333,6 +17354,10 @@ Do you want to continue?`;
                         
                         log(`[Bulk Download DEBUG] folderStructureOption.targetHandle: ${!!folderStructureOption.targetHandle}`, 'debug');
                         
+                        // v7.0.52: Track download execution timing
+                        const downloadStart = Date.now();
+                        log(`[Bulk Download TIMING] Starting executeDownload at +${downloadStart - fileStartTime}ms from file start`, 'debug');
+                        
                         await NetworkState.downloadManager.executeDownload(metadata, entryPassword, {
                             onProgress: (progress) => {
                                 const percent = ((completedFiles + progress.current/progress.total) / totalFiles * 100).toFixed(0);
@@ -17344,6 +17369,9 @@ Do you want to continue?`;
                         
                         completedFiles++;
                         
+                        // v7.0.52: Log file completion timing
+                        log(`[Bulk Download TIMING] File completed in ${Date.now() - fileStartTime}ms`, 'debug');
+                        
                     } catch (error) {
                         errorFiles++;
                         log(`[Bulk Download] Error: ${entry.name} - ${error.message}`, 'error');
@@ -17352,6 +17380,12 @@ Do you want to continue?`;
                 
                 // Summary
                 const summary = `Complete: ${completedFiles} files, Skipped: ${skippedFiles} files, Errors: ${errorFiles} files`;
+                
+                // v7.0.52: Log total timing
+                const totalTime = Date.now() - bulkStartTime;
+                log(`[Bulk Download TIMING] Total bulk download time: ${totalTime}ms`, 'debug');
+                log(`[Bulk Download TIMING] Average time per file: ${(totalTime / totalFiles).toFixed(0)}ms`, 'debug');
+                
                 log(`[Bulk Download] Complete - ${summary}`, 'success');
                 document.getElementById('downloadStatus').textContent = summary;
                 

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://*.kaspa.org wss://*.kaspa.green wss://*.kaspa.blue wss://*.kaspa.stream wss://*.kaspa.red https://*.kaspa.org https://*.kaspa.green https://*.kaspa.blue https://*.kaspa.stream https://*.kaspa.red; img-src 'self' data: blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none';">
-    <title>Kaspa P2P File Storage v7.0.54</title>
+    <title>Kaspa P2P File Storage v7.0.55</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -11955,65 +11955,28 @@ Do you want to continue?`;
                                 const fileName = metadata.file?.name || 'download';
                                 const isAndroidUA = /Android/i.test(navigator.userAgent);
                                 
-                                // v7.0.50: Android - Use WorkspaceState.handle directly to avoid derived handle issues
-                                if (isAndroidUA && folderStructure && WorkspaceState.handle) {
-                                    log(`[DownloadManager DEBUG] Android: Using direct WorkspaceState.handle approach`, 'debug');
-                                    log(`[DownloadManager DEBUG] Android: Original filename: ${fileName}`, 'debug');
-                                    log(`[DownloadManager DEBUG] Android: folderStructure.basePath: ${folderStructure.basePath}`, 'debug');
-                                    log(`[DownloadManager DEBUG] Android: WorkspaceState.handle exists: ${!!WorkspaceState.handle}`, 'debug');
-                                    
-                                    // Determine the folder name - use basePath or extract from targetHandle
-                                    let folderName = folderStructure.basePath;
-                                    if (!folderName && targetHandle && targetHandle.name) {
-                                        folderName = targetHandle.name;
-                                    }
-                                    
-                                    if (folderName) {
-                                        // v7.0.51: Replace slashes with underscores for Android
-                                        const safeFolder = folderName.replace(/\//g, '_');
-                                        const androidFileName = `${safeFolder}_${fileName}`;
-                                        log(`[DownloadManager DEBUG] Android: Safe folder name: ${safeFolder}`, 'debug');
-                                        log(`[DownloadManager DEBUG] Android: Modified filename: ${androidFileName}`, 'debug');
-                                        
-                                        try {
-                                            // Use WorkspaceState.handle directly (like KENV does)
-                                            const fileHandle = await WorkspaceState.handle.getFileHandle(androidFileName, { create: true });
-                                            log(`[DownloadManager DEBUG] Android: File handle created directly from WorkspaceState.handle`, 'debug');
-                                            
-                                            const writable = await fileHandle.createWritable();
-                                            log(`[DownloadManager DEBUG] Android: createWritable succeeded!`, 'debug');
-                                            
-                                            await writable.write(blob);
-                                            await writable.close();
-                                            
-                                            log(`[DownloadManager] Android: File saved successfully as ${androidFileName}`, 'success');
-                                            
-                                            // Call onComplete if provided
-                                            if (onComplete) {
-                                                onComplete(blob, androidFileName);
-                                            }
-                                            
-                                            // Skip default processing
-                                            this.isDownloading = false;
-                                            return blob;
-                                        } catch (androidError) {
-                                            log(`[DownloadManager ERROR] Android direct write failed: ${androidError.message}`, 'error');
-                                            log(`[DownloadManager DEBUG] Android error stack: ${androidError.stack}`, 'debug');
-                                            // Fall through to standard processing
-                                        }
-                                    } else {
-                                        log(`[DownloadManager WARNING] Android: No folder name available for prefix`, 'warning');
-                                    }
+                                // v7.0.55: Skip Android workaround when targetHandle is provided (bulk download)
+                                // Phase separation handles the timing issues
+                                const skipAndroidWorkaround = isAndroidUA && folderStructure && folderStructure.targetHandle;
+                                
+                                if (skipAndroidWorkaround) {
+                                    log(`[DownloadManager DEBUG] v7.0.55: Using targetHandle from phase separation (skipping Android workaround)`, 'debug');
                                 }
                                 
-                                // Standard processing for non-Android or if Android approach fails
+                                // Standard processing
                                 log(`[DownloadManager DEBUG] Creating file: ${fileName}`, 'debug');
                                 log(`[DownloadManager DEBUG] targetHandle before getFileHandle: ${!!targetHandle}`, 'debug');
                                 
                                 let fileHandle;
                                 
-                                if (isAndroidUA) {
-                                    log(`[DownloadManager DEBUG] Android: Fallback to alternative file handle creation`, 'debug');
+                                // v7.0.55: Use simple file creation when phase separation is active
+                                if (skipAndroidWorkaround) {
+                                    // Phase separation handles timing, use simple approach
+                                    fileHandle = await targetHandle.getFileHandle(fileName, { create: true });
+                                    log(`[DownloadManager DEBUG] v7.0.55: File handle created with phase separation`, 'debug');
+                                } else if (isAndroidUA) {
+                                    // Keep Android workaround for non-bulk downloads
+                                    log(`[DownloadManager DEBUG] Android: Using fallback file handle creation`, 'debug');
                                     
                                     // First, try to get existing file handle without creating
                                     try {
@@ -12077,8 +12040,12 @@ Do you want to continue?`;
                                     const startTime = Date.now();
                                     log(`[DownloadManager DEBUG] Starting createWritable at: ${startTime}`, 'debug');
                                     
-                                    // v7.0.48: Try createWritable with options for Android
-                                    if (isAndroidUA) {
+                                    // v7.0.55: Simple createWritable when phase separation is active
+                                    if (skipAndroidWorkaround) {
+                                        writable = await fileHandle.createWritable();
+                                        log(`[DownloadManager DEBUG] v7.0.55: Using standard createWritable with phase separation`, 'debug');
+                                    } else if (isAndroidUA) {
+                                        // v7.0.48: Try createWritable with options for Android (non-bulk downloads)
                                         log(`[DownloadManager DEBUG] Android: Using createWritable with keepExistingData: false`, 'debug');
                                         
                                         // v7.0.49: Add more detailed handle state logging

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://*.kaspa.org wss://*.kaspa.green wss://*.kaspa.blue wss://*.kaspa.stream wss://*.kaspa.red https://*.kaspa.org https://*.kaspa.green https://*.kaspa.blue https://*.kaspa.stream https://*.kaspa.red; img-src 'self' data: blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none';">
-    <title>Kaspa P2P File Storage v7.0.52</title>
+    <title>Kaspa P2P File Storage v7.0.53</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -17261,6 +17261,59 @@ Do you want to continue?`;
                 
                 document.getElementById('downloadProgress').style.display = 'block';
                 
+                // v7.0.53: Phase 1 - Create all directory structures first
+                log(`[Bulk Download Phase 1] Starting directory creation phase`, 'info');
+                const phaseOneStart = Date.now();
+                const directoryHandles = new Map();
+                
+                // Create all directories before processing files
+                for (const entry of entries) {
+                    if (entry.type !== 'file') continue;
+                    if (!entry.path) continue;
+                    
+                    const pathParts = entry.path.split('/');
+                    pathParts.pop(); // Remove filename
+                    
+                    if (pathParts.length > 0) {
+                        const fullPath = pathParts.join('/');
+                        
+                        // Skip if we already created this directory path
+                        if (directoryHandles.has(fullPath)) {
+                            log(`[Bulk Download Phase 1] Directory already created: ${fullPath}`, 'debug');
+                            continue;
+                        }
+                        
+                        let currentHandle = targetHandle;
+                        let currentPath = '';
+                        
+                        // Create each directory level
+                        for (const part of pathParts) {
+                            if (part) {
+                                currentPath = currentPath ? `${currentPath}/${part}` : part;
+                                
+                                try {
+                                    const beforeDir = Date.now();
+                                    currentHandle = await currentHandle.getDirectoryHandle(part, { create: true });
+                                    log(`[Bulk Download Phase 1] Created directory '${part}' in ${Date.now() - beforeDir}ms`, 'debug');
+                                } catch (e) {
+                                    log(`[Bulk Download Phase 1] Directory creation error: ${part} - ${e.message}`, 'error');
+                                }
+                            }
+                        }
+                        
+                        // Store the handle for this path
+                        directoryHandles.set(fullPath, currentHandle);
+                        log(`[Bulk Download Phase 1] Stored handle for path: ${fullPath}`, 'debug');
+                    }
+                }
+                
+                log(`[Bulk Download Phase 1] Directory creation completed in ${Date.now() - phaseOneStart}ms`, 'info');
+                log(`[Bulk Download Phase 1] Created ${directoryHandles.size} unique directory paths`, 'info');
+                
+                // v7.0.53: Phase 2 - Process files with already created directories
+                log(`[Bulk Download Phase 2] Starting file processing phase`, 'info');
+                const phaseTwoStart = Date.now();
+                
                 for (const entry of entries) {
                     if (entry.type !== 'file') continue;
                     
@@ -17273,28 +17326,32 @@ Do you want to continue?`;
                         let fileExists = false;
                         let currentTargetHandle = targetHandle;
                         
-                        // Create subdirectories if path exists
+                        // v7.0.53: Use pre-created directory handle from Phase 1
                         if (entry.path) {
-                            // v7.0.52: Track directory creation timing
-                            const dirCreationStart = Date.now();
-                            log(`[Bulk Download TIMING] Starting directory creation for path: ${entry.path}`, 'debug');
-                            
                             const pathParts = entry.path.split('/');
                             pathParts.pop(); // Remove filename
                             
-                            for (const part of pathParts) {
-                                if (part) {
-                                    try {
-                                        const beforeDir = Date.now();
-                                        currentTargetHandle = await currentTargetHandle.getDirectoryHandle(part, { create: true });
-                                        log(`[Bulk Download TIMING] Created dir '${part}' in ${Date.now() - beforeDir}ms`, 'debug');
-                                    } catch (e) {
-                                        log(`[Bulk Download] Subdirectory creation error: ${part}`, 'error');
+                            if (pathParts.length > 0) {
+                                const fullPath = pathParts.join('/');
+                                const preCreatedHandle = directoryHandles.get(fullPath);
+                                
+                                if (preCreatedHandle) {
+                                    currentTargetHandle = preCreatedHandle;
+                                    log(`[Bulk Download Phase 2] Using pre-created handle for: ${fullPath}`, 'debug');
+                                } else {
+                                    log(`[Bulk Download Phase 2] WARNING: No pre-created handle for: ${fullPath}`, 'warning');
+                                    // Fallback: create directory if somehow it wasn't created in Phase 1
+                                    for (const part of pathParts) {
+                                        if (part) {
+                                            try {
+                                                currentTargetHandle = await currentTargetHandle.getDirectoryHandle(part, { create: true });
+                                            } catch (e) {
+                                                log(`[Bulk Download Phase 2] Fallback directory creation error: ${part}`, 'error');
+                                            }
+                                        }
                                     }
                                 }
                             }
-                            
-                            log(`[Bulk Download TIMING] Directory creation completed in ${Date.now() - dirCreationStart}ms`, 'debug');
                         }
                         
                         // Check if file exists
@@ -17380,6 +17437,9 @@ Do you want to continue?`;
                 
                 // Summary
                 const summary = `Complete: ${completedFiles} files, Skipped: ${skippedFiles} files, Errors: ${errorFiles} files`;
+                
+                // v7.0.53: Log phase 2 completion
+                log(`[Bulk Download Phase 2] File processing completed in ${Date.now() - phaseTwoStart}ms`, 'info');
                 
                 // v7.0.52: Log total timing
                 const totalTime = Date.now() - bulkStartTime;

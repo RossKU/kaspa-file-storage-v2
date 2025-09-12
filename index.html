@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://*.kaspa.org wss://*.kaspa.green wss://*.kaspa.blue wss://*.kaspa.stream wss://*.kaspa.red https://*.kaspa.org https://*.kaspa.green https://*.kaspa.blue https://*.kaspa.stream https://*.kaspa.red; img-src 'self' data: blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none';">
-    <title>Kaspa P2P File Storage v7.0.55</title>
+    <title>Kaspa P2P File Storage v7.0.56</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -17239,10 +17239,11 @@ Do you want to continue?`;
                     if (!entry.path) continue;
                     
                     const pathParts = entry.path.split('/');
-                    pathParts.pop(); // Remove filename
+                    // v7.0.56: entry.path contains directory path only, not filename
+                    // Don't pop() here as it would remove the directory name itself
                     
-                    if (pathParts.length > 0) {
-                        const fullPath = pathParts.join('/');
+                    if (pathParts.length > 0 && pathParts[0] !== '') {
+                        const fullPath = entry.path; // Use path directly as it contains the full directory path
                         
                         // Skip if we already created this directory path
                         if (directoryHandles.has(fullPath)) {
@@ -17308,12 +17309,13 @@ Do you want to continue?`;
                         let currentTargetHandle = targetHandle;
                         
                         // v7.0.53: Use pre-created directory handle from Phase 1
-                        if (entry.path) {
+                        if (entry.path && entry.path !== '') {
                             const pathParts = entry.path.split('/');
-                            pathParts.pop(); // Remove filename
+                            // v7.0.56: entry.path contains directory path only, not filename
+                            // Don't pop() here
                             
-                            if (pathParts.length > 0) {
-                                const fullPath = pathParts.join('/');
+                            if (pathParts.length > 0 && pathParts[0] !== '') {
+                                const fullPath = entry.path; // Use path directly
                                 const preCreatedHandle = directoryHandles.get(fullPath);
                                 
                                 if (preCreatedHandle) {
@@ -17322,6 +17324,7 @@ Do you want to continue?`;
                                 } else {
                                     log(`[Bulk Download Phase 2] WARNING: No pre-created handle for: ${fullPath}`, 'warning');
                                     // Fallback: create directory if somehow it wasn't created in Phase 1
+                                    // Use pathParts which now contains the full path (not popped)
                                     for (const part of pathParts) {
                                         if (part) {
                                             try {

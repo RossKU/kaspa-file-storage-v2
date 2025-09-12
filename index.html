@@ -11516,9 +11516,7 @@ Do you want to continue?`;
                     // v6.2.33: Skip download if addToListOnly is true
                     let blob = null;
                     if (!addToListOnly) {
-                        log(`[DownloadManager DEBUG] chunks[0]: ${metadata.chunks[0]?.substring(0, 16)}...`, 'debug');
-                        log(`[DownloadManager DEBUG] chunks array length: ${metadata.chunks?.length}`, 'debug');
-                        log(`[DownloadManager DEBUG] chunkStructure.type: ${metadata.chunkStructure?.type}`, 'debug');
+                        // Chunks data validated
                         
                         // v5.3.16: Debug logs
                         log(`[DownloadManager v5.3.16] parallelDownloadEnabled: ${AppState.settings.parallelDownloadEnabled}`, 'debug');
@@ -11900,8 +11898,7 @@ Do you want to continue?`;
                     if (folderStructure && folderStructure.enabled && 'showDirectoryPicker' in window) {
                         try {
                             log('[DownloadManager] Starting download with folder structure', 'info');
-                            log(`[DownloadManager DEBUG] folderStructure.targetHandle exists: ${!!folderStructure.targetHandle}`, 'debug');
-                            log(`[DownloadManager DEBUG] showDirectoryPicker in window: ${'showDirectoryPicker' in window}`, 'debug');
+                            // Check folder structure
                             
                             let targetHandle;
                             
@@ -11909,8 +11906,7 @@ Do you want to continue?`;
                             if (folderStructure.targetHandle) {
                                 targetHandle = folderStructure.targetHandle;
                                 log('[DownloadManager] Using provided targetHandle', 'info');
-                                log(`[DownloadManager DEBUG] targetHandle.name: ${targetHandle?.name || 'undefined'}`, 'debug');
-                                log(`[DownloadManager DEBUG] targetHandle.kind: ${targetHandle?.kind || 'undefined'}`, 'debug');
+                                // Target handle ready
                             } else {
                                 log('[DownloadManager WARNING] No targetHandle provided, showing directory picker', 'warning');
                                 // Show directory picker
@@ -11919,7 +11915,7 @@ Do you want to continue?`;
                                     mode: 'readwrite'
                                 });
                                 targetHandle = dirHandle;
-                                log(`[DownloadManager DEBUG] User selected directory: ${dirHandle?.name}`, 'debug');
+                                // User selected directory
                             }
                             
                             // Create or navigate to base directory
@@ -11959,13 +11955,9 @@ Do you want to continue?`;
                                 // Phase separation handles the timing issues
                                 const skipAndroidWorkaround = isAndroidUA && folderStructure && folderStructure.targetHandle;
                                 
-                                if (skipAndroidWorkaround) {
-                                    log(`[DownloadManager DEBUG] v7.0.55: Using targetHandle from phase separation (skipping Android workaround)`, 'debug');
-                                }
+                                // Skip Android workaround when targetHandle is provided (bulk download)
                                 
                                 // Standard processing
-                                log(`[DownloadManager DEBUG] Creating file: ${fileName}`, 'debug');
-                                log(`[DownloadManager DEBUG] targetHandle before getFileHandle: ${!!targetHandle}`, 'debug');
                                 
                                 let fileHandle;
                                 
@@ -11973,93 +11965,72 @@ Do you want to continue?`;
                                 if (skipAndroidWorkaround) {
                                     // Phase separation handles timing, use simple approach
                                     fileHandle = await targetHandle.getFileHandle(fileName, { create: true });
-                                    log(`[DownloadManager DEBUG] v7.0.55: File handle created with phase separation`, 'debug');
+                                    // File handle created with phase separation
                                 } else if (isAndroidUA) {
                                     // Keep Android workaround for non-bulk downloads
-                                    log(`[DownloadManager DEBUG] Android: Using fallback file handle creation`, 'debug');
+                                    // Android: Using fallback file handle creation
                                     
                                     // First, try to get existing file handle without creating
                                     try {
                                         fileHandle = await targetHandle.getFileHandle(fileName, { create: false });
-                                        log(`[DownloadManager DEBUG] Android: Existing file found, removing it`, 'debug');
+                                        // Remove existing file
                                         await targetHandle.removeEntry(fileName);
                                     } catch (e) {
-                                        log(`[DownloadManager DEBUG] Android: No existing file, proceeding`, 'debug');
+                                        // No existing file, proceeding
                                     }
                                     
                                     // Now create fresh file handle
                                     fileHandle = await targetHandle.getFileHandle(fileName, { create: true });
-                                    log(`[DownloadManager DEBUG] Android: Fresh file handle created`, 'debug');
-                                    
                                     // Add delay for Android
-                                    log(`[DownloadManager DEBUG] Android: Adding 100ms delay before createWritable`, 'debug');
                                     await new Promise(resolve => setTimeout(resolve, 100));
                                 } else {
                                     fileHandle = await targetHandle.getFileHandle(fileName, { create: true });
                                 }
                                 
-                                log(`[DownloadManager DEBUG] fileHandle created: ${!!fileHandle}`, 'debug');
-                                log(`[DownloadManager DEBUG] fileHandle.name: ${fileHandle?.name}`, 'debug');
-                                log(`[DownloadManager DEBUG] fileHandle.kind: ${fileHandle?.kind}`, 'debug');
-                                
-                                // v7.0.46: Try immediate createWritable to avoid state invalidation
-                                log(`[DownloadManager DEBUG] Attempting createWritable`, 'debug');
+                                // Try createWritable
                                 
                                 // v7.0.44: Add detailed error handling for createWritable
                                 let writable;
                                 try {
-                                    log(`[DownloadManager DEBUG] Attempting createWritable...`, 'debug');
-                                    
-                                    // v7.0.46: More detailed debugging
-                                    log(`[DownloadManager DEBUG] fileHandle type: ${typeof fileHandle}`, 'debug');
-                                    log(`[DownloadManager DEBUG] fileHandle constructor: ${fileHandle?.constructor?.name}`, 'debug');
-                                    log(`[DownloadManager DEBUG] targetHandle type: ${typeof targetHandle}`, 'debug');
-                                    log(`[DownloadManager DEBUG] targetHandle constructor: ${targetHandle?.constructor?.name}`, 'debug');
+                                    // Attempt createWritable
+                                    // Check handle properties
                                     
                                     // Check if handles are valid
                                     if (fileHandle.isSameEntry && targetHandle.isSameEntry) {
                                         try {
                                             const isSame = await fileHandle.isSameEntry(fileHandle);
-                                            log(`[DownloadManager DEBUG] fileHandle.isSameEntry(self): ${isSame}`, 'debug');
+                                            // Same entry check
                                         } catch (e) {
-                                            log(`[DownloadManager DEBUG] isSameEntry check failed: ${e.message}`, 'debug');
+                                            // Same entry check failed
                                         }
                                     }
                                     
                                     // Check permissions
                                     const targetPerm = await targetHandle.queryPermission({ mode: 'readwrite' }).catch(e => 'N/A');
-                                    log(`[DownloadManager DEBUG] targetHandle.queryPermission: ${targetPerm}`, 'debug');
+                                    // Permission checked
                                     
                                     // Try to check file handle permission
                                     if (fileHandle.queryPermission) {
                                         const filePerm = await fileHandle.queryPermission({ mode: 'readwrite' }).catch(e => 'N/A');
-                                        log(`[DownloadManager DEBUG] fileHandle.queryPermission: ${filePerm}`, 'debug');
+                                        // File permission checked
                                     }
                                     
                                     // Log timing
                                     const startTime = Date.now();
-                                    log(`[DownloadManager DEBUG] Starting createWritable at: ${startTime}`, 'debug');
+                                    // Starting createWritable
                                     
                                     // v7.0.55: Simple createWritable when phase separation is active
                                     if (skipAndroidWorkaround) {
                                         writable = await fileHandle.createWritable();
-                                        log(`[DownloadManager DEBUG] v7.0.55: Using standard createWritable with phase separation`, 'debug');
                                     } else if (isAndroidUA) {
                                         // v7.0.48: Try createWritable with options for Android (non-bulk downloads)
-                                        log(`[DownloadManager DEBUG] Android: Using createWritable with keepExistingData: false`, 'debug');
                                         
                                         // v7.0.49: Add more detailed handle state logging
-                                        log(`[DownloadManager DEBUG] Android: fileHandle methods available:`, 'debug');
-                                        log(`[DownloadManager DEBUG] - getFile: ${typeof fileHandle.getFile}`, 'debug');
-                                        log(`[DownloadManager DEBUG] - createWritable: ${typeof fileHandle.createWritable}`, 'debug');
-                                        log(`[DownloadManager DEBUG] - createSyncAccessHandle: ${typeof fileHandle.createSyncAccessHandle}`, 'debug');
                                         
                                         // Try to get file info before createWritable
                                         try {
                                             const file = await fileHandle.getFile();
-                                            log(`[DownloadManager DEBUG] Android: File info - size: ${file.size}, lastModified: ${file.lastModified}`, 'debug');
                                         } catch (e) {
-                                            log(`[DownloadManager DEBUG] Android: Could not get file info: ${e.message}`, 'debug');
                                         }
                                         
                                         writable = await fileHandle.createWritable({ keepExistingData: false });
@@ -12068,29 +12039,20 @@ Do you want to continue?`;
                                     }
                                     
                                     const endTime = Date.now();
-                                    log(`[DownloadManager DEBUG] createWritable succeeded after ${endTime - startTime}ms`, 'debug');
-                                    log(`[DownloadManager DEBUG] writable created: ${!!writable}`, 'debug');
                                 } catch (writeError) {
                                     log(`[DownloadManager ERROR] createWritable failed: ${writeError.name}: ${writeError.message}`, 'error');
-                                    log(`[DownloadManager DEBUG] Error stack: ${writeError.stack}`, 'debug');
-                                    log(`[DownloadManager DEBUG] Error code: ${writeError.code}`, 'debug');
-                                    log(`[DownloadManager DEBUG] Full error object: ${JSON.stringify(writeError, Object.getOwnPropertyNames(writeError))}`, 'debug');
                                     
                                     // v7.0.49: Clean up 0-byte file on Android if createWritable fails
                                     if (isAndroidUA && writeError.name === 'InvalidStateError') {
                                         try {
-                                            log(`[DownloadManager DEBUG] Android: Cleaning up 0-byte file after createWritable failure`, 'debug');
                                             await targetHandle.removeEntry(fileName);
-                                            log(`[DownloadManager DEBUG] Android: 0-byte file removed successfully`, 'debug');
                                         } catch (removeError) {
-                                            log(`[DownloadManager DEBUG] Android: Could not remove 0-byte file: ${removeError.message}`, 'debug');
                                         }
                                     }
                                     
                                     // v7.0.45: Try alternative approach - recreate file handle from original handle
                                     const originalHandle = folderStructure.originalHandle || WorkspaceState.handle;
                                     if (originalHandle && writeError.name === 'InvalidStateError') {
-                                        log(`[DownloadManager DEBUG] Trying alternative approach with original handle`, 'debug');
                                         try {
                                             // Build full path from original handle
                                             let altHandle = originalHandle;
@@ -12099,11 +12061,9 @@ Do you want to continue?`;
                                             if (folderStructure.basePath) {
                                                 // Split path and create directories one by one
                                                 const pathParts = folderStructure.basePath.split('/').filter(p => p);
-                                                log(`[DownloadManager DEBUG] Creating path: ${pathParts.join('/')}`, 'debug');
                                                 
                                                 for (const part of pathParts) {
                                                     altHandle = await altHandle.getDirectoryHandle(part, { create: true });
-                                                    log(`[DownloadManager DEBUG] Created/navigated to: ${part}`, 'debug');
                                                 }
                                             }
                                             
@@ -12113,14 +12073,11 @@ Do you want to continue?`;
                                                 try {
                                                     const existingFile = await altHandle.getFileHandle(fileName, { create: false });
                                                     await altHandle.removeEntry(fileName);
-                                                    log(`[DownloadManager DEBUG] Alt approach: Removed existing file`, 'debug');
                                                 } catch (e) {
-                                                    log(`[DownloadManager DEBUG] Alt approach: No existing file`, 'debug');
                                                 }
                                             }
                                             
                                             const altFileHandle = await altHandle.getFileHandle(fileName, { create: true });
-                                            log(`[DownloadManager DEBUG] Alt file handle created: ${!!altFileHandle}`, 'debug');
                                             
                                             // v7.0.48: Use keepExistingData: false for Android
                                             if (isAndroidUA) {
@@ -12128,25 +12085,20 @@ Do you want to continue?`;
                                             } else {
                                                 writable = await altFileHandle.createWritable();
                                             }
-                                            log(`[DownloadManager DEBUG] writable created with alt approach: ${!!writable}`, 'debug');
                                         } catch (altError) {
                                             log(`[DownloadManager ERROR] Alternative approach failed: ${altError.message}`, 'error');
                                             
                                             // v7.0.49: Clean up any 0-byte files after alternative approach failure
                                             if (isAndroidUA) {
                                                 try {
-                                                    log(`[DownloadManager DEBUG] Android: Cleaning up 0-byte files after alt approach failure`, 'debug');
                                                     // Try to remove from both handles
                                                     try {
                                                         await targetHandle.removeEntry(fileName);
-                                                        log(`[DownloadManager DEBUG] Android: Removed from targetHandle`, 'debug');
                                                     } catch (e) {}
                                                     try {
                                                         await altHandle.removeEntry(fileName);
-                                                        log(`[DownloadManager DEBUG] Android: Removed from altHandle`, 'debug');
                                                     } catch (e) {}
                                                 } catch (cleanupError) {
-                                                    log(`[DownloadManager DEBUG] Android: Cleanup error: ${cleanupError.message}`, 'debug');
                                                 }
                                             }
                                             
@@ -12157,18 +12109,11 @@ Do you want to continue?`;
                                             const isAndroid = /Android/i.test(navigator.userAgent);
                                             const isMobileChrome = /Chrome.*Mobile/i.test(navigator.userAgent);
                                             const isAndroidEnvironment = isAndroid || isMobileChrome;
-                                            log(`[DownloadManager DEBUG] isAndroid: ${isAndroid}`, 'debug');
-                                            log(`[DownloadManager DEBUG] isMobileChrome: ${isMobileChrome}`, 'debug');
-                                            log(`[DownloadManager DEBUG] isAndroidEnvironment: ${isAndroidEnvironment}`, 'debug');
-                                            log(`[DownloadManager DEBUG] navigator.userAgent: ${navigator.userAgent}`, 'debug');
                                             
                                             // Try different download methods
-                                            log(`[DownloadManager DEBUG] Blob size for download: ${blob.size} bytes`, 'debug');
-                                            log(`[DownloadManager DEBUG] File name: ${fileName}`, 'debug');
                                             
                                             // Method 1: Create download link with longer delay
                                             const url = URL.createObjectURL(blob);
-                                            log(`[DownloadManager DEBUG] Blob URL created: ${url}`, 'debug');
                                             
                                             const a = document.createElement('a');
                                             a.href = url;
@@ -12176,19 +12121,15 @@ Do you want to continue?`;
                                             a.style.display = 'none';
                                             document.body.appendChild(a);
                                             
-                                            log(`[DownloadManager DEBUG] Anchor element created and added to DOM`, 'debug');
                                             
                                             // Try click with timeout
                                             setTimeout(() => {
-                                                log(`[DownloadManager DEBUG] Attempting click on anchor element`, 'debug');
                                                 a.click();
-                                                log(`[DownloadManager DEBUG] Click executed`, 'debug');
                                                 
                                                 // Cleanup after delay
                                                 setTimeout(() => {
                                                     document.body.removeChild(a);
                                                     URL.revokeObjectURL(url);
-                                                    log(`[DownloadManager DEBUG] Cleanup completed`, 'debug');
                                                 }, 1000);
                                             }, 100);
                                             
@@ -12232,16 +12173,12 @@ Do you want to continue?`;
                                         }
                                     } else if (targetHandle.requestPermission) {
                                         // Original permission retry logic
-                                        log(`[DownloadManager DEBUG] Requesting permission again...`, 'debug');
                                         const permission = await targetHandle.requestPermission({ mode: 'readwrite' }).catch(e => {
-                                            log(`[DownloadManager DEBUG] requestPermission failed: ${e.message}`, 'debug');
                                             return null;
                                         });
-                                        log(`[DownloadManager DEBUG] Permission result: ${permission}`, 'debug');
                                         
                                         if (permission === 'granted') {
                                             writable = await fileHandle.createWritable();
-                                            log(`[DownloadManager DEBUG] writable created after permission request: ${!!writable}`, 'debug');
                                         } else {
                                             throw writeError;
                                         }
@@ -12250,10 +12187,8 @@ Do you want to continue?`;
                                     }
                                 }
                                 
-                                log(`[DownloadManager DEBUG] blob size: ${blob.size} bytes`, 'debug');
                                 
                                 await writable.write(blob);
-                                log(`[DownloadManager DEBUG] blob written to writable`, 'debug');
                                 
                                 await writable.close();
                                 log(`[DownloadManager] File save complete: ${folderStructure.filePath || fileName}`, 'success');
@@ -17185,35 +17120,29 @@ Do you want to continue?`;
                 const baseDirName = dirMetadata.directory?.name || 'download';
                 let targetHandle = WorkspaceState.handle;
                 
-                // v7.0.44: Debug WorkspaceState.handle status
-                log(`[Bulk Download DEBUG] WorkspaceState.handle exists: ${!!WorkspaceState.handle}`, 'debug');
-                log(`[Bulk Download DEBUG] WorkspaceState.handle.name: ${WorkspaceState.handle?.name}`, 'debug');
-                log(`[Bulk Download DEBUG] WorkspaceState.handle.kind: ${WorkspaceState.handle?.kind}`, 'debug');
+                // Check WorkspaceState.handle status
                 
                 try {
                     // v7.0.44: Check permission before creating subdirectory
                     if (WorkspaceState.handle.queryPermission) {
                         const permission = await WorkspaceState.handle.queryPermission({ mode: 'readwrite' }).catch(e => 'N/A');
-                        log(`[Bulk Download DEBUG] WorkspaceState.handle permission: ${permission}`, 'debug');
+                        // Permission checked
                     }
                     
-                    // v7.0.45: Track handle chain creation
-                    log(`[Bulk Download DEBUG] Creating subdirectory handle from WorkspaceState.handle`, 'debug');
-                    log(`[Bulk Download DEBUG] WorkspaceState.handle isSameEntry: ${WorkspaceState.handle.isSameEntry ? 'available' : 'not available'}`, 'debug');
+                    // Track handle chain creation
                     
                     targetHandle = await WorkspaceState.handle.getDirectoryHandle(baseDirName, { create: true });
                     log(`[Bulk Download] Create/get base directory: ${baseDirName}`, 'info');
-                    log(`[Bulk Download DEBUG] New targetHandle created from WorkspaceState.handle`, 'debug');
-                    log(`[Bulk Download DEBUG] targetHandle isSameEntry: ${targetHandle.isSameEntry ? 'available' : 'not available'}`, 'debug');
+                    // New targetHandle created
                     
                     // v7.0.45: Test if derived handle is still valid
                     if (targetHandle.queryPermission) {
                         const derivedPermission = await targetHandle.queryPermission({ mode: 'readwrite' }).catch(e => 'N/A');
-                        log(`[Bulk Download DEBUG] Derived targetHandle permission: ${derivedPermission}`, 'debug');
+                        // Permission validated
                     }
                 } catch (e) {
                     log(`[Bulk Download] Base directory creation error: ${e.message}`, 'error');
-                    log(`[Bulk Download DEBUG] Error stack: ${e.stack}`, 'debug');
+                    // Error details logged above
                 }
                 
                 // Process each entry
@@ -17223,10 +17152,8 @@ Do you want to continue?`;
                 let skippedFiles = 0;
                 let errorFiles = 0;
                 
-                // v7.0.52: Add timing debug logs
+                // Track timing
                 const bulkStartTime = Date.now();
-                log(`[Bulk Download TIMING] Starting bulk download at ${bulkStartTime}`, 'debug');
-                log(`[Bulk Download TIMING] Total files to process: ${totalFiles}`, 'debug');
                 
                 document.getElementById('downloadProgress').style.display = 'block';
                 
@@ -17303,7 +17230,6 @@ Do you want to continue?`;
                     
                     // v7.0.52: Track individual file timing
                     const fileStartTime = Date.now();
-                    log(`[Bulk Download TIMING] Processing file: ${entry.name} at +${fileStartTime - bulkStartTime}ms`, 'debug');
                     
                     try {
                         // Check if file already exists
@@ -17372,18 +17298,12 @@ Do you want to continue?`;
                         // v7.0.52: Track metadata fetch timing
                         const metadataStart = Date.now();
                         const metadata = await NetworkState.downloadManager.fetchMetadata(entry.metaTxId, entry.blockId, entryPassword);
-                        log(`[Bulk Download TIMING] Metadata fetched in ${Date.now() - metadataStart}ms`, 'debug');
                         
                         // v7.0.43: Fix for Android WebView - pass created handle
-                        log(`[Bulk Download DEBUG] currentTargetHandle exists: ${!!currentTargetHandle}`, 'debug');
-                        log(`[Bulk Download DEBUG] currentTargetHandle.name: ${currentTargetHandle?.name || 'undefined'}`, 'debug');
-                        log(`[Bulk Download DEBUG] currentTargetHandle.kind: ${currentTargetHandle?.kind || 'undefined'}`, 'debug');
-                        log(`[Bulk Download DEBUG] entry.path: ${entry.path || 'root'}`, 'debug');
                         
                         // v7.0.44: Check handle permission status
                         if (currentTargetHandle.queryPermission) {
                             const permission = await currentTargetHandle.queryPermission({ mode: 'readwrite' }).catch(e => 'N/A');
-                            log(`[Bulk Download DEBUG] currentTargetHandle permission: ${permission}`, 'debug');
                         }
                         
                         // v7.0.45: Pass both handles for fallback approach
@@ -17395,11 +17315,9 @@ Do you want to continue?`;
                             originalHandle: WorkspaceState.handle  // v7.0.45: Original handle for fallback
                         };
                         
-                        log(`[Bulk Download DEBUG] folderStructureOption.targetHandle: ${!!folderStructureOption.targetHandle}`, 'debug');
                         
                         // v7.0.52: Track download execution timing
                         const downloadStart = Date.now();
-                        log(`[Bulk Download TIMING] Starting executeDownload at +${downloadStart - fileStartTime}ms from file start`, 'debug');
                         
                         await NetworkState.downloadManager.executeDownload(metadata, entryPassword, {
                             onProgress: (progress) => {
@@ -17413,7 +17331,6 @@ Do you want to continue?`;
                         completedFiles++;
                         
                         // v7.0.52: Log file completion timing
-                        log(`[Bulk Download TIMING] File completed in ${Date.now() - fileStartTime}ms`, 'debug');
                         
                     } catch (error) {
                         errorFiles++;
@@ -17429,8 +17346,6 @@ Do you want to continue?`;
                 
                 // v7.0.52: Log total timing
                 const totalTime = Date.now() - bulkStartTime;
-                log(`[Bulk Download TIMING] Total bulk download time: ${totalTime}ms`, 'debug');
-                log(`[Bulk Download TIMING] Average time per file: ${(totalTime / totalFiles).toFixed(0)}ms`, 'debug');
                 
                 log(`[Bulk Download] Complete - ${summary}`, 'success');
                 document.getElementById('downloadStatus').textContent = summary;

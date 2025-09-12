@@ -6544,24 +6544,24 @@ Do you want to continue?`;
                             html += ` <span style="color: var(--text-secondary); font-size: 12px;">(${escapeHtml((node.size / 1024).toFixed(1))}KB)</span>`;
                         }
                         
-                        // Add copy and download buttons for files
+                        // Add copy and download buttons for files - v7.0.57: Direct HTML embedding
                         if (node.type === 'file' && node.metaTxId) {
-                            const btnId = `btns_${node.metaTxId.substring(0, 8)}_${Date.now()}`;
-                            html += ` <span id="${btnId}" style="margin-left: auto;"></span>`;
+                            // Escape values for safe HTML embedding
+                            const safeMetaTxId = escapeHtml(node.metaTxId);
+                            const safeBlockId = escapeHtml(node.blockId || '');
+                            const safeName = escapeHtml(node.name);
+                            const safePassword = escapeHtml(node.password || password || '');
+                            const safePath = escapeHtml(node.path || '');
                             
-                            // Store button data for later rendering - v6.2.51: Fix duplicate buttons
-                            if (!window.pendingTreeButtons) window.pendingTreeButtons = [];
-                            // Check if this button ID already exists to prevent duplicates
-                            if (!window.pendingTreeButtons.find(btn => btn.id === btnId)) {
-                                window.pendingTreeButtons.push({
-                                    id: btnId,
-                                    metaTxId: node.metaTxId,
-                                    blockId: node.blockId || '',
-                                    fileName: node.name,
-                                    password: node.password || password,
-                                    path: node.path
-                                });
-                            }
+                            // Create copy button
+                            html += ` <button onclick="copyToClipboard('${safeMetaTxId}:${safeBlockId}')" `;
+                            html += `class="small-button" style="margin-left: auto; padding: 4px 8px; font-size: 12px;" `;
+                            html += `title="Copy TxID:BlockID">Copy</button>`;
+                            
+                            // Create download button
+                            html += ` <button onclick="downloadFileFromDirectory('${safeMetaTxId}','${safeBlockId}','${safeName}','${safePassword}','${safePath}')" `;
+                            html += `class="small-button" style="margin-left: 5px; padding: 4px 8px; font-size: 12px;" `;
+                            html += `title="Download">DL</button>`;
                         }
                         
                         html += '</div>';
@@ -16964,8 +16964,8 @@ Do you want to continue?`;
                     let fileListHtml = '<br><strong>📊 Hierarchy:</strong><br>';
                     fileListHtml += '<div style="border: 1px solid var(--border-dark); padding: 10px; margin-top: 10px; font-family: monospace; background: var(--background-light);">';
                     
-                    // v6.2.51: Clear pending buttons before rendering new tree
-                    window.pendingTreeButtons = [];
+                    // v7.0.57: Direct HTML embedding - no longer using pendingTreeButtons
+                    // window.pendingTreeButtons = [];
                     
                     // Build tree structure
                     const tree = window.SharedTreeBuilder.buildTreeStructure(dirMetadata.entries, dirMetadata.directory.name);
@@ -16997,7 +16997,8 @@ Do you want to continue?`;
                             window.pendingButtons = [];
                         }
                         
-                        // v5.11.114: Handle tree view buttons with copy functionality
+                        // v7.0.57: Direct HTML embedding - pendingTreeButtons no longer needed
+                        /*
                         if (window.pendingTreeButtons && window.pendingTreeButtons.length > 0) {
                             window.pendingTreeButtons.forEach((btnData) => {
                                 const placeholder = document.getElementById(btnData.id);
@@ -17032,6 +17033,7 @@ Do you want to continue?`;
                             });
                             window.pendingTreeButtons = [];
                         }
+                        */
                         
                         // v4.6.32: Debug button display confirmation
                         setTimeout(() => {

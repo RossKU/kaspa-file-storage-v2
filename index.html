@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://*.kaspa.org wss://*.kaspa.green wss://*.kaspa.blue wss://*.kaspa.stream wss://*.kaspa.red https://*.kaspa.org https://*.kaspa.green https://*.kaspa.blue https://*.kaspa.stream https://*.kaspa.red; img-src 'self' data: blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none';">
-    <title>Kaspa P2P File Storage v7.0.56</title>
+    <title>Kaspa P2P File Storage v7.0.60</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -8739,8 +8739,9 @@ Do you want to continue?`;
                             return JSON.parse(value);
                         } catch (e) {
                             ;
-                            // Delete corrupted data
-                            localStorage.removeItem(key);
+                            // v7.0.60: Don't delete corrupted data - preserve for recovery
+                            // localStorage.removeItem(key);
+                            log('[SafeStorage] JSON parse failed but data preserved', 'warning');
                             return null;
                         }
                     }

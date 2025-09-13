@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://*.kaspa.org wss://*.kaspa.green wss://*.kaspa.blue wss://*.kaspa.stream wss://*.kaspa.red https://*.kaspa.org https://*.kaspa.green https://*.kaspa.blue https://*.kaspa.stream https://*.kaspa.red; img-src 'self' data: blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none';">
-    <title>Kaspa P2P File Storage v7.0.60</title>
+    <title>Kaspa P2P File Storage v7.0.61</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -4775,6 +4775,130 @@
             }
         }
         
+        // ===== v7.0.61: IndexedDB Helper for KENV Storage =====
+        const KENVDB = {
+            dbName: 'KaspaKENV',
+            version: 1,
+            storeName: 'kenv_data',
+            
+            async save(data) {
+                log('[KENVDB] Saving data to IndexedDB...', 'debug');
+                return new Promise((resolve, reject) => {
+                    const request = indexedDB.open(this.dbName, this.version);
+                    
+                    request.onupgradeneeded = (e) => {
+                        log('[KENVDB] Creating/upgrading database', 'debug');
+                        const db = e.target.result;
+                        if (!db.objectStoreNames.contains(this.storeName)) {
+                            db.createObjectStore(this.storeName);
+                            log('[KENVDB] Object store created', 'debug');
+                        }
+                    };
+                    
+                    request.onsuccess = (e) => {
+                        const db = e.target.result;
+                        const tx = db.transaction(this.storeName, 'readwrite');
+                        const store = tx.objectStore(this.storeName);
+                        
+                        store.put(data, 'kenv');
+                        
+                        tx.oncomplete = () => {
+                            log(`[KENVDB] Data saved successfully (${data.entries?.length || 0} entries)`, 'success');
+                            db.close();
+                            resolve(true);
+                        };
+                        
+                        tx.onerror = () => {
+                            log(`[KENVDB] Save failed: ${tx.error}`, 'error');
+                            db.close();
+                            reject(tx.error);
+                        };
+                    };
+                    
+                    request.onerror = () => {
+                        log(`[KENVDB] Database open failed: ${request.error}`, 'error');
+                        reject(request.error);
+                    };
+                });
+            },
+            
+            async load() {
+                log('[KENVDB] Loading data from IndexedDB...', 'debug');
+                return new Promise((resolve, reject) => {
+                    const request = indexedDB.open(this.dbName, this.version);
+                    
+                    request.onupgradeneeded = (e) => {
+                        const db = e.target.result;
+                        if (!db.objectStoreNames.contains(this.storeName)) {
+                            db.createObjectStore(this.storeName);
+                            log('[KENVDB] Object store created during load', 'debug');
+                        }
+                    };
+                    
+                    request.onsuccess = (e) => {
+                        const db = e.target.result;
+                        const tx = db.transaction(this.storeName, 'readonly');
+                        const store = tx.objectStore(this.storeName);
+                        const getRequest = store.get('kenv');
+                        
+                        getRequest.onsuccess = () => {
+                            const data = getRequest.result;
+                            if (data) {
+                                log(`[KENVDB] Data loaded successfully (${data.entries?.length || 0} entries)`, 'success');
+                            } else {
+                                log('[KENVDB] No data found in IndexedDB', 'info');
+                            }
+                            db.close();
+                            resolve(data || null);
+                        };
+                        
+                        getRequest.onerror = () => {
+                            log(`[KENVDB] Load failed: ${getRequest.error}`, 'error');
+                            db.close();
+                            reject(getRequest.error);
+                        };
+                    };
+                    
+                    request.onerror = () => {
+                        log(`[KENVDB] Database open failed: ${request.error}`, 'error');
+                        reject(request.error);
+                    };
+                });
+            },
+            
+            async clear() {
+                log('[KENVDB] Clearing IndexedDB data...', 'debug');
+                return new Promise((resolve, reject) => {
+                    const request = indexedDB.open(this.dbName, this.version);
+                    
+                    request.onsuccess = (e) => {
+                        const db = e.target.result;
+                        const tx = db.transaction(this.storeName, 'readwrite');
+                        const store = tx.objectStore(this.storeName);
+                        
+                        store.delete('kenv');
+                        
+                        tx.oncomplete = () => {
+                            log('[KENVDB] Data cleared successfully', 'success');
+                            db.close();
+                            resolve(true);
+                        };
+                        
+                        tx.onerror = () => {
+                            log(`[KENVDB] Clear failed: ${tx.error}`, 'error');
+                            db.close();
+                            reject(tx.error);
+                        };
+                    };
+                    
+                    request.onerror = () => {
+                        log(`[KENVDB] Database open failed: ${request.error}`, 'error');
+                        reject(request.error);
+                    };
+                });
+            }
+        };
+        
         // ===== Phase 5: File State Refactoring (v5.5.0) =====
         // Starting with progressManager only - minimal safe step
         const FileState = {
@@ -5430,61 +5554,31 @@
                 }
             },
             
-            // Save to LocalStorage
+            // v7.0.61: Save to IndexedDB (no size limitations!)
             async saveToLocalStorage() {
-                const KENV_LOCALSTORAGE_LIMIT = 5 * 1024 * 1024; // 5MB
-                const MAX_ENTRIES_IN_LOCALSTORAGE = 500; // Maximum 500 items
+                log('[KENV] Starting IndexedDB save operation', 'debug');
                 
                 try {
-                    // Step 1: Entry count check
-                    let entriesToSave = this.entries;
-                    let truncated = false;
-                    
-                    if (entriesToSave.length > MAX_ENTRIES_IN_LOCALSTORAGE) {
-                        entriesToSave = this.entries.slice(-MAX_ENTRIES_IN_LOCALSTORAGE);
-                        truncated = true;
-                        log(`[KENV] Entry limit: Only ${MAX_ENTRIES_IN_LOCALSTORAGE} of ${this.entries.length} items saved`, 'warning');
-                    }
-                    
-                    // Step 2: Data preparation
+                    // Data preparation (no truncation needed with IndexedDB!)
                     const data = {
-                        entries: entriesToSave,
+                        entries: this.entries,
                         kindex: this.kindex,
                         version: '3.1.3',
                         timestamp: new Date().toISOString(),
-                        truncated: truncated,
-                        originalCount: truncated ? this.entries.length : undefined,
-                        savedCount: entriesToSave.length
+                        truncated: false,
+                        savedCount: this.entries.length
                     };
                     
-                    // Step 3: Size check
-                    const dataStr = JSON.stringify(data);
-                    if (dataStr.length > KENV_LOCALSTORAGE_LIMIT) {
-                        // Further reduction
-                        const reductionRatio = KENV_LOCALSTORAGE_LIMIT / dataStr.length;
-                        const targetCount = Math.floor(entriesToSave.length * reductionRatio * 0.8);
-                        entriesToSave = entriesToSave.slice(-targetCount);
-                        
-                        // Prepare data again
-                        data.entries = entriesToSave;
-                        data.truncated = true;
-                        data.originalCount = this.entries.length;
-                        data.savedCount = entriesToSave.length;
-                        
-                        log(`[KENV] Capacity limit: ${(dataStr.length/1024/1024).toFixed(1)}MB → Reduced to 5MB`, 'warning');
-                    }
+                    log(`[KENV] Preparing to save ${this.entries.length} entries to IndexedDB`, 'info');
                     
-                    // Step 4: Save
-                    const result = SafeStorage.setItem('kenv_temp_data', JSON.stringify(data));
-                    if (result.success) {
-                        log(`[KENV] Saved to LocalStorage (${entriesToSave.length} items)`, 'success');
+                    // Save to IndexedDB
+                    const result = await KENVDB.save(data);
+                    
+                    if (result) {
+                        log(`[KENV] Successfully saved ${this.entries.length} items to IndexedDB (no size limit!)`, 'success');
                         return true;
                     } else {
-                        if (result.error === 'quota_exceeded') {
-                            log('[KENV] LocalStorage capacity insufficient - Workspace setting recommended', 'error');
-                        } else {
-                            log(`[KENV] LocalStorage save error: ${result.error}`, 'error');
-                        }
+                        log('[KENV] IndexedDB save failed', 'error');
                         return false;
                     }
                 } catch (error) {
@@ -5848,15 +5942,17 @@
                 log('[KENV] Initialization started', 'info');
                 
                 try {
-                    // Step 1: Try to restore from LocalStorage
-                    const tempData = this.loadFromLocalStorage();
+                    // Step 1: Try to restore from IndexedDB (v7.0.61)
+                    log('[KENV] Attempting to restore from IndexedDB', 'debug');
+                    const tempData = await this.loadFromLocalStorage();
                     if (tempData) {
                         this.entries = tempData.entries || [];
                         this.kindex = tempData.kindex || this.createEmptyIndex();
-                        log(`[KENV] Restored ${this.entries.length} items from LocalStorage`, 'info');
+                        log(`[KENV] Restored ${this.entries.length} items from IndexedDB`, 'info');
                         
+                        // v7.0.61: No truncation with IndexedDB!
                         if (tempData.truncated) {
-                            log(`[KENV] Partial data restored due to capacity limit (${tempData.savedCount}/${tempData.originalCount} items)`, 'warning');
+                            log(`[KENV] Legacy truncation flag detected (no longer needed with IndexedDB)`, 'debug');
                         }
                     }
                     
@@ -5872,10 +5968,10 @@
                             }
                         }
                         
-                        // Delete from LocalStorage
-                        this.clearLocalStorage();
+                        // Delete from IndexedDB (v7.0.61)
+                        await this.clearLocalStorage();
                     } else {
-                        log('[KENV] Workspace not set - Operating in LocalStorage mode', 'info');
+                        log('[KENV] Workspace not set - Operating in IndexedDB mode', 'info');
                     }
                     
                     this._initialized = true;
@@ -6003,16 +6099,31 @@
             },
             
             // Load from LocalStorage
-            loadFromLocalStorage() {
-                const data = SafeStorage.getItem('kenv_temp_data');
-                if (!data) return null;
+            // v7.0.61: Load from IndexedDB
+            async loadFromLocalStorage() {
+                log('[KENV] Starting IndexedDB load operation', 'debug');
                 
-                if (this.validateKENVData(data)) {
-                    return data;
+                try {
+                    const data = await KENVDB.load();
+                    
+                    if (!data) {
+                        log('[KENV] No data found in IndexedDB', 'info');
+                        return null;
+                    }
+                    
+                    log(`[KENV] Data loaded from IndexedDB, validating...`, 'debug');
+                    
+                    if (this.validateKENVData(data)) {
+                        log(`[KENV] IndexedDB data validated successfully (${data.entries?.length || 0} entries)`, 'success');
+                        return data;
+                    }
+                    
+                    log('[KENV] IndexedDB data validation failed', 'error');
+                    return null;
+                } catch (error) {
+                    log(`[KENV] IndexedDB load error: ${error.message}`, 'error');
+                    return null;
                 }
-                
-                log('[KENV] LocalStorage data validation failed', 'error');
-                return null;
             },
             
             // Data validation
@@ -6259,13 +6370,23 @@ Do you want to continue?`;
                 return confirm(message);
             },
             
-            // Clear LocalStorage
-            clearLocalStorage() {
-                const result = SafeStorage.removeItem('kenv_temp_data');
-                if (result.success) {
-                    log('[KENV] LocalStorage cleared', 'debug');
-                } else {
-                    log(`[KENV] LocalStorage clear error: ${result.error}`, 'error');
+            // v7.0.61: Clear IndexedDB
+            async clearLocalStorage() {
+                log('[KENV] Starting IndexedDB clear operation', 'debug');
+                
+                try {
+                    const result = await KENVDB.clear();
+                    
+                    if (result) {
+                        log('[KENV] IndexedDB data cleared successfully', 'success');
+                        return true;
+                    } else {
+                        log('[KENV] IndexedDB clear failed', 'error');
+                        return false;
+                    }
+                } catch (error) {
+                    log(`[KENV] IndexedDB clear error: ${error.message}`, 'error');
+                    return false;
                 }
             },
             

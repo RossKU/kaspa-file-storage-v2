@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://*.kaspa.org wss://*.kaspa.green wss://*.kaspa.blue wss://*.kaspa.stream wss://*.kaspa.red https://*.kaspa.org https://*.kaspa.green https://*.kaspa.blue https://*.kaspa.stream https://*.kaspa.red; img-src 'self' data: blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none';">
-    <title>Kaspa P2P File Storage v7.0.64</title>
+    <title>Kaspa P2P File Storage v7.0.65</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -4238,8 +4238,8 @@
         // ===== Archive Node Manager (v5.10.21) =====
         class ArchiveNodeManager {
             constructor(config = {}) {
-                // Configuration (customizable) (v5.11.101)
-                this.networkId = config.network || config.defaultNetwork || 'testnet-10';
+                // Configuration (customizable) (v5.11.101, v7.0.65: Fixed network initialization)
+                this.networkId = config.networkId || config.network || 'testnet-10';
                 this.archiveThreshold = this.loadThreshold(); // Load saved threshold
                 this.testOldBlocks = true; // Enable old block testing
                 this.blocksPerSecond = 10;
@@ -4688,7 +4688,33 @@
                 
                 this.addEvent('Reset complete', '✅');
             }
-            
+
+            // v7.0.65: Update network when main network changes
+            updateNetwork(newNetwork) {
+                if (this.networkId !== newNetwork) {
+                    this.log(`Updating network from ${this.networkId} to ${newNetwork}`);
+                    this.networkId = newNetwork;
+
+                    // Stop current connections
+                    this.stop();
+
+                    // Update threshold for new network
+                    this.archiveThreshold = this.loadThreshold();
+
+                    // Update UI
+                    const archiveNetworkDisplay = document.getElementById('archiveNetworkDisplay');
+                    if (archiveNetworkDisplay) {
+                        archiveNetworkDisplay.textContent = newNetwork === 'testnet-10' ? 'Testnet-10' : 'Mainnet';
+                    }
+                    const archiveNetwork = document.getElementById('archiveNetwork');
+                    if (archiveNetwork) {
+                        archiveNetwork.textContent = newNetwork === 'testnet-10' ? 'Testnet-10' : 'Mainnet';
+                    }
+
+                    this.log(`Archive manager network updated to ${newNetwork}`);
+                }
+            }
+
             async testBlocks() {
                 if (this.connections.size === 0) {
                     this.addEvent('No connections to test', '❌');
@@ -12775,14 +12801,23 @@ Do you want to continue?`;
                 log('Kaspa module is not initialized', 'error');
                 return;
             }
-            
-            log('Initializing Archive Node Manager...', 'info');
-            
-            // Use config.network for initialization (v5.11.93)
-            const networkId = config.network;
-            
+
+            // v7.0.65: Ensure config.network is properly set before initialization
+            const networkId = config.network || 'testnet-10';
+            log(`Initializing Archive Node Manager for network: ${networkId}`, 'info');
+
             NetworkState.archiveManager = new ArchiveNodeManager({ networkId });
             await NetworkState.archiveManager.initialize();
+
+            // v7.0.65: Update UI to show correct network
+            const archiveNetworkDisplay = document.getElementById('archiveNetworkDisplay');
+            if (archiveNetworkDisplay) {
+                archiveNetworkDisplay.textContent = networkId === 'testnet-10' ? 'Testnet-10' : 'Mainnet';
+            }
+            const archiveNetwork = document.getElementById('archiveNetwork');
+            if (archiveNetwork) {
+                archiveNetwork.textContent = networkId === 'testnet-10' ? 'Testnet-10' : 'Mainnet';
+            }
             
             // Set UI values from manager (v5.11.95 - archiveNetworkSelect removed)
             const thresholdInput = document.getElementById('archiveThresholdInput');

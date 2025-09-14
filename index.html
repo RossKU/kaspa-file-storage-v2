@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://*.kaspa.org wss://*.kaspa.green wss://*.kaspa.blue wss://*.kaspa.stream wss://*.kaspa.red https://*.kaspa.org https://*.kaspa.green https://*.kaspa.blue https://*.kaspa.stream https://*.kaspa.red; img-src 'self' data: blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none';">
-    <title>Kaspa P2P File Storage v7.0.63</title>
+    <title>Kaspa P2P File Storage v7.0.64</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -2457,7 +2457,7 @@
                 <h3>Network Settings</h3>
                 <label>Network</label>
                 <select id="networkSelect">
-                    <option value="testnet-10" selected>Testnet-10 (for testing)</option>
+                    <option value="testnet-10">Testnet-10 (for testing)</option>
                     <option value="mainnet">Mainnet (Production)</option>
                 </select>
                 
@@ -19346,6 +19346,9 @@ Do you want to continue?`;
             document.getElementById('networkSelect').addEventListener('change', async (e) => {
                 const previousNetwork = config.network;
                 config.network = e.target.value;
+
+                // v7.0.64: Save network preference to localStorage
+                localStorage.setItem('selectedNetwork', config.network);
                 log(`Network changed: ${previousNetwork} → ${config.network}`, 'info');
                 
                 // v5.11.102: Reset connection on network change
@@ -20222,14 +20225,25 @@ Do you want to continue?`;
             
             log('Page loaded - Auto-initializing system', 'info');
             
-            // Initialize config.network from networkSelect (v5.11.92, v5.11.101)
+            // v7.0.64: Initialize network from localStorage or default
             const networkSelect = document.getElementById('networkSelect');
-            if (networkSelect && networkSelect.value) {
-                config.network = networkSelect.value;
+            const savedNetwork = localStorage.getItem('selectedNetwork');
+
+            if (savedNetwork && (savedNetwork === 'mainnet' || savedNetwork === 'testnet-10')) {
+                // Use saved network preference
+                config.network = savedNetwork;
+                if (networkSelect) {
+                    networkSelect.value = savedNetwork;
+                }
+                log(`[Config] Network restored from saved preference: ${config.network}`, 'info');
             } else {
+                // Use default network
                 config.network = config.defaultNetwork;
+                if (networkSelect) {
+                    networkSelect.value = config.defaultNetwork;
+                }
+                log(`[Config] Network initialized to default: ${config.network}`, 'info');
             }
-            log(`[Config] Network settings initialized: ${config.network}`, 'info');
             
             // Initialize archive network display (v5.11.94)
             const archiveNetworkDisplay = document.getElementById('archiveNetworkDisplay');

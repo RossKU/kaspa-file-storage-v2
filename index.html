@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://*.kaspa.org wss://*.kaspa.green wss://*.kaspa.blue wss://*.kaspa.stream wss://*.kaspa.red https://*.kaspa.org https://*.kaspa.green https://*.kaspa.blue https://*.kaspa.stream https://*.kaspa.red; img-src 'self' data: blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none';">
-    <title>Kaspa P2P File Storage v7.0.61</title>
+    <title>Kaspa P2P File Storage v7.0.62</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -2277,21 +2277,15 @@
                     <input type="file" id="settingsImportInput" accept=".kenv" style="display: none;" onchange="importSettings(event)">
                 </div>
             </div>
-            
-            <div class="metric-box">
-                <h3>Theme Settings</h3>
-                <div class="setting-row">
-                    <div class="setting-label">
-                        <label>Theme</label>
-                        <p style="font-size: 12px; margin: 4px 0 0 0; color: var(--text-secondary);">Switch application appearance</p>
-                    </div>
-                    <select id="themeSelect" onchange="changeTheme(this.value)" style="width: 150px;">
-                        <option value="light">☀️ Light</option>
-                        <option value="dark">🌙 Dark</option>
-                    </select>
-                </div>
+
+            <!-- ═══════════════════════════════════════════ -->
+            <!-- v7.0.62: SESSION SETUP (Settings needed every reload) -->
+            <!-- ═══════════════════════════════════════════ -->
+            <div style="background: rgba(255,100,0,0.1); padding: 12px; margin: 20px 0 15px 0; border-left: 4px solid var(--accent-color); border-radius: 4px;">
+                <h2 style="margin: 0; font-size: 18px;">🚀 Session Setup</h2>
+                <p style="margin: 5px 0 0 0; font-size: 12px; color: var(--text-secondary);">毎回の起動時に設定が必要な項目</p>
             </div>
-            
+
             <!-- Wallet & UTXO Management (v6.2.14: Consolidated) -->
             <div class="metric-box">
                 <h3>💰 Wallet & UTXO Management</h3>
@@ -2348,7 +2342,24 @@
                     </div>
                 </div>
             </div>
-            
+
+            <!-- Workspace Settings (Moved from Debug Tab) -->
+            <div class="metric-box">
+                <h3>📁 Workspace Settings</h3>
+                <div id="workspaceStatus" style="margin-top: 15px; padding: 12px; background: var(--bg-secondary); border-radius: 5px;">
+                    <div id="workspaceDisplay" style="font-size: 14px; margin-bottom: 10px;">
+                        Workspace: <span id="workspaceName" style="font-weight: bold;">Not Set (Browser Storage)</span>
+                        <span id="workspaceHelp" onclick="showModal('About Workspace', '<p><strong>Kaspa P2P File Storage - Workspace</strong></p><p><strong>When you set a workspace:</strong><br>✓ Progress is automatically saved to files<br>✓ Downloaded files are organized<br>✓ Progress remains even after closing the browser</p><p><strong>Without workspace setting:</strong><br>✓ Progress is saved in browser<br>✓ No automatic file downloads</p>')" style="cursor: pointer; margin-left: 5px; color: var(--accent-color);">❓</span>
+                    </div>
+                    <button onclick="setupWorkspace()" id="workspaceBtn" style="width: 100%; padding: 10px; background: var(--accent-color); color: var(--button-text-on-accent); border: none; border-radius: 5px; cursor: pointer;">
+                        Select Workspace
+                    </button>
+                </div>
+                <p style="font-size: 12px; color: var(--text-secondary); margin-top: 10px;">
+                    Setting a workspace allows automatic saving of progress files and continuation of work even after closing the browser.
+                </p>
+            </div>
+
             <div class="metric-box">
                 <h3>Network Settings</h3>
                 <label>Network</label>
@@ -2452,23 +2463,8 @@
                 </div>
             </div>
             
-            <!-- Workspace Settings (Moved from Debug Tab) -->
-            <div class="metric-box" style="margin-top: 20px;">
-                <h3>📁 Workspace Settings</h3>
-                <div id="workspaceStatus" style="margin-top: 15px; padding: 12px; background: var(--bg-secondary); border-radius: 5px;">
-                    <div id="workspaceDisplay" style="font-size: 14px; margin-bottom: 10px;">
-                        Workspace: <span id="workspaceName" style="font-weight: bold;">Not Set (Browser Storage)</span>
-                        <span id="workspaceHelp" onclick="showModal('About Workspace', '<p><strong>Kaspa P2P File Storage - Workspace</strong></p><p><strong>When you set a workspace:</strong><br>✓ Progress is automatically saved to files<br>✓ Downloaded files are organized<br>✓ Progress remains even after closing browser</p><p><strong>Without workspace setting:</strong><br>✓ Progress is saved in browser<br>✓ No automatic file downloads</p>')" style="cursor: pointer; margin-left: 5px; color: var(--accent-color);">❓</span>
-                    </div>
-                    <button onclick="setupWorkspace()" id="workspaceBtn" style="width: 100%; padding: 10px; background: var(--accent-color); color: var(--button-text-on-accent); border: none; border-radius: 5px; cursor: pointer;">
-                        Select Workspace
-                    </button>
-                </div>
-                <p style="font-size: 12px; color: var(--text-secondary); margin-top: 10px;">
-                    Setting a workspace allows automatic saving of progress files and continuation of work even after closing the browser.
-                </p>
-            </div>
-            
+            <!-- v7.0.62: Workspace Settings moved to Session Setup section -->
+
             <div class="metric-box" style="display: none;">
                 <!-- v5.11.116: WebSocket Block Statistics -->
                 <div id="wsBlockStats" style="margin-top: 10px; padding: 10px; border-radius: 5px; background: var(--upload-bg); display: none;">

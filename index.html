@@ -18094,7 +18094,48 @@ Do you want to continue?`;
                 if (blockId && (!NetworkState.downloadManager || !NetworkState.downloadManager.forceRestApi)) {
                     log(`Retrieving via RPC using BlockID...`, 'info');
                     try {
-                        const blockResponse = await NetworkState.rpcClient.getBlock({
+                        // Force Archive Mode対応追加
+                        let rpcClient = NetworkState.rpcClient;
+
+                        log(`[DEBUG-VERIFY] Force Archive Mode: ${NetworkState.downloadManager?.forceArchiveNode || false}`, 'debug');
+                        log(`[DEBUG-VERIFY] Archive Manager exists: ${!!NetworkState.archiveManager}`, 'debug');
+                        log(`[DEBUG-VERIFY] Archive connections: ${NetworkState.archiveManager?.connections.size || 0}`, 'debug');
+
+                        if (NetworkState.downloadManager?.forceArchiveNode &&
+                            NetworkState.archiveManager &&
+                            NetworkState.archiveManager.connections.size > 0) {
+
+                            log('[VERIFY] Archive node force mode - Getting optimal client...', 'info');
+                            const archiveClient = await NetworkState.archiveManager.getOptimalClient();
+
+                            log(`[DEBUG-VERIFY] Archive client returned: ${!!archiveClient}`, 'debug');
+
+                            if (archiveClient) {
+                                log(`[DEBUG-VERIFY] Archive client ID: ${archiveClient._debugId || 'unknown'}`, 'debug');
+                                log(`[DEBUG-VERIFY] Archive client URL: ${archiveClient.url || archiveClient._url || 'unknown'}`, 'debug');
+                                log(`[DEBUG-VERIFY] Default client URL: ${NetworkState.rpcClient?.url || NetworkState.rpcClient?._url || 'unknown'}`, 'debug');
+
+                                rpcClient = archiveClient;
+                                log('[VERIFY] Using archive node for verification', 'success');
+                            } else {
+                                log('[VERIFY] No archive node available, using default RPC', 'warning');
+                            }
+                        } else {
+                            log(`[DEBUG-VERIFY] Using default RPC (conditions not met)`, 'debug');
+                            if (!NetworkState.downloadManager?.forceArchiveNode) {
+                                log(`[DEBUG-VERIFY] Reason: Force mode is OFF`, 'debug');
+                            } else if (!NetworkState.archiveManager) {
+                                log(`[DEBUG-VERIFY] Reason: Archive Manager not initialized`, 'debug');
+                            } else if (NetworkState.archiveManager?.connections.size === 0) {
+                                log(`[DEBUG-VERIFY] Reason: No archive connections available`, 'debug');
+                            }
+                        }
+
+                        log(`[DEBUG-VERIFY] Final RPC client ID: ${rpcClient?._debugId || 'default'}`, 'debug');
+                        log(`[DEBUG-VERIFY] Requesting blockId: ${blockId.substring(0, 16)}...`, 'debug');
+
+                        // 選択されたクライアントでブロック取得
+                        const blockResponse = await rpcClient.getBlock({
                             hash: blockId,
                             includeTransactions: true
                         });

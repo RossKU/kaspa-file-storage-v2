@@ -18094,9 +18094,7 @@ Do you want to continue?`;
                 if (blockId && (!NetworkState.downloadManager || !NetworkState.downloadManager.forceRestApi)) {
                     log(`Retrieving via RPC using BlockID...`, 'info');
                     try {
-                        // Force Archive Mode対応追加
-                        let rpcClient = NetworkState.rpcClient;
-
+                        // Force Archive Mode対応 - グローバルRPCクライアント切り替え版
                         log(`[DEBUG-VERIFY] Force Archive Mode: ${NetworkState.downloadManager?.forceArchiveNode || false}`, 'debug');
                         log(`[DEBUG-VERIFY] Archive Manager exists: ${!!NetworkState.archiveManager}`, 'debug');
                         log(`[DEBUG-VERIFY] Archive connections: ${NetworkState.archiveManager?.connections.size || 0}`, 'debug');
@@ -18113,12 +18111,14 @@ Do you want to continue?`;
                             if (archiveClient) {
                                 log(`[DEBUG-VERIFY] Archive client ID: ${archiveClient._debugId || 'unknown'}`, 'debug');
                                 log(`[DEBUG-VERIFY] Archive client URL: ${archiveClient.url || archiveClient._url || 'unknown'}`, 'debug');
-                                log(`[DEBUG-VERIFY] Default client URL: ${NetworkState.rpcClient?.url || NetworkState.rpcClient?._url || 'unknown'}`, 'debug');
+                                log(`[DEBUG-VERIFY] Original RPC client URL: ${NetworkState.rpcClient?.url || NetworkState.rpcClient?._url || 'unknown'}`, 'debug');
 
-                                rpcClient = archiveClient;
-                                log('[VERIFY] Using archive node for verification', 'success');
+                                // グローバルRPCクライアントを切り替え
+                                NetworkState.rpcClient = archiveClient;
+                                log('[VERIFY] Switched NetworkState.rpcClient to archive node', 'success');
+                                log(`[DEBUG-VERIFY] All subsequent RPC calls will use archive node`, 'debug');
                             } else {
-                                log('[VERIFY] No archive node available, using default RPC', 'warning');
+                                log('[VERIFY] No archive node available, keeping default RPC', 'warning');
                             }
                         } else {
                             log(`[DEBUG-VERIFY] Using default RPC (conditions not met)`, 'debug');
@@ -18131,11 +18131,11 @@ Do you want to continue?`;
                             }
                         }
 
-                        log(`[DEBUG-VERIFY] Final RPC client ID: ${rpcClient?._debugId || 'default'}`, 'debug');
+                        log(`[DEBUG-VERIFY] Final RPC client ID: ${NetworkState.rpcClient?._debugId || 'default'}`, 'debug');
                         log(`[DEBUG-VERIFY] Requesting blockId: ${blockId.substring(0, 16)}...`, 'debug');
 
-                        // 選択されたクライアントでブロック取得
-                        const blockResponse = await rpcClient.getBlock({
+                        // NetworkState.rpcClientを使用（切り替え済みならアーカイブノード）
+                        const blockResponse = await NetworkState.rpcClient.getBlock({
                             hash: blockId,
                             includeTransactions: true
                         });

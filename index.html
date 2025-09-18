@@ -4402,10 +4402,22 @@
                         });
 
                         // Removed: DEBUG-ARCHIVE node stored logs to reduce noise
-                        
+
                         const days = calculateDaysFromBlocks(blockCount);
                         this.addEvent(`Archive #${this.connections.size} found! (${blockCountM}M, ${days}days+)`, '🎉');
                         updateArchiveNodeStatus();
+
+                        // Auto-enable Force Archive Mode when archive node is discovered
+                        const toggle = document.getElementById('forceArchiveNodeToggle');
+                        if (toggle && !toggle.checked) {
+                            toggle.checked = true;
+                            if (NetworkState.downloadManager) {
+                                NetworkState.downloadManager.forceArchiveNode = true;
+                            }
+                            log('[ARCHIVE] Auto-enabled Force Mode (archive node discovered)', 'success');
+                            log('[ARCHIVE] Note: Upload/Download will use archive node', 'info');
+                        }
+                        // If already ON, no need to log (avoid noise)
                         
                         // v5.11.119 Phase 2: Reset counter on success
                         this.consecutiveNonArchive = 0;

@@ -18778,7 +18778,40 @@ Do you want to continue?`;
                 ]);
                 return;
             }
-            
+
+            // Force Archive Mode対応 (.kaspaファイル経由用) - 二重切り替え防止版
+            if (NetworkState.downloadManager?.forceArchiveNode &&
+                NetworkState.archiveManager &&
+                NetworkState.archiveManager.connections.size > 0) {
+
+                // 既にアーカイブノードを使用しているか確認
+                const currentId = NetworkState.rpcClient?._debugId;
+                const isArchiveNode = currentId &&
+                    Array.from(NetworkState.archiveManager.connections.values())
+                        .some(node => node.client._debugId === currentId);
+
+                if (!isArchiveNode) {
+                    log('[DOWNLOAD] Force Archive Mode detected for .kaspa file download', 'info');
+                    log(`[DEBUG-DOWNLOAD] Current RPC client ID: ${currentId || 'default'}`, 'debug');
+                    log(`[DEBUG-DOWNLOAD] Archive connections available: ${NetworkState.archiveManager.connections.size}`, 'debug');
+
+                    const archiveClient = await NetworkState.archiveManager.getOptimalClient();
+
+                    if (archiveClient) {
+                        const newId = archiveClient._debugId;
+                        const newUrl = archiveClient.url || archiveClient._url || 'unknown';
+
+                        NetworkState.rpcClient = archiveClient;
+                        log(`[DOWNLOAD] Switched to archive node (ID: ${newId})`, 'success');
+                        log(`[DEBUG-DOWNLOAD] Archive node URL: ${newUrl}`, 'debug');
+                    } else {
+                        log('[DOWNLOAD] No archive node available, continuing with default', 'warning');
+                    }
+                } else {
+                    log(`[DEBUG-DOWNLOAD] Already using archive node (ID: ${currentId}), skipping switch`, 'debug');
+                }
+            }
+
             document.getElementById('downloadProgress').style.display = 'block';
             
             try {

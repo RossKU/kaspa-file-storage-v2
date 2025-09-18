@@ -4345,11 +4345,10 @@
                     
                     await client.connect();
 
-                    // DEBUG: Log connection details
+                    // Store client ID for tracking (logs removed to reduce noise)
                     const clientId = Math.random().toString(36).substr(2, 9);
                     client._debugId = clientId;
-                    log(`[DEBUG-ARCHIVE] Client connected - ID: ${clientId}`, 'debug');
-                    log(`[DEBUG-ARCHIVE] Client URL: ${client.url || client._url || 'unknown'}`, 'debug');
+                    // Removed: DEBUG-ARCHIVE Client connected/URL logs
 
                     // Get node info first
                     const nodeInfo = await client.getServerInfo();
@@ -4402,8 +4401,7 @@
                             }
                         });
 
-                        log(`[DEBUG-ARCHIVE] Archive node stored - NodeID: ${nodeId}, ClientID: ${client._debugId}`, 'debug');
-                        log(`[DEBUG-ARCHIVE] Node details - Blocks: ${blockCount}, Healthy: true`, 'debug');
+                        // Removed: DEBUG-ARCHIVE node stored logs to reduce noise
                         
                         const days = calculateDaysFromBlocks(blockCount);
                         this.addEvent(`Archive #${this.connections.size} found! (${blockCountM}M, ${days}days+)`, '🎉');

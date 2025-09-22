@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://*.kaspa.org wss://*.kaspa.green wss://*.kaspa.blue wss://*.kaspa.stream wss://*.kaspa.red https://*.kaspa.org https://*.kaspa.green https://*.kaspa.blue https://*.kaspa.stream https://*.kaspa.red; img-src 'self' data: blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none';">
-    <title>Kaspa P2P File Storage v7.0.65</title>
+    <title>Kaspa P2P File Storage v7.1.0</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -20494,6 +20494,78 @@ Do you want to continue?`;
     <!-- Multi-Wallet Phase 1 Integration -->
     <script>
         // Define as global variable
+
+        // v7.1.0: Base32 URL-safe encoder/decoder for shareable URLs
+        const Base32URL = {
+            // URL-safe alphabet using 0-9 and A-V (RFC 4648 base32hex variant)
+            // This avoids special characters and is case-insensitive
+            alphabet: '0123456789ABCDEFGHIJKLMNOPQRSTUV',
+
+            encode(str) {
+                if (!str) return '';
+
+                const bytes = new TextEncoder().encode(str);
+                let bits = '';
+                let result = '';
+
+                // Convert bytes to bit string
+                for (const byte of bytes) {
+                    bits += byte.toString(2).padStart(8, '0');
+                }
+
+                // Convert 5-bit chunks to Base32 characters
+                for (let i = 0; i < bits.length; i += 5) {
+                    const chunk = bits.substr(i, 5).padEnd(5, '0');
+                    result += this.alphabet[parseInt(chunk, 2)];
+                }
+
+                return result;
+            },
+
+            decode(str) {
+                if (!str) return '';
+
+                let bits = '';
+
+                // Convert Base32 characters back to bit string
+                for (const char of str.toUpperCase()) {
+                    const index = this.alphabet.indexOf(char);
+                    if (index === -1) continue; // Skip invalid characters
+                    bits += index.toString(2).padStart(5, '0');
+                }
+
+                // Convert 8-bit chunks back to bytes
+                const bytes = [];
+                for (let i = 0; i + 8 <= bits.length; i += 8) {
+                    bytes.push(parseInt(bits.substr(i, 8), 2));
+                }
+
+                return new TextDecoder().decode(new Uint8Array(bytes));
+            },
+
+            // Test function for development
+            test() {
+                const testCases = [
+                    'test',
+                    'TxID:BlockID:Password',
+                    '9e91dfa43ea3a3030fca998b4dd25d916681d32e1feb17a1839acf75bccf5c9f:8d73bfe2ca5e3c4f2a9b7c8d9e0f1a2b3c4d5e6f7081929394a5b6c7d8e9fa0b:myPassword123',
+                    '日本語テスト',
+                    ''
+                ];
+
+                console.log('Base32URL Test Results:');
+                for (const test of testCases) {
+                    const encoded = this.encode(test);
+                    const decoded = this.decode(encoded);
+                    const passed = decoded === test;
+                    console.log(`${passed ? '✅' : '❌'} "${test.substring(0, 20)}..." => "${encoded.substring(0, 30)}..." => "${decoded.substring(0, 20)}..."`);
+                }
+                return true;
+            }
+        };
+
+        // Expose to window for console testing
+        window.Base32URL = Base32URL;
 
         // Safe inline implementation
         class SimpleWalletManager {

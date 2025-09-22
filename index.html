@@ -1971,6 +1971,7 @@
                         <button class="share-option" onclick="shareAction('txid-password')">🔐 TxID (with password)</button>
                         <button class="share-option" onclick="shareAction('txid-no-password')">🔓 TxID (no password)</button>
                         <button class="share-option" onclick="shareAction('password')">🔑 Pass (password only)</button>
+                        <button class="share-option" onclick="shareAction('url')">🌐 Share URL</button>
                     </div>
                 </div>
                 <button class="file-action-btn" onclick="FileTabHandlers.showSelectedFileDetails()">
@@ -22658,7 +22659,44 @@ Do you want to continue?`;
                         // Generate .kaspa file (v5.11.98: Use kenvManager method)
                         await FileState.kenvManager.generateKaspaFile(selectedId, action === 'kaspa-password');
                         break;
-                        
+
+                    case 'url':
+                        // v7.1.0: Generate shareable URL with Base32 encoding
+                        if (!kenvEntry.metaTxId) {
+                            log('Meta transaction ID does not exist', 'error');
+                            return;
+                        }
+                        if (!kenvEntry.password) {
+                            log('Password is not saved', 'error');
+                            return;
+                        }
+
+                        // Prepare data for URL
+                        const blockIdForUrl = kenvEntry.metaTxBlockId || '';
+                        const shareData = blockIdForUrl ?
+                            `${kenvEntry.metaTxId}:${blockIdForUrl}:${kenvEntry.password}` :
+                            `${kenvEntry.metaTxId}::${kenvEntry.password}`;
+
+                        // Encode with Base32URL
+                        const encoded = Base32URL.encode(shareData);
+
+                        // Generate shareable URL
+                        const shareURL = `${window.location.origin}${window.location.pathname}#d=${encoded}`;
+
+                        // Copy to clipboard
+                        await window.copyToClipboard(shareURL);
+
+                        // Show success message with URL preview
+                        const shortUrl = shareURL.length > 80 ?
+                            shareURL.substring(0, 40) + '...' + shareURL.substring(shareURL.length - 30) :
+                            shareURL;
+                        log(`Share URL copied: ${shortUrl}`, 'success');
+
+                        // Also log to console for debugging
+                        console.log('[v7.1.0] Generated Share URL:', shareURL);
+                        console.log('[v7.1.0] URL Length:', shareURL.length, 'characters');
+                        break;
+
                     default:
                         log(`Unknown action: ${action}`, 'error');
                 }

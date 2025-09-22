@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://*.kaspa.org wss://*.kaspa.green wss://*.kaspa.blue wss://*.kaspa.stream wss://*.kaspa.red https://*.kaspa.org https://*.kaspa.green https://*.kaspa.blue https://*.kaspa.stream https://*.kaspa.red; img-src 'self' data: blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none';">
-    <title>Kaspa P2P File Storage v7.1.0</title>
+    <title>Kaspa P2P File Storage v7.1.1</title>
     <style>
         /* Sort arrow styles */
         .sort-arrow {
@@ -20498,9 +20498,9 @@ Do you want to continue?`;
 
         // v7.1.0: Base32 URL-safe encoder/decoder for shareable URLs
         const Base32URL = {
-            // URL-safe alphabet using 0-9 and A-V (RFC 4648 base32hex variant)
+            // URL-safe alphabet using 0-9 and a-v (RFC 4648 base32hex variant, lowercase)
             // This avoids special characters and is case-insensitive
-            alphabet: '0123456789ABCDEFGHIJKLMNOPQRSTUV',
+            alphabet: '0123456789abcdefghijklmnopqrstuv',
 
             encode(str) {
                 if (!str) return '';
@@ -20528,8 +20528,8 @@ Do you want to continue?`;
 
                 let bits = '';
 
-                // Convert Base32 characters back to bit string
-                for (const char of str.toUpperCase()) {
+                // Convert Base32 characters back to bit string (case-insensitive)
+                for (const char of str.toLowerCase()) {
                     const index = this.alphabet.indexOf(char);
                     if (index === -1) continue; // Skip invalid characters
                     bits += index.toString(2).padStart(5, '0');
@@ -23739,7 +23739,7 @@ try {
                             box-shadow: 0 4px 12px rgba(0,0,0,0.3);
                             animation: slideIn 0.3s ease;
                         `;
-                        notification.textContent = '📋 Share data loaded. Click Verify to continue.';
+                        notification.textContent = '✅ Connected to Kaspa network. Go to Download tab and click Verify.';
                         document.body.appendChild(notification);
 
                         // Add slide-in animation

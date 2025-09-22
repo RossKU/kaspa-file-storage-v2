@@ -3963,7 +3963,56 @@
                     // Test connection
                     const info = await NetworkState.rpcClient.getServerInfo();
                     log(`Connected successfully! Server: ${info.serverVersion}`, 'success');
-                    
+
+                    // v7.1.1: Check for pending share URL notification
+                    if (window.pendingShareNotification) {
+                        setTimeout(() => {
+                            const notification = document.createElement('div');
+                            notification.style.cssText = `
+                                position: fixed;
+                                top: 20px;
+                                right: 20px;
+                                background: var(--accent-color);
+                                color: white;
+                                padding: 12px 20px;
+                                border-radius: 8px;
+                                z-index: 10000;
+                                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                                animation: slideIn 0.3s ease;
+                            `;
+                            notification.textContent = '📋 Share data loaded. Go to Download tab and click Verify.';
+                            document.body.appendChild(notification);
+
+                            // Add slide-in animation if not already exists
+                            if (!document.querySelector('style[data-share-notification]')) {
+                                const style = document.createElement('style');
+                                style.setAttribute('data-share-notification', 'true');
+                                style.textContent = `
+                                    @keyframes slideIn {
+                                        from {
+                                            transform: translateX(100%);
+                                            opacity: 0;
+                                        }
+                                        to {
+                                            transform: translateX(0);
+                                            opacity: 1;
+                                        }
+                                    }
+                                `;
+                                document.head.appendChild(style);
+                            }
+
+                            // Remove notification after 10 seconds
+                            setTimeout(() => {
+                                notification.remove();
+                            }, 10000);
+
+                            console.log('[v7.1.1] Share notification displayed after Kaspa connection');
+                        }, 500); // Wait 500ms after connection
+
+                        window.pendingShareNotification = false;
+                    }
+
                     // v6.1.7: Get RPC connection URL
                     const rpcUrl = NetworkState.rpcClient.url || config.currentEndpoint || '';
                     log(`RPC URL: ${rpcUrl}`);
@@ -23665,105 +23714,19 @@ try {
 
                     // Clean URL immediately (remove hash from browser history)
                     history.replaceState(null, '', window.location.pathname);
-                    console.log('[v7.1.0] URL cleaned from history');
+                    console.log('[v7.1.1] URL cleaned from history');
 
-                    // Wait for page to be fully loaded
-                    const waitForElement = (selector, timeout = 5000) => {
-                        return new Promise((resolve) => {
-                            const element = document.querySelector(selector);
-                            if (element) {
-                                resolve(element);
-                                return;
-                            }
-
-                            const observer = new MutationObserver(() => {
-                                const element = document.querySelector(selector);
-                                if (element) {
-                                    observer.disconnect();
-                                    resolve(element);
-                                }
-                            });
-
-                            observer.observe(document.body, {
-                                childList: true,
-                                subtree: true
-                            });
-
-                            setTimeout(() => {
-                                observer.disconnect();
-                                resolve(null);
-                            }, timeout);
-                        });
-                    };
-
-                    // Switch to Download tab
-                    const downloadTabBtn = await waitForElement('[data-tab="download"]');
-                    if (downloadTabBtn) {
-                        // Remove active class from all tabs
-                        document.querySelectorAll('.tab-btn').forEach(btn => {
-                            btn.classList.remove('active');
-                        });
-                        downloadTabBtn.classList.add('active');
-
-                        // Hide all tab contents
-                        document.querySelectorAll('.tab-content').forEach(content => {
-                            content.classList.remove('active');
-                        });
-
-                        // Show download tab
-                        const downloadTab = document.getElementById('download-tab');
-                        if (downloadTab) {
-                            downloadTab.classList.add('active');
-                        }
-
-                        console.log('[v7.1.0] Switched to Download tab');
-                    }
-
-                    // Fill the unified input field
-                    const inputField = await waitForElement('#unifiedTxIdInput');
+                    // Fill the unified input field silently (no tab switching)
+                    const inputField = document.getElementById('unifiedTxIdInput');
                     if (inputField) {
                         inputField.value = decoded;
-                        console.log('[v7.1.0] Filled input field with decoded data');
+                        console.log('[v7.1.1] Filled input field with decoded data');
 
-                        // Show notification
-                        const notification = document.createElement('div');
-                        notification.style.cssText = `
-                            position: fixed;
-                            top: 20px;
-                            right: 20px;
-                            background: var(--accent-color);
-                            color: white;
-                            padding: 12px 20px;
-                            border-radius: 8px;
-                            z-index: 10000;
-                            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-                            animation: slideIn 0.3s ease;
-                        `;
-                        notification.textContent = '✅ Connected to Kaspa network. Go to Download tab and click Verify.';
-                        document.body.appendChild(notification);
-
-                        // Add slide-in animation
-                        const style = document.createElement('style');
-                        style.textContent = `
-                            @keyframes slideIn {
-                                from {
-                                    transform: translateX(100%);
-                                    opacity: 0;
-                                }
-                                to {
-                                    transform: translateX(0);
-                                    opacity: 1;
-                                }
-                            }
-                        `;
-                        document.head.appendChild(style);
-
-                        // Remove notification after 5 seconds
-                        setTimeout(() => {
-                            notification.remove();
-                        }, 5000);
+                        // Set flag for notification after Kaspa connection
+                        window.pendingShareNotification = true;
+                        console.log('[v7.1.1] Share URL loaded, waiting for Kaspa connection...');
                     } else {
-                        console.error('[v7.1.0] Input field not found');
+                        console.error('[v7.1.1] Input field not found');
                     }
 
                 } catch (error) {

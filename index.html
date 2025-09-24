@@ -22869,6 +22869,22 @@ Do you want to continue?`;
                     log(`[kas.fyi] Using API key: ${apiKey.substring(0, 15)}...`, 'debug');
                 }
 
+                // Debug: Check if fetch is modified
+                log(`[kas.fyi DEBUG] typeof fetch: ${typeof fetch}`, 'debug');
+                log(`[kas.fyi DEBUG] fetch.toString(): ${fetch.toString().substring(0, 50)}...`, 'debug');
+                log(`[kas.fyi DEBUG] window.fetch === fetch: ${window.fetch === fetch}`, 'debug');
+
+                // Try direct fetch without wrapper first
+                try {
+                    log('[kas.fyi DEBUG] Trying direct fetch without timeout wrapper...', 'debug');
+                    const testResponse = await fetch(testUrl, {
+                        headers: apiKey ? { 'x-api-key': apiKey } : {}
+                    });
+                    log(`[kas.fyi DEBUG] Direct fetch succeeded: ${testResponse.status}`, 'success');
+                } catch (directError) {
+                    log(`[kas.fyi DEBUG] Direct fetch failed: ${directError.message}`, 'error');
+                }
+
                 const startTime = performance.now();
                 const response = await fetchWithTimeout(
                     testUrl,

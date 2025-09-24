@@ -22859,8 +22859,8 @@ Do you want to continue?`;
                     }
                 };
 
-                // Test endpoint
-                const testUrl = 'https://api.kas.fyi/v1/addresses/kaspa:qpzpfwcsqsxhxwup26r55fd0ghqlhyugz8cp6y3wxuddc02vcxtjg75pspnwz/tag';
+                // Test endpoint - Use BlockDAG info instead of wallet (v7.2.0)
+                const testUrl = 'https://api.kas.fyi/v1/rpc/getBlockDagInfo';
 
                 log('[kas.fyi] Testing connection...', 'info');
                 log(`[kas.fyi] URL: ${testUrl}`, 'debug');
@@ -22902,7 +22902,7 @@ Do you want to continue?`;
                         <div style="color: var(--success-color);">✅ Connection successful!</div>
                         <div style="margin-top: 5px; font-size: 0.9em;">Response time: ${elapsed}ms</div>
                         <div style="margin-top: 5px; font-size: 0.85em; color: var(--text-secondary);">
-                            Tag: ${data.tag?.name || 'Unknown'}
+                            BlockDAG: ${data.blockCount || '0'} blocks, DAA: ${data.virtualDaaScore || '0'}
                         </div>
                     `;
                     resultDiv.style.border = '1px solid var(--success-color)';

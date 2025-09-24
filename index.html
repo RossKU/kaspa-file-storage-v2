@@ -2526,7 +2526,28 @@
                     </p>
                 </div>
             </div>
-            
+
+            <!-- kas.fyi API Test (Simple) -->
+            <div class="metric-box">
+                <h3>🔧 kas.fyi API Test</h3>
+                <div style="margin-bottom: 15px;">
+                    <label>API Key (optional)</label>
+                    <div style="display: flex; gap: 10px; margin-top: 10px;">
+                        <input type="password" id="kasFyiApiKey"
+                               placeholder="kdp_..."
+                               style="flex: 1; padding: 8px; border: 1px solid var(--border-color); border-radius: 5px;">
+                        <button onclick="testKasFyiConnection()"
+                                id="kasFyiTestBtn"
+                                style="padding: 8px 16px; background: var(--accent-color); color: var(--button-text-on-accent); border: none; border-radius: 5px; cursor: pointer;">
+                            Test Connection
+                        </button>
+                    </div>
+                    <div id="kasFyiTestResult" style="margin-top: 10px; padding: 10px; display: none; border-radius: 5px;">
+                        <!-- Results will appear here -->
+                    </div>
+                </div>
+            </div>
+
             <!-- Transaction Amount Setting -->
             <div class="metric-box">
                 <h3>💸 Transaction Amount Settings</h3>
@@ -22803,7 +22824,108 @@ Do you want to continue?`;
             }
             closePasswordDialog();
         };
-        
+
+        // Test kas.fyi API connection (simple implementation)
+        window.testKasFyiConnection = async function() {
+            const apiKey = document.getElementById('kasFyiApiKey').value.trim();
+            const resultDiv = document.getElementById('kasFyiTestResult');
+            const testBtn = document.getElementById('kasFyiTestBtn');
+
+            // Show result area
+            resultDiv.style.display = 'block';
+            resultDiv.style.background = 'var(--bg-secondary)';
+            resultDiv.style.border = '1px solid var(--border-color)';
+
+            // Disable button
+            testBtn.disabled = true;
+            testBtn.textContent = 'Testing...';
+
+            try {
+                // Local fetchWithTimeout implementation (proven to work in test HTML)
+                const fetchWithTimeout = async (url, options = {}, timeout = 5000) => {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+                    try {
+                        const response = await fetch(url, {
+                            ...options,
+                            signal: controller.signal
+                        });
+                        clearTimeout(timeoutId);
+                        return response;
+                    } catch (error) {
+                        clearTimeout(timeoutId);
+                        throw error;
+                    }
+                };
+
+                // Test endpoint
+                const testUrl = 'https://api.kas.fyi/v1/addresses/kaspa:qpzpfwcsqsxhxwup26r55fd0ghqlhyugz8cp6y3wxuddc02vcxtjg75pspnwz/tag';
+
+                log('[kas.fyi] Testing connection...', 'info');
+                log(`[kas.fyi] URL: ${testUrl}`, 'debug');
+
+                if (apiKey) {
+                    log(`[kas.fyi] Using API key: ${apiKey.substring(0, 15)}...`, 'debug');
+                }
+
+                const startTime = performance.now();
+                const response = await fetchWithTimeout(
+                    testUrl,
+                    apiKey ? { headers: { 'x-api-key': apiKey } } : {},
+                    5000
+                );
+                const elapsed = Math.round(performance.now() - startTime);
+
+                if (response.ok) {
+                    const data = await response.json();
+                    log(`[kas.fyi] Success: ${response.status} in ${elapsed}ms`, 'success');
+                    log(`[kas.fyi] Data: ${JSON.stringify(data)}`, 'debug');
+
+                    resultDiv.innerHTML = `
+                        <div style="color: var(--success-color);">✅ Connection successful!</div>
+                        <div style="margin-top: 5px; font-size: 0.9em;">Response time: ${elapsed}ms</div>
+                        <div style="margin-top: 5px; font-size: 0.85em; color: var(--text-secondary);">
+                            Tag: ${data.tag?.name || 'Unknown'}
+                        </div>
+                    `;
+                    resultDiv.style.border = '1px solid var(--success-color)';
+                } else {
+                    const errorText = await response.text();
+                    log(`[kas.fyi] Error: ${response.status} - ${errorText}`, 'error');
+
+                    resultDiv.innerHTML = `
+                        <div style="color: var(--error-color);">❌ HTTP ${response.status}</div>
+                        <div style="margin-top: 5px; font-size: 0.9em;">${errorText}</div>
+                    `;
+                    resultDiv.style.border = '1px solid var(--error-color)';
+                }
+
+            } catch (error) {
+                log(`[kas.fyi] Failed: ${error.message}`, 'error');
+                log(`[kas.fyi] Error type: ${error.name}`, 'error');
+
+                let errorMessage = error.message;
+                if (error.message.includes('Failed to fetch')) {
+                    errorMessage = 'Network error - Check CORS/Extensions or try without API key';
+                } else if (error.name === 'AbortError') {
+                    errorMessage = 'Request timeout (5s)';
+                }
+
+                resultDiv.innerHTML = `
+                    <div style="color: var(--error-color);">❌ ${errorMessage}</div>
+                    <div style="margin-top: 5px; font-size: 0.85em; color: var(--text-secondary);">
+                        Check console and logs for details
+                    </div>
+                `;
+                resultDiv.style.border = '1px solid var(--error-color)';
+            } finally {
+                // Re-enable button
+                testBtn.disabled = false;
+                testBtn.textContent = 'Test Connection';
+            }
+        };
+
         // Update Archive Node display (dummy function for UI)
         window.updateArchiveNodeDisplay = function() {
             // Simulated display update

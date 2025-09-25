@@ -19563,7 +19563,17 @@ Do you want to continue?`;
                     handlePasswordRemoval();
                 });
             }
-            
+
+            // Load kas.fyi API key from LocalStorage
+            const savedKasFyiApiKey = localStorage.getItem('kasFyiApiKey');
+            if (savedKasFyiApiKey) {
+                const apiKeyInput = document.getElementById('kasFyiApiKey');
+                if (apiKeyInput) {
+                    apiKeyInput.value = savedKasFyiApiKey;
+                    log('[kas.fyi] API key loaded from LocalStorage', 'info');
+                }
+            }
+
             // Add document click event for closing sidebar on outside click
             document.addEventListener('click', (e) => {
                 const sidebar = document.getElementById('sidebar');
@@ -22897,6 +22907,12 @@ Do you want to continue?`;
                     const data = await response.json();
                     log(`[kas.fyi] Success: ${response.status} in ${elapsed}ms`, 'success');
                     log(`[kas.fyi] Data: ${JSON.stringify(data)}`, 'debug');
+
+                    // Save API key to LocalStorage on successful connection
+                    if (apiKey) {
+                        localStorage.setItem('kasFyiApiKey', apiKey);
+                        log('[kas.fyi] API key saved to LocalStorage', 'info');
+                    }
 
                     resultDiv.innerHTML = `
                         <div style="color: var(--success-color);">✅ Connection successful!</div>

@@ -1810,6 +1810,22 @@
                         <small id="restApiResponse">Response: -</small>
                     </div>
                 </div>
+
+                <div style="margin: 16px 0; border-top: 1px solid var(--border-color);"></div>
+
+                <!-- kas.fyi API Status -->
+                <div class="status-row">
+                    <div>
+                        <strong>kas.fyi API:</strong>
+                        <span class="status-indicator-large status-disconnected" id="kasFyiIndicator"></span>
+                        <span id="kasFyiStatus">Not Configured</span>
+                    </div>
+                </div>
+                <div class="status-row">
+                    <div style="margin-left: 20px;">
+                        <small id="kasFyiDetails">API Key: Not Set</small>
+                    </div>
+                </div>
             </div>
             
             <!-- v5.11.134: Workspace Folder moved to Settings tab -->
@@ -19584,6 +19600,16 @@ Do you want to continue?`;
                 if (refreshBtn) {
                     refreshBtn.style.display = 'inline-block';
                 }
+
+                // Update Status tab display
+                const kasFyiIndicator = document.getElementById('kasFyiIndicator');
+                const kasFyiStatus = document.getElementById('kasFyiStatus');
+                const kasFyiDetails = document.getElementById('kasFyiDetails');
+                if (kasFyiIndicator && kasFyiStatus && kasFyiDetails) {
+                    kasFyiIndicator.className = 'status-indicator-large status-warning';
+                    kasFyiStatus.textContent = 'Configured';
+                    kasFyiDetails.textContent = `API Key: ${savedKasFyiApiKey.substring(0, 15)}...`;
+                }
             }
 
             // Add document click event for closing sidebar on outside click
@@ -22938,6 +22964,20 @@ Do you want to continue?`;
                         }
                     }
 
+                    // Update Status tab display for successful connection
+                    const kasFyiIndicator = document.getElementById('kasFyiIndicator');
+                    const kasFyiStatus = document.getElementById('kasFyiStatus');
+                    const kasFyiDetails = document.getElementById('kasFyiDetails');
+                    if (kasFyiIndicator && kasFyiStatus && kasFyiDetails) {
+                        kasFyiIndicator.className = 'status-indicator-large status-connected';
+                        kasFyiStatus.textContent = 'Connected';
+                        if (apiKey) {
+                            kasFyiDetails.textContent = `API Key: ${apiKey.substring(0, 15)}...`;
+                        } else {
+                            kasFyiDetails.textContent = 'API Key: Public Access';
+                        }
+                    }
+
                     resultDiv.innerHTML = `
                         <div style="color: var(--success-color);">✅ Connection successful!</div>
                         <div style="margin-top: 5px; font-size: 0.9em;">Response time: ${elapsed}ms</div>
@@ -22950,6 +22990,14 @@ Do you want to continue?`;
                     const errorText = await response.text();
                     log(`[kas.fyi] Error: ${response.status} - ${errorText}`, 'error');
 
+                    // Update Status tab display for failed connection
+                    const kasFyiIndicator = document.getElementById('kasFyiIndicator');
+                    const kasFyiStatus = document.getElementById('kasFyiStatus');
+                    if (kasFyiIndicator && kasFyiStatus) {
+                        kasFyiIndicator.className = 'status-indicator-large status-disconnected';
+                        kasFyiStatus.textContent = 'Connection Failed';
+                    }
+
                     resultDiv.innerHTML = `
                         <div style="color: var(--error-color);">❌ HTTP ${response.status}</div>
                         <div style="margin-top: 5px; font-size: 0.9em;">${errorText}</div>
@@ -22960,6 +23008,14 @@ Do you want to continue?`;
             } catch (error) {
                 log(`[kas.fyi] Failed: ${error.message}`, 'error');
                 log(`[kas.fyi] Error type: ${error.name}`, 'error');
+
+                // Update Status tab display for error
+                const kasFyiIndicator = document.getElementById('kasFyiIndicator');
+                const kasFyiStatus = document.getElementById('kasFyiStatus');
+                if (kasFyiIndicator && kasFyiStatus) {
+                    kasFyiIndicator.className = 'status-indicator-large status-disconnected';
+                    kasFyiStatus.textContent = 'Connection Error';
+                }
 
                 let errorMessage = error.message;
                 if (error.message.includes('Failed to fetch')) {

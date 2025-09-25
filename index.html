@@ -2564,6 +2564,11 @@
                                 style="padding: 8px 16px; background: var(--accent-color); color: var(--button-text-on-accent); border: none; border-radius: 5px; cursor: pointer;">
                             Test Connection
                         </button>
+                        <button onclick="handleKasFyiAction()"
+                                id="kasFyiActionBtn"
+                                style="padding: 8px 16px; background: var(--error-color); color: white; border: none; border-radius: 5px; cursor: pointer; display: none;">
+                            Delete Key
+                        </button>
                     </div>
                     <div id="kasFyiTestResult" style="margin-top: 10px; padding: 10px; display: none; border-radius: 5px;">
                         <!-- Results will appear here -->
@@ -19602,14 +19607,34 @@ Do you want to continue?`;
                     refreshBtn.style.display = 'inline-block';
                 }
 
+                // Show action button and set its state based on test status
+                const actionBtn = document.getElementById('kasFyiActionBtn');
+                const isTested = localStorage.getItem('kasFyiTested') === 'true';
+                if (actionBtn) {
+                    actionBtn.style.display = 'inline-block';
+                    if (isTested) {
+                        actionBtn.textContent = 'Disconnect';
+                        actionBtn.style.background = 'var(--warning-color)';
+                    } else {
+                        actionBtn.textContent = 'Delete Key';
+                        actionBtn.style.background = 'var(--error-color)';
+                    }
+                }
+
                 // Update Status tab display
                 const kasFyiIndicator = document.getElementById('kasFyiIndicator');
                 const kasFyiStatus = document.getElementById('kasFyiStatus');
                 const kasFyiDetails = document.getElementById('kasFyiDetails');
                 if (kasFyiIndicator && kasFyiStatus && kasFyiDetails) {
-                    kasFyiIndicator.className = 'status-indicator-large status-warning';
-                    kasFyiStatus.textContent = 'Ready (Not Tested)';
-                    kasFyiDetails.textContent = 'API Key: Configured';
+                    if (isTested) {
+                        kasFyiIndicator.className = 'status-indicator-large status-connected';
+                        kasFyiStatus.textContent = 'Connected';
+                        kasFyiDetails.textContent = 'API Key: Authenticated';
+                    } else {
+                        kasFyiIndicator.className = 'status-indicator-large status-warning';
+                        kasFyiStatus.textContent = 'Ready (Not Tested)';
+                        kasFyiDetails.textContent = 'API Key: Configured';
+                    }
                 }
             }
 
@@ -22880,6 +22905,81 @@ Do you want to continue?`;
             testKasFyiConnection();
         };
 
+        // Handle kas.fyi action (Delete or Disconnect)
+        window.handleKasFyiAction = function() {
+            const isTested = localStorage.getItem('kasFyiTested') === 'true';
+
+            if (isTested) {
+                // Disconnect action - keep key, reset test state
+                if (confirm('Disconnect from kas.fyi? (API key will be kept)')) {
+                    localStorage.removeItem('kasFyiTested');
+
+                    // Update button to Delete state
+                    const actionBtn = document.getElementById('kasFyiActionBtn');
+                    if (actionBtn) {
+                        actionBtn.textContent = 'Delete Key';
+                        actionBtn.style.background = 'var(--error-color)';
+                    }
+
+                    // Update Status tab display
+                    const kasFyiIndicator = document.getElementById('kasFyiIndicator');
+                    const kasFyiStatus = document.getElementById('kasFyiStatus');
+                    const kasFyiDetails = document.getElementById('kasFyiDetails');
+                    if (kasFyiIndicator && kasFyiStatus && kasFyiDetails) {
+                        kasFyiIndicator.className = 'status-indicator-large status-warning';
+                        kasFyiStatus.textContent = 'Ready (Not Tested)';
+                        kasFyiDetails.textContent = 'API Key: Configured';
+                    }
+
+                    // Clear test result display
+                    const resultDiv = document.getElementById('kasFyiTestResult');
+                    if (resultDiv) {
+                        resultDiv.style.display = 'none';
+                        resultDiv.innerHTML = '';
+                    }
+
+                    log('[kas.fyi] Disconnected (key retained)', 'info');
+                }
+            } else {
+                // Delete action - remove everything
+                if (confirm('Delete kas.fyi API key?')) {
+                    localStorage.removeItem('kasFyiApiKey');
+                    localStorage.removeItem('kasFyiTested');
+
+                    // Clear input field
+                    const apiKeyInput = document.getElementById('kasFyiApiKey');
+                    if (apiKeyInput) {
+                        apiKeyInput.value = '';
+                    }
+
+                    // Hide buttons
+                    const refreshBtn = document.getElementById('kasFyiRefreshBtn');
+                    const actionBtn = document.getElementById('kasFyiActionBtn');
+                    if (refreshBtn) refreshBtn.style.display = 'none';
+                    if (actionBtn) actionBtn.style.display = 'none';
+
+                    // Update Status tab display
+                    const kasFyiIndicator = document.getElementById('kasFyiIndicator');
+                    const kasFyiStatus = document.getElementById('kasFyiStatus');
+                    const kasFyiDetails = document.getElementById('kasFyiDetails');
+                    if (kasFyiIndicator && kasFyiStatus && kasFyiDetails) {
+                        kasFyiIndicator.className = 'status-indicator-large status-disconnected';
+                        kasFyiStatus.textContent = 'Not Configured';
+                        kasFyiDetails.textContent = 'API Key: Not Set';
+                    }
+
+                    // Clear test result display
+                    const resultDiv = document.getElementById('kasFyiTestResult');
+                    if (resultDiv) {
+                        resultDiv.style.display = 'none';
+                        resultDiv.innerHTML = '';
+                    }
+
+                    log('[kas.fyi] API key deleted', 'info');
+                }
+            }
+        };
+
         // Test kas.fyi API connection (simple implementation)
         window.testKasFyiConnection = async function() {
             const apiKey = document.getElementById('kasFyiApiKey').value.trim();
@@ -22963,6 +23063,17 @@ Do you want to continue?`;
                         if (refreshBtn) {
                             refreshBtn.style.display = 'inline-block';
                         }
+                    }
+
+                    // Mark as tested
+                    localStorage.setItem('kasFyiTested', 'true');
+
+                    // Update action button to Disconnect state
+                    const actionBtn = document.getElementById('kasFyiActionBtn');
+                    if (actionBtn) {
+                        actionBtn.style.display = 'inline-block';
+                        actionBtn.textContent = 'Disconnect';
+                        actionBtn.style.background = 'var(--warning-color)';
                     }
 
                     // Update Status tab display for successful connection

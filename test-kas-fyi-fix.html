@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test kas.fyi Response Normalization</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #00ff00;
+        }
+        .test {
+            margin: 20px 0;
+            padding: 10px;
+            border: 1px solid #00ff00;
+        }
+        .success { color: #00ff00; }
+        .error { color: #ff0000; }
+        .info { color: #ffff00; }
+        pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+    </style>
+</head>
+<body>
+    <h1>kas.fyi Response Normalization Test</h1>
+    <div id="output"></div>
+
+    <script>
+        const output = document.getElementById('output');
+        const API_KEY = 'kdp_b25e6fb0af7b03ee5a234318b301b4d5abd37ce406bc844c394d274c6999737b';
+
+        function log(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = type;
+            div.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            output.appendChild(div);
+        }
+
+        // Copy of the modified fetchWithTimeout from index.html
+        async function fetchWithTimeout(url, options = {}, timeout = 10000, retries = 3) {
+            // kas.fyi priority fallback simulation
+            if (url.includes('/transactions/') && url.includes('api.kaspa.org')) {
+                const originalUrl = url;
+                url = url.replace(/api(-tn10)?\.kaspa\.org/g, 'api.kas.fyi/v1');
+
+                if (!url.includes('include_payload')) {
+                    url += url.includes('?') ? '&include_payload=true' : '?include_payload=true';
+                }
+
+                options = {
+                    ...options,
+                    headers: {
+                        ...options.headers,
+                        'x-api-key': API_KEY
+                    }
+                };
+
+                log(`Converting: ${originalUrl}`, 'info');
+                log(`To: ${url}`, 'info');
+            }
+
+            for (let attempt = 1; attempt <= retries; attempt++) {
+                try {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+                    const response = await fetch(url, {
+                        ...options,
+                        signal: controller.signal
+                    });
+
+                    clearTimeout(timeoutId);
+
+                    // Normalize kas.fyi response structure to match api.kaspa.org format
+                    // kas.fyi returns payload in transaction.payload instead of root level
+                    if (url.includes('api.kas.fyi') && url.includes('/transactions/')) {
+                        const originalJson = response.json.bind(response);
+
+                        // Override json() method to normalize the response
+                        response.json = async function() {
+                            const data = await originalJson();
+
+                            // Move transaction.payload to root level for compatibility
+                            if (data.transaction && data.transaction.payload) {
+                                data.payload = data.transaction.payload;
+                                log('✅ Normalized: transaction.payload → payload', 'success');
+                            }
+
+                            return data;
+                        };
+                    }
+
+                    return response;
+
+                } catch (error) {
+                    if (attempt < retries) {
+                        const waitTime = attempt * 1000;
+                        log(`Retry ${attempt}/${retries} in ${waitTime/1000}s: ${error.message}`, 'error');
+                        await new Promise(resolve => setTimeout(resolve, waitTime));
+                    } else {
+                        throw error;
+                    }
+                }
+            }
+        }
+
+        async function runTest() {
+            log('Starting kas.fyi Response Normalization Test', 'success');
+            log('=' .repeat(50), 'info');
+
+            // Test transactions
+            const testCases = [
+                {
+                    name: "Old Transaction (9/14)",
+                    txId: "3e49da4dea4e7c1150a58fd49c9949e02def4201e675b7f2bc1c6707cb55ce43"
+                },
+                {
+                    name: "Meta Transaction",
+                    txId: "c0497c9b4eca03cbfaefc593585d013861560760134dc9846028c479d3ed3312"
+                }
+            ];
+
+            for (const test of testCases) {
+                log(`\n📋 Test: ${test.name}`, 'success');
+                log(`TxID: ${test.txId}`, 'info');
+
+                try {
+                    // Simulate api.kaspa.org URL that will be intercepted
+                    const url = `https://api.kaspa.org/transactions/${test.txId}`;
+                    const response = await fetchWithTimeout(url, {}, 10000, 2);
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+
+                    const data = await response.json();
+
+                    // Check if normalization worked
+                    if (data.payload) {
+                        log(`✅ SUCCESS: data.payload exists!`, 'success');
+                        log(`   Size: ${data.payload.length} chars`, 'success');
+                        log(`   Preview: ${data.payload.substring(0, 50)}...`, 'info');
+                    } else {
+                        log(`❌ FAILED: data.payload not found`, 'error');
+                        log(`   Keys: ${Object.keys(data).join(', ')}`, 'error');
+                    }
+
+                } catch (error) {
+                    log(`❌ Test failed: ${error.message}`, 'error');
+                }
+            }
+
+            log('\n' + '=' .repeat(50), 'info');
+            log('Test Complete!', 'success');
+        }
+
+        // Run test on page load
+        window.addEventListener('load', runTest);
+    </script>
+</body>
+</html>

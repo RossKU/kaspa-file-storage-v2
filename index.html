@@ -10855,6 +10855,25 @@ Do you want to continue?`;
                     });
 
                     clearTimeout(timeoutId);
+
+                    // Normalize kas.fyi response structure to match api.kaspa.org format
+                    // kas.fyi returns payload in transaction.payload instead of root level
+                    if (url.includes('api.kas.fyi') && url.includes('/transactions/')) {
+                        const originalJson = response.json.bind(response);
+
+                        // Override json() method to normalize the response
+                        response.json = async function() {
+                            const data = await originalJson();
+
+                            // Move transaction.payload to root level for compatibility
+                            if (data.transaction && data.transaction.payload) {
+                                data.payload = data.transaction.payload;
+                            }
+
+                            return data;
+                        };
+                    }
+
                     return response;
                     
                 } catch (error) {

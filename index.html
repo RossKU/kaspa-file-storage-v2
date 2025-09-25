@@ -2536,6 +2536,12 @@
                         <input type="password" id="kasFyiApiKey"
                                placeholder="kdp_..."
                                style="flex: 1; padding: 8px; border: 1px solid var(--border-color); border-radius: 5px;">
+                        <button onclick="refreshKasFyiConnection()"
+                                id="kasFyiRefreshBtn"
+                                style="padding: 8px 12px; background: var(--button-bg); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 5px; cursor: pointer; display: none;"
+                                title="Refresh connection test">
+                            🔄
+                        </button>
                         <button onclick="testKasFyiConnection()"
                                 id="kasFyiTestBtn"
                                 style="padding: 8px 16px; background: var(--accent-color); color: var(--button-text-on-accent); border: none; border-radius: 5px; cursor: pointer;">
@@ -19572,6 +19578,12 @@ Do you want to continue?`;
                     apiKeyInput.value = savedKasFyiApiKey;
                     log('[kas.fyi] API key loaded from LocalStorage', 'info');
                 }
+
+                // Show refresh button when API key exists
+                const refreshBtn = document.getElementById('kasFyiRefreshBtn');
+                if (refreshBtn) {
+                    refreshBtn.style.display = 'inline-block';
+                }
             }
 
             // Add document click event for closing sidebar on outside click
@@ -22835,6 +22847,12 @@ Do you want to continue?`;
             closePasswordDialog();
         };
 
+        // Refresh kas.fyi connection test
+        window.refreshKasFyiConnection = function() {
+            // Simply call the test function with existing API key
+            testKasFyiConnection();
+        };
+
         // Test kas.fyi API connection (simple implementation)
         window.testKasFyiConnection = async function() {
             const apiKey = document.getElementById('kasFyiApiKey').value.trim();
@@ -22912,6 +22930,12 @@ Do you want to continue?`;
                     if (apiKey) {
                         localStorage.setItem('kasFyiApiKey', apiKey);
                         log('[kas.fyi] API key saved to LocalStorage', 'info');
+
+                        // Show refresh button when API key is saved
+                        const refreshBtn = document.getElementById('kasFyiRefreshBtn');
+                        if (refreshBtn) {
+                            refreshBtn.style.display = 'inline-block';
+                        }
                     }
 
                     resultDiv.innerHTML = `

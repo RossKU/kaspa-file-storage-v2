@@ -3805,6 +3805,13 @@
                 skipCount: 0,           // Number of skipped REST API calls
                 lastSkipped: null       // Timestamp of last skip
             },
+            kasFyiControl: {  // kas.fyi API priority control
+                enabled: false,         // Set from localStorage on init
+                apiKey: null,          // API key from localStorage
+                priority: true,        // Use kas.fyi before REST API
+                useCount: 0,           // Usage statistics
+                lastUsed: null         // Last usage timestamp
+            },
             ws: {
                 connection: null,       // WebSocket connection
                 connected: false,       // WebSocket connection state
@@ -10803,16 +10810,50 @@ Do you want to continue?`;
         
         // Fetch with timeout and retry
         async function fetchWithTimeout(url, options = {}, timeout = 10000, retries = 3) {
+            // kas.fyi priority fallback - intercept api.kaspa.org transaction requests
+            if (NetworkState.kasFyiControl &&
+                NetworkState.kasFyiControl.enabled &&
+                NetworkState.kasFyiControl.priority &&
+                NetworkState.kasFyiControl.apiKey &&
+                url.includes('/transactions/') &&
+                (url.includes('api.kaspa.org') || url.includes('api-tn10.kaspa.org'))) {
+
+                // Convert to kas.fyi URL
+                const originalUrl = url;
+                url = url.replace(/api(-tn10)?\.kaspa\.org/g, 'api.kas.fyi/v1');
+
+                // Add include_payload parameter if not present
+                if (!url.includes('include_payload')) {
+                    url += url.includes('?') ? '&include_payload=true' : '?include_payload=true';
+                }
+
+                // Add API key header
+                options = {
+                    ...options,
+                    headers: {
+                        ...options.headers,
+                        'x-api-key': NetworkState.kasFyiControl.apiKey
+                    }
+                };
+
+                // Update statistics
+                NetworkState.kasFyiControl.useCount++;
+                NetworkState.kasFyiControl.lastUsed = Date.now();
+
+                log(`[kas.fyi] Using priority fallback (${NetworkState.kasFyiControl.useCount} times)`, 'info');
+                log(`[kas.fyi] ${originalUrl} → ${url}`, 'debug');
+            }
+
             for (let attempt = 1; attempt <= retries; attempt++) {
                 try {
                     const controller = new AbortController();
                     const timeoutId = setTimeout(() => controller.abort(), timeout);
-                    
+
                     const response = await fetch(url, {
                         ...options,
                         signal: controller.signal
                     });
-                    
+
                     clearTimeout(timeoutId);
                     return response;
                     
@@ -19601,6 +19642,14 @@ Do you want to continue?`;
                     log('[kas.fyi] API key loaded from LocalStorage', 'info');
                 }
 
+                // Initialize NetworkState.kasFyiControl
+                const isTested = localStorage.getItem('kasFyiTested') === 'true';
+                if (isTested) {
+                    NetworkState.kasFyiControl.enabled = true;
+                    NetworkState.kasFyiControl.apiKey = savedKasFyiApiKey;
+                    log('[kas.fyi] Priority fallback enabled', 'info');
+                }
+
                 // Show refresh button when API key exists
                 const refreshBtn = document.getElementById('kasFyiRefreshBtn');
                 if (refreshBtn) {
@@ -22914,6 +22963,10 @@ Do you want to continue?`;
                 if (confirm('Disconnect from kas.fyi? (API key will be kept)')) {
                     localStorage.removeItem('kasFyiTested');
 
+                    // Disable kas.fyi priority fallback
+                    NetworkState.kasFyiControl.enabled = false;
+                    log('[kas.fyi] Priority fallback disabled (disconnected)', 'info');
+
                     // Update button to Delete state
                     const actionBtn = document.getElementById('kasFyiActionBtn');
                     if (actionBtn) {
@@ -22945,6 +22998,11 @@ Do you want to continue?`;
                 if (confirm('Delete kas.fyi API key?')) {
                     localStorage.removeItem('kasFyiApiKey');
                     localStorage.removeItem('kasFyiTested');
+
+                    // Disable kas.fyi priority fallback completely
+                    NetworkState.kasFyiControl.enabled = false;
+                    NetworkState.kasFyiControl.apiKey = null;
+                    log('[kas.fyi] Priority fallback removed (key deleted)', 'info');
 
                     // Clear input field
                     const apiKeyInput = document.getElementById('kasFyiApiKey');
@@ -23067,6 +23125,13 @@ Do you want to continue?`;
 
                     // Mark as tested
                     localStorage.setItem('kasFyiTested', 'true');
+
+                    // Enable kas.fyi priority fallback
+                    if (apiKey) {
+                        NetworkState.kasFyiControl.enabled = true;
+                        NetworkState.kasFyiControl.apiKey = apiKey;
+                        log('[kas.fyi] Priority fallback activated', 'success');
+                    }
 
                     // Update action button to Disconnect state
                     const actionBtn = document.getElementById('kasFyiActionBtn');

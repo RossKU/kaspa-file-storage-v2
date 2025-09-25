@@ -18303,6 +18303,10 @@ Do you want to continue?`;
                         log(`[DEBUG-VERIFY] Final RPC client ID: ${NetworkState.rpcClient?._debugId || 'default'}`, 'debug');
                         log(`[DEBUG-VERIFY] Requesting blockId: ${blockId.substring(0, 16)}...`, 'debug');
 
+                        // Log payload source
+                        log(`📍 [PAYLOAD SOURCE] Using Archive RPC (BlockID provided)`, 'info');
+                        log(`📍 [PAYLOAD SOURCE] kas.fyi will NOT be used (RPC takes priority)`, 'warning');
+
                         // NetworkState.rpcClientを使用（切り替え済みならアーカイブノード）
                         const blockResponse = await NetworkState.rpcClient.getBlock({
                             hash: blockId,
@@ -18438,6 +18442,15 @@ Do you want to continue?`;
                     try {
                     // First try to get via Explorer API (more reliable)
                     log('Retrieving meta transaction via Explorer API...', 'info');
+
+                    // Log payload source
+                    log(`📍 [PAYLOAD SOURCE] Using REST API (BlockID not provided or RPC failed)`, 'info');
+                    if (NetworkState.kasFyiControl?.enabled && NetworkState.kasFyiControl?.priority) {
+                        log(`📍 [PAYLOAD SOURCE] kas.fyi priority fallback WILL be used`, 'success');
+                    } else {
+                        log(`📍 [PAYLOAD SOURCE] Using api.kaspa.org (kas.fyi not configured)`, 'info');
+                    }
+
                     const apiUrl = `${config.apiEndpoints[config.network]}/transactions/${metaTxId}`;
                     const response = await fetchWithTimeout(apiUrl, {}, 15000, 3); // 15s timeout, 3 retries
                     
@@ -18685,13 +18698,16 @@ Do you want to continue?`;
                                 const intMetaBlockId = metaData.chunkBlockIds[i];
                                 
                                 log(`[SuperMeta] Retrieving intermediate metadata ${i + 1}/${metaData.chunks.length}...`, 'info');
-                                
+
                                 // Download intermediate metadata
                                 try {
                                     // Try BlockID first if available
                                     let intPayload = null;
-                                    
+
                                     if (intMetaBlockId && intMetaBlockId !== '') {
+                                        // Log payload source for intermediate metadata
+                                        log(`📍 [PAYLOAD SOURCE] Intermediate meta ${i+1}: Using Archive RPC (BlockID available)`, 'info');
+
                                         // Try to get via BlockID
                                         try {
                                             const blockResponse = await NetworkState.rpcClient.getBlock({
@@ -18723,7 +18739,15 @@ Do you want to continue?`;
                                     // Fallback to REST API if BlockID failed or not available
                                     if (!intPayload) {
                                         log(`[SuperMeta] Retrieving intermediate metadata via REST API...`, 'info');
-                                        
+
+                                        // Log payload source for intermediate metadata
+                                        log(`📍 [PAYLOAD SOURCE] Intermediate meta ${i+1}: Using REST API (RPC failed or no BlockID)`, 'info');
+                                        if (NetworkState.kasFyiControl?.enabled && NetworkState.kasFyiControl?.priority) {
+                                            log(`📍 [PAYLOAD SOURCE] kas.fyi priority fallback WILL be used`, 'success');
+                                        } else {
+                                            log(`📍 [PAYLOAD SOURCE] Using api.kaspa.org`, 'info');
+                                        }
+
                                         // Kill switch check
                                         if (!NetworkState.restApiControl.globalEnabled || NetworkState.restApiControl.temporaryKilled) {
                                             throw new Error('REST API is disabled - cannot fetch intermediate metadata');

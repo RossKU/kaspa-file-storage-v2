@@ -1,4 +1,4 @@
-# Kaspa File Format Specification v3.4.2
+# Kaspa File Format Specification v3.4.3
 
 ## Overview
 
@@ -6,10 +6,10 @@ This is the standard file format specification for the distributed file storage 
 
 ## Format Version
 
-- **Current Version**: 3.4.2
-- **Reference Implementation**: v5.10.20
+- **Current Version**: 3.4.3
+- **Reference Implementation**: v6.2.78
 - **Created**: 2025-07-07
-- **Updated**: 2025-07-25
+- **Updated**: 2025-09-29
 
 ## Terminology
 
@@ -309,7 +309,9 @@ This is the standard file format specification for the distributed file storage 
                 confirmed: true      // [Required] Block confirmation flag
             },
             // ...
-        ]
+        ],
+        // v3.4.3: SuperMeta progress tracking
+        intermediateMetaTxs: []     // [Optional] Array of intermediate meta transactions
     }
 }
 ```
@@ -322,7 +324,7 @@ This is the standard file format specification for the distributed file storage 
    - `kaspa-file`: Single file
    - `kaspa-directory`: Directory
 
-2. **version**: Format version (current: "3.3")
+2. **version**: Format version (current: "3.4")
 
 3. **created**: Creation date (ISO-8601 format)
 
@@ -606,6 +608,11 @@ Example: document.pdf.abc12345.kprogress
 - **Individual password management**: Password field in entries not implemented
 
 ## Change History
+
+### v3.4.3 (2025-09-29)
+- **SuperMeta Progress Tracking**: Added intermediateMetaTxs field to _progress
+- **Implementation Update**: Reference implementation updated to v6.2.78
+- **Progress Resume Enhancement**: Support for resuming SuperMeta uploads with existing intermediate meta-txs
 
 ### v3.4.2 (2025-07-25)
 - **Directory Entry Optimization**: Allow omission of intermediate directory entries

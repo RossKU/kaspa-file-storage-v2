@@ -4947,7 +4947,7 @@
                     return parseFloat(saved) * 1000000; // Convert from M to blocks
                 }
                 // Default thresholds
-                return this.networkId === 'mainnet' ? 50000000 : 5000000; // 50M for mainnet, 5M for testnet
+                return 2000000; // 2M blocks for both mainnet and testnet
             }
             
             saveThreshold(thresholdM) {
@@ -5522,6 +5522,11 @@
                         const checkbox = document.getElementById('restApiTestToggle');
                         if (checkbox) checkbox.checked = settings.download.restApiTest;
                     }
+                    // Apply forceArchiveNode checkbox
+                    if (settings.download.forceArchiveNode !== undefined) {
+                        const checkbox = document.getElementById('forceArchiveNodeToggle');
+                        if (checkbox) checkbox.checked = settings.download.forceArchiveNode;
+                    }
                     // Apply retryCount and timeout
                     if (settings.download.retryCount !== undefined) {
                         const input = document.getElementById('retryCount');
@@ -5563,16 +5568,17 @@
                                      document.getElementById('parallelDownloadToggle')?.checked || false,
                             retryCount: parseInt(document.getElementById('retryCount')?.value || '3'),
                             timeout: parseInt(document.getElementById('timeout')?.value || '300'),
-                            restApiTest: document.getElementById('restApiTestToggle')?.checked || false  // REST API test mode
+                            restApiTest: document.getElementById('restApiTestToggle')?.checked || false,  // REST API test mode
+                            forceArchiveNode: document.getElementById('forceArchiveNodeToggle')?.checked || false  // Force archive node
                         },
                         network: {
                             selected: currentNetwork,
                             nodeType: nodeTypeSelect ? nodeTypeSelect.value : 'public',
                             customRpc: document.getElementById('customRpcEndpoint')?.value || '',
                             restApi: document.getElementById('restApiEnabled')?.checked !== false,
-                            archiveThreshold: parseFloat(localStorage.getItem(`archiveThreshold_${currentNetwork}`) || 
-                                             document.getElementById('archiveThresholdInput')?.value || '50'),
-                            archiveMaxConsecutive: parseInt(localStorage.getItem('archiveMaxConsecutive') || '10')
+                            archiveThreshold: parseFloat(localStorage.getItem(`archiveThreshold_${currentNetwork}`) ||
+                                             document.getElementById('archiveThresholdInput')?.value || '2'),
+                            archiveMaxConsecutive: parseInt(localStorage.getItem('archiveMaxConsecutive') || '100')
                         },
                         ui: {
                             theme: localStorage.getItem('theme') || 
@@ -5582,11 +5588,8 @@
                             defaultFilter: document.getElementById('kenvFilterSelect')?.value || 'all'
                         },
                         transaction: {
-                            defaultAmount: parseFloat(localStorage.getItem('kaspaTransactionAmount') || 
+                            defaultAmount: parseFloat(localStorage.getItem('kaspaTransactionAmount') ||
                                           document.getElementById('transactionAmountInput')?.value || '0.001')
-                        },
-                        debug: {
-                            chunksPerMeta: parseInt(localStorage.getItem('debugChunksPerMeta') || '160')
                         }
                     },
                     workspace: {
@@ -21657,6 +21660,11 @@ Do you want to continue?`;
                     if (s.download.restApiTest !== undefined) {
                         const checkbox = document.getElementById('restApiTestToggle');
                         if (checkbox) checkbox.checked = s.download.restApiTest;
+                    }
+                    // Restore forceArchiveNode checkbox
+                    if (s.download.forceArchiveNode !== undefined) {
+                        const checkbox = document.getElementById('forceArchiveNodeToggle');
+                        if (checkbox) checkbox.checked = s.download.forceArchiveNode;
                     }
                     // Restore retryCount and timeout
                     if (s.download.retryCount !== undefined) {

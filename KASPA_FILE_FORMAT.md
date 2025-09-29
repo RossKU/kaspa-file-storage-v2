@@ -96,7 +96,7 @@ This is the standard file format specification for the distributed file storage 
     // === Recovery Information ===
     recovery: {                      // [Required] Information needed for recovery
         totalChunks: 123,            // [Required] Total chunk count
-        chunkSize: 12288,            // [Required] Chunk size (bytes)
+        chunkSize: 22528,            // [Required] Chunk size (bytes)
         checksum: "abc123...",       // [Required] Checksum (same as file.sha256)
         uploadCost: 0.02583,         // [Required] Upload cost (KAS)
         uploadDuration: 123456       // [Optional] Upload duration (milliseconds)
@@ -271,7 +271,7 @@ This is the standard file format specification for the distributed file storage 
     // === Recovery Information (Same as .kaspa file) ===
     recovery: {                      // [Required] Information needed for recovery
         totalChunks: 123,
-        chunkSize: 12288,
+        chunkSize: 22528,
         checksum: "abc123...",
         uploadCost: 0.02583,
         uploadDuration: null         // Not finalized as upload is in progress
@@ -304,7 +304,7 @@ This is the standard file format specification for the distributed file storage 
                 index: 0,            // [Required] Chunk index
                 txid: "txid123...",  // [Required] Transaction ID
                 blockId: "blk123...", // [Optional] Block ID (after confirmation)
-                size: 12288,         // [Required] Chunk size
+                size: 22528,         // [Required] Chunk size
                 uploadedAt: 1704628500000, // [Required] Upload time
                 confirmed: true      // [Required] Block confirmation flag
             },

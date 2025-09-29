@@ -5507,6 +5507,13 @@
                     if (settings.upload.chunkSize !== undefined) {
                         const select = document.getElementById('chunkSize');
                         if (select) select.value = settings.upload.chunkSize.toString();
+                        localStorage.setItem('chunkSize', settings.upload.chunkSize.toString());
+                    }
+                    // Apply savePasswords setting
+                    if (settings.upload.savePasswords !== undefined) {
+                        const checkbox = document.getElementById('savePasswordEnabled');
+                        if (checkbox) checkbox.checked = settings.upload.savePasswords;
+                        localStorage.setItem('savePasswordEnabled', settings.upload.savePasswords.toString());
                     }
                 }
 
@@ -5516,6 +5523,7 @@
                     if (settings.download.parallel !== undefined) {
                         const checkbox = document.getElementById('parallelDownloadToggle');
                         if (checkbox) checkbox.checked = settings.download.parallel;
+                        localStorage.setItem('kaspaParallelDownload', settings.download.parallel.toString());
                     }
                     // Apply restApiTest checkbox
                     if (settings.download.restApiTest !== undefined) {
@@ -5535,6 +5543,102 @@
                     if (settings.download.timeout !== undefined) {
                         const input = document.getElementById('timeout');
                         if (input) input.value = settings.download.timeout;
+                    }
+                }
+
+                // Network settings
+                if (settings.network) {
+                    // Apply network selection
+                    if (settings.network.selected !== undefined) {
+                        const select = document.getElementById('networkSelect');
+                        if (select) select.value = settings.network.selected;
+                    }
+                    // Apply node type
+                    if (settings.network.nodeType !== undefined) {
+                        const select = document.getElementById('nodeTypeSelect');
+                        if (select) {
+                            select.value = settings.network.nodeType;
+                            // Show/hide custom RPC section if needed
+                            const customSection = document.getElementById('customEndpointSection');
+                            if (customSection) {
+                                customSection.style.display = settings.network.nodeType === 'custom' ? 'block' : 'none';
+                            }
+                        }
+                    }
+                    // Apply custom RPC endpoint
+                    if (settings.network.customRpc !== undefined) {
+                        const input = document.getElementById('customRpcEndpoint');
+                        if (input) input.value = settings.network.customRpc;
+                    }
+                    // Apply REST API enabled
+                    if (settings.network.restApi !== undefined) {
+                        const checkbox = document.getElementById('restApiEnabled');
+                        if (checkbox) checkbox.checked = settings.network.restApi;
+                    }
+                    // Apply archive threshold
+                    if (settings.network.archiveThreshold !== undefined && settings.network.selected) {
+                        localStorage.setItem(`archiveThreshold_${settings.network.selected}`, settings.network.archiveThreshold.toString());
+                        const input = document.getElementById('archiveThresholdInput');
+                        if (input) input.value = settings.network.archiveThreshold.toString();
+                    }
+                    // Apply archive max consecutive
+                    if (settings.network.archiveMaxConsecutive !== undefined) {
+                        localStorage.setItem('archiveMaxConsecutive', settings.network.archiveMaxConsecutive.toString());
+                        const input = document.getElementById('maxConsecutiveInput');
+                        if (input) input.value = settings.network.archiveMaxConsecutive.toString();
+                    }
+                }
+
+                // UI settings
+                if (settings.ui) {
+                    // Apply theme
+                    if (settings.ui.theme !== undefined) {
+                        localStorage.setItem('theme', settings.ui.theme);
+                        const select = document.getElementById('themeSelect');
+                        if (select) select.value = settings.ui.theme;
+                        // Apply theme immediately
+                        if (typeof changeTheme === 'function') {
+                            changeTheme(settings.ui.theme);
+                        }
+                    }
+                    // Apply sidebar collapsed state
+                    if (settings.ui.sidebarCollapsed !== undefined) {
+                        localStorage.setItem('sidebarCollapsed', settings.ui.sidebarCollapsed.toString());
+                        // Apply sidebar state
+                        const sidebar = document.getElementById('sidebar');
+                        const mainContent = document.getElementById('mainContent');
+                        const toggle = document.getElementById('sidebarToggle');
+                        if (sidebar && mainContent) {
+                            if (settings.ui.sidebarCollapsed) {
+                                sidebar.classList.add('collapsed');
+                                mainContent.classList.add('expanded');
+                                if (toggle) toggle.textContent = '▶';
+                            } else {
+                                sidebar.classList.remove('collapsed');
+                                mainContent.classList.remove('expanded');
+                                if (toggle) toggle.textContent = '◀';
+                            }
+                        }
+                    }
+                    // Apply default sort
+                    if (settings.ui.defaultSort !== undefined) {
+                        const select = document.getElementById('kenvSortSelect');
+                        if (select) select.value = settings.ui.defaultSort;
+                    }
+                    // Apply default filter
+                    if (settings.ui.defaultFilter !== undefined) {
+                        const select = document.getElementById('kenvFilterSelect');
+                        if (select) select.value = settings.ui.defaultFilter;
+                    }
+                }
+
+                // Transaction settings
+                if (settings.transaction) {
+                    // Apply default amount
+                    if (settings.transaction.defaultAmount !== undefined) {
+                        localStorage.setItem('kaspaTransactionAmount', settings.transaction.defaultAmount.toString());
+                        const input = document.getElementById('transactionAmountInput');
+                        if (input) input.value = settings.transaction.defaultAmount;
                     }
                 }
 

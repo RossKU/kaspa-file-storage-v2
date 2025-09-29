@@ -5215,11 +5215,11 @@
         // Expose FileState to window for global access
         window.FileState = FileState;
         
-        // ===== KENV Manager (v3.1.4) =====
-        // KENV v3.1.4 Integrated optimized data management system
+        // ===== KENV Manager (v3.1.4-fix3) =====
+        // KENV v3.1.4-fix3 Integrated optimized data management system
         FileState.kenvManager = {
             // Version information
-            version: "3.1.4",
+            version: "3.1.4-fix3",
             schemaVersion: 3,
             kaspaCompatVersion: "3.4.3",
             
@@ -5844,7 +5844,7 @@
                             }
                         }
                         
-                        // v5.11.111: Add directoryMetadata in 7-column format (KENV v3.1.4 compliant)
+                        // v5.11.111: Add directoryMetadata in 7-column format (KENV v3.1.4-fix3 compliant)
                         if (entry.directoryMetadata && entry.type === 'kaspa-directory') {
                             const dirMeta = entry.directoryMetadata;
                             if (dirMeta.entries && Array.isArray(dirMeta.entries)) {
@@ -5918,7 +5918,7 @@
                     const data = {
                         entries: this.entries,
                         kindex: this.kindex,
-                        version: '3.1.4',
+                        version: '3.1.4-fix3',
                         timestamp: new Date().toISOString(),
                         truncated: false,
                         savedCount: this.entries.length
@@ -6071,7 +6071,7 @@
                                         break;
                                     }
                                 } else if (values[i] === 'entries' && values[i + 1] && values[i + 2]) {
-                                    // v5.11.111: directory entry (7 column format, KENV v3.1.4 compliant)
+                                    // v5.11.111: directory entry (7 column format, KENV v3.1.4-fix3 compliant)
                                     const fileCount = parseInt(values[i + 1]) || 0;
                                     const dirCount = parseInt(values[i + 2]) || 0;
                                     const totalEntries = fileCount + dirCount;
@@ -6493,7 +6493,7 @@
                 if (!data.kindex || typeof data.kindex !== 'object') return false;
                 
                 // Version check
-                if (data.version && !['3.1.4', '3.1.3', '3.1.2'].includes(data.version)) {
+                if (data.version && !['3.1.4-fix3', '3.1.4', '3.1.3'].includes(data.version)) {
                     log(`[KENV] Unsupported version: ${data.version}`, 'warning');
                 }
                 
@@ -8930,7 +8930,7 @@ Do you want to continue?`;
                     document.getElementById('sidebar').classList.remove('open');
                 }
                 
-                // Update file tab when switching to it (KENV v3.1.4)
+                // Update file tab when switching to it (KENV v3.1.4-fix3)
                 if (tab === 'file') {
                     // v5.11.48: Initialize KENV regardless of workspace
                     if (!FileState.kenvManager._initialized) {

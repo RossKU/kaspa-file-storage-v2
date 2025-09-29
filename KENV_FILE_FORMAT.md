@@ -1,11 +1,11 @@
-# KENV File Format Specification v3.1.4-fix2
+# KENV File Format Specification v3.1.4-fix3
 
 ## Overview
 The KENV file system is a lightweight storage system that manages the working environment for Kaspa P2P File Storage. This specification defines a 47-column fixed format that is fully consistent with the implementation and clarifies the relationship with Kaspa File Format v3.4.3.
 
 ## Format Version
-- **Current Version**: 3.1.4-fix2
-- **Reference Implementation**: v6.2.31
+- **Current Version**: 3.1.4-fix3
+- **Reference Implementation**: v7.1.3
 - **.kaspa Compatible**: v3.4.3 compliant
 - **Fixed Column Count**: 47 (including salt)
 
@@ -26,58 +26,50 @@ workspace/
 
 ## 1. .kenv (Configuration File)
 
-### Structure
+### Structure (Actual Implementation)
 ```json
 {
-  "version": "3.1.4",
+  "version": "3.1.4-fix3",
   "schemaVersion": 3,
   "kaspaCompatVersion": "3.4.3",
   "createdAt": "2025-01-28T10:00:00Z",
   "updatedAt": "2025-01-28T15:30:00Z",
-  "wallet": "kaspa:qpxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-  "encryption": {
-    "enabled": true,
-    "algorithm": "AES-256-GCM",
-    "iterations": 100000,
-    "passwordStorage": "encrypted"
-  },
+  "wallet": "",  // Currently not populated
   "settings": {
+    "upload": {
+      "chunkSize": 22,  // Chunk size selector value
+      "useRandomCid": false,  // Random CID option
+      "savePasswords": true,  // Remember passwords
+      "useMetaTx": true  // Use meta transactions (recommended)
+    },
+    "download": {
+      "parallel": false,  // Parallel download enabled
+      "retryCount": 3,  // Download retry attempts
+      "timeout": 300,  // Timeout in seconds
+      "restApiTest": false,  // REST API test mode
+      "forceArchiveNode": false  // Force archive node usage
+    },
     "network": {
-      "parallelDownloadEnabled": false,
-      "devWalletEnabled": true,
-      "customRpcEndpoint": "",
-      "archiveNodeThreshold": 50
+      "selected": "testnet-10",  // Current network (mainnet/testnet-10/testnet-11)
+      "nodeType": "auto",  // Node type (auto/public/custom)
+      "customRpc": "",  // Custom RPC endpoint URL
+      "restApi": true,  // REST API enabled
+      "archiveThreshold": 2,  // Archive node threshold (millions of blocks)
+      "archiveMaxConsecutive": 100  // Max consecutive archive requests
     },
     "ui": {
-      "theme": "dark",
-      "accentColor": "#2A6F65",
-      "language": "en",
-      "defaultSort": "uploadDate",
-      "itemsPerPage": 100
+      "theme": "dark",  // Theme (dark/light)
+      "sidebarCollapsed": false,  // Sidebar state
+      "defaultSort": "uploadDate",  // Default sort (uploadDate/name/size/type)
+      "defaultFilter": "all"  // Default filter (all/encrypted/unencrypted/meta-tx/directory)
     },
-    "storage": {
-      "autoSaveInterval": 300,
-      "csvEncryption": false,
-      "streamingChunkSize": 65536,
-      "externalFileThreshold": 10000,
-      "minimalMode": true,
-      "indexUpdateInterval": 60
-    },
-    "technical": {
-      "chunkSize": 22528,
-      "maxTransactionSize": 102400,
-      "minTransactionFee": 0.00001,
-      "maxChunksPerFile": 10000,
-      "defaultCompression": "lz77",
-      "cipherAlgorithm": "AES-256-GCM",
-      "pbkdf2Iterations": 100000
+    "transaction": {
+      "defaultAmount": 0.001  // Default transaction amount in KAS
     }
   },
-  "stats": {
-    "totalFiles": 150,
-    "totalSize": 1073741824,
-    "lastSync": "2025-01-28T15:00:00Z",
-    "lastBackup": "2025-01-28T14:00:00Z"
+  "workspace": {
+    "lastActivity": "2025-01-28T15:30:00Z",
+    "indexVersion": "2.0"
   }
 }
 ```

@@ -5487,6 +5487,55 @@
             // ===== File save/load functions (v5.11.39: Phase 1-A) =====
             
             // v7.0.35: Collect current settings from LocalStorage and UI
+            // Apply loaded settings to UI elements
+            applyLoadedSettings(settings) {
+                if (!settings) return;
+
+                // Upload settings
+                if (settings.upload) {
+                    // Apply useMetaTx checkbox
+                    if (settings.upload.useMetaTx !== undefined) {
+                        const checkbox = document.getElementById('useMetaTx');
+                        if (checkbox) checkbox.checked = settings.upload.useMetaTx;
+                    }
+                    // Apply useRandomCid checkbox
+                    if (settings.upload.useRandomCid !== undefined) {
+                        const checkbox = document.getElementById('useRandomCid');
+                        if (checkbox) checkbox.checked = settings.upload.useRandomCid;
+                    }
+                    // Apply chunkSize select
+                    if (settings.upload.chunkSize !== undefined) {
+                        const select = document.getElementById('chunkSize');
+                        if (select) select.value = settings.upload.chunkSize.toString();
+                    }
+                }
+
+                // Download settings
+                if (settings.download) {
+                    // Apply parallelDownloadToggle checkbox
+                    if (settings.download.parallel !== undefined) {
+                        const checkbox = document.getElementById('parallelDownloadToggle');
+                        if (checkbox) checkbox.checked = settings.download.parallel;
+                    }
+                    // Apply restApiTest checkbox
+                    if (settings.download.restApiTest !== undefined) {
+                        const checkbox = document.getElementById('restApiTestToggle');
+                        if (checkbox) checkbox.checked = settings.download.restApiTest;
+                    }
+                    // Apply retryCount and timeout
+                    if (settings.download.retryCount !== undefined) {
+                        const input = document.getElementById('retryCount');
+                        if (input) input.value = settings.download.retryCount;
+                    }
+                    if (settings.download.timeout !== undefined) {
+                        const input = document.getElementById('timeout');
+                        if (input) input.value = settings.download.timeout;
+                    }
+                }
+
+                log('[KENV] Settings applied from .kenv file', 'success');
+            },
+
             collectCurrentSettings() {
                 // Get current network ID
                 const networkSelect = document.getElementById('networkSelect');
@@ -5503,16 +5552,18 @@
                     wallet: '',  // Will be populated from actual wallet connection
                     settings: {
                         upload: {
-                            chunkSize: parseInt(localStorage.getItem('chunkSize') || 
+                            chunkSize: parseInt(localStorage.getItem('chunkSize') ||
                                       (document.getElementById('chunkSize')?.value) || '22'),
                             useRandomCid: document.getElementById('useRandomCid')?.checked || false,
-                            savePasswords: localStorage.getItem('savePasswordEnabled') !== 'false'
+                            savePasswords: localStorage.getItem('savePasswordEnabled') !== 'false',
+                            useMetaTx: document.getElementById('useMetaTx')?.checked ?? true  // Default to true (recommended)
                         },
                         download: {
                             parallel: localStorage.getItem('kaspaParallelDownload') === 'true' ||
                                      document.getElementById('parallelDownloadToggle')?.checked || false,
                             retryCount: parseInt(document.getElementById('retryCount')?.value || '3'),
-                            timeout: parseInt(document.getElementById('timeout')?.value || '300')
+                            timeout: parseInt(document.getElementById('timeout')?.value || '300'),
+                            restApiTest: document.getElementById('restApiTestToggle')?.checked || false  // REST API test mode
                         },
                         network: {
                             selected: currentNetwork,
@@ -6114,10 +6165,15 @@
             // Load all KENV files
             async loadAll() {
                 log('[KENV] Starting to load all files', 'info');
-                
+
                 // Load settings file
                 const kenvData = await this.loadKenvFile();
-                
+
+                // Apply loaded settings to UI
+                if (kenvData && kenvData.settings) {
+                    this.applyLoadedSettings(kenvData.settings);
+                }
+
                 // Load entries and index
                 const kentryLoaded = await this.loadKentryFile();
                 const kindexLoaded = await this.loadKindexFile();
@@ -21575,12 +21631,41 @@ Do you want to continue?`;
                     if (s.upload.savePasswords !== undefined) {
                         localStorage.setItem('savePasswordEnabled', s.upload.savePasswords.toString());
                     }
+                    // Restore useMetaTx checkbox
+                    if (s.upload.useMetaTx !== undefined) {
+                        const checkbox = document.getElementById('useMetaTx');
+                        if (checkbox) checkbox.checked = s.upload.useMetaTx;
+                    }
+                    // Restore useRandomCid checkbox
+                    if (s.upload.useRandomCid !== undefined) {
+                        const checkbox = document.getElementById('useRandomCid');
+                        if (checkbox) checkbox.checked = s.upload.useRandomCid;
+                    }
                 }
                 
                 // Download settings
                 if (s.download) {
                     if (s.download.parallel !== undefined) {
                         localStorage.setItem('kaspaParallelDownload', s.download.parallel.toString());
+                    }
+                    // Restore parallelDownloadToggle checkbox
+                    if (s.download.parallel !== undefined) {
+                        const checkbox = document.getElementById('parallelDownloadToggle');
+                        if (checkbox) checkbox.checked = s.download.parallel;
+                    }
+                    // Restore restApiTest checkbox
+                    if (s.download.restApiTest !== undefined) {
+                        const checkbox = document.getElementById('restApiTestToggle');
+                        if (checkbox) checkbox.checked = s.download.restApiTest;
+                    }
+                    // Restore retryCount and timeout
+                    if (s.download.retryCount !== undefined) {
+                        const input = document.getElementById('retryCount');
+                        if (input) input.value = s.download.retryCount;
+                    }
+                    if (s.download.timeout !== undefined) {
+                        const input = document.getElementById('timeout');
+                        if (input) input.value = s.download.timeout;
                     }
                 }
                 

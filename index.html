@@ -6329,7 +6329,7 @@
                 if (!data.kindex || typeof data.kindex !== 'object') return false;
                 
                 // Version check
-                if (data.version && !['3.1.3', '3.1.2', '3.1.1'].includes(data.version)) {
+                if (data.version && !['3.1.4-fix2', '3.1.4', '3.1.3'].includes(data.version)) {
                     log(`[KENV] Unsupported version: ${data.version}`, 'warning');
                 }
                 
@@ -8657,15 +8657,6 @@ Do you want to continue?`;
                                     } else if (typeof loadKaspaFile === 'function') {
                                         document.getElementById('kaspaFileInput').files = e.dataTransfer.files;
                                         loadKaspaFile({ target: { files: [file] } });
-                                    }
-                                } else if (kaspaData.version === 'v3.4.0' && kaspaData.type === 'directory') {
-                                    // v4.6.18: Handle v3.4.0 directory format
-                                    log('v3.4.0 directory format detected', 'info');
-                                    
-                                    if (typeof displayDirectoryContents === 'function') {
-                                        displayDirectoryContents(kaspaData);
-                                    } else {
-                                        log('Directory display function is not available', 'error');
                                     }
                                 } else {
                                     log('Unsupported Kaspa file format', 'error');
@@ -18658,7 +18649,7 @@ Do you want to continue?`;
                     }
                     
                     // Verify this is a valid metadata (meta-tx or directory)
-                    if ((metaData.version === "2.1" || metaData.version === "3.3" || metaData.version === "3.1.1" || metaData.version === "3.4" || metaData.version === "3.4.2" || metaData.version === "3.4.3") && 
+                    if (["3.4.3", "3.4.2", "3.4.1"].includes(metaData.version) &&
                         (metaData.type === "kaspa-meta-tx" || metaData.type === "kaspa-directory")) {
                         log(`Metadata successfully decrypted (v${metaData.version}, type: ${metaData.type})`, 'success');
                         log(`Metadata content: ${JSON.stringify(metaData, null, 2)}`, 'info');

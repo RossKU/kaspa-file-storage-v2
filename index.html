@@ -1814,10 +1814,10 @@
 
                 <div style="margin: 16px 0; border-top: 1px solid var(--border-color);"></div>
 
-                <!-- kas.fyi API Status -->
+                <!-- Kaspa Developer Platform Status -->
                 <div class="status-row">
                     <div>
-                        <strong>kas.fyi API (Priority Fallback):</strong>
+                        <strong>Kaspa Developer Platform (Transaction Optimizer):</strong>
                         <span class="status-indicator-large status-disconnected" id="kasFyiIndicator"></span>
                         <span id="kasFyiStatus">Not Configured</span>
                     </div>
@@ -2544,11 +2544,18 @@
                 </div>
             </div>
 
-            <!-- kas.fyi API Test (Simple) -->
+            <!-- Kaspa Developer Platform (kas.fyi) -->
             <div class="metric-box">
-                <h3>🔧 kas.fyi API Test</h3>
+                <h3>🔧 Kaspa Developer Platform (kas.fyi)</h3>
+                <div style="margin-bottom: 10px; color: var(--text-secondary); font-size: 0.9em;">
+                    Enterprise-grade API for fast transaction data retrieval.
+                    No need to run your own node. When configured, serves as priority
+                    fallback for downloading files. Get your API key at
+                    <a href="https://docs.kas.fyi/" target="_blank"
+                       style="color: var(--accent-color)">docs.kas.fyi</a>
+                </div>
                 <div style="margin-bottom: 15px;">
-                    <label>API Key (optional)</label>
+                    <label>API Key (kdp_...)</label>
                     <div style="display: flex; gap: 10px; margin-top: 10px;">
                         <input type="password" id="kasFyiApiKey"
                                placeholder="kdp_..."
@@ -23225,7 +23232,7 @@ Do you want to continue?`;
                 }
             } else {
                 // Delete action - remove everything
-                if (confirm('Delete kas.fyi API key?')) {
+                if (confirm('Delete Kaspa Developer Platform API key?')) {
                     localStorage.removeItem('kasFyiApiKey');
                     localStorage.removeItem('kasFyiTested');
 
@@ -23386,10 +23393,14 @@ Do you want to continue?`;
                     }
 
                     resultDiv.innerHTML = `
-                        <div style="color: var(--success-color);">✅ Connection successful!</div>
+                        <div style="color: var(--success-color);">✅ Connected to Kaspa Developer Platform</div>
                         <div style="margin-top: 5px; font-size: 0.9em;">Response time: ${elapsed}ms</div>
                         <div style="margin-top: 5px; font-size: 0.85em; color: var(--text-secondary);">
                             BlockDAG: ${data.blockCount || '0'} blocks, DAA: ${data.virtualDaaScore || '0'}
+                        </div>
+                        <div style="margin-top: 8px; font-size: 0.85em; color: var(--success-color);">
+                            ✓ Transaction payload retrieval optimized<br>
+                            ✓ Priority fallback enabled
                         </div>
                     `;
                     resultDiv.style.border = '1px solid var(--success-color)';

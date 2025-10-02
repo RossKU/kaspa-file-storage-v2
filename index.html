@@ -22758,26 +22758,18 @@ Do you want to continue?`;
         window.updateFileListFromKENV = function() {
             const tbody = document.getElementById('fileListBody');
             if (!tbody) return;
-            
-            tbody.innerHTML = ''; // Clear existing content
-            
-            // Get sorted entries from KENV index
-            const sortedEntries = FileState.kenvManager.kindex.sortIndexes.name;
-            
-            if (sortedEntries.length === 0) {
-                // Show empty state using DOM manipulation (v6.3.10)
+
+            // Check if there are entries
+            if (!FileState.kenvManager.entries || Object.keys(FileState.kenvManager.entries).length === 0) {
+                tbody.innerHTML = '';
                 const emptyRow = FileListDOM.createEmptyState('No files', true);
                 tbody.appendChild(emptyRow);
                 return;
             }
-            
-            // Create rows for each entry
-            sortedEntries.forEach(([name, lineNum, type]) => {
-                const entry = FileState.kenvManager.entries[lineNum];
-                const row = createKENVTableRow(entry);
-                tbody.appendChild(row);
-            });
-            
+
+            // Apply current sort state (respects user's sort selection)
+            sortKENVFiles(sortState.column, sortState.ascending);
+
             // Update file actions bar
             updateFileActions();
         };

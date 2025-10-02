@@ -10080,11 +10080,9 @@ Do you want to continue?`;
                     // v5.5.26: Fixed File System Access API state cache error by removing local progressManager variable
                     // v5.5.27: Fixed state cache error by handling file operations more robustly
                     // v5.5.28: Fixed null reference error by initializing progressManager before processFileWithPayloadSplit
-                    log(`[DEBUG] saveProgress started - progressFileName: ${this.progressFileName}`, 'debug');
-                    
+
                     const progressData = JSON.stringify(this.progress, null, 2);
-                    log(`[DEBUG] Progress data size: ${progressData.length} bytes`, 'debug');
-                    
+
                     // Save to localStorage as backup
                     try {
                         localStorage.setItem('kaspa-upload-progress', progressData);
@@ -10096,7 +10094,7 @@ Do you want to continue?`;
                             lastUpdate: Date.now()
                         };
                         localStorage.setItem('kaspa-upload-metadata', JSON.stringify(metadata));
-                        log(`[DEBUG] localStorage save successful`, 'debug');
+                        log(`[DEBUG] localStorage save successful (${progressData.length} bytes)`, 'debug');
                         // v4.7.25: Remove save notifications
                     } catch (err) {
                         // v4.7.25: Remove error log for localStorage

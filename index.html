@@ -2377,6 +2377,20 @@
                     
                     <!-- UTXO Consolidation (moved from Debug tab) -->
                     <div id="utxoConsolidationSection" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border-color); display: none;">
+                        <div style="margin-bottom: 12px;">
+                            <label style="display: block; margin-bottom: 6px; font-weight: 500;">Consolidation %:</label>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <input type="number"
+                                       id="consolidation-percentage"
+                                       min="1"
+                                       max="100"
+                                       step="1"
+                                       value="99"
+                                       style="width: 80px; padding: 8px; font-size: 14px; border: 1px solid var(--border-color); border-radius: 4px;">
+                                <span style="color: var(--text-secondary);">%</span>
+                                <span style="font-size: 12px; color: var(--text-secondary);">(remaining = fee buffer)</span>
+                            </div>
+                        </div>
                         <button onclick="consolidateUTXOs()" id="utxoConsolidateBtn" 
                                 style="width: 100%; padding: 12px; background: var(--accent-color); color: var(--button-text-on-accent); 
                                        border: none; border-radius: 6px; cursor: pointer; font-weight: bold;"
@@ -3248,9 +3262,11 @@
                         blockDaaScore: BigInt(utxo.blockDaaScore)
                     }));
                     
-                    // Create consolidation transaction - send 99% to self (1% for fees)
-                    const consolidatedAmount = totalBalance * 99n / 100n;  // 99% of balance
-                    log(`📊 UTXO consolidation details: ${entries.length} UTXOs, Total: ${(Number(totalBalance) / 100000000).toFixed(8)} KAS, Sending: ${(Number(consolidatedAmount) / 100000000).toFixed(8)} KAS (99%)`, 'info');
+                    // Get consolidation percentage from settings
+                    const percentage = parseInt(document.getElementById('consolidation-percentage')?.value || '99');
+                    localStorage.setItem('kaspa-consolidation-percentage', percentage.toString());
+                    const consolidatedAmount = totalBalance * BigInt(percentage) / 100n;
+                    log(`📊 UTXO consolidation details: ${entries.length} UTXOs, Total: ${(Number(totalBalance) / 100000000).toFixed(8)} KAS, Sending: ${(Number(consolidatedAmount) / 100000000).toFixed(8)} KAS (${percentage}%)`, 'info');
                     
                     let result;
                     try {
@@ -20884,7 +20900,16 @@ Do you want to continue?`;
                     DebugHandlers.updateChunksPerMeta(limit);
                 }
             }
-            
+
+            // Restore consolidation percentage setting
+            const savedPercentage = localStorage.getItem('kaspa-consolidation-percentage');
+            if (savedPercentage) {
+                const percentageInput = document.getElementById('consolidation-percentage');
+                if (percentageInput) {
+                    percentageInput.value = savedPercentage;
+                }
+            }
+
             // v5.6.6: Initialize ConnectionManager after log function is available
             ConnectionManager.init();
             

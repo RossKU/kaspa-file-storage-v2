@@ -574,6 +574,40 @@
             cursor: not-allowed !important;
         }
 
+        /* Upload Checklist Styles */
+        .checklist-item {
+            transition: all 0.2s ease;
+        }
+
+        .checklist-item.completed {
+            color: var(--success-color, #4caf50);
+        }
+
+        .checklist-item.incomplete {
+            color: var(--text-secondary);
+        }
+
+        .check-icon {
+            font-size: 16px;
+            min-width: 20px;
+            text-align: center;
+        }
+
+        #uploadChecklist {
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
         /* Form Elements */
         input[type="text"], input[type="password"], input[type="number"], select, textarea {
             width: 100%;
@@ -2199,7 +2233,29 @@
                 <label style="display: block; margin-bottom: 5px; font-weight: bold;">🔑 Password (8+ characters)<label>
                 <input type="password" id="uploadPassword" placeholder="Enter a strong password" style="width: 100%; padding: 12px; font-size: 16px; border: 1px solid var(--border-color); border-radius: 5px; box-sizing: border-box;">
             </div>
-            
+
+            <!-- Upload Requirements Checklist -->
+            <div id="uploadChecklist" style="margin-top: 15px; padding: 12px; background: var(--background-secondary); border-radius: 8px; border-left: 3px solid var(--accent-color);">
+                <div style="font-size: 14px; font-weight: bold; margin-bottom: 8px; color: var(--text-primary);">
+                    📋 Upload Requirements
+                </div>
+                <div id="checklist-items" style="display: flex; flex-direction: column; gap: 6px;">
+                    <div id="check-wallet" class="checklist-item" style="display: flex; align-items: center; gap: 8px; font-size: 13px;">
+                        <span class="check-icon">❌</span>
+                        <span>Wallet connected</span>
+                    </div>
+                    <div id="check-file" class="checklist-item" style="display: flex; align-items: center; gap: 8px; font-size: 13px;">
+                        <span class="check-icon">❌</span>
+                        <span>File selected</span>
+                    </div>
+                    <div id="check-password" class="checklist-item" style="display: flex; align-items: center; gap: 8px; font-size: 13px;">
+                        <span class="check-icon">❌</span>
+                        <span>Password (8+ characters)</span>
+                        <span id="password-count" style="margin-left: auto; font-size: 11px; color: var(--text-secondary);"></span>
+                    </div>
+                </div>
+            </div>
+
             <!-- v5.11.135: Always visible upload button (fixed initial state) -->
             <button id="uploadBtn" disabled style="margin-top: 20px; width: 100%; padding: 15px; font-size: 18px; font-weight: bold; background: var(--text-secondary); color: var(--button-text-on-accent); border: none; border-radius: 8px; cursor: not-allowed; transition: all 0.3s; opacity: 0.6;">
                 📤 Upload
@@ -10559,13 +10615,13 @@ Do you want to continue?`;
             return parts.length > 1 ? parts[1] : 'Kaspa P2P File Storage';
         }
         
-        // v5.11.135: Update upload button state with proper styling (3-condition check)
+        // v5.11.135: Update upload button state with proper styling (3-condition check + checklist UI)
         function updateUploadButtonState(forceState = null) {
             const uploadBtn = document.getElementById('uploadBtn');
             if (!uploadBtn) return;
-            
+
             let enabled = false;
-            
+
             // If forceState is provided, use it (for upload in progress)
             if (forceState !== null) {
                 enabled = forceState;
@@ -10575,12 +10631,15 @@ Do you want to continue?`;
                 const hasFile = FileState.currentFile !== null;
                 const passwordInput = document.getElementById('uploadPassword');
                 const hasPassword = passwordInput && passwordInput.value.length >= 8;
-                
-                
+                const passwordLength = passwordInput ? passwordInput.value.length : 0;
+
+                // Update checklist UI
+                updateChecklistUI(hasWallet, hasFile, hasPassword, passwordLength);
+
                 // All 3 conditions must be met
                 enabled = hasWallet && hasFile && hasPassword;
             }
-            
+
             uploadBtn.disabled = !enabled;
             uploadBtn.style.opacity = enabled ? '1' : '0.6';
             uploadBtn.style.cursor = enabled ? 'pointer' : 'not-allowed';
@@ -10590,7 +10649,55 @@ Do you want to continue?`;
         
         // v5.12.5: Export to window for cross-scope access
         window.updateUploadButtonState = updateUploadButtonState;
-        
+
+        // Update checklist UI to show which conditions are met
+        function updateChecklistUI(hasWallet, hasFile, hasPassword, passwordLength) {
+            const checkWallet = document.getElementById('check-wallet');
+            const checkFile = document.getElementById('check-file');
+            const checkPassword = document.getElementById('check-password');
+            const passwordCount = document.getElementById('password-count');
+
+            if (!checkWallet || !checkFile || !checkPassword) return;
+
+            // Update wallet check
+            updateCheckItem(checkWallet, hasWallet, 'Wallet connected');
+
+            // Update file check
+            updateCheckItem(checkFile, hasFile, 'File selected');
+
+            // Update password check with character count
+            updateCheckItem(checkPassword, hasPassword, 'Password (8+ characters)');
+            if (passwordCount) {
+                if (passwordLength > 0) {
+                    const remaining = 8 - passwordLength;
+                    if (remaining > 0) {
+                        passwordCount.textContent = `${passwordLength}/8 (+${remaining} needed)`;
+                        passwordCount.style.color = 'var(--warning-color, #ff9800)';
+                    } else {
+                        passwordCount.textContent = `${passwordLength}/8 ✓`;
+                        passwordCount.style.color = 'var(--success-color, #4caf50)';
+                    }
+                } else {
+                    passwordCount.textContent = '';
+                }
+            }
+        }
+
+        // Helper function to update individual checklist item
+        function updateCheckItem(element, isComplete, label) {
+            const icon = element.querySelector('.check-icon');
+
+            if (isComplete) {
+                element.classList.add('completed');
+                element.classList.remove('incomplete');
+                if (icon) icon.textContent = '✅';
+            } else {
+                element.classList.add('incomplete');
+                element.classList.remove('completed');
+                if (icon) icon.textContent = '❌';
+            }
+        }
+
         // Configuration
         const config = {
             defaultNetwork: 'mainnet', // v7.1.1: Changed default to mainnet
@@ -21574,7 +21681,10 @@ Do you want to continue?`;
             // v7.0.30: Capture file creation/modification time
             FileState.fileCreatedTime = new Date(file.lastModified).toISOString();
             log(`File selected: ${file.name} (${(file.size/1024).toFixed(1)}KB)`);
-            
+
+            // Update upload button state and checklist
+            updateUploadButtonState();
+
             // Generate thumbnail for image files
             log(`[DEBUG] File type: "${file.type}", size: ${file.size}`, 'debug');
             const isImageFile = file.type.startsWith('image/') && 
@@ -21786,9 +21896,9 @@ Do you want to continue?`;
                     const { entries } = await NetworkState.rpcClient.getUtxosByAddresses([UserState.address.toString()]);
                     const balance = entries.reduce((sum, utxo) => sum + Number(utxo.amount), 0) / 1e8;
                     document.getElementById('walletBalance').textContent = `${balance.toFixed(8)} KAS`;
-                    
-                    // Update upload button state
-                    document.getElementById('uploadBtn').disabled = false;
+
+                    // Update upload button state and checklist
+                    updateUploadButtonState();
                 } else {
                     document.getElementById('walletBalance').textContent = 'RPCDisconnected';
                 }

@@ -19855,37 +19855,50 @@ Do you want to continue?`;
 
                 log('[Direct View] Starting download process...', 'info');
 
-                // Show loading screen
-                document.body.innerHTML = `
-                    <div style="display: flex; justify-content: center; align-items: center;
-                                height: 100vh; background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
-                                color: white; flex-direction: column;
-                                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;">
-                        <div style="font-size: 72px; margin-bottom: 30px; animation: pulse 2s ease-in-out infinite;">
-                            👁️
-                        </div>
-                        <div style="font-size: 32px; color: #70C7BA; margin-bottom: 20px; font-weight: 600;">
-                            Loading file...
-                        </div>
-                        <div id="direct-status" style="font-size: 18px; color: #aaa; margin-bottom: 30px;">
-                            Downloading...
-                        </div>
-                        <div style="width: 450px; height: 8px; background: rgba(255,255,255,0.1);
-                                    border-radius: 4px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.3);">
-                            <div id="direct-progress"
-                                 style="width: 10%; height: 100%;
-                                        background: linear-gradient(90deg, #70C7BA 0%, #4A9B8E 100%);
-                                        transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-                                        box-shadow: 0 0 10px rgba(112, 199, 186, 0.5);"></div>
-                        </div>
-                        <style>
-                            @keyframes pulse {
-                                0%, 100% { transform: scale(1); opacity: 1; }
-                                50% { transform: scale(1.1); opacity: 0.8; }
-                            }
-                        </style>
-                    </div>
+                // v7.2.1: Create overlay instead of replacing body (preserves tabs/navigation)
+                const overlay = document.createElement('div');
+                overlay.id = 'direct-view-overlay';
+                overlay.style.cssText = `
+                    position: fixed;
+                    top: 0; left: 0; bottom: 0; right: 0;
+                    width: 100%; height: 100%;
+                    background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+                    z-index: 999999;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    flex-direction: column;
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+                    color: white;
                 `;
+
+                overlay.innerHTML = `
+                    <div style="font-size: 72px; margin-bottom: 30px; animation: pulse 2s ease-in-out infinite;">
+                        👁️
+                    </div>
+                    <div style="font-size: 32px; color: #70C7BA; margin-bottom: 20px; font-weight: 600;">
+                        Loading file...
+                    </div>
+                    <div id="direct-status" style="font-size: 18px; color: #aaa; margin-bottom: 30px;">
+                        Downloading...
+                    </div>
+                    <div style="width: 450px; height: 8px; background: rgba(255,255,255,0.1);
+                                border-radius: 4px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.3);">
+                        <div id="direct-progress"
+                             style="width: 10%; height: 100%;
+                                    background: linear-gradient(90deg, #70C7BA 0%, #4A9B8E 100%);
+                                    transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+                                    box-shadow: 0 0 10px rgba(112, 199, 186, 0.5);"></div>
+                    </div>
+                    <style>
+                        @keyframes pulse {
+                            0%, 100% { transform: scale(1); opacity: 1; }
+                            50% { transform: scale(1.1); opacity: 0.8; }
+                        }
+                    </style>
+                `;
+
+                document.body.appendChild(overlay);
 
                 // Progress update helper
                 const updateProgress = (percent, status) => {
@@ -19931,38 +19944,36 @@ Do you want to continue?`;
                 updateProgress(100, 'Opening file...');
                 log('[Direct View] Download complete, preparing to display...', 'success');
 
-                // Show success screen briefly
-                document.body.innerHTML = `
-                    <div style="display: flex; justify-content: center; align-items: center;
-                                height: 100vh; background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
-                                color: white; flex-direction: column;
-                                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;">
-                        <div style="font-size: 72px; margin-bottom: 30px; animation: checkmark 0.6s ease-out;">
-                            ✅
-                        </div>
-                        <div style="font-size: 32px; color: #4caf50; margin-bottom: 15px; font-weight: 600;">
-                            File loaded successfully!
-                        </div>
-                        <div style="font-size: 18px; color: #66bb6a; margin-bottom: 20px;">
-                            ${capturedFilename}
-                        </div>
-                        <div style="font-size: 16px; color: #aaa;">
-                            Opening in browser...
-                        </div>
-                        <style>
-                            @keyframes checkmark {
-                                0% { transform: scale(0) rotate(-45deg); opacity: 0; }
-                                50% { transform: scale(1.2) rotate(5deg); }
-                                100% { transform: scale(1) rotate(0deg); opacity: 1; }
-                            }
-                        </style>
+                // Update overlay to success screen
+                overlay.innerHTML = `
+                    <div style="font-size: 72px; margin-bottom: 30px; animation: checkmark 0.6s ease-out;">
+                        ✅
                     </div>
+                    <div style="font-size: 32px; color: #4caf50; margin-bottom: 15px; font-weight: 600;">
+                        File loaded successfully!
+                    </div>
+                    <div style="font-size: 18px; color: #66bb6a; margin-bottom: 20px;">
+                        ${capturedFilename}
+                    </div>
+                    <div style="font-size: 16px; color: #aaa;">
+                        Opening in browser...
+                    </div>
+                    <style>
+                        @keyframes checkmark {
+                            0% { transform: scale(0) rotate(-45deg); opacity: 0; }
+                            50% { transform: scale(1.2) rotate(5deg); }
+                            100% { transform: scale(1) rotate(0deg); opacity: 1; }
+                        }
+                    </style>
                 `;
 
                 // Wait 0.5s before navigating
                 await new Promise(resolve => setTimeout(resolve, 500));
 
                 log('[Direct View] Navigating to file with blob URL...', 'success');
+
+                // Remove overlay before navigation
+                overlay.remove();
 
                 // Navigate to blob URL in same tab
                 const blobURL = URL.createObjectURL(capturedBlob);
@@ -19974,34 +19985,35 @@ Do you want to continue?`;
                 log(`❌ [Direct View] Error: ${error.message}`, 'error');
                 console.error('[Direct View] Full error:', error);
 
-                // Show error screen
-                document.body.innerHTML = `
-                    <div style="display: flex; justify-content: center; align-items: center;
-                                height: 100vh; background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
-                                color: white; flex-direction: column;
-                                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;">
+                // Update overlay to error screen
+                const overlay = document.getElementById('direct-view-overlay');
+                if (overlay) {
+                    overlay.innerHTML = `
                         <div style="font-size: 72px; margin-bottom: 30px;">❌</div>
                         <div style="font-size: 32px; color: #e74c3c; margin-bottom: 20px; font-weight: 600;">
                             Failed to load file
                         </div>
                         <div style="font-size: 16px; color: #888; max-width: 600px;
-                                    text-align: center; line-height: 1.6; padding: 0 20px;">
+                                    text-align: center; line-height: 1.6; padding: 0 20px; margin-bottom: 20px;">
                             ${error.message}
                         </div>
-                        <button onclick="window.close()"
-                                style="margin-top: 40px; padding: 14px 28px;
+                        <div style="font-size: 14px; color: #666; margin-bottom: 30px;">
+                            Check logs: Enter #debug in URL bar
+                        </div>
+                        <button onclick="document.getElementById('direct-view-overlay').remove()"
+                                style="margin-top: 20px; padding: 14px 28px;
                                        background: linear-gradient(135deg, #555 0%, #444 100%);
                                        color: white; border: none; border-radius: 8px;
                                        cursor: pointer; font-size: 16px; font-weight: 500;
                                        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
                                        transition: transform 0.2s;">
-                            Close Tab
+                            Close Overlay
                         </button>
                         <style>
                             button:hover { transform: translateY(-2px); }
                         </style>
-                    </div>
-                `;
+                    `;
+                }
             }
         };
 

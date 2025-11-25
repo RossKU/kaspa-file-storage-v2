@@ -19828,6 +19828,183 @@ Do you want to continue?`;
         // Backward compatibility for downloadFile
         window.downloadFile = FileState.fileOperationHandlers.downloadFile;
 
+        // v7.2.0: Direct View mode - Open file in same tab
+        window.downloadFileDirectView = async function() {
+            try {
+                // Get password
+                let passwordField = document.getElementById('downloadPasswordDirectory-hidden') ||
+                                  document.getElementById('downloadPasswordDirectory') ||
+                                  document.getElementById('downloadPassword');
+                let password = passwordField ? passwordField.value : '';
+
+                if (FileState.kaspaMetadata.auth?.passwordIncluded && FileState.kaspaMetadata.auth?.password) {
+                    password = FileState.kaspaMetadata.auth.password;
+                }
+
+                if (!password) {
+                    throw new Error('No password available');
+                }
+
+                if (!FileState.kaspaMetadata) {
+                    throw new Error('No metadata loaded');
+                }
+
+                if (!NetworkState.rpcClient) {
+                    throw new Error('Kaspa system not initialized');
+                }
+
+                log('[Direct View] Starting download process...', 'info');
+
+                // Show loading screen
+                document.body.innerHTML = `
+                    <div style="display: flex; justify-content: center; align-items: center;
+                                height: 100vh; background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+                                color: white; flex-direction: column;
+                                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;">
+                        <div style="font-size: 72px; margin-bottom: 30px; animation: pulse 2s ease-in-out infinite;">
+                            👁️
+                        </div>
+                        <div style="font-size: 32px; color: #70C7BA; margin-bottom: 20px; font-weight: 600;">
+                            Loading file...
+                        </div>
+                        <div id="direct-status" style="font-size: 18px; color: #aaa; margin-bottom: 30px;">
+                            Downloading...
+                        </div>
+                        <div style="width: 450px; height: 8px; background: rgba(255,255,255,0.1);
+                                    border-radius: 4px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.3);">
+                            <div id="direct-progress"
+                                 style="width: 10%; height: 100%;
+                                        background: linear-gradient(90deg, #70C7BA 0%, #4A9B8E 100%);
+                                        transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+                                        box-shadow: 0 0 10px rgba(112, 199, 186, 0.5);"></div>
+                        </div>
+                        <style>
+                            @keyframes pulse {
+                                0%, 100% { transform: scale(1); opacity: 1; }
+                                50% { transform: scale(1.1); opacity: 0.8; }
+                            }
+                        </style>
+                    </div>
+                `;
+
+                // Progress update helper
+                const updateProgress = (percent, status) => {
+                    const progressBar = document.getElementById('direct-progress');
+                    const statusEl = document.getElementById('direct-status');
+                    if (progressBar) progressBar.style.width = percent + '%';
+                    if (statusEl) statusEl.textContent = status;
+                };
+
+                // Blob capture callback
+                let capturedBlob = null;
+                let capturedFilename = null;
+
+                const onProgress = (progress) => {
+                    const percent = Math.min(90, 10 + (progress.percent * 0.8));
+                    const status = progress.current && progress.total
+                        ? `Downloading: ${progress.current}/${progress.total} chunks (${progress.percent}%)`
+                        : `Downloading: ${progress.percent}%`;
+                    updateProgress(percent, status);
+                };
+
+                const onComplete = (blob, filename) => {
+                    capturedBlob = blob;
+                    capturedFilename = filename;
+                };
+
+                // Execute download
+                await NetworkState.downloadManager.executeDownload(
+                    FileState.kaspaMetadata,
+                    password,
+                    {
+                        onProgress: onProgress,
+                        onComplete: onComplete,
+                        metaTxId: FileState.kaspaMetadata.metaTx?.txid || null,
+                        metaTxBlockId: FileState.kaspaMetadata.metaTx?.blockId || null
+                    }
+                );
+
+                if (!capturedBlob) {
+                    throw new Error('Failed to generate file blob');
+                }
+
+                updateProgress(100, 'Opening file...');
+                log('[Direct View] Download complete, preparing to display...', 'success');
+
+                // Show success screen briefly
+                document.body.innerHTML = `
+                    <div style="display: flex; justify-content: center; align-items: center;
+                                height: 100vh; background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+                                color: white; flex-direction: column;
+                                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;">
+                        <div style="font-size: 72px; margin-bottom: 30px; animation: checkmark 0.6s ease-out;">
+                            ✅
+                        </div>
+                        <div style="font-size: 32px; color: #4caf50; margin-bottom: 15px; font-weight: 600;">
+                            File loaded successfully!
+                        </div>
+                        <div style="font-size: 18px; color: #66bb6a; margin-bottom: 20px;">
+                            ${capturedFilename}
+                        </div>
+                        <div style="font-size: 16px; color: #aaa;">
+                            Opening in browser...
+                        </div>
+                        <style>
+                            @keyframes checkmark {
+                                0% { transform: scale(0) rotate(-45deg); opacity: 0; }
+                                50% { transform: scale(1.2) rotate(5deg); }
+                                100% { transform: scale(1) rotate(0deg); opacity: 1; }
+                            }
+                        </style>
+                    </div>
+                `;
+
+                // Wait 0.5s before navigating
+                await new Promise(resolve => setTimeout(resolve, 500));
+
+                log('[Direct View] Navigating to file with blob URL...', 'success');
+
+                // Navigate to blob URL in same tab
+                const blobURL = URL.createObjectURL(capturedBlob);
+                window.location.replace(blobURL);
+
+                // Code after this won't execute (page navigation)
+
+            } catch (error) {
+                log(`❌ [Direct View] Error: ${error.message}`, 'error');
+                console.error('[Direct View] Full error:', error);
+
+                // Show error screen
+                document.body.innerHTML = `
+                    <div style="display: flex; justify-content: center; align-items: center;
+                                height: 100vh; background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+                                color: white; flex-direction: column;
+                                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;">
+                        <div style="font-size: 72px; margin-bottom: 30px;">❌</div>
+                        <div style="font-size: 32px; color: #e74c3c; margin-bottom: 20px; font-weight: 600;">
+                            Failed to load file
+                        </div>
+                        <div style="font-size: 16px; color: #888; max-width: 600px;
+                                    text-align: center; line-height: 1.6; padding: 0 20px;">
+                            ${error.message}
+                        </div>
+                        <button onclick="window.close()"
+                                style="margin-top: 40px; padding: 14px 28px;
+                                       background: linear-gradient(135deg, #555 0%, #444 100%);
+                                       color: white; border: none; border-radius: 8px;
+                                       cursor: pointer; font-size: 16px; font-weight: 500;
+                                       box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+                                       transition: transform 0.2s;">
+                            Close Tab
+                        </button>
+                        <style>
+                            button:hover { transform: translateY(-2px); }
+                        </style>
+                    </div>
+                `;
+            }
+        };
+
         // v6.2.34: Add to File List only function
         window.addToFileListOnly = async function() {
             if (!FileState.kaspaMetadata && !FileState.directoryMetadata) {
@@ -24561,54 +24738,130 @@ try {
         (function() {
             const processShareableURL = async function() {
                 try {
-                    // Check if URL has hash with d= parameter
                     const hash = window.location.hash.substring(1);
-                    if (!hash || !hash.startsWith('d=')) return;
 
-                    console.log('[v7.1.0] Shareable URL detected:', hash.substring(0, 30) + '...');
+                    // Detect mode: d= (data) or v= (view)
+                    let mode = null;
+                    let encoded = '';
 
-                    // Extract Base32 encoded data
-                    const encoded = hash.substring(2); // Remove 'd=' prefix
-                    if (!encoded) {
-                        console.error('[v7.1.0] No data in URL hash');
+                    if (hash.startsWith('d=')) {
+                        mode = 'data';
+                        encoded = hash.substring(2);
+                    } else if (hash.startsWith('v=')) {
+                        mode = 'view';  // v7.2.0: Direct View mode
+                        encoded = hash.substring(2);
+                    } else if (!hash) {
+                        return;
+                    } else {
+                        console.warn('[URL] Unknown hash format:', hash.substring(0, 20));
                         return;
                     }
+
+                    if (!encoded) {
+                        console.error('[URL] No encoded data in hash');
+                        return;
+                    }
+
+                    console.log(`[URL v7.2.0] Processing ${mode} mode URL...`);
 
                     // Decode using Base32URL
                     let decoded;
                     try {
                         decoded = Base32URL.decode(encoded);
-                        console.log('[v7.1.0] Decoded data:', decoded.substring(0, 50) + '...');
+                        console.log(`[URL] Decoded ${mode} data:`, decoded.substring(0, 50) + '...');
                     } catch (decodeError) {
-                        console.error('[v7.1.0] Failed to decode Base32:', decodeError);
+                        console.error('[URL] Base32 decode failed:', decodeError);
                         return;
                     }
 
-                    // Validate decoded format (should be TxID:BlockID:Password or similar)
+                    // Validate format
                     if (!decoded || !decoded.includes(':')) {
-                        console.error('[v7.1.0] Invalid decoded format:', decoded);
+                        console.error('[URL] Invalid format (no colon separator):', decoded);
                         return;
                     }
 
-                    // Clean URL immediately (remove hash from browser history)
+                    // Clean URL from browser history
                     history.replaceState(null, '', window.location.pathname);
-                    console.log('[v7.1.1] URL cleaned from history');
+                    console.log('[URL] Hash cleaned from browser history');
 
-                    // Fill the unified input field silently (no tab switching)
+                    // Fill the unified input field
                     const inputField = document.getElementById('unifiedTxIdInput');
-                    if (inputField) {
-                        inputField.value = decoded;
-                        console.log('[v7.1.1] Filled input field with decoded data');
+                    if (!inputField) {
+                        console.error('[URL] unifiedTxIdInput field not found');
+                        return;
+                    }
 
-                        // Set flag for notification after Kaspa connection
-                        window.pendingShareNotification = true;
-                        console.log('[v7.1.1] Share URL loaded, waiting for Kaspa connection...');
+                    inputField.value = decoded;
+                    console.log('[URL] Input field populated with decoded data');
+
+                    // Mode-specific processing
+                    if (mode === 'view') {
+                        // v7.2.0: Direct View mode - Automatic execution
+                        console.log('[Direct View v7.2.0] Starting automatic execution...');
+
+                        // Wait for Kaspa connection
+                        const waitForConnection = async () => {
+                            let attempts = 0;
+                            const maxAttempts = 30; // 30 seconds
+
+                            while (!NetworkState.rpcClient && attempts < maxAttempts) {
+                                await new Promise(resolve => setTimeout(resolve, 1000));
+                                attempts++;
+
+                                if (attempts % 5 === 0) {
+                                    console.log(`[Direct View] Waiting for connection... (${attempts}/${maxAttempts})`);
+                                }
+                            }
+
+                            if (!NetworkState.rpcClient) {
+                                throw new Error('Kaspa connection timeout (30 seconds)');
+                            }
+
+                            console.log('[Direct View] Kaspa connected after', attempts, 'seconds');
+                        };
+
+                        try {
+                            // Step 1: Wait for Kaspa connection
+                            log('🔄 [Direct View] Waiting for Kaspa connection...', 'info');
+                            await waitForConnection();
+                            log('✅ [Direct View] Kaspa connected', 'success');
+
+                            // Step 2: Load metadata (Verify)
+                            log('🔍 [Direct View] Loading metadata...', 'info');
+                            await loadFromUnifiedInput();
+
+                            // Wait a bit for metadata loading to complete
+                            await new Promise(resolve => setTimeout(resolve, 1000));
+
+                            if (!FileState.kaspaMetadata) {
+                                throw new Error('Metadata loading failed');
+                            }
+
+                            log('✅ [Direct View] Metadata loaded successfully', 'success');
+                            console.log('[Direct View] Metadata:', {
+                                name: FileState.kaspaMetadata.file?.name,
+                                size: FileState.kaspaMetadata.file?.size,
+                                chunks: FileState.kaspaMetadata.chunks?.length
+                            });
+
+                            // Step 3: Download and display file
+                            log('📥 [Direct View] Starting file download and display...', 'info');
+                            await downloadFileDirectView();
+
+                        } catch (error) {
+                            log(`❌ [Direct View] Execution failed: ${error.message}`, 'error');
+                            console.error('[Direct View] Full error:', error);
+                            alert(`Direct View Mode Error:\n\n${error.message}\n\nPlease try again or use the normal download method.`);
+                        }
+
                     } else {
-                        console.error('[v7.1.1] Input field not found');
+                        // Data mode (existing behavior)
+                        window.pendingShareNotification = true;
+                        console.log('[URL] Data mode - Share URL loaded, waiting for notification');
                     }
 
                 } catch (error) {
-                    console.error('[v7.1.0] Error processing shareable URL:', error);
+                    console.error('[URL] Error processing shareable URL:', error);
                 }
             };
 

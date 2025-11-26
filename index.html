@@ -18632,17 +18632,18 @@ Do you want to continue?`;
                 return;
             }
             
-            if (!NetworkState.rpcClient) {
-                log('Please restart Kaspa system first', 'error');
-                return;
-            }
-            
+            // v7.2.5: RPC不要 - REST APIで動作可能
+            // if (!NetworkState.rpcClient) {
+            //     log('Please restart Kaspa system first', 'error');
+            //     return;
+            // }
+
             try {
                 // Get transaction from blockchain
                 let payload = null;
-                
-                // If we have BlockID, use RPC directly (no REST API needed)
-                if (blockId && (!NetworkState.downloadManager || !NetworkState.downloadManager.forceRestApi)) {
+
+                // If we have BlockID AND RPC is available, use RPC directly
+                if (blockId && NetworkState.rpcClient && (!NetworkState.downloadManager || !NetworkState.downloadManager.forceRestApi)) {
                     log(`Retrieving via RPC using BlockID...`, 'info');
                     try {
                         // Force Archive Mode対応 - グローバルRPCクライアント切り替え版
@@ -19849,9 +19850,10 @@ Do you want to continue?`;
                     throw new Error('No metadata loaded');
                 }
 
-                if (!NetworkState.rpcClient) {
-                    throw new Error('Kaspa system not initialized');
-                }
+                // v7.2.5: RPC不要 - REST APIで動作可能
+                // if (!NetworkState.rpcClient) {
+                //     throw new Error('Kaspa system not initialized');
+                // }
 
                 log('[Direct View] Starting download process...', 'info');
 
@@ -24832,25 +24834,15 @@ try {
                             if (progressBar && percent !== null) progressBar.style.width = percent + '%';
                         };
 
-                        // Wait for Kaspa connection
+                        // v7.2.5: REST API専用モード - RPC待ち不要
                         const waitForConnection = async () => {
-                            let attempts = 0;
-                            const maxAttempts = 30; // 30 seconds
-
-                            while (!NetworkState.rpcClient && attempts < maxAttempts) {
-                                await new Promise(resolve => setTimeout(resolve, 1000));
-                                attempts++;
-
-                                if (attempts % 5 === 0) {
-                                    console.log(`[Direct View] Waiting for connection... (${attempts}/${maxAttempts})`);
-                                }
+                            // config.networkを同期的に設定（API URL構築に必要）
+                            if (!config.network) {
+                                config.network = localStorage.getItem('network') || 'mainnet';
+                                console.log(`[Direct View] Config network set: ${config.network}`);
                             }
-
-                            if (!NetworkState.rpcClient) {
-                                throw new Error('Kaspa connection timeout (30 seconds)');
-                            }
-
-                            console.log('[Direct View] Kaspa connected after', attempts, 'seconds');
+                            // REST APIは常に利用可能なので即座に開始
+                            console.log('[Direct View] REST API mode - skipping RPC wait');
                         };
 
                         try {

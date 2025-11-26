@@ -19930,8 +19930,8 @@ Do you want to continue?`;
                     </style>
                 `;
 
-                // Wait 0.5s before navigating
-                await new Promise(resolve => setTimeout(resolve, 500));
+                // v7.2.5: 200msに短縮（UX演出）
+                await new Promise(resolve => setTimeout(resolve, 200));
 
                 log('[Direct View] Navigating to file with blob URL...', 'success');
 
@@ -24856,8 +24856,7 @@ try {
                             updateStatus('Loading metadata...', 15);
                             await loadFromUnifiedInput();
 
-                            // Wait a bit for metadata loading to complete
-                            await new Promise(resolve => setTimeout(resolve, 1000));
+                            // v7.2.5: 冗長な待機を削除（awaitで既に完了待ち済み）
 
                             if (!FileState.kaspaMetadata) {
                                 throw new Error('Metadata loading failed');

@@ -24834,16 +24834,13 @@ try {
                             if (progressBar && percent !== null) progressBar.style.width = percent + '%';
                         };
 
-                        // v7.2.5: REST API専用モード - configに依存しない
+                        // v7.2.5: REST API専用モード - モジュール初期化待ち
                         const waitForConnection = async () => {
-                            // DOMContentLoadedを待つ（モジュール内のconfig初期化完了を保証）
-                            if (document.readyState === 'loading') {
-                                console.log('[Direct View] Waiting for DOM ready...');
-                                await new Promise(resolve =>
-                                    document.addEventListener('DOMContentLoaded', resolve, {once: true})
-                                );
-                            }
-                            console.log('[Direct View] DOM ready - REST API mode');
+                            // モジュールスクリプトのconfig初期化を待つ（100ms固定）
+                            // readyState='interactive'でもDOMContentLoadedハンドラ未実行の可能性あり
+                            console.log('[Direct View] Waiting 100ms for module init...');
+                            await new Promise(r => setTimeout(r, 100));
+                            console.log('[Direct View] Ready - REST API mode');
                         };
 
                         try {

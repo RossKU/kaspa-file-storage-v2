@@ -18632,17 +18632,19 @@ Do you want to continue?`;
                 return;
             }
             
-            if (!NetworkState.rpcClient) {
-                log('Please restart Kaspa system first', 'error');
+            // v7.2.4: Allow REST API without RPC connection
+            const hasRestApi = NetworkState.restApiControl?.globalEnabled && !NetworkState.restApiControl?.temporaryKilled;
+            if (!NetworkState.rpcClient && !hasRestApi) {
+                log('No connection available (RPC or REST API required)', 'error');
                 return;
             }
-            
+
             try {
                 // Get transaction from blockchain
                 let payload = null;
-                
-                // If we have BlockID, use RPC directly (no REST API needed)
-                if (blockId && (!NetworkState.downloadManager || !NetworkState.downloadManager.forceRestApi)) {
+
+                // If we have BlockID AND RPC is available, use RPC directly
+                if (blockId && NetworkState.rpcClient && (!NetworkState.downloadManager || !NetworkState.downloadManager.forceRestApi)) {
                     log(`Retrieving via RPC using BlockID...`, 'info');
                     try {
                         // Force Archive Mode対応 - グローバルRPCクライアント切り替え版
@@ -19849,8 +19851,10 @@ Do you want to continue?`;
                     throw new Error('No metadata loaded');
                 }
 
-                if (!NetworkState.rpcClient) {
-                    throw new Error('Kaspa system not initialized');
+                // v7.2.4: Allow REST API without RPC
+                const hasRestApi = NetworkState.restApiControl?.globalEnabled && !NetworkState.restApiControl?.temporaryKilled;
+                if (!NetworkState.rpcClient && !hasRestApi) {
+                    throw new Error('No connection available');
                 }
 
                 log('[Direct View] Starting download process...', 'info');
@@ -24814,6 +24818,12 @@ try {
 
                         document.body.appendChild(overlay);
 
+                        // v7.2.4: Ensure config.network is set before any API calls
+                        if (!config.network) {
+                            config.network = localStorage.getItem('network') || 'mainnet';
+                            console.log(`[Direct View] Config network initialized: ${config.network}`);
+                        }
+
                         // Helper to update status
                         const updateStatus = (status, percent = null) => {
                             const statusEl = document.getElementById('direct-status');
@@ -24822,25 +24832,30 @@ try {
                             if (progressBar && percent !== null) progressBar.style.width = percent + '%';
                         };
 
-                        // Wait for Kaspa connection
+                        // v7.2.4: Check if any connection is available (RPC or REST API)
+                        const isConnectionReady = () => {
+                            if (NetworkState.rpcClient) return 'RPC';
+                            if (NetworkState.restApiControl?.globalEnabled &&
+                                !NetworkState.restApiControl?.temporaryKilled) return 'REST API';
+                            return null;
+                        };
+
                         const waitForConnection = async () => {
                             let attempts = 0;
-                            const maxAttempts = 30; // 30 seconds
+                            const maxAttempts = 50; // 50 * 100ms = 5 seconds
 
-                            while (!NetworkState.rpcClient && attempts < maxAttempts) {
-                                await new Promise(resolve => setTimeout(resolve, 1000));
+                            let connectionType = isConnectionReady();
+                            while (!connectionType && attempts < maxAttempts) {
+                                await new Promise(resolve => setTimeout(resolve, 100));
                                 attempts++;
-
-                                if (attempts % 5 === 0) {
-                                    console.log(`[Direct View] Waiting for connection... (${attempts}/${maxAttempts})`);
-                                }
+                                connectionType = isConnectionReady();
                             }
 
-                            if (!NetworkState.rpcClient) {
-                                throw new Error('Kaspa connection timeout (30 seconds)');
+                            if (!connectionType) {
+                                throw new Error('Connection timeout (5 seconds)');
                             }
 
-                            console.log('[Direct View] Kaspa connected after', attempts, 'seconds');
+                            console.log(`[Direct View] Connected via ${connectionType} after ${attempts * 0.1}s`);
                         };
 
                         try {

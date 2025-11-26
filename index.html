@@ -24836,6 +24836,20 @@ try {
 
                         // v7.2.5: REST API専用モード - RPC待ち不要
                         const waitForConnection = async () => {
+                            // configが未定義の場合は待機（最大500ms）
+                            if (typeof config === 'undefined') {
+                                console.log('[Direct View] Waiting for config...');
+                                let attempts = 0;
+                                while (typeof config === 'undefined' && attempts < 50) {
+                                    await new Promise(r => setTimeout(r, 10));
+                                    attempts++;
+                                }
+                                if (typeof config === 'undefined') {
+                                    throw new Error('Config initialization timeout');
+                                }
+                                console.log(`[Direct View] Config ready after ${attempts * 10}ms`);
+                            }
+
                             // config.networkを同期的に設定（API URL構築に必要）
                             if (!config.network) {
                                 config.network = localStorage.getItem('network') || 'mainnet';

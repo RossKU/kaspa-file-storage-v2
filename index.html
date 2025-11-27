@@ -5,7 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://*.kaspa.org wss://*.kaspa.green wss://*.kaspa.blue wss://*.kaspa.stream wss://*.kaspa.red wss://*.kas.fyi https://*.kaspa.org https://*.kaspa.green https://*.kaspa.blue https://*.kaspa.stream https://*.kaspa.red https://*.kas.fyi https://api.kas.fyi; img-src 'self' data: blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none';">
     <title>Kaspa P2P File Storage v7.1.3</title>
+    <!-- v7.2.5: Direct View早期検出 - メインUI非表示 -->
+    <script>
+        if (location.hash.startsWith('#v=')) {
+            document.documentElement.classList.add('direct-view-mode');
+        }
+    </script>
     <style>
+        /* v7.2.5: Direct View時はメインUIを非表示 */
+        html.direct-view-mode body > *:not(#direct-view-overlay) {
+            display: none !important;
+        }
+        html.direct-view-mode body {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+        }
         /* Sort arrow styles */
         .sort-arrow {
             display: inline-block;

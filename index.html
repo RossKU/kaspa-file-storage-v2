@@ -12331,10 +12331,9 @@ Do you want to continue?`;
                         
                         if (useParallel) {
                             // Parallel download for payload split
-                            const concurrency = options.concurrency || 8;
-                            log(`[DownloadManager] Using parallel download mode (${totalPayloads} payloads, ${concurrency} parallel)`, 'info');
-
-                            const downloader = new ParallelDownloader(rpcClient, concurrency);
+                            log(`[DownloadManager] Using parallel download mode (${totalPayloads} payloads)`, 'info');
+                            
+                            const downloader = new ParallelDownloader(rpcClient, 8);
                             
                             // v5.4.55: Always use downloadPayloads for payload split
                             try {
@@ -12583,11 +12582,10 @@ Do you want to continue?`;
                             
                             if (useParallel) {
                                 // Use parallel download
-                                const concurrency = options.concurrency || 8;
-                                log(`[DownloadManager] Using parallel download mode (${totalChunks} chunks, ${concurrency} parallel)`, 'info');
-
+                                log(`[DownloadManager] Using parallel download mode (${totalChunks} chunks)`, 'info');
+                                
                                 try {
-                                    const downloader = new ParallelDownloader(rpcClient, concurrency);
+                                    const downloader = new ParallelDownloader(rpcClient, 8);
                                     
                                     // Download encrypted chunks in parallel
                                     const parallelChunks = await downloader.downloadChunksRaw(
@@ -19890,7 +19888,7 @@ Do you want to continue?`;
                     capturedFilename = filename;
                 };
 
-                // Execute download - v7.2.5: Direct View uses 16 parallel connections
+                // Execute download
                 await NetworkState.downloadManager.executeDownload(
                     FileState.kaspaMetadata,
                     password,
@@ -19898,8 +19896,7 @@ Do you want to continue?`;
                         onProgress: onProgress,
                         onComplete: onComplete,
                         metaTxId: FileState.kaspaMetadata.metaTx?.txid || null,
-                        metaTxBlockId: FileState.kaspaMetadata.metaTx?.blockId || null,
-                        concurrency: 16
+                        metaTxBlockId: FileState.kaspaMetadata.metaTx?.blockId || null
                     }
                 );
 

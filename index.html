@@ -12324,16 +12324,19 @@ Do you want to continue?`;
                         const totalPayloads = metadata.chunks.length;
                         
                         // v4.7.45: Check if parallel download should be used
-                        const useParallel = AppState.settings.parallelDownloadEnabled && totalPayloads >= 2;
-                        
+                        // v7.2.5: kas.fyi有効時は強制ON + 16並列
+                        const hasKasFyi = NetworkState.kasFyiControl?.enabled && NetworkState.kasFyiControl?.apiKey;
+                        const useParallel = (AppState.settings.parallelDownloadEnabled || hasKasFyi) && totalPayloads >= 2;
+                        const concurrency = hasKasFyi ? 16 : 8;
+
                         // v5.3.16: Debug log
-                        log(`[DownloadManager v5.3.16] payloadSplit path - useParallel: ${useParallel}, totalPayloads: ${totalPayloads}`, 'debug');
-                        
+                        log(`[DownloadManager v5.3.16] payloadSplit path - useParallel: ${useParallel}, totalPayloads: ${totalPayloads}, kas.fyi: ${hasKasFyi}`, 'debug');
+
                         if (useParallel) {
                             // Parallel download for payload split
-                            log(`[DownloadManager] Using parallel download mode (${totalPayloads} payloads)`, 'info');
-                            
-                            const downloader = new ParallelDownloader(rpcClient, 8);
+                            log(`[DownloadManager] Using parallel download mode (${totalPayloads} payloads, ${concurrency} parallel${hasKasFyi ? ', kas.fyi' : ''})`, 'info');
+
+                            const downloader = new ParallelDownloader(rpcClient, concurrency);
                             
                             // v5.4.55: Always use downloadPayloads for payload split
                             try {
@@ -12578,14 +12581,17 @@ Do you want to continue?`;
                             const totalChunks = metadata.chunks.length;
                             
                             // v5.3.15: Enable parallel download for standard chunks
-                            const useParallel = AppState.settings.parallelDownloadEnabled && totalChunks >= 2;
-                            
+                            // v7.2.5: kas.fyi有効時は強制ON + 16並列
+                            const hasKasFyi = NetworkState.kasFyiControl?.enabled && NetworkState.kasFyiControl?.apiKey;
+                            const useParallel = (AppState.settings.parallelDownloadEnabled || hasKasFyi) && totalChunks >= 2;
+                            const concurrency = hasKasFyi ? 16 : 8;
+
                             if (useParallel) {
                                 // Use parallel download
-                                log(`[DownloadManager] Using parallel download mode (${totalChunks} chunks)`, 'info');
-                                
+                                log(`[DownloadManager] Using parallel download mode (${totalChunks} chunks, ${concurrency} parallel${hasKasFyi ? ', kas.fyi' : ''})`, 'info');
+
                                 try {
-                                    const downloader = new ParallelDownloader(rpcClient, 8);
+                                    const downloader = new ParallelDownloader(rpcClient, concurrency);
                                     
                                     // Download encrypted chunks in parallel
                                     const parallelChunks = await downloader.downloadChunksRaw(

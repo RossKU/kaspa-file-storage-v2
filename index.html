@@ -19946,14 +19946,16 @@ Do you want to continue?`;
                     </style>
                 `;
 
-                // v7.2.5: 200msに短縮（UX演出）
-                await new Promise(resolve => setTimeout(resolve, 200));
-
                 log('[Direct View] Navigating to file with blob URL...', 'success');
 
-                // Navigate to blob URL in same tab (overlay removed automatically by page navigation)
+                // Navigate to blob URL in same tab
                 const blobURL = URL.createObjectURL(capturedBlob);
-                window.location.replace(blobURL);
+
+                // v7.2.5: 戻るボタンでarkiv.fyiをスキップ（元のページに戻る）
+                history.back();
+                setTimeout(() => {
+                    window.location.replace(blobURL);
+                }, 50);
 
                 // Code after this won't execute (page navigation)
 

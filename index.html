@@ -2196,6 +2196,7 @@
                         <button class="share-option" onclick="shareAction('txid-no-password')">🔓 TxID (no password)</button>
                         <button class="share-option" onclick="shareAction('password')">🔑 Pass (password only)</button>
                         <button class="share-option" onclick="shareAction('url')">🌐 Share URL</button>
+                        <button class="share-option" onclick="shareAction('view-link')">👁️ View Link</button>
                     </div>
                 </div>
                 <button class="file-action-btn" onclick="FileTabHandlers.showSelectedFileDetails()">
@@ -23518,6 +23519,41 @@ Do you want to continue?`;
                         // Also log to console for debugging
                         console.log('[v7.1.0] Generated Share URL:', shareURL);
                         console.log('[v7.1.0] URL Length:', shareURL.length, 'characters');
+                        break;
+
+                    case 'view-link':
+                        // v7.2.5: Generate Direct View URL (#v= format)
+                        if (!kenvEntry.metaTxId) {
+                            log('Meta transaction ID does not exist', 'error');
+                            return;
+                        }
+                        if (!kenvEntry.password) {
+                            log('Password is not saved', 'error');
+                            return;
+                        }
+
+                        // Prepare data for View URL (same format as Share URL)
+                        const viewBlockId = kenvEntry.metaTxBlockId || '';
+                        const viewData = viewBlockId ?
+                            `${kenvEntry.metaTxId}:${viewBlockId}:${kenvEntry.password}` :
+                            `${kenvEntry.metaTxId}::${kenvEntry.password}`;
+
+                        // Encode with Base32URL
+                        const viewEncoded = Base32URL.encode(viewData);
+
+                        // Generate View URL with #v= prefix (Direct View mode)
+                        const viewURL = `${window.location.origin}${window.location.pathname}#v=${viewEncoded}`;
+
+                        // Copy to clipboard
+                        await window.copyToClipboard(viewURL);
+
+                        // Show success message
+                        const shortViewUrl = viewURL.length > 80 ?
+                            viewURL.substring(0, 40) + '...' + viewURL.substring(viewURL.length - 30) :
+                            viewURL;
+                        log(`👁️ View Link copied: ${shortViewUrl}`, 'success');
+
+                        console.log('[v7.2.5] Generated View Link:', viewURL);
                         break;
 
                     default:

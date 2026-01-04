@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://*.kaspa.org wss://*.kaspa.green wss://*.kaspa.blue wss://*.kaspa.stream wss://*.kaspa.red wss://*.kas.fyi https://*.kaspa.org https://*.kaspa.green https://*.kaspa.blue https://*.kaspa.stream https://*.kaspa.red https://*.kas.fyi https://api.kas.fyi; img-src 'self' data: blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none';">
-    <title>Kaspa P2P File Storage v7.2.5</title>
-    <!-- v7.2.5: Direct View早期検出 - メインUI非表示 -->
+    <title>Kaspa P2P File Storage v7.3.0</title>
+    <!-- v7.3.0: KFS protocol prefix support for explorer statistics -->
     <script>
         if (location.hash.startsWith('#v=')) {
             document.documentElement.classList.add('direct-view-mode');
@@ -10396,9 +10396,10 @@ Do you want to continue?`;
                         if (!payload) {
                             throw new Error(`Payload not found`);
                         }
-                        
-                        const decrypted = await decryptChunk(payload, key, index);
-                        log(`[DEBUG Download] Chunk ${index} decryption: ${payload.length} → ${decrypted.length} bytes`, 'debug');
+
+                        const strippedPayload = stripKfsPrefix(payload);
+                        const decrypted = await decryptChunk(strippedPayload, key, index);
+                        log(`[DEBUG Download] Chunk ${index} decryption: ${strippedPayload.length} → ${decrypted.length} bytes`, 'debug');
                         
                         const original = FileState.kaspaMetadata.file?.compression?.enabled ? 
                             lzDecompress(decrypted) : decrypted;
@@ -10545,10 +10546,11 @@ Do you want to continue?`;
                         if (!payload) {
                             throw new Error(`Payload not found`);
                         }
-                        
-                        this.results.set(index, payload);
+
+                        const strippedPayload = stripKfsPrefix(payload);
+                        this.results.set(index, strippedPayload);
                         this.completedCount++;
-                        this.totalBytes += payload.length;
+                        this.totalBytes += strippedPayload.length;
                         
                         const elapsed = (Date.now() - this.startTime) / 1000;
                         const speed = this.completedCount / elapsed;
@@ -10584,12 +10586,13 @@ Do you want to continue?`;
                             const data = await response.json();
                             if (data.payload) {
                                 const payload = safeHexDecode(data.payload, 'payload from REST API');
-                                log(`[ParallelDownloader] Payload ${work.index} fetched via REST API: ${payload.length} bytes`, 'success');
-                                
+                                const strippedPayload = stripKfsPrefix(payload);
+                                log(`[ParallelDownloader] Payload ${work.index} fetched via REST API: ${strippedPayload.length} bytes`, 'success');
+
                                 // Save result if successful
-                                this.results.set(work.index, payload);
+                                this.results.set(work.index, strippedPayload);
                                 this.completedCount++;
-                                this.totalBytes += payload.length;
+                                this.totalBytes += strippedPayload.length;
                                 
                                 // Update progress
                                 const elapsed = (Date.now() - this.startTime) / 1000;
@@ -10788,6 +10791,25 @@ Do you want to continue?`;
             }
         }
         
+        // v7.3.0: Strip KFS protocol prefix for backward compatibility
+        // Prefix format: "kfs:1:" (6 bytes ASCII)
+        function stripKfsPrefix(payloadBytes) {
+            if (payloadBytes && payloadBytes.length > 6) {
+                // Check for "kfs:1:" prefix
+                if (payloadBytes[0] === 0x6b && // 'k'
+                    payloadBytes[1] === 0x66 && // 'f'
+                    payloadBytes[2] === 0x73 && // 's'
+                    payloadBytes[3] === 0x3a && // ':'
+                    payloadBytes[4] === 0x31 && // '1'
+                    payloadBytes[5] === 0x3a) { // ':'
+                    log('[KFS] Detected kfs:1: prefix, stripping...', 'debug');
+                    return payloadBytes.slice(6);
+                }
+            }
+            // Legacy format: no prefix
+            return payloadBytes;
+        }
+
         // Format network display name (v5.11.100: Phase 10)
         function formatNetworkDisplay(network) {
             return config.networkDisplayNames[network] || network;
@@ -11915,11 +11937,12 @@ Do you want to continue?`;
                     if (!payload) {
                         throw lastError || new Error('Payload not found');
                     }
-                    
+
+                    const strippedPayload = stripKfsPrefix(payload);
                     // Return encrypted data as-is (decryption handled by caller)
-                    this.results.set(index, payload);
+                    this.results.set(index, strippedPayload);
                     this.completedCount++;
-                    this.totalBytes += payload.length;
+                    this.totalBytes += strippedPayload.length;
                     log(`[DEBUG] Chunk ${index} completed. Total: ${this.completedCount}/${this.totalChunks}, Bytes: ${this.totalBytes}`, 'debug');
                     
                     const elapsed = (Date.now() - this.startTime) / 1000;
@@ -12052,11 +12075,12 @@ Do you want to continue?`;
                     if (!payload) {
                         throw new Error('Metadata payload not found');
                     }
-                    
+
+                    const strippedPayload = stripKfsPrefix(payload);
                     // Decrypt metadata
-                    if (payload.length > 16) {
-                        const salt = payload.slice(0, 16);
-                        const encryptedData = payload.slice(16);
+                    if (strippedPayload.length > 16) {
+                        const salt = strippedPayload.slice(0, 16);
+                        const encryptedData = strippedPayload.slice(16);
                         const key = await deriveKey(password, salt);
                         
                         const decrypted = await decryptChunk(encryptedData, key, -1);
@@ -12141,8 +12165,8 @@ Do you want to continue?`;
                     if (!payload) {
                         throw new Error(`Payload ${index + 1} not found`);
                     }
-                    
-                    return payload;
+
+                    return stripKfsPrefix(payload);
                     
                 } catch (rpcError) {
                     log(`[DownloadManager] RPC failed, falling back to REST API: ${rpcError.message}`, 'warning');
@@ -12165,8 +12189,9 @@ Do you want to continue?`;
                         const data = await response.json();
                         if (data.payload) {
                             const payload = safeHexDecode(data.payload, 'payload from REST API');
-                            log(`[DownloadManager] Payload fetched via REST API: ${payload.length} bytes`, 'success');
-                            return payload;
+                            const strippedPayload = stripKfsPrefix(payload);
+                            log(`[DownloadManager] Payload fetched via REST API: ${strippedPayload.length} bytes`, 'success');
+                            return strippedPayload;
                         } else {
                             throw new Error('No payload in REST API response');
                         }
@@ -12176,7 +12201,7 @@ Do you want to continue?`;
                     }
                 }
             }
-            
+
             // Download single chunk from blockchain
             async downloadChunk(txId, blockId, key, index, metadata) {
                 try {
@@ -12241,21 +12266,22 @@ Do you want to continue?`;
                     if (!payload) {
                         throw new Error(`Chunk ${index + 1} payload not found`);
                     }
-                    
+
+                    const strippedPayload = stripKfsPrefix(payload);
                     // v4.7.41: Enhanced debugging for variable chunk compression
                     const segmentBoundaries = metadata.metadata?.segmentBoundaries || metadata.metadata?.chunkBoundaries;
                     if (metadata.file?.compression?.enabled && segmentBoundaries) {
                         log(`[DownloadManager] Variable chunk compressed file detected - returning encrypted data as-is`, 'info');
-                        log(`[DownloadManager] Chunk ${index}: payload size=${payload.length} bytes`, 'debug');
-                        log(`[DownloadManager] Encrypted data preview: ${Array.from(payload.slice(0, 16)).map(b => b.toString(16).padStart(2, '0')).join(' ')}...`, 'debug');
+                        log(`[DownloadManager] Chunk ${index}: payload size=${strippedPayload.length} bytes`, 'debug');
+                        log(`[DownloadManager] Encrypted data preview: ${Array.from(strippedPayload.slice(0, 16)).map(b => b.toString(16).padStart(2, '0')).join(' ')}...`, 'debug');
                         if (segmentBoundaries[index]) {
                             log(`[DownloadManager] Boundary info: ${JSON.stringify(segmentBoundaries[index])}`, 'debug');
                         }
-                        return payload; // Return encrypted data as-is for later processing
+                        return strippedPayload; // Return encrypted data as-is for later processing
                     }
-                    
+
                     // Standard processing for non-variable chunk files
-                    const decrypted = await decryptChunk(payload, key, index);
+                    const decrypted = await decryptChunk(strippedPayload, key, index);
                     const decompressed = metadata.file?.compression?.enabled ? 
                         lzDecompress(decrypted) : decrypted;
                     
@@ -12283,18 +12309,19 @@ Do you want to continue?`;
                         const data = await response.json();
                         if (data.payload) {
                             const payload = safeHexDecode(data.payload, 'chunk payload from REST API');
-                            log(`[DownloadManager] Chunk fetched via REST API: ${payload.length} bytes`, 'success');
-                            
+                            const strippedPayload = stripKfsPrefix(payload);
+                            log(`[DownloadManager] Chunk fetched via REST API: ${strippedPayload.length} bytes`, 'success');
+
                             // Process chunk data same as above
                             const segmentBoundaries = metadata.metadata?.segmentBoundaries || metadata.metadata?.chunkBoundaries;
                             if (metadata.file?.compression?.enabled && segmentBoundaries) {
-                                return payload; // Return encrypted data as-is
+                                return strippedPayload; // Return encrypted data as-is
                             }
-                            
-                            const decrypted = await decryptChunk(payload, key, index);
-                            const decompressed = metadata.file?.compression?.enabled ? 
+
+                            const decrypted = await decryptChunk(strippedPayload, key, index);
+                            const decompressed = metadata.file?.compression?.enabled ?
                                 lzDecompress(decrypted) : decrypted;
-                            
+
                             log(`[DownloadManager] Chunk ${index + 1} processed (REST API): ${decompressed.length} bytes`, 'success');
                             return decompressed;
                         } else {
@@ -12306,7 +12333,7 @@ Do you want to continue?`;
                     }
                 }
             }
-            
+
             // Execute download with all chunks
             async executeDownload(metadata, password, options = {}) {
                 try {
@@ -18990,7 +19017,10 @@ Do you want to continue?`;
                 }
                 
                 log(`Payload retrieved successfully: ${payload.length} bytes`, 'info');
-                
+
+                // v7.3.0: Strip KFS prefix if present
+                const strippedPayload = stripKfsPrefix(payload);
+
                 // Try to decrypt the payload
                 try {
                     // First, try to derive key with a temporary salt (we'll get the real salt from decrypted data)
@@ -18999,19 +19029,19 @@ Do you want to continue?`;
                     for (let i = 0; i < 16; i++) {
                         tempSalt[i] = parseInt(metaTxId.substr(i * 2, 2), 16);
                     }
-                    
+
                     // Try decrypting with chunk index -1 (meta-tx indicator)
                     let decrypted;
                     let metaData;
-                    
+
                     // We need to try different approaches since we don't have the salt yet
                     // The actual implementation would need to extract salt from the encrypted data
                     // or use a standardized approach
-                    
+
                     // For now, let's try to extract the salt from the beginning of the payload
-                    if (payload.length > 16) {
-                        const salt = payload.slice(0, 16);
-                        const encryptedData = payload.slice(16);
+                    if (strippedPayload.length > 16) {
+                        const salt = strippedPayload.slice(0, 16);
+                        const encryptedData = strippedPayload.slice(16);
                         
                         const key = await deriveKey(password, salt);
                         
@@ -19167,9 +19197,11 @@ Do you want to continue?`;
                                         }
                                     }
                                     
+                                    // v7.3.0: Strip KFS prefix if present
+                                    const strippedIntPayload = stripKfsPrefix(intPayload);
                                     // Decrypt intermediate metadata
-                                    const intSalt = intPayload.slice(0, 16);
-                                    const intEncryptedData = intPayload.slice(16);
+                                    const intSalt = strippedIntPayload.slice(0, 16);
+                                    const intEncryptedData = strippedIntPayload.slice(16);
                                     const intKey = await deriveKey(password, intSalt);
                                     const intDecrypted = await decryptChunk(intEncryptedData, intKey, -1);
                                     const intMetaData = JSON.parse(new TextDecoder().decode(intDecrypted));
@@ -19586,9 +19618,11 @@ Do you want to continue?`;
                         if (!payload) {
                             throw new Error(`Payload for chunk ${i + 1} not found`);
                         }
-                        
+
+                        // v7.3.0: Strip KFS prefix if present
+                        const strippedPayload = stripKfsPrefix(payload);
                         // Decrypt and decompress
-                        const encrypted = payload; // Already binary Uint8Array
+                        const encrypted = strippedPayload; // Already binary Uint8Array
                         const compressed = await decryptChunk(encrypted, key, i);
                         const original = kaspaMetadata.file?.compression?.enabled ? lzDecompress(compressed) : compressed;
                         
@@ -19682,9 +19716,11 @@ Do you want to continue?`;
                             if (!payload) {
                                 throw new Error(`Payload for chunk ${i + 1} not found`);
                             }
-                            
+
+                            // v7.3.0: Strip KFS prefix if present
+                            const strippedPayload = stripKfsPrefix(payload);
                             // Decrypt and decompress
-                            const encrypted = payload; // Already binary Uint8Array
+                            const encrypted = strippedPayload; // Already binary Uint8Array
                             log(`Chunk ${i + 1}: Encrypted data ${encrypted.length} bytes`, 'info');
                             // Log first few bytes for debugging
                             const preview = Array.from(encrypted.slice(0, 16)).map(b => b.toString(16).padStart(2, '0')).join(' ');

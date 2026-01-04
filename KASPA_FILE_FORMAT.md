@@ -1,4 +1,4 @@
-# Kaspa File Format Specification v3.4.3
+# Kaspa File Format Specification v3.4.4
 
 ## Overview
 
@@ -6,10 +6,10 @@ This is the standard file format specification for the distributed file storage 
 
 ## Format Version
 
-- **Current Version**: 3.4.3
-- **Reference Implementation**: v6.2.78
+- **Current Version**: 3.4.4
+- **Reference Implementation**: v7.3.2
 - **Created**: 2025-07-07
-- **Updated**: 2025-09-29
+- **Updated**: 2026-01-05
 
 ## Terminology
 
@@ -22,6 +22,14 @@ This is the standard file format specification for the distributed file storage 
 - Processing unit for compression and decryption (1MB)
 - Larger unit containing multiple chunks
 - Enables efficient processing in payloadSplit mode
+
+### Payload Prefix (v3.4.4)
+- All transaction payloads are prefixed with a protocol identifier
+- **Prefix**: `kfs:1:` (6 bytes ASCII)
+- **Hex representation**: `6b66733a313a`
+- **Structure**: `kfs` (protocol) + `:` (delimiter) + `1` (version) + `:` (delimiter)
+- **Purpose**: Enables Kaspa Explorer to identify and track KFS transactions for usage statistics
+- Applied to both chunk payloads and metadata payloads
 
 ## File Type Definitions
 
@@ -608,6 +616,14 @@ Example: document.pdf.abc12345.kprogress
 - **Individual password management**: Password field in entries not implemented
 
 ## Change History
+
+### v3.4.4 (2026-01-05)
+- **KFS Protocol Prefix**: All transaction payloads now include `kfs:1:` prefix
+  - Prefix format: `kfs:1:` (6 bytes ASCII, hex: `6b66733a313a`)
+  - Enables Kaspa Explorer to track Kaspa File Storage usage statistics
+  - Applied to both chunk and metadata transactions
+  - Backward compatible: Reader implementations strip prefix if present
+- **Reference Implementation**: Updated to v7.3.2
 
 ### v3.4.3 (2025-09-29)
 - **SuperMeta Progress Tracking**: Added intermediateMetaTxs field to _progress

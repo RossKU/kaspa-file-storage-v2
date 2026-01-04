@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://*.kaspa.org wss://*.kaspa.green wss://*.kaspa.blue wss://*.kaspa.stream wss://*.kaspa.red wss://*.kas.fyi https://*.kaspa.org https://*.kaspa.green https://*.kaspa.blue https://*.kaspa.stream https://*.kaspa.red https://*.kas.fyi https://api.kas.fyi; img-src 'self' data: blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none';">
-    <title>Kaspa P2P File Storage v7.3.1</title>
-    <!-- v7.3.1: Fix KENV persistence on browser reload with workspace -->
+    <title>Kaspa P2P File Storage v7.3.0</title>
+    <!-- v7.3.0: KFS protocol prefix support for explorer statistics -->
     <script>
         if (location.hash.startsWith('#v=')) {
             document.documentElement.classList.add('direct-view-mode');
@@ -6525,9 +6525,8 @@
                             }
                         }
                         
-                        // v7.3.1: Keep IndexedDB as backup storage (don't clear on workspace load)
-                        // This prevents data loss on browser reload when workspace handle is lost
-                        // await this.clearLocalStorage();
+                        // Delete from IndexedDB (v7.0.61)
+                        await this.clearLocalStorage();
                     } else {
                         log('[KENV] Workspace not set - Operating in IndexedDB mode', 'info');
                     }
@@ -6719,29 +6718,12 @@
             async confirmMerge(tempData) {
                 const entryCount = tempData.entries?.length || 0;
                 if (entryCount === 0) return false;
-
-                // v7.3.1: Count only new entries to avoid duplicate merge prompts
-                let newCount = 0;
-                for (const entry of tempData.entries) {
-                    const isIdentical = this.entries.some(e =>
-                        e.name === entry.name &&
-                        e.cid === entry.cid &&
-                        (e.metaTxId === entry.metaTxId || (!e.metaTxId && !entry.metaTxId))
-                    );
-                    if (!isIdentical) newCount++;
-                }
-
-                // Skip if no new entries
-                if (newCount === 0) {
-                    log('[KENV] No new entries to merge', 'info');
-                    return false;
-                }
-
+                
                 return confirm(
-                    `Found ${newCount} new KENV items (out of ${entryCount} total).\n\n` +
+                    `Found ${entryCount} KENV data items created outside the workspace.\n\n` +
                     'Do you want to integrate this data into the workspace?\n\n' +
                     '"OK": Integrate (recommended)\n' +
-                    '"Cancel": Skip'
+                    '"Cancel": Discard'
                 );
             },
             

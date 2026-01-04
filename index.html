@@ -10810,6 +10810,17 @@ Do you want to continue?`;
             return payloadBytes;
         }
 
+        // v7.3.0: Add KFS protocol prefix for explorer statistics
+        // Prefix format: "kfs:1:" (6 bytes ASCII)
+        const KFS_PREFIX = new Uint8Array([0x6b, 0x66, 0x73, 0x3a, 0x31, 0x3a]); // "kfs:1:"
+        function addKfsPrefix(payloadBytes) {
+            const result = new Uint8Array(KFS_PREFIX.length + payloadBytes.length);
+            result.set(KFS_PREFIX, 0);
+            result.set(payloadBytes, KFS_PREFIX.length);
+            log(`[KFS] Added kfs:1: prefix (${payloadBytes.length} → ${result.length} bytes)`, 'debug');
+            return result;
+        }
+
         // Format network display name (v5.11.100: Phase 10)
         function formatNetworkDisplay(network) {
             return config.networkDisplayNames[network] || network;
@@ -14156,6 +14167,8 @@ Do you want to continue?`;
             const payloadBytes = fromBase64(payloadBase64);
             
             // Create transaction
+            // v7.3.0: Add KFS prefix for explorer statistics
+            const prefixedPayload = addKfsPrefix(payloadBytes);
             const result = await NetworkState.kaspa.createTransactions({
                 entries: formattedUtxos,
                 outputs: [{
@@ -14165,16 +14178,16 @@ Do you want to continue?`;
                 changeAddress: UserState.address.toString(),
                 priorityFee: 0n,  // v5.11.17: Cost reduction by removing Priority Fee
                 networkId: config.network,
-                payload: payloadBytes
+                payload: prefixedPayload
             });
-            
+
             if (!result.transactions || result.transactions.length === 0) {
                 throw new Error('Failed to create transaction');
             }
-            
+
             return result.transactions[0];
         }
-        
+
         async function sendTransaction(transaction) {
             // Sign transaction
             let keyObj = null;
@@ -15411,6 +15424,8 @@ Do you want to continue?`;
                                     blockDaaScore: BigInt(utxo.blockDaaScore)
                                 }));
                                 
+                                // v7.3.0: Add KFS prefix for explorer statistics
+                                const prefixedPayload = addKfsPrefix(payloadBytes);
                                 const result = await NetworkState.kaspa.createTransactions({
                                     entries: formattedUtxos,
                                     outputs: [{
@@ -15420,9 +15435,9 @@ Do you want to continue?`;
                                     changeAddress: UserState.address.toString(),
                                     priorityFee: 0n,  // v5.11.17: Cost reduction by removing Priority Fee
                                     networkId: config.network,
-                                    payload: payloadBytes
+                                    payload: prefixedPayload
                                 });
-                                
+
                                 // Sign and submit
                                 if (!result.transactions || result.transactions.length === 0) {
                                     throw new Error('No transactions generated');
@@ -15878,6 +15893,8 @@ Do you want to continue?`;
                                 blockDaaScore: BigInt(utxo.blockDaaScore)
                             }));
                             
+                            // v7.3.0: Add KFS prefix for explorer statistics
+                            const prefixedPayload = addKfsPrefix(payloadBytes);
                             const result = await NetworkState.kaspa.createTransactions({
                                 entries: formattedUtxos,
                                 outputs: [{
@@ -15887,16 +15904,16 @@ Do you want to continue?`;
                                 changeAddress: UserState.address.toString(),
                                 priorityFee: 0n,  // v5.11.17: Cost reduction by removing Priority Fee
                                 networkId: config.network,
-                                payload: payloadBytes
+                                payload: prefixedPayload
                             });
-                            
+
                             // Sign and submit transaction
                             if (!result.transactions || result.transactions.length === 0) {
                                 throw new Error('No transactions generated');
                             }
-                            
+
                             const pendingTx = result.transactions[0];
-                            
+
                             // Sign the transaction
                             log(`Signing transaction...`);
                             // Securely retrieve and use private key
@@ -16906,10 +16923,12 @@ Do you want to continue?`;
                         });
                         
                         log(`Creating meta-tx with ${formattedUtxos.length} UTXOs, payload size: ${metaPayload.length} bytes`);
-                        
+
                         // Use same amount as regular chunks
                         const amount = AppState.settings.transactionAmount;
-                        
+
+                        // v7.3.0: Add KFS prefix for explorer statistics
+                        const prefixedMetaPayload = addKfsPrefix(metaPayload);
                         const result = await NetworkState.kaspa.createTransactions({
                             entries: formattedUtxos,
                             outputs: [{
@@ -16919,7 +16938,7 @@ Do you want to continue?`;
                             changeAddress: UserState.address.toString(),
                             priorityFee: 0n,  // v5.11.17: Cost reduction by removing Priority Fee
                             networkId: config.network,
-                            payload: metaPayload
+                            payload: prefixedMetaPayload
                         });
                         
                         if (!result) {
@@ -17338,11 +17357,11 @@ Do you want to continue?`;
                 metaPayload.set(encryptedMetaData, salt.length);
                 
                 log(`[SuperMeta] Intermediate metadata size: ${metaDataBytes.length} bytes`, 'debug');
-                
+
                 // Upload to blockchain
                 const utxoResponse = await NetworkState.rpcClient.getUtxosByAddresses([UserState.address.toString()]);
                 const entries = utxoResponse.entries || [];
-                
+
                 const formattedUtxos = entries.map(utxo => ({
                     address: UserState.address.toString(),
                     outpoint: {
@@ -17354,7 +17373,9 @@ Do you want to continue?`;
                     isCoinbase: utxo.isCoinbase || false,
                     blockDaaScore: BigInt(utxo.blockDaaScore)
                 }));
-                
+
+                // v7.3.0: Add KFS prefix for explorer statistics
+                const prefixedMetaPayload = addKfsPrefix(metaPayload);
                 const result = await NetworkState.kaspa.createTransactions({
                     entries: formattedUtxos,
                     outputs: [{
@@ -17364,7 +17385,7 @@ Do you want to continue?`;
                     changeAddress: UserState.address.toString(),
                     priorityFee: 0n,  // v5.11.17: Cost reduction by removing Priority Fee
                     networkId: config.network,
-                    payload: metaPayload
+                    payload: prefixedMetaPayload
                 });
                 
                 const pendingTx = result.transactions[0];
@@ -17561,11 +17582,11 @@ Do you want to continue?`;
                 metaPayload.set(encryptedMetaData, salt.length);
                 
                 log(`[SuperMeta] Super metadata size: ${metaDataBytes.length} bytes`, 'debug');
-                
+
                 // Upload to blockchain
                 const utxoResponse = await NetworkState.rpcClient.getUtxosByAddresses([UserState.address.toString()]);
                 const entries = utxoResponse.entries || [];
-                
+
                 const formattedUtxos = entries.map(utxo => ({
                     address: UserState.address.toString(),
                     outpoint: {
@@ -17577,7 +17598,9 @@ Do you want to continue?`;
                     isCoinbase: utxo.isCoinbase || false,
                     blockDaaScore: BigInt(utxo.blockDaaScore)
                 }));
-                
+
+                // v7.3.0: Add KFS prefix for explorer statistics
+                const prefixedMetaPayload = addKfsPrefix(metaPayload);
                 const result = await NetworkState.kaspa.createTransactions({
                     entries: formattedUtxos,
                     outputs: [{
@@ -17587,7 +17610,7 @@ Do you want to continue?`;
                     changeAddress: UserState.address.toString(),
                     priorityFee: 0n,  // v5.11.17: Cost reduction by removing Priority Fee
                     networkId: config.network,
-                    payload: metaPayload
+                    payload: prefixedMetaPayload
                 });
                 
                 const pendingTx = result.transactions[0];

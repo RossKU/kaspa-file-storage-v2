@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://*.kaspa.org wss://*.kaspa.green wss://*.kaspa.blue wss://*.kaspa.stream wss://*.kaspa.red wss://*.kas.fyi https://*.kaspa.org https://*.kaspa.green https://*.kaspa.blue https://*.kaspa.stream https://*.kaspa.red https://*.kas.fyi https://api.kas.fyi; img-src 'self' data: blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none';">
-    <title>Kaspa P2P File Storage v7.3.1</title>
-    <!-- v7.3.1: Fix KENV persistence on browser reload with workspace -->
+    <title>Kaspa P2P File Storage v7.3.2</title>
+    <!-- v7.3.2: Fix download button not resetting for single file after directory download -->
     <script>
         if (location.hash.startsWith('#v=')) {
             document.documentElement.classList.add('direct-view-mode');
@@ -19387,7 +19387,15 @@ Do you want to continue?`;
                         
                         // Show download section
                         document.getElementById('downloadSection').style.display = 'block';
-                        
+
+                        // v7.3.2: Reset download button for single file download
+                        const downloadBtn = document.getElementById('downloadBtn');
+                        if (downloadBtn) {
+                            downloadBtn.disabled = false;
+                            downloadBtn.textContent = '💾 Download File';
+                            downloadBtn.onclick = function() { downloadFile(); };
+                        }
+
                         log('Ready to download! Click the Download button to start.', 'success');
                         
                     } else {

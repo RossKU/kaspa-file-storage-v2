@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://*.kaspa.org wss://*.kaspa.green wss://*.kaspa.blue wss://*.kaspa.stream wss://*.kaspa.red wss://*.kas.fyi https://*.kaspa.org https://*.kaspa.green https://*.kaspa.blue https://*.kaspa.stream https://*.kaspa.red https://*.kas.fyi https://api.kas.fyi; img-src 'self' data: blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none';">
-    <title>Kaspa P2P File Storage v7.5.13</title>
-    <!-- v7.5.13: Handle orphan TX error with entries refresh and retry -->
+    <title>Kaspa P2P File Storage v7.5.14</title>
+    <!-- v7.5.14: Precise fee calculation using calculateTransactionFee -->
     <script>
         if (location.hash.startsWith('#v=')) {
             document.documentElement.classList.add('direct-view-mode');
@@ -3405,22 +3405,18 @@
                     const consolidatedAmount = totalBalance * BigInt(percentage) / 100n;
                     log(`📊 UTXO consolidation details: ${entries.length} UTXOs, Total: ${(Number(totalBalance) / 100000000).toFixed(8)} KAS, Sending: ${(Number(consolidatedAmount) / 100000000).toFixed(8)} KAS (${percentage}%)`, 'info');
                     
-                    // v7.5.11: Use createTransaction (singular) to force using ALL UTXOs
-                    // createTransactions (plural) uses Generator which selects minimal UTXOs
-                    // createTransaction (singular) uses ALL provided UTXOs as inputs
+                    // v7.5.14: Use createTransaction with precise fee calculation
+                    // Two-pass approach: create TX, calculate exact fee, recreate if needed
                     let tx;
                     try {
-                        // Create outputs array for the transaction
-                        const outputs = [{
+                        // Pass 1: Create TX with generous fee estimate
+                        const initialFeeEstimate = BigInt(2000 + entries.length * 1500 + 2 * 500 + 1000);
+                        let changeAmount = totalBalance - consolidatedAmount - initialFeeEstimate;
+
+                        let outputs = [{
                             address: UserState.address.toString(),
                             amount: consolidatedAmount
                         }];
-
-                        // Calculate change amount (total - output - estimated fee)
-                        // Fee formula: base (2000) + inputs (1500 each) + outputs (500 each) + margin
-                        // For safety, use generous estimate to avoid "fee too low" rejection
-                        const estimatedFee = BigInt(2000 + entries.length * 1500 + 2 * 500 + 500);
-                        const changeAmount = totalBalance - consolidatedAmount - estimatedFee;
 
                         if (changeAmount > 0n) {
                             outputs.push({
@@ -3429,16 +3425,60 @@
                             });
                         }
 
-                        // createTransaction uses ALL provided UTXOs (no Generator selection)
-                        tx = NetworkState.kaspa.createTransaction(
-                            formattedUtxos,  // All UTXOs as inputs
-                            outputs,         // Output + change
-                            0n,              // priorityFee
-                            null,            // payload
-                            1                // sigOpCount (1 signature per input)
+                        // Create initial TX to calculate exact fee
+                        let tempTx = NetworkState.kaspa.createTransaction(
+                            formattedUtxos,
+                            outputs,
+                            0n,
+                            null,
+                            1
                         );
 
-                        log(`📝 [v7.5.11] Created TX with ${formattedUtxos.length} inputs (all UTXOs)`, 'info');
+                        // Calculate exact minimum fee
+                        const exactFee = NetworkState.kaspa.calculateTransactionFee(
+                            config.network,
+                            tempTx,
+                            entries.length  // minimum_signatures = number of inputs
+                        );
+
+                        // Free temp TX
+                        if (tempTx && typeof tempTx.free === 'function') {
+                            tempTx.free();
+                        }
+
+                        if (exactFee === undefined) {
+                            throw new Error('Failed to calculate transaction fee (mass exceeded?)');
+                        }
+
+                        // Pass 2: Recreate with exact fee (add small margin of 100 sompi)
+                        const finalFee = exactFee + 100n;
+                        const finalChangeAmount = totalBalance - consolidatedAmount - finalFee;
+
+                        log(`💰 Fee calculation: estimated=${initialFeeEstimate}, exact=${exactFee}, final=${finalFee} sompi`, 'debug');
+
+                        // Rebuild outputs with exact change
+                        outputs = [{
+                            address: UserState.address.toString(),
+                            amount: consolidatedAmount
+                        }];
+
+                        if (finalChangeAmount > 0n) {
+                            outputs.push({
+                                address: UserState.address.toString(),
+                                amount: finalChangeAmount
+                            });
+                        }
+
+                        // Create final TX with exact fee
+                        tx = NetworkState.kaspa.createTransaction(
+                            formattedUtxos,
+                            outputs,
+                            0n,
+                            null,
+                            1
+                        );
+
+                        log(`📝 [v7.5.14] Created TX: ${formattedUtxos.length} inputs, fee=${Number(finalFee)} sompi (${(Number(finalFee)/100000000).toFixed(8)} KAS)`, 'info');
                     } catch (txError) {
                         // Enhanced error logging for transaction creation
                         const txErrorMsg = txError?.message || txError?.toString() || JSON.stringify(txError);

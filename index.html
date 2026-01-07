@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://*.kaspa.org wss://*.kaspa.green wss://*.kaspa.blue wss://*.kaspa.stream wss://*.kaspa.red wss://*.kas.fyi https://*.kaspa.org https://*.kaspa.green https://*.kaspa.blue https://*.kaspa.stream https://*.kaspa.red https://*.kas.fyi https://api.kas.fyi; img-src 'self' data: blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none';">
-    <title>Kaspa P2P File Storage v7.5.5</title>
-    <!-- v7.5.5: Auto-recovery for Storage Mass exceeded - automatic 20% UTXO consolidation -->
+    <title>Kaspa P2P File Storage v7.5.6</title>
+    <!-- v7.5.6: Fix const entries reassignment error in auto-recovery -->
     <script>
         if (location.hash.startsWith('#v=')) {
             document.documentElement.classList.add('direct-view-mode');
@@ -15511,7 +15511,9 @@ Do you want to continue?`;
                         }
                         
                         // Get fresh UTXOs
-                        const { entries } = await NetworkState.rpcClient.getUtxosByAddresses([UserState.address.toString()]);
+                        // v7.5.6: Use let instead of const for entries (allows reassignment in auto-recovery)
+                        let utxoResult = await NetworkState.rpcClient.getUtxosByAddresses([UserState.address.toString()]);
+                        let entries = utxoResult.entries;
                         if (!entries || entries.length === 0) {
                             throw new Error('No available UTXOs');
                         }

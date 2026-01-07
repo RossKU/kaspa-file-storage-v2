@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://*.kaspa.org wss://*.kaspa.green wss://*.kaspa.blue wss://*.kaspa.stream wss://*.kaspa.red wss://*.kas.fyi https://*.kaspa.org https://*.kaspa.green https://*.kaspa.blue https://*.kaspa.stream https://*.kaspa.red https://*.kas.fyi https://api.kas.fyi; img-src 'self' data: blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none';">
-    <title>Kaspa P2P File Storage v7.5.11</title>
-    <!-- v7.5.11: Manual consolidation uses createTransaction (singular) to force all UTXOs -->
+    <title>Kaspa P2P File Storage v7.5.12</title>
+    <!-- v7.5.12: Fix fee estimation for manual consolidation -->
     <script>
         if (location.hash.startsWith('#v=')) {
             document.documentElement.classList.add('direct-view-mode');
@@ -3417,8 +3417,9 @@
                         }];
 
                         // Calculate change amount (total - output - estimated fee)
-                        // Estimated fee: ~3000 sompi for 4 inputs, scale with UTXO count
-                        const estimatedFee = BigInt(Math.max(3000, entries.length * 1000));
+                        // Fee formula: base (2000) + inputs (1500 each) + outputs (500 each) + margin
+                        // For safety, use generous estimate to avoid "fee too low" rejection
+                        const estimatedFee = BigInt(2000 + entries.length * 1500 + 2 * 500 + 500);
                         const changeAmount = totalBalance - consolidatedAmount - estimatedFee;
 
                         if (changeAmount > 0n) {

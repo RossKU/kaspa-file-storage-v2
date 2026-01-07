@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://*.kaspa.org wss://*.kaspa.green wss://*.kaspa.blue wss://*.kaspa.stream wss://*.kaspa.red wss://*.kas.fyi https://*.kaspa.org https://*.kaspa.green https://*.kaspa.blue https://*.kaspa.stream https://*.kaspa.red https://*.kas.fyi https://api.kas.fyi; img-src 'self' data: blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none';">
-    <title>Kaspa P2P File Storage v7.5.6</title>
-    <!-- v7.5.6: Fix const entries reassignment error in auto-recovery -->
+    <title>Kaspa P2P File Storage v7.5.7</title>
+    <!-- v7.5.7: Wait for BlockID confirmation in auto-consolidation -->
     <script>
         if (location.hash.startsWith('#v=')) {
             document.documentElement.classList.add('direct-view-mode');
@@ -14639,11 +14639,39 @@ Do you want to continue?`;
                     throw new Error('Failed to submit consolidation transaction');
                 }
 
-                log(`✅ [Auto-Recovery] Consolidation successful! TxID: ${txid.substring(0, 16)}...`, 'success');
+                log(`✅ [Auto-Recovery] Consolidation TX submitted: ${txid.substring(0, 16)}...`, 'success');
 
-                // Wait for transaction to be processed (3 seconds)
-                log('⏳ [Auto-Recovery] Waiting 3 seconds for UTXO refresh...', 'info');
-                await new Promise(resolve => setTimeout(resolve, 3000));
+                // v7.5.7: Wait for BlockID confirmation instead of fixed 3 seconds
+                log('⏳ [Auto-Recovery] Waiting for BlockID confirmation...', 'info');
+                const apiUrl = `${config.apiEndpoints[config.network]}/transactions/${txid}`;
+                let blockId = null;
+                let waitTime = 0;
+                const maxWaitTime = 30000; // 30 seconds max
+
+                while (!blockId && waitTime < maxWaitTime) {
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    waitTime += 1000;
+
+                    try {
+                        const response = await fetch(apiUrl);
+                        if (response.ok) {
+                            const data = await response.json();
+                            if (data.block_id) {
+                                blockId = data.block_id;
+                                log(`✅ [Auto-Recovery] BlockID confirmed: ${blockId.substring(0, 16)}... (${waitTime/1000}s)`, 'success');
+                            }
+                        }
+                    } catch (e) {
+                        // API error - continue waiting
+                    }
+                }
+
+                if (!blockId) {
+                    log('⚠️ [Auto-Recovery] BlockID not confirmed within 30s, continuing anyway...', 'warning');
+                }
+
+                // Additional 1 second buffer for UTXO propagation
+                await new Promise(resolve => setTimeout(resolve, 1000));
 
                 return true;
             } catch (error) {

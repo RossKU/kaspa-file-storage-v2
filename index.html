@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://*.kaspa.org wss://*.kaspa.green wss://*.kaspa.blue wss://*.kaspa.stream wss://*.kaspa.red wss://*.kas.fyi https://*.kaspa.org https://*.kaspa.green https://*.kaspa.blue https://*.kaspa.stream https://*.kaspa.red https://*.kas.fyi https://api.kas.fyi; img-src 'self' data: blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none';">
-    <title>Kaspa P2P File Storage v7.4.0</title>
-    <!-- v7.4.0: Fix Main RPC duplicate checkMonitoringStop calls (setTimeout moved inside if block) -->
+    <title>Kaspa P2P File Storage v7.5.0</title>
+    <!-- v7.5.0: AbortController for upload loop - prevents race condition on reconnect -->
     <script>
         if (location.hash.startsWith('#v=')) {
             document.documentElement.classList.add('direct-view-mode');
@@ -5312,6 +5312,7 @@
             currentKenvEntryId: null,  // Current KENV entry ID for session (v5.12.13)
             needsMetaTx: false,        // v6.2.73: Whether meta-tx needs to be sent after chunk upload
             metaTxAbortController: null,  // v6.2.74: AbortController for meta-tx BlockID waiting loop
+            uploadAbortController: null,  // v7.5.0: AbortController for chunk upload loop (prevents race condition on reconnect)
             uploadStartTime: null,     // v7.0.29: Unified upload start timestamp
             fileCreatedTime: null,     // v7.0.30: File creation/modification timestamp
             // v5.9.0: File selection management
@@ -9540,14 +9541,15 @@ Do you want to continue?`;
             const message = (typeof error === 'string' ? error : error.message || '').toLowerCase();
             log(`[DEBUG-isNetworkError] Target message: "${message}"`, 'debug');
             
-            const result = message.includes('network') || 
-                   message.includes('connection') || 
+            // v7.5.0: Removed 'orphan' - orphan transactions are TX validation errors, not network errors
+            // Orphan errors occur when trying to spend already-spent UTXOs (race condition)
+            const result = message.includes('network') ||
+                   message.includes('connection') ||
                    message.includes('not connected') ||
                    message.includes('offline') ||
                    message.includes('timeout') ||
                    message.includes('disconnected') ||
-                   message.includes('websocket') ||  // Phase 0-F: Added WebSocket check
-                   message.includes('orphan');  // v7.0.27: Handle orphan transactions as network errors
+                   message.includes('websocket');  // Phase 0-F: Added WebSocket check
             
             log(`[DEBUG-isNetworkError] Result: ${result}`, 'debug');
             return result;
@@ -9807,6 +9809,14 @@ Do you want to continue?`;
                     } else {
                         // Normal chunk resume or chunks + meta-tx
                         setTimeout(async () => {
+                            // v7.5.0: Abort existing upload loop to prevent race condition
+                            if (FileState.uploadAbortController) {
+                                log('[DEBUG] Aborting existing upload loop before auto-resume', 'debug');
+                                FileState.uploadAbortController.abort();
+                                // Wait for abort to propagate
+                                await new Promise(r => setTimeout(r, 100));
+                            }
+
                             if (FileState.currentFile && window.pendingProgress) {
                                 log('[ConnectionManager] Calling processAndUpload...', 'info');
                                 log(`[DEBUG] Before auto-resume - uploadSessionActive: ${FileState.uploadSessionActive}`, 'debug');
@@ -14272,19 +14282,26 @@ Do you want to continue?`;
             }
         }
         
-        async function waitForConfirmation(txid) {
+        // v7.5.0: Added optional signal parameter for AbortController support
+        async function waitForConfirmation(txid, signal = null) {
             log(`[DEBUG] Starting waitForConfirmation - TxID: ${txid.substring(0, 16)}...`, 'debug');
-            
+
             // v5.4.52: Restored v5.4.0 active polling logic for better performance
             let blockId = null;
             let waitTime = 0;
             const maxWaitTime = config.timeout || 300000; // v5.11.118: Use config.timeout (default 5 minutes)
-            
+
             // v5.4.52: Initial 2-second wait (from v5.4.0)
             await new Promise(resolve => setTimeout(resolve, 2000));
-            
+
             // Active polling loop
             while (!blockId && waitTime < maxWaitTime) {
+                // v7.5.0: Check if upload was aborted (e.g., during reconnection)
+                if (signal?.aborted) {
+                    log('[DEBUG] waitForConfirmation aborted by signal', 'debug');
+                    throw new DOMException('Upload aborted', 'AbortError');
+                }
+
                 // Phase 0-O-2: Check both ConnectionManager and WebSocket status
                 if (!ConnectionManager.isConnected || !NetworkState.ws.connected) {
                     log(`[DEBUG] Network disconnect detected - Continuing BlockID wait and allowing REST API fallback (CM: ${ConnectionManager.isConnected}, WS: ${NetworkState.ws.connected})`, 'warning');
@@ -14999,9 +15016,16 @@ Do you want to continue?`;
             }
             
             try {
+                // v7.5.0: Abort any existing upload loop to prevent race condition
+                if (FileState.uploadAbortController) {
+                    log('[DEBUG] Aborting previous upload loop', 'debug');
+                    FileState.uploadAbortController.abort();
+                }
+                FileState.uploadAbortController = new AbortController();
+
                 // v3.6.3 fix: Set upload flag
                 FileState.isUploadingFile = true; // v5.5.34: Using FileState
-                
+
                 // v5.3.7: Also set uploadSessionActive
                 FileState.uploadSessionActive = true; // v5.5.35: Using FileState
                 log('[INFO] Starting upload session (main)', 'info');
@@ -15356,6 +15380,12 @@ Do you want to continue?`;
                     try {
                         // Upload each payload
                         for (let i = 0; i < payloads.length; i++) {
+                        // v7.5.0: Check if upload was aborted (e.g., during reconnection)
+                        if (FileState.uploadAbortController?.signal.aborted) {
+                            log('[DEBUG] Upload loop aborted by signal', 'debug');
+                            throw new DOMException('Upload aborted', 'AbortError');
+                        }
+
                         // Check if already uploaded
                         if (FileState.progressManager.isChunkCompleted(i)) {
                             log(`Payload ${i + 1}/${payloads.length} already uploaded`);
@@ -15502,6 +15532,12 @@ Do you want to continue?`;
                                 log(`Payload ${i + 1} waiting for BlockID... (max ${maxWaitTime/1000} seconds)`, 'info');
                                 
                                 while (!blockId && waitTime < maxWaitTime) {
+                                    // v7.5.0: Check if upload was aborted (e.g., during reconnection)
+                                    if (FileState.uploadAbortController?.signal.aborted) {
+                                        log('[DEBUG] BlockID wait aborted by signal', 'debug');
+                                        throw new DOMException('Upload aborted', 'AbortError');
+                                    }
+
                                     // Check network connection
                                     if (!ConnectionManager.isConnected || !NetworkState.ws.connected) {
                                         log(`[DEBUG] Network disconnect detected - Continuing BlockID wait and allowing REST API fallback`, 'warning');
@@ -16469,6 +16505,15 @@ Do you want to continue?`;
                 
             } catch (error) {
                 log(`[DEBUG-CATCH] Reached processAndUpload catch block`, 'debug');
+
+                // v7.5.0: Handle AbortError separately - this is expected during reconnection
+                if (error?.name === 'AbortError') {
+                    log('[DEBUG] Upload aborted (expected during reconnection) - exiting gracefully', 'debug');
+                    // Don't treat as error, don't trigger reconnection logic
+                    // The new upload loop started by handleReconnected will continue
+                    return;
+                }
+
                 const errorMessage = error?.message || error?.toString() || 'Unknown error';
                 log(`Upload error: ${errorMessage}`, 'error');
                 ;

@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://*.kaspa.org wss://*.kaspa.green wss://*.kaspa.blue wss://*.kaspa.stream wss://*.kaspa.red wss://*.kas.fyi https://*.kaspa.org https://*.kaspa.green https://*.kaspa.blue https://*.kaspa.stream https://*.kaspa.red https://*.kas.fyi https://api.kas.fyi; img-src 'self' data: blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none';">
-    <title>Kaspa P2P File Storage v7.5.2</title>
-    <!-- v7.5.2: Fix MetaTx AbortController signal reference - use local variable -->
+    <title>Kaspa P2P File Storage v7.5.3</title>
+    <!-- v7.5.3: Add abort support to SuperMetaTx BlockID wait loop -->
     <script>
         if (location.hash.startsWith('#v=')) {
             document.documentElement.classList.add('direct-view-mode');
@@ -16800,7 +16800,8 @@ Do you want to continue?`;
                     
                     // Create super meta-tx
                     // v5.5.20: window.currentPassword -> FileState.currentPassword (4/6)
-                    const superMeta = await createSuperMetaTx(singleMetaTxs, FileState.kaspaMetadata, FileState.currentPassword);
+                    // v7.5.3: Pass metaTxSignal for abort support
+                    const superMeta = await createSuperMetaTx(singleMetaTxs, FileState.kaspaMetadata, FileState.currentPassword, metaTxSignal);
                     
                     // Update metadata with super meta info
                     window.kaspaMetadata.metaTx = {
@@ -17589,7 +17590,8 @@ Do you want to continue?`;
         }
 
         // Create super meta-tx that references all intermediate meta-txs
-        async function createSuperMetaTx(singleMetaTxs, fileMetadata, password) {
+        // v7.5.3: Added signal parameter for abort support
+        async function createSuperMetaTx(singleMetaTxs, fileMetadata, password, signal = null) {
             try {
                 log(`[SuperMeta] Generating super metadata...`, 'info');
                 
@@ -17721,6 +17723,12 @@ Do you want to continue?`;
                 let superMetaBlockTime = null;
                 let waitTime = 0;
                 while (!superMetaBlockId && waitTime < (config.timeout || 300000)) {
+                    // v7.5.3: Check if this loop should be aborted
+                    if (signal?.aborted) {
+                        log('[DEBUG] Super meta Tx BlockID wait was cancelled', 'debug');
+                        throw new DOMException('Aborted', 'AbortError');
+                    }
+
                     // Phase 0-O-2: Check both ConnectionManager and WebSocket status
                     if (!ConnectionManager.isConnected || !NetworkState.ws.connected) {
                         log(`[DEBUG] Network disconnect detected - Continuing super meta BlockID wait and allowing REST API fallback`, 'warning');
@@ -17764,10 +17772,32 @@ Do you want to continue?`;
                         }
                     }
                     
-                    await new Promise(resolve => setTimeout(resolve, 500));
+                    // v7.5.3: Handle abort signal in delay
+                    try {
+                        await new Promise((resolve, reject) => {
+                            const timeout = setTimeout(resolve, 500);
+
+                            if (signal?.aborted) {
+                                clearTimeout(timeout);
+                                reject(new DOMException('Aborted', 'AbortError'));
+                                return;
+                            }
+
+                            signal?.addEventListener('abort', () => {
+                                clearTimeout(timeout);
+                                reject(new DOMException('Aborted', 'AbortError'));
+                            }, { once: true });
+                        });
+                    } catch (err) {
+                        if (err.name === 'AbortError') {
+                            log('[DEBUG] Super meta Tx BlockID wait was cancelled (while waiting)', 'debug');
+                            throw err;
+                        }
+                        throw err;
+                    }
                     waitTime += 500;
                 }
-                
+
                 if (!superMetaBlockId) {
                     log(`[SuperMeta] Warning: BlockID retrieval timed out`, 'warning');
                 }

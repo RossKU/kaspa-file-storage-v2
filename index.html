@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://*.kaspa.org wss://*.kaspa.green wss://*.kaspa.blue wss://*.kaspa.stream wss://*.kaspa.red wss://*.kas.fyi https://*.kaspa.org https://*.kaspa.green https://*.kaspa.blue https://*.kaspa.stream https://*.kaspa.red https://*.kas.fyi https://api.kas.fyi; img-src 'self' data: blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none';">
-    <title>Kaspa P2P File Storage v7.5.9</title>
-    <!-- v7.5.9: Reset auto-consolidation flag after successful recovery -->
+    <title>Kaspa P2P File Storage v7.5.10</title>
+    <!-- v7.5.10: Wait for consolidation TX to appear in UTXO set -->
     <script>
         if (location.hash.startsWith('#v=')) {
             document.documentElement.classList.add('direct-view-mode');
@@ -14676,8 +14676,37 @@ Do you want to continue?`;
                     log('⚠️ [Auto-Recovery] BlockID not confirmed within 30s, continuing anyway...', 'warning');
                 }
 
-                // Small buffer for UTXO propagation
-                await new Promise(resolve => setTimeout(resolve, 500));
+                // v7.5.10: Wait until consolidation TX outputs appear in UTXO set
+                log('⏳ [Auto-Recovery] Waiting for consolidation TX to appear in UTXOs...', 'info');
+                let utxoConfirmed = false;
+                let utxoWaitTime = 0;
+                const maxUtxoWaitTime = 15000; // 15 seconds max
+
+                while (!utxoConfirmed && utxoWaitTime < maxUtxoWaitTime) {
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    utxoWaitTime += 1000;
+
+                    try {
+                        const checkResult = await NetworkState.rpcClient.getUtxosByAddresses([UserState.address.toString()]);
+                        const checkEntries = checkResult.entries || [];
+
+                        // Check if any UTXO is from our consolidation TX
+                        const hasConsolidationOutput = checkEntries.some(utxo =>
+                            utxo.outpoint && utxo.outpoint.transactionId === txid
+                        );
+
+                        if (hasConsolidationOutput) {
+                            utxoConfirmed = true;
+                            log(`✅ [Auto-Recovery] Consolidation TX confirmed in UTXOs (${utxoWaitTime/1000}s)`, 'success');
+                        }
+                    } catch (e) {
+                        // RPC error - continue waiting
+                    }
+                }
+
+                if (!utxoConfirmed) {
+                    log('⚠️ [Auto-Recovery] Consolidation TX not found in UTXOs within 15s, continuing anyway...', 'warning');
+                }
 
                 return true;
             } catch (error) {

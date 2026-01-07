@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://*.kaspa.org wss://*.kaspa.green wss://*.kaspa.blue wss://*.kaspa.stream wss://*.kaspa.red wss://*.kas.fyi https://*.kaspa.org https://*.kaspa.green https://*.kaspa.blue https://*.kaspa.stream https://*.kaspa.red https://*.kas.fyi https://api.kas.fyi; img-src 'self' data: blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none';">
-    <title>Kaspa P2P File Storage v7.5.14</title>
-    <!-- v7.5.14: Precise fee calculation using calculateTransactionFee -->
+    <title>Kaspa P2P File Storage v7.5.15</title>
+    <!-- v7.5.15: Auto-recovery also uses createTransaction with precise fee -->
     <script>
         if (location.hash.startsWith('#v=')) {
             document.documentElement.classList.add('direct-view-mode');
@@ -14677,39 +14677,111 @@ Do you want to continue?`;
                 const consolidatedAmount = totalBalance * BigInt(percentage) / 100n;
                 log(`📊 [Auto-Recovery] ${entries.length} UTXOs, Total: ${(Number(totalBalance) / 100000000).toFixed(8)} KAS, Sending: ${(Number(consolidatedAmount) / 100000000).toFixed(8)} KAS (${percentage}%)`, 'info');
 
-                // Create transaction
-                const result = await NetworkState.kaspa.createTransactions({
-                    entries: formattedUtxos,
-                    outputs: [{
-                        address: UserState.address.toString(),
-                        amount: consolidatedAmount
-                    }],
-                    changeAddress: UserState.address.toString(),
-                    priorityFee: 0n,
-                    networkId: config.network,
-                    payload: null
-                });
+                // v7.5.15: Use createTransaction (singular) with precise fee calculation
+                // Two-pass approach: create TX, calculate exact fee, recreate
 
-                if (!result.transactions || result.transactions.length === 0) {
+                // Pass 1: Create TX with generous fee estimate
+                const initialFeeEstimate = BigInt(2000 + entries.length * 1500 + 2 * 500 + 1000);
+                let changeAmount = totalBalance - consolidatedAmount - initialFeeEstimate;
+
+                let outputs = [{
+                    address: UserState.address.toString(),
+                    amount: consolidatedAmount
+                }];
+
+                if (changeAmount > 0n) {
+                    outputs.push({
+                        address: UserState.address.toString(),
+                        amount: changeAmount
+                    });
+                }
+
+                // Create initial TX to calculate exact fee
+                let tempTx = NetworkState.kaspa.createTransaction(
+                    formattedUtxos,
+                    outputs,
+                    0n,
+                    null,
+                    1
+                );
+
+                // Calculate exact minimum fee
+                const exactFee = NetworkState.kaspa.calculateTransactionFee(
+                    config.network,
+                    tempTx,
+                    entries.length
+                );
+
+                // Free temp TX
+                if (tempTx && typeof tempTx.free === 'function') {
+                    tempTx.free();
+                }
+
+                if (exactFee === undefined) {
+                    throw new Error('Failed to calculate transaction fee');
+                }
+
+                // Pass 2: Recreate with exact fee + 100 sompi margin
+                const finalFee = exactFee + 100n;
+                const finalChangeAmount = totalBalance - consolidatedAmount - finalFee;
+
+                log(`💰 [Auto-Recovery] Fee: estimated=${initialFeeEstimate}, exact=${exactFee}, final=${finalFee} sompi`, 'debug');
+
+                outputs = [{
+                    address: UserState.address.toString(),
+                    amount: consolidatedAmount
+                }];
+
+                if (finalChangeAmount > 0n) {
+                    outputs.push({
+                        address: UserState.address.toString(),
+                        amount: finalChangeAmount
+                    });
+                }
+
+                // Create final TX with exact fee
+                const tx = NetworkState.kaspa.createTransaction(
+                    formattedUtxos,
+                    outputs,
+                    0n,
+                    null,
+                    1
+                );
+
+                if (!tx) {
                     throw new Error('Failed to create consolidation transaction');
                 }
 
-                // Sign and submit
-                const tx = result.transactions[0];
+                log(`📝 [Auto-Recovery] Created TX: ${formattedUtxos.length} inputs, fee=${Number(finalFee)} sompi`, 'info');
+
+                // Sign transaction
                 let privateKey = await SecureWallet.getKey();
                 let keyObj = new NetworkState.kaspa.PrivateKey(privateKey);
                 privateKey = null;
 
+                let signedTx;
                 try {
-                    await tx.sign([keyObj]);
+                    signedTx = NetworkState.kaspa.signTransaction(tx, [keyObj], true);
                 } finally {
                     if (keyObj && typeof keyObj.free === 'function') {
                         keyObj.free();
                     }
                     keyObj = null;
+                    if (tx && typeof tx.free === 'function') {
+                        tx.free();
+                    }
                 }
 
-                const txid = await tx.submit(NetworkState.rpcClient);
+                // Submit transaction via RPC
+                const submitResult = await NetworkState.rpcClient.submitTransaction({
+                    transaction: signedTx
+                });
+                const txid = submitResult?.transactionId || signedTx.id;
+
+                // Free signed transaction
+                if (signedTx && typeof signedTx.free === 'function') {
+                    signedTx.free();
+                }
                 if (!txid) {
                     throw new Error('Failed to submit consolidation transaction');
                 }

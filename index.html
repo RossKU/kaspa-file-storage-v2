@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://*.kaspa.org wss://*.kaspa.green wss://*.kaspa.blue wss://*.kaspa.stream wss://*.kaspa.red wss://*.kas.fyi https://*.kaspa.org https://*.kaspa.green https://*.kaspa.blue https://*.kaspa.stream https://*.kaspa.red https://*.kas.fyi https://api.kas.fyi; img-src 'self' data: blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none';">
-    <title>Kaspa P2P File Storage v7.5.4</title>
-    <!-- v7.5.4: Limit log entries to 10,000 to prevent memory issues -->
+    <title>Kaspa P2P File Storage v7.5.5</title>
+    <!-- v7.5.5: Auto-recovery for Storage Mass exceeded - automatic 20% UTXO consolidation -->
     <script>
         if (location.hash.startsWith('#v=')) {
             document.documentElement.classList.add('direct-view-mode');
@@ -14566,6 +14566,92 @@ Do you want to continue?`;
                 .join('');
         }
 
+        // v7.5.5: Auto-consolidate UTXOs when storage mass exceeded
+        // Uses 20% send (leaves 80% as change) which is proven to work
+        async function autoConsolidateUTXOs() {
+            try {
+                log('🔄 [Auto-Recovery] Starting automatic UTXO consolidation (20%)...', 'info');
+
+                // Get UTXOs
+                const { entries } = await NetworkState.rpcClient.getUtxosByAddresses([UserState.address.toString()]);
+                if (!entries || entries.length === 0) {
+                    throw new Error('No UTXOs available');
+                }
+
+                // Calculate total balance
+                let totalBalance = 0n;
+                for (const utxo of entries) {
+                    totalBalance += BigInt(utxo.amount);
+                }
+
+                // Format UTXOs
+                const formattedUtxos = entries.map(utxo => ({
+                    address: UserState.address.toString(),
+                    outpoint: {
+                        transactionId: utxo.outpoint.transactionId,
+                        index: utxo.outpoint.index
+                    },
+                    scriptPublicKey: utxo.scriptPublicKey,
+                    amount: BigInt(utxo.amount),
+                    isCoinbase: utxo.isCoinbase || false,
+                    blockDaaScore: BigInt(utxo.blockDaaScore)
+                }));
+
+                // Use 20% - this leaves 80% as change, avoiding storage mass issues
+                const percentage = 20;
+                const consolidatedAmount = totalBalance * BigInt(percentage) / 100n;
+                log(`📊 [Auto-Recovery] ${entries.length} UTXOs, Total: ${(Number(totalBalance) / 100000000).toFixed(8)} KAS, Sending: ${(Number(consolidatedAmount) / 100000000).toFixed(8)} KAS (${percentage}%)`, 'info');
+
+                // Create transaction
+                const result = await NetworkState.kaspa.createTransactions({
+                    entries: formattedUtxos,
+                    outputs: [{
+                        address: UserState.address.toString(),
+                        amount: consolidatedAmount
+                    }],
+                    changeAddress: UserState.address.toString(),
+                    priorityFee: 0n,
+                    networkId: config.network,
+                    payload: null
+                });
+
+                if (!result.transactions || result.transactions.length === 0) {
+                    throw new Error('Failed to create consolidation transaction');
+                }
+
+                // Sign and submit
+                const tx = result.transactions[0];
+                let privateKey = await SecureWallet.getKey();
+                let keyObj = new NetworkState.kaspa.PrivateKey(privateKey);
+                privateKey = null;
+
+                try {
+                    await tx.sign([keyObj]);
+                } finally {
+                    if (keyObj && typeof keyObj.free === 'function') {
+                        keyObj.free();
+                    }
+                    keyObj = null;
+                }
+
+                const txid = await tx.submit(NetworkState.rpcClient);
+                if (!txid) {
+                    throw new Error('Failed to submit consolidation transaction');
+                }
+
+                log(`✅ [Auto-Recovery] Consolidation successful! TxID: ${txid.substring(0, 16)}...`, 'success');
+
+                // Wait for transaction to be processed (3 seconds)
+                log('⏳ [Auto-Recovery] Waiting 3 seconds for UTXO refresh...', 'info');
+                await new Promise(resolve => setTimeout(resolve, 3000));
+
+                return true;
+            } catch (error) {
+                log(`❌ [Auto-Recovery] Consolidation failed: ${error.message}`, 'error');
+                return false;
+            }
+        }
+
         // Calculate safe payload size based on storage mass limit
         function calculateSafePayloadSize(rawChunkSize) {
             // v4.7.30: Dynamic chunk size optimization (phase 2)
@@ -15040,6 +15126,9 @@ Do you want to continue?`;
                 // v7.5.1: Store signal reference locally - don't check FileState directly
                 // because a new AbortController may be created by another loop
                 const uploadSignal = FileState.uploadAbortController.signal;
+
+                // v7.5.5: Reset auto-consolidation flag for fresh upload session
+                FileState._autoConsolidationAttempted = false;
 
                 // v3.6.3 fix: Set upload flag
                 FileState.isUploadingFile = true; // v5.5.34: Using FileState
@@ -15703,41 +15792,62 @@ Do you want to continue?`;
                                     }
                                 }
                                 
-                                // v5.12.80: Dedicated handling for Storage mass exceeded error
-                                if (errorMessage.includes('Storage mass exceeds') || 
+                                // v7.5.5: Dedicated handling for Storage mass exceeded error with auto-recovery
+                                if (errorMessage.includes('Storage mass exceeds') ||
                                     errorMessage.includes('mass exceeds maximum') ||
                                     errorMessage.includes('transaction mass')) {
-                                    
+
                                     // Get UTXO count (entries already obtained in scope above)
                                     const utxoCount = entries ? entries.length : 'unknown';
+
+                                    log(`⚠️ Storage mass exceeded: ${utxoCount} UTXOs (Payload ${i + 1}/${FileState.payloadCount})`, 'warning');
+
+                                    // v7.5.5: Try auto-consolidation before giving up
+                                    // Use a flag on FileState to track if we've already tried (avoid infinite loop)
+                                    if (!FileState._autoConsolidationAttempted) {
+                                        FileState._autoConsolidationAttempted = true;
+                                        log('🔧 [Auto-Recovery] Attempting automatic UTXO consolidation...', 'info');
+
+                                        const consolidationSuccess = await autoConsolidateUTXOs();
+
+                                        if (consolidationSuccess) {
+                                            // Refresh entries and retry this payload
+                                            log('🔄 [Auto-Recovery] Refreshing UTXOs and retrying payload...', 'info');
+                                            const refreshResult = await NetworkState.rpcClient.getUtxosByAddresses([UserState.address.toString()]);
+                                            entries = refreshResult.entries || [];
+
+                                            if (entries.length > 0) {
+                                                log(`✅ [Auto-Recovery] Got ${entries.length} UTXOs - retrying payload ${i + 1}`, 'success');
+                                                // Reset retries to try again with fresh UTXOs
+                                                retries = 0;
+                                                continue; // Retry the while loop
+                                            }
+                                        }
+
+                                        // Consolidation failed or no UTXOs - fall through to error
+                                        log('❌ [Auto-Recovery] Auto-consolidation did not resolve the issue', 'error');
+                                    }
+
+                                    // Show final error message
                                     const currentAmountKAS = Number(AppState.settings.transactionAmount) / 100000000;
-                                    
-                                    // Calculate recommended amount (based on UTXO count)
-                                    const recommendedAmount = utxoCount > 80 ? 100 : 
-                                                             utxoCount > 40 ? 50 : 
+                                    const recommendedAmount = utxoCount > 80 ? 100 :
+                                                             utxoCount > 40 ? 50 :
                                                              utxoCount > 20 ? 10 : 5;
-                                    
-                                    // User message
-                                    const userMessage = 
+
+                                    const userMessage =
                                         `⚠️ Transaction size exceeded error\n\n` +
                                         `Current UTXO count: ${utxoCount}\n` +
                                         `Current amount: ${currentAmountKAS.toFixed(1)} KAS\n\n` +
                                         `[Cause]\n` +
                                         `${utxoCount} small UTXOs have accumulated in your wallet.\n` +
-                                        `Using these at once will exceed size limit.\n\n` +
+                                        `Auto-consolidation was attempted but did not resolve the issue.\n\n` +
                                         `[Solution]\n` +
-                                        `Please set amount to ${recommendedAmount} KAS or more.\n` +
-                                        `This will consolidate UTXOs and resolve the issue.\n\n` +
-                                        `Change amount in Settings tab and try again.`;
-                                    
-                                    // Also log
-                                    log(`❌ Storage mass exceeded: ${utxoCount} UTXOs (Payload ${i + 1}/${FileState.payloadCount})`, 'error');
-                                    log(`💡 Recommended: Set amount to ${recommendedAmount} KAS or more`, 'warning');
-                                    
-                                    // Show alert
+                                        `Please manually consolidate UTXOs at 20% or lower,\n` +
+                                        `or set transaction amount to ${recommendedAmount} KAS or more.`;
+
+                                    log(`💡 Recommended: Manual consolidation at 20% or set amount to ${recommendedAmount} KAS`, 'warning');
                                     log(userMessage, 'error');
-                                    
-                                    // Stop immediately without retry (no need to save progress)
+
                                     throw new Error(`Storage mass exceeded with ${utxoCount} UTXOs - stopping upload`);
                                 }
                                 

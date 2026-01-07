@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://*.kaspa.org wss://*.kaspa.green wss://*.kaspa.blue wss://*.kaspa.stream wss://*.kaspa.red wss://*.kas.fyi https://*.kaspa.org https://*.kaspa.green https://*.kaspa.blue https://*.kaspa.stream https://*.kaspa.red https://*.kas.fyi https://api.kas.fyi; img-src 'self' data: blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none';">
-    <title>Kaspa P2P File Storage v7.3.2</title>
-    <!-- v7.3.2: Fix download button not resetting for single file after directory download -->
+    <title>Kaspa P2P File Storage v7.4.0</title>
+    <!-- v7.4.0: Fix Main RPC duplicate checkMonitoringStop calls (setTimeout moved inside if block) -->
     <script>
         if (location.hash.startsWith('#v=')) {
             document.documentElement.classList.add('direct-view-mode');
@@ -20139,7 +20139,8 @@ Do you want to continue?`;
             
             // v5.3.6: Don't stop monitoring during upload session
             if (FileState.uploadSessionActive) { // v5.5.35: Using FileState
-                // Continue monitoring (log removed to reduce noise - called every block ~1s)
+                // v7.4.0: Log restored - with Main RPC bug fix, this should appear much less frequently
+                log('[DEBUG] Continuing monitoring during upload session', 'debug');
                 return;
             }
             
@@ -20900,21 +20901,20 @@ Do you want to continue?`;
                                         existing.blockTime = blockTime;
                                         existing.foundAt = new Date();
                                         existing.receivedAt = Date.now();  // v5.11.117: Track receive time for better cleanup
-                                    
-                                    log(`[DEBUG] WebSocket: Monitored transaction detected! TxID: ${txId.substring(0, 16)}... BlockID: ${blockId.substring(0, 16)}...`, 'debug');
-                                    log(`[DEBUG] WebSocket: Saved block time - Time: ${blockTime.toISOString()}`, 'debug');
-                                    myTransactionFound = true;
-                                    
+
+                                        log(`[DEBUG] WebSocket: Monitored transaction detected! TxID: ${txId.substring(0, 16)}... BlockID: ${blockId.substring(0, 16)}...`, 'debug');
+                                        log(`[DEBUG] WebSocket: Saved block time - Time: ${blockTime.toISOString()}`, 'debug');
+                                        myTransactionFound = true;
+
                                         // v5.11.141: Track main RPC score (moved inside duplicate check)
                                         NetworkState.rpcScores.main++;
                                         const totalAux = NetworkState.rpcScores.aux.reduce((a, b) => a + b, 0);
                                         log(`[Main RPC] BlockID detected - Score: Main: ${NetworkState.rpcScores.main}, Auxiliary total: ${totalAux}`, 'info');
+
+                                        // v7.4.0: Moved inside if block to prevent duplicate calls (was outside, causing bug)
+                                        // Check if upload is complete after finding this transaction
+                                        setTimeout(checkMonitoringStop, 100);
                                     }
-                                    
-                                    // v5.4.52: Removed pendingBlockIds callback mechanism - using direct polling instead
-                                    
-                                    // Check if upload is complete after finding this transaction
-                                    setTimeout(checkMonitoringStop, 100);
                                 } else {
                                     // Skip monitoring other transactions to reduce noise
                                     // We only care about our own transactions

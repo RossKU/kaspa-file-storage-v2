@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://*.kaspa.org wss://*.kaspa.green wss://*.kaspa.blue wss://*.kaspa.stream wss://*.kaspa.red wss://*.kas.fyi https://*.kaspa.org https://*.kaspa.green https://*.kaspa.blue https://*.kaspa.stream https://*.kaspa.red https://*.kas.fyi https://api.kas.fyi; img-src 'self' data: blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none';">
-    <title>Kaspa P2P File Storage v7.5.10</title>
-    <!-- v7.5.10: Wait for consolidation TX to appear in UTXO set -->
+    <title>Kaspa P2P File Storage v7.5.11</title>
+    <!-- v7.5.11: Manual consolidation uses createTransaction (singular) to force all UTXOs -->
     <script>
         if (location.hash.startsWith('#v=')) {
             document.documentElement.classList.add('direct-view-mode');
@@ -3405,24 +3405,44 @@
                     const consolidatedAmount = totalBalance * BigInt(percentage) / 100n;
                     log(`📊 UTXO consolidation details: ${entries.length} UTXOs, Total: ${(Number(totalBalance) / 100000000).toFixed(8)} KAS, Sending: ${(Number(consolidatedAmount) / 100000000).toFixed(8)} KAS (${percentage}%)`, 'info');
                     
-                    let result;
+                    // v7.5.11: Use createTransaction (singular) to force using ALL UTXOs
+                    // createTransactions (plural) uses Generator which selects minimal UTXOs
+                    // createTransaction (singular) uses ALL provided UTXOs as inputs
+                    let tx;
                     try {
-                        result = await NetworkState.kaspa.createTransactions({
-                            entries: formattedUtxos,
-                            outputs: [{
+                        // Create outputs array for the transaction
+                        const outputs = [{
+                            address: UserState.address.toString(),
+                            amount: consolidatedAmount
+                        }];
+
+                        // Calculate change amount (total - output - estimated fee)
+                        // Estimated fee: ~3000 sompi for 4 inputs, scale with UTXO count
+                        const estimatedFee = BigInt(Math.max(3000, entries.length * 1000));
+                        const changeAmount = totalBalance - consolidatedAmount - estimatedFee;
+
+                        if (changeAmount > 0n) {
+                            outputs.push({
                                 address: UserState.address.toString(),
-                                amount: consolidatedAmount  // Send 99%, leave 1% for fee
-                            }],
-                            changeAddress: UserState.address.toString(),
-                            priorityFee: 0n,
-                            networkId: config.network,
-                            payload: null // No payload for consolidation
-                        });
+                                amount: changeAmount
+                            });
+                        }
+
+                        // createTransaction uses ALL provided UTXOs (no Generator selection)
+                        tx = NetworkState.kaspa.createTransaction(
+                            formattedUtxos,  // All UTXOs as inputs
+                            outputs,         // Output + change
+                            0n,              // priorityFee
+                            null,            // payload
+                            1                // sigOpCount (1 signature per input)
+                        );
+
+                        log(`📝 [v7.5.11] Created TX with ${formattedUtxos.length} inputs (all UTXOs)`, 'info');
                     } catch (txError) {
                         // Enhanced error logging for transaction creation
                         const txErrorMsg = txError?.message || txError?.toString() || JSON.stringify(txError);
                         log(`❌ Transaction creation error: ${txErrorMsg}`, 'error');
-                        
+
                         // Check for specific error types
                         if (txErrorMsg.includes('mass') || txErrorMsg.includes('Mass')) {
                             throw new Error(`Storage mass exceeded with ${entries.length} UTXOs. Try consolidating fewer UTXOs at once.`);
@@ -3432,15 +3452,14 @@
                             throw new Error(`Transaction creation failed: ${txErrorMsg}`);
                         }
                     }
-                    
-                    if (!result.transactions || result.transactions.length === 0) {
+
+                    if (!tx) {
                         throw new Error('Failed to create consolidation transaction');
                     }
-                    
-                    // Sign and send transaction
-                    const tx = result.transactions[0];
+
+                    // Sign transaction using signTransaction helper
                     // Securely retrieve and use private key
-                    let privateKey, keyObj;
+                    let privateKey, keyObj, signedTx;
                     try {
                         privateKey = await SecureWallet.getKey();
                         keyObj = new NetworkState.kaspa.PrivateKey(privateKey);
@@ -3452,17 +3471,32 @@
                         }
                         throw error;
                     }
-                    
+
                     try {
-                        await tx.sign([keyObj]);
+                        // signTransaction returns a new signed Transaction
+                        signedTx = NetworkState.kaspa.signTransaction(tx, [keyObj], true);
                     } finally {
                         // Always free WASM memory
                         if (keyObj && typeof keyObj.free === 'function') {
                             keyObj.free();
                         }
                         keyObj = null;
+                        // Free original unsigned transaction
+                        if (tx && typeof tx.free === 'function') {
+                            tx.free();
+                        }
                     }
-                    const txid = await tx.submit(NetworkState.rpcClient);
+
+                    // Submit transaction via RPC
+                    const submitResult = await NetworkState.rpcClient.submitTransaction({
+                        transaction: signedTx
+                    });
+                    const txid = submitResult?.transactionId || signedTx.id;
+
+                    // Free signed transaction
+                    if (signedTx && typeof signedTx.free === 'function') {
+                        signedTx.free();
+                    }
                     
                     if (!txid) {
                         throw new Error('Failed to submit consolidation transaction');

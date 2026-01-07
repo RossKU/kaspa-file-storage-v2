@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://*.kaspa.org wss://*.kaspa.green wss://*.kaspa.blue wss://*.kaspa.stream wss://*.kaspa.red wss://*.kas.fyi https://*.kaspa.org https://*.kaspa.green https://*.kaspa.blue https://*.kaspa.stream https://*.kaspa.red https://*.kas.fyi https://api.kas.fyi; img-src 'self' data: blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none';">
-    <title>Kaspa P2P File Storage v7.5.1</title>
-    <!-- v7.5.1: Fix AbortController signal reference - use local variable instead of FileState -->
+    <title>Kaspa P2P File Storage v7.5.2</title>
+    <!-- v7.5.2: Fix MetaTx AbortController signal reference - use local variable -->
     <script>
         if (location.hash.startsWith('#v=')) {
             document.documentElement.classList.add('direct-view-mode');
@@ -16695,7 +16695,10 @@ Do you want to continue?`;
                 
                 // Create new AbortController for this meta-tx session
                 FileState.metaTxAbortController = new AbortController();
-                
+                // v7.5.2: Store signal reference locally - don't check FileState directly
+                // because a new AbortController may be created by another loop
+                const metaTxSignal = FileState.metaTxAbortController.signal;
+
                 log('Starting meta transaction creation...', 'info');
                 
                 // Debug logs
@@ -17095,8 +17098,9 @@ Do you want to continue?`;
                 let lastApiCheck = 0;  // v6.2.70: Track last REST API check time (same as regular chunks)
                 
                 while (!metaBlockId && waitTime < maxWaitTime) {
-                    // v6.2.74: Check if this loop should be aborted
-                    if (FileState.metaTxAbortController && FileState.metaTxAbortController.signal.aborted) {
+                    // v7.5.2: Check if this loop should be aborted
+                    // Use local metaTxSignal reference, not FileState (which may point to new controller)
+                    if (metaTxSignal.aborted) {
                         log('[DEBUG] Meta Tx BlockID wait was cancelled', 'debug');
                         return; // Exit the function
                     }
@@ -17145,20 +17149,21 @@ Do you want to continue?`;
                         lastApiCheck = waitTime;  // v6.2.70: Reset timer after API call
                     }
                     
-                    // v6.2.74: Handle abort signal in delay
+                    // v7.5.2: Handle abort signal in delay
+                    // Use local metaTxSignal reference, not FileState (which may point to new controller)
                     try {
                         await new Promise((resolve, reject) => {
                             const timeout = setTimeout(resolve, 500);
-                            
+
                             // Check if already aborted
-                            if (FileState.metaTxAbortController?.signal.aborted) {
+                            if (metaTxSignal.aborted) {
                                 clearTimeout(timeout);
                                 reject(new DOMException('Aborted', 'AbortError'));
                                 return;
                             }
-                            
+
                             // Listen for abort event
-                            FileState.metaTxAbortController?.signal.addEventListener('abort', () => {
+                            metaTxSignal.addEventListener('abort', () => {
                                 clearTimeout(timeout);
                                 reject(new DOMException('Aborted', 'AbortError'));
                             }, { once: true });

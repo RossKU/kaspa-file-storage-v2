@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://*.kaspa.org wss://*.kaspa.green wss://*.kaspa.blue wss://*.kaspa.stream wss://*.kaspa.red wss://*.kas.fyi https://*.kaspa.org https://*.kaspa.green https://*.kaspa.blue https://*.kaspa.stream https://*.kaspa.red https://*.kas.fyi https://api.kas.fyi; img-src 'self' data: blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none';">
-    <title>Kaspa P2P File Storage v7.5.15</title>
-    <!-- v7.5.15: Auto-recovery also uses createTransaction with precise fee -->
+    <title>Kaspa P2P File Storage v7.5.16</title>
+    <!-- v7.5.16: Fix session state not maintained after AbortError during reconnection -->
     <script>
         if (location.hash.startsWith('#v=')) {
             document.documentElement.classList.add('direct-view-mode');
@@ -15325,7 +15325,10 @@ Do you want to continue?`;
             } else {
                 log('[ERROR] uploadProgress element not found during initialization!', 'error');
             }
-            
+
+            // v7.5.16: Track if upload was aborted for reconnection (not a real error)
+            let wasAbortedForReconnection = false;
+
             try {
                 // v7.5.0: Abort any existing upload loop to prevent race condition
                 if (FileState.uploadAbortController) {
@@ -16877,7 +16880,9 @@ Do you want to continue?`;
                 log(`[DEBUG-CATCH] Reached processAndUpload catch block`, 'debug');
 
                 // v7.5.0: Handle AbortError separately - this is expected during reconnection
+                // v7.5.16: Set flag to prevent finally block from clearing session state
                 if (error?.name === 'AbortError') {
+                    wasAbortedForReconnection = true;
                     log('[DEBUG] Upload aborted (expected during reconnection) - exiting gracefully', 'debug');
                     // Don't treat as error, don't trigger reconnection logic
                     // The new upload loop started by handleReconnected will continue
@@ -16918,14 +16923,20 @@ Do you want to continue?`;
                 }
             } finally {
                 // v3.6.3 fix: Clear upload flag
-                FileState.isUploadingFile = false; // v5.5.34: Using FileState
-                
+                // v7.5.16: Don't clear if aborted for reconnection (new loop will set it)
+                if (!wasAbortedForReconnection) {
+                    FileState.isUploadingFile = false; // v5.5.34: Using FileState
+                }
+
                 // v5.3.7: End upload session
                 // v5.7.9: Check network error BEFORE clearing session
-                if (!FileState.networkErrorOccurred) {
+                // v7.5.16: Also check wasAbortedForReconnection
+                if (!FileState.networkErrorOccurred && !wasAbortedForReconnection) {
                     // v5.7.0: Clear session flag only on normal completion
                     FileState.uploadSessionActive = false; // v5.5.35: Using FileState
                     log('[INFO] Upload session ended', 'info');
+                } else if (wasAbortedForReconnection) {
+                    log('[INFO] Session maintained for reconnection', 'info');
                 } else {
                     log('[INFO] Maintaining session due to network error', 'info');
                 }
@@ -16948,7 +16959,8 @@ Do you want to continue?`;
                 }, 10000);
                 
                 // v5.12.19: Complete cleanup after successful upload
-                if (!FileState.networkErrorOccurred) {
+                // v7.5.16: Also skip cleanup if aborted for reconnection
+                if (!FileState.networkErrorOccurred && !wasAbortedForReconnection) {
                     // Clear password for security
                     document.getElementById('uploadPassword').value = '';
                     // Clear file selection
@@ -17001,27 +17013,28 @@ Do you want to continue?`;
                 // v5.5.28: Fixed local variable reference - use FileState.progressManager
                 // v5.6.2: Do not reset ProgressManager on network errors
                 // v6.2.79: Keep ProgressManager for SuperMeta processing
-                if (!FileState.networkErrorOccurred) {
+                // v7.5.16: Also skip reset if aborted for reconnection
+                if (!FileState.networkErrorOccurred && !wasAbortedForReconnection) {
                     // Check if SuperMeta processing might be needed
                     // v6.3.22: Fixed checkbox ID bug - should be 'useMetaTx' not 'generateMetaTx'
                     const metaTxCheckbox = document.getElementById('useMetaTx');
                     const useMetaTx = metaTxCheckbox ? metaTxCheckbox.checked : false;
                     let shouldKeepProgressManager = false;
-                    
+
                     if (useMetaTx && FileState.progressManager) {
                         // Get total chunks from ProgressManager or kaspaMetadata
-                        const totalChunks = FileState.progressManager.progress?.recovery?.totalChunks || 
+                        const totalChunks = FileState.progressManager.progress?.recovery?.totalChunks ||
                                           FileState.kaspaMetadata?.chunks?.length || 0;
-                        
+
                         // Check if SuperMeta threshold
                         const CHUNKS_PER_META = parseInt(localStorage.getItem('debugChunksPerMeta')) || 160;
-                        
+
                         if (totalChunks > CHUNKS_PER_META) {
                             shouldKeepProgressManager = true;
                             log(`[SuperMeta] Keeping ProgressManager (${totalChunks} chunks > ${CHUNKS_PER_META})`, 'debug');
                         }
                     }
-                    
+
                     if (!shouldKeepProgressManager) {
                         FileState.progressManager = null;
                         log('ProgressManager reset', 'debug');
@@ -17031,6 +17044,9 @@ Do you want to continue?`;
                         FileState.fileCreatedTime = null;
                         log('[DEBUG] Upload start time and file created time cleared', 'debug');
                     }
+                } else if (wasAbortedForReconnection) {
+                    log('Maintaining ProgressManager for reconnection', 'info');
+                    log(`[DEBUG] FileState.currentFile retention status: ${FileState.currentFile ? FileState.currentFile.name : 'null'}`, 'debug');
                 } else {
                     log('Maintaining ProgressManager due to network error', 'info');
                     // Phase 0-F-3: Do not clear the flag immediately - keep it for auto-resume

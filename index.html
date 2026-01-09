@@ -15058,6 +15058,11 @@ Do you want to continue?`;
             const saltBase = fileHash + file.name;
             const saltHash = await sha256(new TextEncoder().encode(saltBase));
             const salt = safeHexDecode(saltHash.substring(0, 32), 'salt generation');
+
+            // v7.5.22-debug: Log salt for upload/download comparison
+            const saltHex = Array.from(salt).map(b => b.toString(16).padStart(2, '0')).join('');
+            log(`[DEBUG-KEY-UPLOAD] Salt generated: ${saltHex}, Password length: ${password.length}`, 'debug');
+
             const key = await deriveKey(password, salt);
             
             // Update progress manager with encryption info (v3.3 format)

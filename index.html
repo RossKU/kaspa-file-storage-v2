@@ -10905,11 +10905,9 @@ Do you want to continue?`;
                     payloadBytes[3] === 0x3a && // ':'
                     payloadBytes[4] === 0x31 && // '1'
                     payloadBytes[5] === 0x3a) { // ':'
-                    log('[KFS] Detected kfs:1: prefix, stripping...', 'debug');
                     return payloadBytes.slice(6);
                 }
             }
-            // Legacy format: no prefix
             return payloadBytes;
         }
 
@@ -10920,7 +10918,6 @@ Do you want to continue?`;
             const result = new Uint8Array(KFS_PREFIX.length + payloadBytes.length);
             result.set(KFS_PREFIX, 0);
             result.set(payloadBytes, KFS_PREFIX.length);
-            log(`[KFS] Added kfs:1: prefix (${payloadBytes.length} → ${result.length} bytes)`, 'debug');
             return result;
         }
 

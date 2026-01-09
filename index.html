@@ -16678,7 +16678,9 @@ Do you want to continue?`;
                     
                     // Recovery information
                     recovery: {
-                        totalChunks: totalChunks,
+                        // v7.5.17: Use actual payload count instead of estimated chunks
+                        // (estimated was based on uncompressed size, causing mismatch)
+                        totalChunks: FileState.processedChunks.length,
                         chunkSize: config.chunkSize,
                         checksum: fileHash,
                         uploadCost: totalCost

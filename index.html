@@ -12571,24 +12571,48 @@ Do you want to continue?`;
                         if (boundaries) {
                             // Use segment boundary information for precise decryption
                             log('[DownloadManager] Using segment boundary info for decryption', 'info');
-                            
+                            log(`[DEBUG-DECRYPT] Total segments: ${boundaries.length}, encryptedData: ${encryptedData.length} bytes`, 'debug');
+
+                            // v7.5.19: Debug - try all segments and report which fail
+                            const segmentResults = [];
+                            let allFailed = true;
+
                             for (const boundary of boundaries) {
                                 const start = boundary.offset;
                                 const end = start + boundary.size;
-                                
+
                                 if (start < encryptedData.length) {
                                     const encryptedChunk = encryptedData.slice(start, Math.min(end, encryptedData.length));
+                                    const payloadIndex = boundary.payloadIndex || 0;
+
+                                    // Debug: show first 8 bytes of encrypted data for this segment
+                                    const preview = Array.from(encryptedChunk.slice(0, 8)).map(b => b.toString(16).padStart(2, '0')).join(' ');
+                                    log(`[DEBUG-DECRYPT] Segment ${boundary.index}: offset=${start}, size=${boundary.size}, payloadIndex=${payloadIndex}, first8bytes=[${preview}]`, 'debug');
+
                                     try {
-                                        // v5.3.11 fix: Use the payloadIndex from boundary if available
-                                        const payloadIndex = boundary.payloadIndex || 0;
                                         const decryptedChunk = await decryptChunk(encryptedChunk, key, boundary.index, payloadIndex);
                                         decryptedChunks.push(decryptedChunk);
+                                        segmentResults.push({ index: boundary.index, status: 'OK', size: decryptedChunk.length });
+                                        allFailed = false;
                                     } catch (e) {
-                                        log(`[DownloadManager] Chunk ${boundary.index} decryption error: ${e.message}`, 'error');
-                                        log(`[DownloadManager] Chunk boundary: ${JSON.stringify(boundary)}`, 'error');
-                                        throw new Error(`Failed to decrypt chunk ${boundary.index}`);
+                                        log(`[DEBUG-DECRYPT] Segment ${boundary.index} FAILED: ${e.message}`, 'error');
+                                        segmentResults.push({ index: boundary.index, status: 'FAIL', error: e.message });
+                                        // Continue to test other segments instead of throwing
                                     }
                                 }
+                            }
+
+                            // Report results
+                            const okCount = segmentResults.filter(r => r.status === 'OK').length;
+                            const failCount = segmentResults.filter(r => r.status === 'FAIL').length;
+                            log(`[DEBUG-DECRYPT] Results: ${okCount} OK, ${failCount} FAILED out of ${boundaries.length} segments`, okCount > 0 ? 'info' : 'error');
+
+                            if (allFailed) {
+                                log(`[DEBUG-DECRYPT] All segments failed - likely global issue (key/data format)`, 'error');
+                                throw new Error(`All ${failCount} segments failed decryption`);
+                            } else if (failCount > 0) {
+                                log(`[DEBUG-DECRYPT] Partial failure - some segments work, issue may be alignment`, 'warning');
+                                throw new Error(`${failCount} segments failed decryption`);
                             }
                         } else {
                             // Fallback: try to find chunk boundaries by trial and error

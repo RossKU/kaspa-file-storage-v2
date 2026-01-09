@@ -12237,6 +12237,11 @@ Do you want to continue?`;
                     if (strippedPayload.length > 16) {
                         const salt = strippedPayload.slice(0, 16);
                         const encryptedData = strippedPayload.slice(16);
+
+                        // v7.5.19-debug: Log meta decryption key params
+                        const saltHex = Array.from(salt).map(b => b.toString(16).padStart(2, '0')).join('');
+                        log(`[DEBUG-KEY-META] Salt from payload (first 16 bytes): ${saltHex}, Iterations: 100000 (default), Password length: ${password.length}`, 'debug');
+
                         const key = await deriveKey(password, salt);
                         
                         const decrypted = await decryptChunk(encryptedData, key, -1);
@@ -12509,9 +12514,14 @@ Do you want to continue?`;
                         
                         // Derive encryption key
                         const salt = fromBase64(metadata.encryption.pbkdf2.salt);
-                        const iterations = metadata.encryption.pbkdf2.iterations || 
+                        const iterations = metadata.encryption.pbkdf2.iterations ||
                             (metadata.version === "3.0" ? 10000 : 100000);
                         const key = await deriveKey(password, salt, iterations);
+
+                        // v7.5.19-debug: Log key info for verification
+                        const saltHex = Array.from(salt).map(b => b.toString(16).padStart(2, '0')).join('');
+                        log(`[DEBUG-KEY-DATA] Salt from metadata.encryption.pbkdf2.salt: ${saltHex}, Iterations: ${iterations}, Password length: ${password.length}`, 'debug');
+                        log(`[DEBUG-KEY-DATA] Compare with [DEBUG-KEY-META] above - salts MUST match!`, 'debug');
                     
                         // Check if using new payload split approach
                         let combined;

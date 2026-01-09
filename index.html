@@ -10650,7 +10650,20 @@ Do you want to continue?`;
                             throw new Error(`Payload not found`);
                         }
 
+                        // v7.5.19-debug: Log raw payload info for first 3 payloads
+                        if (index < 3) {
+                            const rawPreview = Array.from(payload.slice(0, 12)).map(b => b.toString(16).padStart(2, '0')).join(' ');
+                            log(`[DEBUG-PAYLOAD] Payload ${index} RAW: size=${payload.length}, first12=[${rawPreview}]`, 'debug');
+                        }
+
                         const strippedPayload = stripKfsPrefix(payload);
+
+                        // v7.5.19-debug: Log stripped payload info for first 3 payloads
+                        if (index < 3) {
+                            const strippedPreview = Array.from(strippedPayload.slice(0, 12)).map(b => b.toString(16).padStart(2, '0')).join(' ');
+                            log(`[DEBUG-PAYLOAD] Payload ${index} STRIPPED: size=${strippedPayload.length}, first12=[${strippedPreview}]`, 'debug');
+                        }
+
                         this.results.set(index, strippedPayload);
                         this.completedCount++;
                         this.totalBytes += strippedPayload.length;
@@ -10689,7 +10702,21 @@ Do you want to continue?`;
                             const data = await response.json();
                             if (data.payload) {
                                 const payload = safeHexDecode(data.payload, 'payload from REST API');
+
+                                // v7.5.19-debug: Log REST API payload for first 3
+                                if (work.index < 3) {
+                                    const rawPreview = Array.from(payload.slice(0, 12)).map(b => b.toString(16).padStart(2, '0')).join(' ');
+                                    log(`[DEBUG-PAYLOAD] Payload ${work.index} REST RAW: size=${payload.length}, first12=[${rawPreview}]`, 'debug');
+                                }
+
                                 const strippedPayload = stripKfsPrefix(payload);
+
+                                // v7.5.19-debug: Log stripped
+                                if (work.index < 3) {
+                                    const strippedPreview = Array.from(strippedPayload.slice(0, 12)).map(b => b.toString(16).padStart(2, '0')).join(' ');
+                                    log(`[DEBUG-PAYLOAD] Payload ${work.index} REST STRIPPED: size=${strippedPayload.length}, first12=[${strippedPreview}]`, 'debug');
+                                }
+
                                 log(`[ParallelDownloader] Payload ${work.index} fetched via REST API: ${strippedPayload.length} bytes`, 'success');
 
                                 // Save result if successful

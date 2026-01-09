@@ -16780,10 +16780,11 @@ Do you want to continue?`;
                     network: config.network,
                     
                     // Encryption at top level
+                    // v7.5.23: Use salt from progressManager (set by processFileWithPayloadSplit) if available
                     encryption: {
                         algorithm: "AES-256-GCM",
                         pbkdf2: {
-                            salt: toBase64(salt),
+                            salt: FileState.progressManager?.progress?.encryption?.pbkdf2?.salt || toBase64(salt),
                             iterations: 100000
                         }
                     },

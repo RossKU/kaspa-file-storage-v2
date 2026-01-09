@@ -15969,33 +15969,40 @@ Do you want to continue?`;
                                 retries++;
                                 const errorMessage = error?.message || error?.toString() || 'Unknown error';
                                 
-                                // Phase 0-N: Check for already accepted error
+                                // v7.5.18: already accepted = TX was submitted but response timed out
+                                // The TX is already on blockchain, so we retry with new UTXOs to get proper BlockID
                                 if (errorMessage.includes('already accepted')) {
-                                    const match = errorMessage.match(/transaction ([a-f0-9]{64}) was already accepted/);
-                                    if (match) {
-                                        txid = match[1];
-                                        log(`Payload ${i + 1} already confirmed: ${txid.substring(0, 16)}...`, 'info');
-                                        // Extract blockId from error message if available
-                                        const blockMatch = errorMessage.match(/by the consensus.*?([a-f0-9]{64})/);
-                                        if (blockMatch) {
-                                            blockId = blockMatch[1];
+                                    log(`⚠️ [Already Accepted] Payload ${i + 1} TX was accepted but response timed out (attempt ${retries}/${config.retryCount})`, 'warning');
+
+                                    if (retries < config.retryCount) {
+                                        // Wait for UTXO to be spent and new change UTXO to propagate
+                                        log('⏳ [Already Accepted] Waiting 2s for UTXO propagation...', 'info');
+                                        await new Promise(resolve => setTimeout(resolve, 2000));
+
+                                        // Refresh UTXOs - the old UTXO is now spent, new change UTXO available
+                                        log('🔄 [Already Accepted] Refreshing UTXOs...', 'info');
+                                        const refreshResult = await NetworkState.rpcClient.getUtxosByAddresses([UserState.address.toString()]);
+                                        entries = refreshResult.entries || [];
+
+                                        if (entries.length > 0) {
+                                            log(`✅ [Already Accepted] Got ${entries.length} UTXOs - retrying payload ${i + 1} with new UTXO`, 'success');
+                                            continue; // Retry with fresh UTXOs
                                         } else {
-                                            // If blockId not in error, use a placeholder
-                                            blockId = 'already-accepted-' + Date.now();
+                                            log('❌ [Already Accepted] No UTXOs available after refresh', 'error');
                                         }
-                                        break; // Success - exit retry loop
                                     }
+                                    // Fall through to error logging if max retries reached or no UTXOs
                                 }
-                                
-                                // v5.7.8: Check for output already spent error
+
+                                // v7.5.18: already spent = UTXO was used by another TX (race condition or previous session)
                                 if (errorMessage.includes('already spent')) {
                                     const spentMatch = errorMessage.match(/spent by transaction ([a-f0-9]{64})/);
                                     if (spentMatch) {
                                         const spentByTxId = spentMatch[1];
-                                        // Check if this is our own transaction
+                                        // Check if this is our own monitored transaction
                                         if (NetworkState.ws.monitoredTransactions && NetworkState.ws.monitoredTransactions.has(spentByTxId)) {
                                             txid = spentByTxId;
-                                            log(`Payload ${i + 1} already processed in own transaction: ${txid.substring(0, 16)}...`, 'info');
+                                            log(`✅ Payload ${i + 1} already processed in own transaction: ${txid.substring(0, 16)}...`, 'success');
                                             const monitorData = NetworkState.ws.monitoredTransactions.get(spentByTxId);
                                             if (monitorData && monitorData.blockId) {
                                                 blockId = monitorData.blockId;
@@ -16005,6 +16012,28 @@ Do you want to continue?`;
                                             break; // Success - exit retry loop
                                         }
                                     }
+
+                                    // v7.5.18: Not our transaction - refresh UTXOs and retry
+                                    log(`⚠️ [Already Spent] Payload ${i + 1} UTXO was spent by another TX (attempt ${retries}/${config.retryCount})`, 'warning');
+
+                                    if (retries < config.retryCount) {
+                                        // Wait for new UTXOs to be available
+                                        log('⏳ [Already Spent] Waiting 1s before refreshing UTXOs...', 'info');
+                                        await new Promise(resolve => setTimeout(resolve, 1000));
+
+                                        // Refresh UTXOs
+                                        log('🔄 [Already Spent] Refreshing UTXOs...', 'info');
+                                        const refreshResult = await NetworkState.rpcClient.getUtxosByAddresses([UserState.address.toString()]);
+                                        entries = refreshResult.entries || [];
+
+                                        if (entries.length > 0) {
+                                            log(`✅ [Already Spent] Got ${entries.length} UTXOs - retrying payload ${i + 1}`, 'success');
+                                            continue; // Retry with fresh UTXOs
+                                        } else {
+                                            log('❌ [Already Spent] No UTXOs available after refresh', 'error');
+                                        }
+                                    }
+                                    // Fall through to error logging if max retries reached or no UTXOs
                                 }
 
                                 // v7.5.13: Handle orphan transaction error
@@ -16531,40 +16560,60 @@ Do you want to continue?`;
                             retries++;
                             const errorMessage = error?.message || error?.toString() || 'Unknown error';
                             
-                            // Phase 0-N: Check for already accepted error (old method)
+                            // v7.5.18: already accepted = TX was submitted but response timed out (old method)
                             if (errorMessage.includes('already accepted')) {
-                                const match = errorMessage.match(/transaction ([a-f0-9]{64}) was already accepted/);
-                                if (match) {
-                                    txid = match[1];
-                                    log(`Chunk ${i + 1} already confirmed: ${txid.substring(0, 16)}...`, 'info');
-                                    // Extract blockId from error message if available
-                                    const blockMatch = errorMessage.match(/by the consensus.*?([a-f0-9]{64})/);
-                                    if (blockMatch) {
-                                        blockId = blockMatch[1];
+                                log(`⚠️ [Already Accepted] Chunk ${i + 1} TX was accepted but response timed out (attempt ${retries}/${config.retryCount})`, 'warning');
+
+                                if (retries < config.retryCount) {
+                                    log('⏳ [Already Accepted] Waiting 2s for UTXO propagation...', 'info');
+                                    await new Promise(resolve => setTimeout(resolve, 2000));
+
+                                    log('🔄 [Already Accepted] Refreshing UTXOs...', 'info');
+                                    const refreshResult = await NetworkState.rpcClient.getUtxosByAddresses([UserState.address.toString()]);
+                                    entries = refreshResult.entries || [];
+
+                                    if (entries.length > 0) {
+                                        log(`✅ [Already Accepted] Got ${entries.length} UTXOs - retrying chunk ${i + 1}`, 'success');
+                                        continue;
                                     } else {
-                                        // If blockId not in error, use a placeholder
-                                        blockId = 'already-accepted-' + Date.now();
+                                        log('❌ [Already Accepted] No UTXOs available after refresh', 'error');
                                     }
-                                    break; // Success - exit retry loop
                                 }
                             }
-                            
-                            // v5.7.8: Check for output already spent error (old method)
+
+                            // v7.5.18: already spent = UTXO was used by another TX (old method)
                             if (errorMessage.includes('already spent')) {
                                 const spentMatch = errorMessage.match(/spent by transaction ([a-f0-9]{64})/);
                                 if (spentMatch) {
                                     const spentByTxId = spentMatch[1];
-                                    // Check if this is our own transaction
                                     if (NetworkState.ws.monitoredTransactions && NetworkState.ws.monitoredTransactions.has(spentByTxId)) {
                                         txid = spentByTxId;
-                                        log(`Chunk ${i + 1} already processed in own transaction: ${txid.substring(0, 16)}...`, 'info');
+                                        log(`✅ Chunk ${i + 1} already processed in own transaction: ${txid.substring(0, 16)}...`, 'success');
                                         const monitorData = NetworkState.ws.monitoredTransactions.get(spentByTxId);
                                         if (monitorData && monitorData.blockId) {
                                             blockId = monitorData.blockId;
                                         } else {
                                             blockId = 'already-spent-' + Date.now();
                                         }
-                                        break; // Success - exit retry loop
+                                        break;
+                                    }
+                                }
+
+                                log(`⚠️ [Already Spent] Chunk ${i + 1} UTXO was spent by another TX (attempt ${retries}/${config.retryCount})`, 'warning');
+
+                                if (retries < config.retryCount) {
+                                    log('⏳ [Already Spent] Waiting 1s before refreshing UTXOs...', 'info');
+                                    await new Promise(resolve => setTimeout(resolve, 1000));
+
+                                    log('🔄 [Already Spent] Refreshing UTXOs...', 'info');
+                                    const refreshResult = await NetworkState.rpcClient.getUtxosByAddresses([UserState.address.toString()]);
+                                    entries = refreshResult.entries || [];
+
+                                    if (entries.length > 0) {
+                                        log(`✅ [Already Spent] Got ${entries.length} UTXOs - retrying chunk ${i + 1}`, 'success');
+                                        continue;
+                                    } else {
+                                        log('❌ [Already Spent] No UTXOs available after refresh', 'error');
                                     }
                                 }
                             }

@@ -10650,20 +10650,7 @@ Do you want to continue?`;
                             throw new Error(`Payload not found`);
                         }
 
-                        // v7.5.19-debug: Log raw payload info for first 3 payloads
-                        if (index < 3) {
-                            const rawPreview = Array.from(payload.slice(0, 12)).map(b => b.toString(16).padStart(2, '0')).join(' ');
-                            log(`[DEBUG-PAYLOAD] Payload ${index} RAW: size=${payload.length}, first12=[${rawPreview}]`, 'debug');
-                        }
-
                         const strippedPayload = stripKfsPrefix(payload);
-
-                        // v7.5.19-debug: Log stripped payload info for first 3 payloads
-                        if (index < 3) {
-                            const strippedPreview = Array.from(strippedPayload.slice(0, 12)).map(b => b.toString(16).padStart(2, '0')).join(' ');
-                            log(`[DEBUG-PAYLOAD] Payload ${index} STRIPPED: size=${strippedPayload.length}, first12=[${strippedPreview}]`, 'debug');
-                        }
-
                         this.results.set(index, strippedPayload);
                         this.completedCount++;
                         this.totalBytes += strippedPayload.length;
@@ -10702,21 +10689,7 @@ Do you want to continue?`;
                             const data = await response.json();
                             if (data.payload) {
                                 const payload = safeHexDecode(data.payload, 'payload from REST API');
-
-                                // v7.5.19-debug: Log REST API payload for first 3
-                                if (work.index < 3) {
-                                    const rawPreview = Array.from(payload.slice(0, 12)).map(b => b.toString(16).padStart(2, '0')).join(' ');
-                                    log(`[DEBUG-PAYLOAD] Payload ${work.index} REST RAW: size=${payload.length}, first12=[${rawPreview}]`, 'debug');
-                                }
-
                                 const strippedPayload = stripKfsPrefix(payload);
-
-                                // v7.5.19-debug: Log stripped
-                                if (work.index < 3) {
-                                    const strippedPreview = Array.from(strippedPayload.slice(0, 12)).map(b => b.toString(16).padStart(2, '0')).join(' ');
-                                    log(`[DEBUG-PAYLOAD] Payload ${work.index} REST STRIPPED: size=${strippedPayload.length}, first12=[${strippedPreview}]`, 'debug');
-                                }
-
                                 log(`[ParallelDownloader] Payload ${work.index} fetched via REST API: ${strippedPayload.length} bytes`, 'success');
 
                                 // Save result if successful
@@ -12237,11 +12210,6 @@ Do you want to continue?`;
                     if (strippedPayload.length > 16) {
                         const salt = strippedPayload.slice(0, 16);
                         const encryptedData = strippedPayload.slice(16);
-
-                        // v7.5.19-debug: Log meta decryption key params
-                        const saltHex = Array.from(salt).map(b => b.toString(16).padStart(2, '0')).join('');
-                        log(`[DEBUG-KEY-META] Salt from payload (first 16 bytes): ${saltHex}, Iterations: 100000 (default), Password length: ${password.length}`, 'debug');
-
                         const key = await deriveKey(password, salt);
                         
                         const decrypted = await decryptChunk(encryptedData, key, -1);
@@ -12518,11 +12486,6 @@ Do you want to continue?`;
                             (metadata.version === "3.0" ? 10000 : 100000);
                         const key = await deriveKey(password, salt, iterations);
 
-                        // v7.5.19-debug: Log key info for verification
-                        const saltHex = Array.from(salt).map(b => b.toString(16).padStart(2, '0')).join('');
-                        log(`[DEBUG-KEY-DATA] Salt from metadata.encryption.pbkdf2.salt: ${saltHex}, Iterations: ${iterations}, Password length: ${password.length}`, 'debug');
-                        log(`[DEBUG-KEY-DATA] Compare with [DEBUG-KEY-META] above - salts MUST match!`, 'debug');
-                    
                         // Check if using new payload split approach
                         let combined;
                     
@@ -14612,27 +14575,12 @@ Do you want to continue?`;
                 deterministicBytes[3] = ((chunkIndex * 7 + payloadIndex * 13) ^ 0xCC) & 0xFF;
                 iv.set(deterministicBytes, 8);
             }
-            
-            // v7.5.21-debug: Log encryption params for verification
-            if (chunkIndex >= 0 && chunkIndex < 3) {
-                const ivHex = Array.from(iv).map(b => b.toString(16).padStart(2, '0')).join(' ');
-                const first8 = Array.from(data.slice(0, 8)).map(b => b.toString(16).padStart(2, '0')).join(' ');
-                log(`[DEBUG-ENCRYPT] Chunk ${chunkIndex}: dataLen=${data.length}, payloadIndex=${payloadIndex}, IV=[${ivHex}], first8=[${first8}]`, 'debug');
-            }
 
             const encrypted = await crypto.subtle.encrypt(
                 { name: 'AES-GCM', iv: iv },
                 key,
                 data
             );
-
-            // v7.5.21-debug: Log encrypted result
-            if (chunkIndex >= 0 && chunkIndex < 3) {
-                const result = new Uint8Array(encrypted);
-                const encFirst8 = Array.from(result.slice(0, 8)).map(b => b.toString(16).padStart(2, '0')).join(' ');
-                const encLast16 = Array.from(result.slice(-16)).map(b => b.toString(16).padStart(2, '0')).join(' ');
-                log(`[DEBUG-ENCRYPT] Chunk ${chunkIndex}: encryptedLen=${result.length}, encFirst8=[${encFirst8}], encLast16(tag)=[${encLast16}]`, 'debug');
-            }
 
             return new Uint8Array(encrypted);
         }
@@ -14676,15 +14624,6 @@ Do you want to continue?`;
                     }
                 }
                 
-                log(`Decrypting chunk ${chunkIndex}: data length=${data.length}, IV=${Array.from(iv).map(b => b.toString(16).padStart(2, '0')).join(' ')}`, 'debug');
-
-                // v7.5.19-debug: Log last 16 bytes (auth tag) for verification
-                if (chunkIndex >= 0 && chunkIndex < 3) {
-                    const last16 = Array.from(data.slice(-16)).map(b => b.toString(16).padStart(2, '0')).join(' ');
-                    const first16 = Array.from(data.slice(0, 16)).map(b => b.toString(16).padStart(2, '0')).join(' ');
-                    log(`[DEBUG-CRYPTO] Chunk ${chunkIndex}: first16=[${first16}], last16(tag)=[${last16}]`, 'debug');
-                }
-
                 const decrypted = await crypto.subtle.decrypt(
                     { name: 'AES-GCM', iv: iv },
                     key,
@@ -15058,11 +14997,6 @@ Do you want to continue?`;
             const saltBase = fileHash + file.name;
             const saltHash = await sha256(new TextEncoder().encode(saltBase));
             const salt = safeHexDecode(saltHash.substring(0, 32), 'salt generation');
-
-            // v7.5.22-debug: Log salt for upload/download comparison
-            const saltHex = Array.from(salt).map(b => b.toString(16).padStart(2, '0')).join('');
-            log(`[DEBUG-KEY-UPLOAD] Salt generated: ${saltHex}, Password length: ${password.length}`, 'debug');
-
             const key = await deriveKey(password, salt);
             
             // Update progress manager with encryption info (v3.3 format)
@@ -19689,11 +19623,6 @@ Do you want to continue?`;
                     if (strippedPayload.length > 16) {
                         const salt = strippedPayload.slice(0, 16);
                         const encryptedData = strippedPayload.slice(16);
-
-                        // v7.5.20-debug: Log SuperMeta salt
-                        const superMetaSaltHex = Array.from(salt).map(b => b.toString(16).padStart(2, '0')).join('');
-                        log(`[DEBUG-KEY-SUPER-META] Salt from SuperMeta payload (first 16 bytes): ${superMetaSaltHex}`, 'debug');
-
                         const key = await deriveKey(password, salt);
 
                         try {
@@ -19853,11 +19782,6 @@ Do you want to continue?`;
                                     // Decrypt intermediate metadata
                                     const intSalt = strippedIntPayload.slice(0, 16);
                                     const intEncryptedData = strippedIntPayload.slice(16);
-
-                                    // v7.5.20-debug: Log intermediate meta salt
-                                    const intSaltHex = Array.from(intSalt).map(b => b.toString(16).padStart(2, '0')).join('');
-                                    log(`[DEBUG-KEY-INT-META-${i+1}] Salt from intermediate payload: ${intSaltHex}, Iterations: 100000 (default)`, 'debug');
-
                                     const intKey = await deriveKey(password, intSalt);
                                     const intDecrypted = await decryptChunk(intEncryptedData, intKey, -1);
                                     const intMetaData = JSON.parse(new TextDecoder().decode(intDecrypted));

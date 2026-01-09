@@ -14652,7 +14652,14 @@ Do you want to continue?`;
                 }
                 
                 log(`Decrypting chunk ${chunkIndex}: data length=${data.length}, IV=${Array.from(iv).map(b => b.toString(16).padStart(2, '0')).join(' ')}`, 'debug');
-                
+
+                // v7.5.19-debug: Log last 16 bytes (auth tag) for verification
+                if (chunkIndex >= 0 && chunkIndex < 3) {
+                    const last16 = Array.from(data.slice(-16)).map(b => b.toString(16).padStart(2, '0')).join(' ');
+                    const first16 = Array.from(data.slice(0, 16)).map(b => b.toString(16).padStart(2, '0')).join(' ');
+                    log(`[DEBUG-CRYPTO] Chunk ${chunkIndex}: first16=[${first16}], last16(tag)=[${last16}]`, 'debug');
+                }
+
                 const decrypted = await crypto.subtle.decrypt(
                     { name: 'AES-GCM', iv: iv },
                     key,

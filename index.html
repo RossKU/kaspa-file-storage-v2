@@ -14613,12 +14613,27 @@ Do you want to continue?`;
                 iv.set(deterministicBytes, 8);
             }
             
+            // v7.5.21-debug: Log encryption params for verification
+            if (chunkIndex >= 0 && chunkIndex < 3) {
+                const ivHex = Array.from(iv).map(b => b.toString(16).padStart(2, '0')).join(' ');
+                const first8 = Array.from(data.slice(0, 8)).map(b => b.toString(16).padStart(2, '0')).join(' ');
+                log(`[DEBUG-ENCRYPT] Chunk ${chunkIndex}: dataLen=${data.length}, payloadIndex=${payloadIndex}, IV=[${ivHex}], first8=[${first8}]`, 'debug');
+            }
+
             const encrypted = await crypto.subtle.encrypt(
                 { name: 'AES-GCM', iv: iv },
                 key,
                 data
             );
-            
+
+            // v7.5.21-debug: Log encrypted result
+            if (chunkIndex >= 0 && chunkIndex < 3) {
+                const result = new Uint8Array(encrypted);
+                const encFirst8 = Array.from(result.slice(0, 8)).map(b => b.toString(16).padStart(2, '0')).join(' ');
+                const encLast16 = Array.from(result.slice(-16)).map(b => b.toString(16).padStart(2, '0')).join(' ');
+                log(`[DEBUG-ENCRYPT] Chunk ${chunkIndex}: encryptedLen=${result.length}, encFirst8=[${encFirst8}], encLast16(tag)=[${encLast16}]`, 'debug');
+            }
+
             return new Uint8Array(encrypted);
         }
 
@@ -19668,9 +19683,13 @@ Do you want to continue?`;
                     if (strippedPayload.length > 16) {
                         const salt = strippedPayload.slice(0, 16);
                         const encryptedData = strippedPayload.slice(16);
-                        
+
+                        // v7.5.20-debug: Log SuperMeta salt
+                        const superMetaSaltHex = Array.from(salt).map(b => b.toString(16).padStart(2, '0')).join('');
+                        log(`[DEBUG-KEY-SUPER-META] Salt from SuperMeta payload (first 16 bytes): ${superMetaSaltHex}`, 'debug');
+
                         const key = await deriveKey(password, salt);
-                        
+
                         try {
                             log(`Attempting to decrypt with salt (${salt.length} bytes) and encrypted data (${encryptedData.length} bytes)`, 'info');
                             decrypted = await decryptChunk(encryptedData, key, -1);
@@ -19828,6 +19847,11 @@ Do you want to continue?`;
                                     // Decrypt intermediate metadata
                                     const intSalt = strippedIntPayload.slice(0, 16);
                                     const intEncryptedData = strippedIntPayload.slice(16);
+
+                                    // v7.5.20-debug: Log intermediate meta salt
+                                    const intSaltHex = Array.from(intSalt).map(b => b.toString(16).padStart(2, '0')).join('');
+                                    log(`[DEBUG-KEY-INT-META-${i+1}] Salt from intermediate payload: ${intSaltHex}, Iterations: 100000 (default)`, 'debug');
+
                                     const intKey = await deriveKey(password, intSalt);
                                     const intDecrypted = await decryptChunk(intEncryptedData, intKey, -1);
                                     const intMetaData = JSON.parse(new TextDecoder().decode(intDecrypted));

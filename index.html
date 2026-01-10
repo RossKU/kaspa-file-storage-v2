@@ -11231,25 +11231,16 @@ Do you want to continue?`;
             return output;
         }
         
-        // v7.0.33: Generate IPFS-compliant CIDv1 using full file hash
+        // v7.5.26: Generate IPFS-compliant CIDv1 using first/last 1MB hash (Option B - unified approach)
         async function generateFileCID(file) {
-            let hashArray;
-            
-            if (file.size < 100 * 1024 * 1024) {  // 100MB threshold
-                // Small/medium files: hash entire file
-                log(`[CID] Hashing entire file (${(file.size / 1024 / 1024).toFixed(2)} MB)...`);
-                const data = new Uint8Array(await file.arrayBuffer());
-                hashArray = await sha256(data, true);  // Get binary output
-            } else {
-                // Large files: hash first and last 1MB
-                log(`[CID] Large file - hashing first and last 1MB...`);
-                const firstChunk = await file.slice(0, 1024 * 1024).arrayBuffer();
-                const lastChunk = await file.slice(-1024 * 1024).arrayBuffer();
-                const combined = new Uint8Array(firstChunk.byteLength + lastChunk.byteLength);
-                combined.set(new Uint8Array(firstChunk), 0);
-                combined.set(new Uint8Array(lastChunk), firstChunk.byteLength);
-                hashArray = await sha256(combined, true);  // Get binary output
-            }
+            // Always use first+last 1MB regardless of file size (for files < 1MB, slice returns entire file)
+            log(`[CID] Hashing file (first+last 1MB): ${(file.size / 1024 / 1024).toFixed(2)} MB...`);
+            const firstChunk = await file.slice(0, 1024 * 1024).arrayBuffer();
+            const lastChunk = await file.slice(-1024 * 1024).arrayBuffer();
+            const combined = new Uint8Array(firstChunk.byteLength + lastChunk.byteLength);
+            combined.set(new Uint8Array(firstChunk), 0);
+            combined.set(new Uint8Array(lastChunk), firstChunk.byteLength);
+            const hashArray = await sha256(combined, true);  // Get binary output
             
             // Create multihash (0x12 = sha256, 0x20 = 32 bytes)
             const multihash = new Uint8Array(2 + hashArray.length);
@@ -14977,19 +14968,14 @@ Do you want to continue?`;
                 const PROCESS_SEGMENT_SIZE = 1024 * 1024; // 1MB processing segments
                 const PAYLOAD_SIZE = 22 * 1024; // 22KB payloads
             
-            // Generate proper salt using file hash
-            let fileHash;
-            if (file.size < 10 * 1024 * 1024) {
-                const data = new Uint8Array(await file.arrayBuffer());
-                fileHash = await sha256(data);
-            } else {
-                const firstChunk = await file.slice(0, 1024 * 1024).arrayBuffer();
-                const lastChunk = await file.slice(-1024 * 1024).arrayBuffer();
-                const combined = new Uint8Array(firstChunk.byteLength + lastChunk.byteLength);
-                combined.set(new Uint8Array(firstChunk), 0);
-                combined.set(new Uint8Array(lastChunk), firstChunk.byteLength);
-                fileHash = await sha256(combined);
-            }
+            // v7.5.26: Generate salt using first/last 1MB hash (Option B - unified approach)
+            // Always use first+last 1MB regardless of file size (for files < 1MB, slice returns entire file)
+            const firstChunk = await file.slice(0, 1024 * 1024).arrayBuffer();
+            const lastChunk = await file.slice(-1024 * 1024).arrayBuffer();
+            const combined = new Uint8Array(firstChunk.byteLength + lastChunk.byteLength);
+            combined.set(new Uint8Array(firstChunk), 0);
+            combined.set(new Uint8Array(lastChunk), firstChunk.byteLength);
+            const fileHash = await sha256(combined);
             
             const saltBase = fileHash + file.name;
             const saltHash = await sha256(new TextEncoder().encode(saltBase));
@@ -15448,22 +15434,15 @@ Do you want to continue?`;
                     }
                 }
                 
-                // v7.0.33: Get file hash (matches CID calculation for consistency)
-                let fileHash;
-                if (currentFile.size < 100 * 1024 * 1024) { // 100MB threshold
-                    log(`Hashing entire file (${(currentFile.size / 1024 / 1024).toFixed(2)} MB)...`);
-                    const data = new Uint8Array(await currentFile.arrayBuffer());
-                    fileHash = await sha256(data);
-                } else {
-                    // For large files, hash first and last 1MB
-                    log('Large file - hashing first and last 1MB...');
-                    const firstChunk = await currentFile.slice(0, 1024 * 1024).arrayBuffer();
-                    const lastChunk = await currentFile.slice(-1024 * 1024).arrayBuffer();
-                    const combined = new Uint8Array(firstChunk.byteLength + lastChunk.byteLength);
-                    combined.set(new Uint8Array(firstChunk), 0);
-                    combined.set(new Uint8Array(lastChunk), firstChunk.byteLength);
-                    fileHash = await sha256(combined);
-                }
+                // v7.5.26: Get file hash using first/last 1MB (Option B - unified approach)
+                // Always use first+last 1MB regardless of file size (for files < 1MB, slice returns entire file)
+                log(`Hashing file (first+last 1MB): ${(currentFile.size / 1024 / 1024).toFixed(2)} MB...`);
+                const firstChunk = await currentFile.slice(0, 1024 * 1024).arrayBuffer();
+                const lastChunk = await currentFile.slice(-1024 * 1024).arrayBuffer();
+                const combined = new Uint8Array(firstChunk.byteLength + lastChunk.byteLength);
+                combined.set(new Uint8Array(firstChunk), 0);
+                combined.set(new Uint8Array(lastChunk), firstChunk.byteLength);
+                const fileHash = await sha256(combined);
                 log(`File hash: ${fileHash}`);
                 
                 // Compression strategy

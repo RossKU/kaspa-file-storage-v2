@@ -10355,6 +10355,7 @@ Do you want to continue?`;
         }
         
         // Parallel Downloader Class (v3.6.2)
+        // v7.5.28: Added WebSocket reconnection support
         class ParallelDownloader {
             constructor(rpcClient, concurrency = 8) {
                 this.rpcClient = rpcClient;
@@ -10368,6 +10369,62 @@ Do you want to continue?`;
                 this.totalBytes = 0;
                 this.queueLock = false;
                 this.maxRetries = 3;
+                // v7.5.28: WebSocket reconnection support
+                this.reconnecting = false;
+                this.reconnectPromise = null;
+            }
+
+            // v7.5.28: Wait for WebSocket reconnection (SDK auto-reconnect)
+            async waitForReconnect(maxWaitMs = 30000) {
+                // If already reconnecting, wait for existing promise
+                if (this.reconnecting && this.reconnectPromise) {
+                    return this.reconnectPromise;
+                }
+
+                this.reconnecting = true;
+                log('[ParallelDownloader] WebSocket disconnected, waiting for SDK auto-reconnect...', 'warning');
+
+                this.reconnectPromise = new Promise((resolve, reject) => {
+                    const startTime = Date.now();
+                    const checkInterval = 500;
+
+                    const check = () => {
+                        // Check if SDK has reconnected
+                        if (NetworkState.rpcClient?.isConnected) {
+                            log('[ParallelDownloader] WebSocket reconnected!', 'success');
+                            this.reconnecting = false;
+                            this.reconnectPromise = null;
+                            resolve(true);
+                            return;
+                        }
+
+                        // Check timeout
+                        if (Date.now() - startTime > maxWaitMs) {
+                            log('[ParallelDownloader] Reconnection timeout, falling back to REST API', 'warning');
+                            this.reconnecting = false;
+                            this.reconnectPromise = null;
+                            reject(new Error('Reconnection timeout'));
+                            return;
+                        }
+
+                        // Check again after interval
+                        setTimeout(check, checkInterval);
+                    };
+
+                    check();
+                });
+
+                return this.reconnectPromise;
+            }
+
+            // v7.5.28: Check if error is a WebSocket disconnection error
+            isWebSocketError(error) {
+                const msg = error?.message?.toLowerCase() || '';
+                return msg.includes('websocket') ||
+                       msg.includes('not connected') ||
+                       msg.includes('disconnected') ||
+                       msg.includes('connection') ||
+                       msg.includes('socket');
             }
             
             async downloadChunks(txIds, blockIds, key, kaspaMetadata, progressCallback) {
@@ -10469,6 +10526,18 @@ Do you want to continue?`;
                                 break;
                             } catch (error) {
                                 lastError = error;
+                                // v7.5.28: Check if WebSocket disconnection error
+                                if (this.isWebSocketError(error)) {
+                                    log(`[ParallelDownloader] Chunk ${index} WebSocket error, waiting for reconnect...`, 'warning');
+                                    try {
+                                        await this.waitForReconnect();
+                                        // Reconnected, retry immediately (don't count as retry)
+                                        retry--;
+                                        continue;
+                                    } catch (reconnectError) {
+                                        log(`[ParallelDownloader] Reconnection failed: ${reconnectError.message}`, 'warning');
+                                    }
+                                }
                                 if (retry < this.maxRetries) {
                                     log(`Failed to get chunk ${index} (retry ${retry + 1}/${this.maxRetries}): ${error.message}`, 'warning');
                                     await new Promise(resolve => setTimeout(resolve, 1000 * (retry + 1)));
@@ -10669,9 +10738,36 @@ Do you want to continue?`;
                         }
                         
                     } catch (rpcError) {
+                        // v7.5.28: Check if WebSocket disconnection error
+                        if (this.isWebSocketError(rpcError)) {
+                            log(`[ParallelDownloader] Payload ${work.index} WebSocket error: ${rpcError.message}`, 'warning');
+
+                            try {
+                                // Wait for SDK auto-reconnect
+                                await this.waitForReconnect();
+
+                                // Reconnected! Put work back in queue and retry
+                                log(`[ParallelDownloader] Retrying payload ${work.index} after reconnect`, 'info');
+                                while (this.queueLock) {
+                                    await new Promise(resolve => setTimeout(resolve, 10));
+                                }
+                                this.queueLock = true;
+                                try {
+                                    this.queue.unshift(work);  // Add to front for immediate retry
+                                } finally {
+                                    this.queueLock = false;
+                                }
+                                this.active--;
+                                continue;  // Skip to next iteration
+                            } catch (reconnectError) {
+                                // Reconnection failed/timeout, fall through to REST API
+                                log(`[ParallelDownloader] Reconnection failed: ${reconnectError.message}`, 'warning');
+                            }
+                        }
+
                         // Fall back to REST API on RPC error
                         log(`[ParallelDownloader] Payload ${work.index} RPC failed, falling back to REST API: ${rpcError.message}`, 'warning');
-                        
+
                         try {
                             // REST API Kill switch check
                             if (!NetworkState.restApiControl.globalEnabled || NetworkState.restApiControl.temporaryKilled) {
@@ -21342,30 +21438,56 @@ Do you want to continue?`;
                     
                     // Phase 0-O-3: WebSocket disconnect detection
                     NetworkState.rpcClient.addEventListener('disconnect', (event) => {
-                        // v5.7.4: Removed v5.7.1 workaround - no longer needed since v5.7.3 
+                        // v5.7.4: Removed v5.7.1 workaround - no longer needed since v5.7.3
                         // removes all event listeners in stopMonitoring
-                        
+
                         log('[WebSocket] Disconnect event detected', 'warning');
                         NetworkState.ws.connected = false;
-                        
+
                         // Notify ConnectionManager
                         if (ConnectionManager.isConnected) {
                             ConnectionManager.isConnected = false;
                             ConnectionManager.lastError = new Error('WebSocket disconnected via event');
                             updateNetworkStatus('offline', 'WebSocketDisconnect');
                             updateRpcNodeInfo(); // Reset display
-                            
+
                             // v6.2.63: Keep RPC client alive for REST API fallback
                             // Keep RPC client even when WebSocket disconnects to enable REST API fallback
                             if (NetworkState.rpcClient) {
                                 // NetworkState.rpcClient = null;  // v6.2.63: Commented out to enable REST API fallback
-                                log('[WebSocket] Disconnect detected - Keeping RPC client (for REST API fallback)', 'debug');
+                                log('[WebSocket] Disconnect detected - Keeping RPC client (for SDK auto-reconnect)', 'debug');
                             }
-                            
-                            ConnectionManager.scheduleReconnect();
+
+                            // v7.5.28: Don't schedule app-level reconnect, let SDK handle it
+                            // ConnectionManager.scheduleReconnect();
+                            log('[WebSocket] Waiting for SDK auto-reconnect...', 'info');
                         }
                     });
-                    
+
+                    // v7.5.28: WebSocket connect event detection (SDK auto-reconnect)
+                    NetworkState.rpcClient.addEventListener('connect', async (event) => {
+                        log('[WebSocket] Connect event detected (SDK auto-reconnected)', 'success');
+                        NetworkState.ws.connected = true;
+                        ConnectionManager.isConnected = true;
+                        ConnectionManager.reconnectAttempts = 0;
+                        updateNetworkStatus('online', 'Connected');
+
+                        // Re-subscribe to notifications after reconnect
+                        try {
+                            if (NetworkState.rpcClient) {
+                                const info = await NetworkState.rpcClient.getServerInfo();
+                                log(`[WebSocket] Reconnected to ${info.serverVersion}`, 'success');
+                                updateRpcNodeInfo(info, config.network);
+
+                                // Re-subscribe to block notifications
+                                await NetworkState.rpcClient.subscribeBlockAdded();
+                                log('[WebSocket] Re-subscribed to block notifications', 'info');
+                            }
+                        } catch (e) {
+                            log(`[WebSocket] Post-reconnect setup error: ${e.message}`, 'warning');
+                        }
+                    });
+
                     NetworkState.rpcClient.addEventListener('block-added', (event) => {
                     // v5.12.1: Block event filter for main RPC
                     if (NetworkState.blockEventFilter.enabled) {

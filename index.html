@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://*.kaspa.org wss://*.kaspa.green wss://*.kaspa.blue wss://*.kaspa.stream wss://*.kaspa.red wss://*.kas.fyi https://*.kaspa.org https://*.kaspa.green https://*.kaspa.blue https://*.kaspa.stream https://*.kaspa.red https://*.kas.fyi https://api.kas.fyi; img-src 'self' data: blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none';">
-    <title>Kaspa P2P File Storage v7.5.29</title>
-    <!-- v7.5.29: Fix active-- double decrement bug in WebSocket reconnection -->
+    <title>Kaspa P2P File Storage v7.5.30</title>
+    <!-- v7.5.30: Add pre-compressed archive formats to COMPRESS_SKIP -->
     <script>
         if (location.hash.startsWith('#v=')) {
             document.documentElement.classList.add('direct-view-mode');
@@ -14551,7 +14551,8 @@ Do you want to continue?`;
         }
 
         // Compression logic
-        const COMPRESS_SKIP = new Set(['jpg','jpeg','png','gif','webp','mp4','avi','mov','mp3','wav','zip','rar','pdf']);
+        // v7.5.30: Added pre-compressed archive formats (apk,7z,gz,bz2,xz,lzma)
+        const COMPRESS_SKIP = new Set(['jpg','jpeg','png','gif','webp','mp4','avi','mov','mp3','wav','zip','rar','pdf','apk','7z','gz','bz2','xz','lzma']);
         
         function shouldCompress(filename) {
             const ext = filename.split('.').pop()?.toLowerCase() || '';

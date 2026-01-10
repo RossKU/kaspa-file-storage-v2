@@ -14463,6 +14463,7 @@ Do you want to continue?`;
         }
 
         // LZ compression
+        // v7.5.27: Added escape sequence for literal 255 bytes [255, 0, 0]
         function lzCompress(data) {
             const result = [];
             let i = 0;
@@ -14480,6 +14481,10 @@ Do you want to continue?`;
                 if (bestLen > 3) {
                     result.push(255, bestOff, bestLen);
                     i += bestLen;
+                } else if (data[i] === 255) {
+                    // v7.5.27: Escape literal 255 as [255, 0, 0] (len=0 means literal 255)
+                    result.push(255, 0, 0);
+                    i++;
                 } else {
                     result.push(data[i]);
                     i++;
@@ -14488,6 +14493,7 @@ Do you want to continue?`;
             return new Uint8Array(result);
         }
 
+        // v7.5.27: Handle escaped literal 255 (len=0)
         function lzDecompress(data) {
             const result = [];
             let i = 0;
@@ -14495,9 +14501,15 @@ Do you want to continue?`;
                 if (data[i] === 255 && i + 2 < data.length) {
                     const off = data[i + 1];
                     const len = data[i + 2];
-                    const start = result.length - off;
-                    for (let j = 0; j < len; j++) {
-                        result.push(result[start + j]);
+                    if (len === 0) {
+                        // v7.5.27: Escaped literal 255
+                        result.push(255);
+                    } else {
+                        // Backreference
+                        const start = result.length - off;
+                        for (let j = 0; j < len; j++) {
+                            result.push(result[start + j]);
+                        }
                     }
                     i += 3;
                 } else {

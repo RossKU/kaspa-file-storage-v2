@@ -4,7 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://*.kaspa.org wss://*.kaspa.green wss://*.kaspa.blue wss://*.kaspa.stream wss://*.kaspa.red wss://*.kas.fyi https://*.kaspa.org https://*.kaspa.green https://*.kaspa.blue https://*.kaspa.stream https://*.kaspa.red https://*.kas.fyi https://api.kas.fyi; img-src 'self' data: blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none';">
-    <title>Kaspa P2P File Storage v7.5.30</title>
+    <title>Kaspa P2P File Storage v7.6.2</title>
+    <!-- v7.6.2 (2026-06-30): Pre-flight balance interlock — upload confirm dialog warns when wallet balance < estimated cost (×1.1). -->
+    <!-- v7.6.1 (2026-06-30): Corrected FAQ upload-cost figures to measured values (~0.05 KAS / 22KB chunk; ~230 KAS / 100MB at min fee rate). -->
+    <!-- v7.6.0 (2026-06-30): Toccata support (rusty-kaspa v2.0.0 WASM SDK); kfs:2 write format
+         (still reads legacy kfs:1); configurable fee rate (sompi/gram) replacing the old fixed
+         cost estimate; removed discontinued kas.fyi integration and the chunk-size selector (fixed 22KB). -->
     <!-- v7.5.30: Add pre-compressed archive formats to COMPRESS_SKIP -->
     <script>
         if (location.hash.startsWith('#v=')) {
@@ -1824,12 +1829,7 @@
                     <li><strong>Full Node:</strong> Recent files (~30 hours, before pruning)</li>
                     <li><strong>Archive Node:</strong> Files up to displayed retention period</li>
                     <li><strong>api.kaspa.org:</strong> All files (Community service - please minimize load)</li>
-                    <li><strong>kas.fyi:</strong> All files (Recommended - Enterprise-grade service)</li>
                 </ul>
-                <p style="margin: 8px 0 0 0; color: var(--text-secondary); font-size: 12px;">
-                    💡 <strong>Recommended:</strong> Use kas.fyi to reduce load on community-run api.kaspa.org service.
-                    Requires API key from <a href="https://kas.fyi" target="_blank" style="color: var(--accent-color);">kas.fyi</a>.
-                </p>
             </div>
 
             <p style="margin-top: 10px; color: var(--text-secondary); font-size: 14px;">
@@ -1853,11 +1853,13 @@
 
             <h4 style="margin-top: 15px;">💰 How much does upload cost?</h4>
             <p style="line-height: 1.8; margin-left: 20px;">
-                Upload cost is <strong>miner fees only</strong> (approximately <strong>1 KAS per 100MB</strong> uncompressed).<br>
-                • Actual cost: Only transaction fees (~0.0003 KAS per 20KB chunk)<br>
-                • Transaction amount returns to yourself - only fees are consumed<br>
-                • With compression (if applicable): Cost can be further reduced<br>
-                • <strong>Rewards go to miners only</strong> - Kaspa currently has no rewards for archive nodes
+                Upload cost is <strong>miner fees only</strong>. At the minimum fee rate (100 sompi/gram) that is
+                roughly <strong>~0.05 KAS per 22KB chunk</strong> — about <strong>~2.4 KAS per 1MB</strong> and
+                <strong>~230 KAS per 100MB</strong> (uncompressed).<br>
+                • The transaction amount you set returns to yourself — only the fees are consumed.<br>
+                • Cost scales with the <strong>Fee Rate</strong> setting (Settings tab): 100 = cheapest (network minimum), higher = faster confirmation but more expensive.<br>
+                • Compression (when it helps) reduces the chunk count, and therefore the cost.<br>
+                • <strong>Rewards go to miners only</strong> — Kaspa currently has no rewards for archive nodes.
             </p>
 
             <h4 style="margin-top: 15px;">📥 Is download free?</h4>
@@ -1888,7 +1890,7 @@
                 <strong>No, this is a Layer 1 (L1) service.</strong><br>
                 • All communication and data storage are on Kaspa L1 blockchain<br>
                 • Files are stored directly in transaction payloads on-chain<br>
-                • API services (api.kaspa.org, kas.fyi) are third-party services for convenience<br>
+                • API services (api.kaspa.org) are third-party services for convenience<br>
                 • Core functionality operates purely on Kaspa blockchain
             </p>
 
@@ -2004,29 +2006,6 @@
                     </div>
                 </div>
 
-                <div style="margin: 16px 0; border-top: 1px solid var(--border-color);"></div>
-
-                <!-- Kaspa Developer Platform Status -->
-                <div class="status-row">
-                    <div>
-                        <strong>kas.fyi (Kaspa Developer Platform) Priority Fallback:</strong>
-                        <span class="status-indicator-large status-disconnected" id="kasFyiIndicator"></span>
-                        <span id="kasFyiStatus">Not Configured</span>
-                    </div>
-                </div>
-                <div class="status-row">
-                    <div style="margin-left: 20px;">
-                        <small id="kasFyiDetails">API Key: Not Set</small>
-                    </div>
-                </div>
-                <div class="status-row">
-                    <div style="margin-left: 20px; padding: 4px 0;">
-                        <small style="color: var(--text-secondary); font-size: 0.85em; line-height: 1.3;">
-                            Alternative when Kaspa network is unavailable.<br>
-                            Enterprise-grade service by kas.fyi. Requires API key from kas.fyi.
-                        </small>
-                    </div>
-                </div>
             </div>
             
             <!-- v5.11.134: Workspace Folder moved to Settings tab -->
@@ -2788,44 +2767,9 @@
                 </div>
             </div>
 
-            <!-- Kaspa Developer Platform (kas.fyi) -->
-            <div class="metric-box">
-                <h3>🔧 Kaspa Developer Platform (kas.fyi)</h3>
-                <div style="margin-bottom: 10px; color: var(--text-secondary); font-size: 0.9em;">
-                    Enterprise-grade API for fast transaction data retrieval.
-                    No need to run your own node. When configured, serves as priority
-                    fallback for downloading files. Get your API key at
-                    <a href="https://docs.kas.fyi/" target="_blank"
-                       style="color: var(--accent-color)">docs.kas.fyi</a>
-                </div>
-                <div style="margin-bottom: 15px;">
-                    <label>API Key (kdp_...)</label>
-                    <div style="display: flex; gap: 10px; margin-top: 10px;">
-                        <input type="password" id="kasFyiApiKey"
-                               placeholder="kdp_..."
-                               style="flex: 1; padding: 8px; border: 1px solid var(--border-color); border-radius: 5px;">
-                        <button onclick="refreshKasFyiConnection()"
-                                id="kasFyiRefreshBtn"
-                                style="padding: 8px 12px; background: var(--button-bg); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 5px; cursor: pointer; display: none;"
-                                title="Refresh connection test">
-                            🔄
-                        </button>
-                        <button onclick="testKasFyiConnection()"
-                                id="kasFyiTestBtn"
-                                style="padding: 8px 16px; background: var(--accent-color); color: var(--button-text-on-accent); border: none; border-radius: 5px; cursor: pointer;">
-                            Test Connection
-                        </button>
-                        <button onclick="handleKasFyiAction()"
-                                id="kasFyiActionBtn"
-                                style="padding: 8px 16px; background: var(--error-color); color: white; border: none; border-radius: 5px; cursor: pointer; display: none;">
-                            Delete Key
-                        </button>
-                    </div>
-                    <div id="kasFyiTestResult" style="margin-top: 10px; padding: 10px; display: none; border-radius: 5px;">
-                        <!-- Results will appear here -->
-                    </div>
-                </div>
-            </div>
+            <!-- kas.fyi (Kaspa Developer Platform) removed 2026-06-30: service discontinued.
+                 Backend plumbing (NetworkState.kasFyiControl, fetch interceptor) left dormant
+                 for a possible future replacement. -->
 
             <!-- Transaction Amount Setting -->
             <div class="metric-box">
@@ -2848,7 +2792,7 @@
                     <p style="margin: 10px 0 0 0; font-size: 0.9em; color: var(--text-secondary);">
                         ⚠️ Amount for recording data on blockchain.<br>
                         Recommended: 0.2-1 KAS (Too small will cause errors)<br>
-                        Actual cost: Only fees (about 0.0003 KAS per 20KB)<br>
+                        Actual cost: only fees (~0.05 KAS per 22KB chunk at the minimum fee rate — see Fee Rate setting below)<br>
                         ※ Amount returns to yourself, only fees are consumed
                     </p>
                 </div>
@@ -2856,7 +2800,27 @@
                     <div>Current setting: <span id="transaction-amount-display" style="font-weight: bold;">1 KAS</span></div>
                 </div>
             </div>
-            
+
+            <!-- Toccata: Configurable fee rate (sompi per gram of tx mass) -->
+            <div class="metric-box">
+                <h3>💸 Fee Rate (upload speed vs cost)</h3>
+                <div style="margin-bottom: 15px;">
+                    <label>Fee rate (sompi per gram of tx mass)</label>
+                    <div style="display: flex; align-items: center; gap: 10px; margin-top: 10px;">
+                        <input type="number" id="kfsFeeRate"
+                               value="100" min="100" step="10"
+                               style="width: 120px; padding: 8px; border: 1px solid var(--border-color); border-radius: 5px;"
+                               onchange="DebugHandlers.updateFeeRate(this.value)">
+                        <span id="feeRateInfo" style="color: var(--text-secondary); font-size: 0.9em;">≈ 0.0471 KAS per 22KB chunk (network minimum)</span>
+                    </div>
+                    <p style="margin: 10px 0 0 0; font-size: 0.9em; color: var(--text-secondary);">
+                        On-chain fee = feeRate × transaction mass. Network minimum is <strong>100</strong> (you can't go lower).<br>
+                        100 = cheapest (slower when the network is busy) · ~200 = normal · ~800 = top priority (sub-second).<br>
+                        Raising it increases both the upload cost estimate and the actual cost.
+                    </p>
+                </div>
+            </div>
+
             <!-- v7.0.62: WebSocket Configuration (made visible) -->
             <div class="metric-box">
                 <h3>📊 WebSocket Configuration</h3>
@@ -2934,14 +2898,9 @@
             <!-- v5.11.131: Upload Settings -->
             <div class="metric-box" style="margin-top: 20px;">
                 <h3>📤 Upload Settings</h3>
-                <div style="margin-top: 15px;">
-                    <label>Chunk Size</label>
-                    <select id="chunkSize" style="width: 100%; padding: 8px; margin-top: 5px;">
-                        <option value="20">🧪 20KB chunks (Experimental - Legacy)</option>
-                        <option value="22" selected>🚀 22KB chunks (Recommended - New)</option>
-                    </select>
-                </div>
-                
+                <!-- Chunk Size selector removed 2026-06-30: chunk size is fixed at 22KB (22528 bytes);
+                     other sizes are not structurally supported (the payload-split path requires >= 22528). -->
+
                 <div style="margin-top: 15px;">
                     <div class="checkbox-label">
                         <input type="checkbox" id="useMetaTx" checked>
@@ -3156,13 +3115,13 @@
                 
                 <div style="margin-top: 10px; padding: 10px; background: var(--warning-light); border-radius: 5px;">
                     <small>
-                        ⚠️ <strong>Warning:</strong> This is for testing only. Smaller values create more MetaTxIDs, 
+                        ⚠️ <strong>Warning:</strong> This is for testing only. Smaller values create more MetaTxIDs,
                         which increases upload time and blockchain costs. Always use 160 for production.
                     </small>
                 </div>
             </div>
         </div>
-        
+
     </div>
 
         </main>
@@ -3643,6 +3602,21 @@
                 if (limit !== 160) {
                     log(`⚠️ [Debug] Test mode active! This will create more MetaTxIDs than normal.`, 'warning');
                 }
+            },
+
+            // Toccata: configurable fee rate (sompi per gram of tx mass). Network minimum = 100.
+            updateFeeRate(value) {
+                const rate = Math.max(100, parseInt(value) || 100);
+                localStorage.setItem('kfsFeeRate', rate);
+                const infoEl = document.getElementById('feeRateInfo');
+                if (infoEl) {
+                    const perChunk = (2 * 22528 + 2036) * rate / 1e8; // computeMass(22KB)≈47,092 × feeRate
+                    infoEl.textContent = `≈ ${perChunk.toFixed(4)} KAS per 22KB chunk` + (rate === 100 ? ' (network minimum)' : '');
+                    infoEl.style.color = rate === 100 ? 'var(--text-secondary)' : 'var(--warning-color)';
+                }
+                const inputEl = document.getElementById('kfsFeeRate');
+                if (inputEl && inputEl.value !== rate.toString()) inputEl.value = rate;
+                log(`💸 Fee rate set to ${rate} sompi/gram`, rate === 100 ? 'info' : 'warning');
             }
         };
         
@@ -10990,16 +10964,17 @@ Do you want to continue?`;
             }
         }
         
-        // v7.3.0: Strip KFS protocol prefix for backward compatibility
-        // Prefix format: "kfs:1:" (6 bytes ASCII)
+        // Strip KFS protocol prefix. Reads BOTH protocol versions:
+        //   "kfs:1:" = pre-Toccata (HF) files  — legacy, read-only
+        //   "kfs:2:" = post-Toccata (HF) files — current write format
         function stripKfsPrefix(payloadBytes) {
             if (payloadBytes && payloadBytes.length > 6) {
-                // Check for "kfs:1:" prefix
+                // "kfs:" + version('1' pre-HF | '2' post-HF) + ":"
                 if (payloadBytes[0] === 0x6b && // 'k'
                     payloadBytes[1] === 0x66 && // 'f'
                     payloadBytes[2] === 0x73 && // 's'
                     payloadBytes[3] === 0x3a && // ':'
-                    payloadBytes[4] === 0x31 && // '1'
+                    (payloadBytes[4] === 0x31 || payloadBytes[4] === 0x32) && // '1' (pre-HF) or '2' (post-HF)
                     payloadBytes[5] === 0x3a) { // ':'
                     return payloadBytes.slice(6);
                 }
@@ -11007,15 +10982,49 @@ Do you want to continue?`;
             return payloadBytes;
         }
 
-        // v7.3.0: Add KFS protocol prefix for explorer statistics
-        // Prefix format: "kfs:1:" (6 bytes ASCII)
-        const KFS_PREFIX = new Uint8Array([0x6b, 0x66, 0x73, 0x3a, 0x31, 0x3a]); // "kfs:1:"
+        // Add KFS protocol prefix for explorer statistics.
+        // WRITE format is "kfs:2:" (post-Toccata/HF). "kfs:1:" (pre-HF) is read-only — never written.
+        const KFS_PREFIX = new Uint8Array([0x6b, 0x66, 0x73, 0x3a, 0x32, 0x3a]); // "kfs:2:"
         function addKfsPrefix(payloadBytes) {
             const result = new Uint8Array(KFS_PREFIX.length + payloadBytes.length);
             result.set(KFS_PREFIX, 0);
             result.set(payloadBytes, KFS_PREFIX.length);
             return result;
         }
+
+        // === Fee rate (Toccata) ===
+        // Kaspa fee = feeRate (sompi per gram of tx mass) × mass(tx). Network minimum feeRate = 100.
+        // Higher feeRate ⇒ faster inclusion, higher cost. Configured in Settings (localStorage 'kfsFeeRate').
+        function getFeeRate() {
+            const v = parseInt(localStorage.getItem('kfsFeeRate'), 10);
+            return (Number.isFinite(v) && v >= 100) ? v : 100;
+        }
+        // Estimate the on-chain fee (sompi) for a tx carrying a `byteLen`-byte payload at the configured
+        // feeRate, by building (NOT submitting) a transaction via the SDK. Used for upload cost estimates.
+        async function sdkFeeForPayloadSompi(byteLen, utxos) {
+            // Build the sample tx from a single sizeable UTXO + a 0.2 KAS output. This keeps the input
+            // count low and avoids KIP9 storage-mass blow-up (tiny outputs inflate storage mass), so the
+            // sample stays within the max standard mass and its fee reflects a real chunk tx.
+            const arr = Array.isArray(utxos) ? utxos : [];
+            const entry = arr.reduce((a, b) => (BigInt(b?.amount ?? 0) > BigInt(a?.amount ?? 0) ? b : a), arr[0]);
+            const result = await NetworkState.kaspa.createTransactions({
+                entries: entry ? [entry] : arr,
+                outputs: [{ address: UserState.address.toString(), amount: 20000000n }],
+                changeAddress: UserState.address.toString(),
+                priorityFee: 0n,
+                feeRate: getFeeRate(),
+                networkId: config.network,
+                payload: new Uint8Array(byteLen)
+            });
+            const fee = BigInt(result.summary?.fees ?? 0n);
+            if (result.transactions) for (const t of result.transactions) { try { t.transaction?.free?.(); } catch (e) {} }
+            return fee;
+        }
+        // Restore the fee-rate setting input from storage once the DOM is ready.
+        document.addEventListener('DOMContentLoaded', () => {
+            const el = document.getElementById('kfsFeeRate');
+            if (el) { el.value = getFeeRate(); if (window.DebugHandlers?.updateFeeRate) DebugHandlers.updateFeeRate(el.value); }
+        });
 
         // Format network display name (v5.11.100: Phase 10)
         function formatNetworkDisplay(network) {
@@ -14402,7 +14411,7 @@ Do you want to continue?`;
                     amount: AppState.settings.transactionAmount
                 }],
                 changeAddress: UserState.address.toString(),
-                priorityFee: 0n,  // v5.11.17: Cost reduction by removing Priority Fee
+                priorityFee: 0n, feeRate: getFeeRate(),  // v5.11.17 priority removed; Toccata: configurable feeRate (sompi/gram)
                 networkId: config.network,
                 payload: prefixedPayload
             });
@@ -15479,7 +15488,7 @@ Do you want to continue?`;
                 // Generate CID early for progress manager
                 let fileCID = '';
                 const useRandomCid = document.getElementById('useRandomCid').checked;
-                const chunkSize = parseInt(document.getElementById('chunkSize').value) * 1024;
+                const chunkSize = 22528; // fixed 22KB (chunk-size selector removed; other sizes not structurally supported)
                 log(`Chunk size setting: ${chunkSize / 1024} KB`);
                 
                 if (useRandomCid) {
@@ -15573,7 +15582,7 @@ Do you want to continue?`;
                 FileState.progressManager.progress.encryption.compressed = useCompression;
                 
                 // Get chunk size and apply safety limit
-                const requestedChunkSize = parseInt(document.getElementById('chunkSize').value) * 1024;
+                const requestedChunkSize = 22528; // fixed 22KB (chunk-size selector removed)
                 
                 // v4.7.30: Apply dynamic chunk size optimization
                 let actualChunkSize;
@@ -15708,10 +15717,29 @@ Do you want to continue?`;
                         totalTxCount += metaTxCount + superMetaTxCount;
                     }
                     
-                    // Calculate estimated cost and time
-                    const costPerTx = 0.00024; // 24,000 sompi per tx (Priority Fee removed)
+                    // Calculate estimated cost (Toccata: SDK fee summation at configured feeRate) and time
+                    const feeRate = getFeeRate();
+                    let estimatedCost;
+                    try {
+                        const utxoRes = await NetworkState.rpcClient.getUtxosByAddresses([UserState.address.toString()]);
+                        const utxosForEst = utxoRes.entries || utxoRes;
+                        const fullChunkFee = await sdkFeeForPayloadSompi(actualChunkSize, utxosForEst);
+                        let totalSompi = BigInt(payloadCount) * fullChunkFee;
+                        if (useMetaTx) {
+                            const metaBytes = Math.min(CHUNKS_PER_META, payloadCount) * 70 + 6;
+                            const metaFee = await sdkFeeForPayloadSompi(metaBytes, utxosForEst);
+                            totalSompi += BigInt(metaTxCount + superMetaTxCount) * metaFee;
+                        }
+                        estimatedCost = Number(totalSompi) / 1e8;
+                    } catch (e) {
+                        // Fallback: empirically computeMass ≈ 2*payloadBytes + 2036; fee = mass × feeRate (sompi)
+                        log(`Cost estimate via SDK failed (${e.message}); using mass formula`, 'warning');
+                        const massOf = b => 2 * b + 2036;
+                        let s = BigInt(Math.round(massOf(actualChunkSize) * feeRate)) * BigInt(payloadCount);
+                        if (useMetaTx) s += BigInt(metaTxCount + superMetaTxCount) * BigInt(Math.round(massOf(Math.min(CHUNKS_PER_META, payloadCount) * 70 + 6) * feeRate));
+                        estimatedCost = Number(s) / 1e8;
+                    }
                     const timePerTx = 2.4; // 2.4 seconds per tx (measured value)
-                    const estimatedCost = totalTxCount * costPerTx;
                     const estimatedTime = totalTxCount * timePerTx;
                     
                     // Build confirmation message
@@ -15744,9 +15772,18 @@ Do you want to continue?`;
                             confirmMessage += `This may cause "Storage mass exceeded" errors.\n`;
                             confirmMessage += `Recommended: Consolidate UTXOs first (Settings tab → Wallet & UTXO Management)\n`;
                         }
+
+                        // Pre-flight balance interlock: warn (don't hard-block, since uploads are resumable)
+                        // if the wallet can't cover the estimated cost with a 10% margin.
+                        const walletBalanceKAS = entries.reduce((sum, u) => sum + Number(u.amount), 0) / 1e8;
+                        if (walletBalanceKAS < estimatedCost * 1.1) {
+                            confirmMessage += `\n⛔ LOW BALANCE: wallet has ${walletBalanceKAS.toFixed(4)} KAS, estimate is ${estimatedCost.toFixed(4)} KAS.\n`;
+                            confirmMessage += `The upload will likely stop partway (you can resume it after topping up).\n`;
+                            confirmMessage += `Recommended: add KAS, or lower the Fee Rate (Settings tab), before continuing.\n`;
+                        }
                     } catch (utxoError) {
-                        // Ignore UTXO check errors, proceed with upload
-                        log('Could not check UTXO count', 'debug');
+                        // Ignore UTXO/balance check errors, proceed with upload
+                        log('Could not check UTXO count / balance', 'debug');
                     }
                     
                     confirmMessage += `\nDo you want to continue?`;
@@ -15911,7 +15948,7 @@ Do you want to continue?`;
                                         amount: AppState.settings.transactionAmount
                                     }],
                                     changeAddress: UserState.address.toString(),
-                                    priorityFee: 0n,  // v5.11.17: Cost reduction by removing Priority Fee
+                                    priorityFee: 0n, feeRate: getFeeRate(),  // v5.11.17 priority removed; Toccata: configurable feeRate (sompi/gram)
                                     networkId: config.network,
                                     payload: prefixedPayload
                                 });
@@ -16465,7 +16502,7 @@ Do you want to continue?`;
                                     amount: AppState.settings.transactionAmount
                                 }],
                                 changeAddress: UserState.address.toString(),
-                                priorityFee: 0n,  // v5.11.17: Cost reduction by removing Priority Fee
+                                priorityFee: 0n, feeRate: getFeeRate(),  // v5.11.17 priority removed; Toccata: configurable feeRate (sompi/gram)
                                 networkId: config.network,
                                 payload: prefixedPayload
                             });
@@ -17548,7 +17585,7 @@ Do you want to continue?`;
                                 amount: amount
                             }],
                             changeAddress: UserState.address.toString(),
-                            priorityFee: 0n,  // v5.11.17: Cost reduction by removing Priority Fee
+                            priorityFee: 0n, feeRate: getFeeRate(),  // v5.11.17 priority removed; Toccata: configurable feeRate (sompi/gram)
                             networkId: config.network,
                             payload: prefixedMetaPayload
                         });
@@ -17997,7 +18034,7 @@ Do you want to continue?`;
                         amount: AppState.settings.transactionAmount
                     }],
                     changeAddress: UserState.address.toString(),
-                    priorityFee: 0n,  // v5.11.17: Cost reduction by removing Priority Fee
+                    priorityFee: 0n, feeRate: getFeeRate(),  // v5.11.17 priority removed; Toccata: configurable feeRate (sompi/gram)
                     networkId: config.network,
                     payload: prefixedMetaPayload
                 });
@@ -18223,7 +18260,7 @@ Do you want to continue?`;
                         amount: AppState.settings.transactionAmount
                     }],
                     changeAddress: UserState.address.toString(),
-                    priorityFee: 0n,  // v5.11.17: Cost reduction by removing Priority Fee
+                    priorityFee: 0n, feeRate: getFeeRate(),  // v5.11.17 priority removed; Toccata: configurable feeRate (sompi/gram)
                     networkId: config.network,
                     payload: prefixedMetaPayload
                 });
@@ -20937,7 +20974,9 @@ Do you want to continue?`;
             }
 
             // Load kas.fyi API key from LocalStorage
-            const savedKasFyiApiKey = localStorage.getItem('kasFyiApiKey');
+            // kas.fyi discontinued (2026-06-30): force-disabled so a previously-saved key never
+            // re-activates the dead service. Set this back to localStorage.getItem('kasFyiApiKey') to restore.
+            const savedKasFyiApiKey = null;
             if (savedKasFyiApiKey) {
                 const apiKeyInput = document.getElementById('kasFyiApiKey');
                 if (apiKeyInput) {
@@ -22691,7 +22730,7 @@ Do you want to continue?`;
             
             // Handle resume or new upload
             if (window.pendingProgress) {
-                const chunkSize = parseInt(document.getElementById('chunkSize').value) * 1024;
+                const chunkSize = 22528; // fixed 22KB (chunk-size selector removed; other sizes not structurally supported)
                 const cid = window.ShortCID || window.pendingProgress.cid || null;
                 // v5.5.24: window.progressManager -> FileState.progressManager (5/11)
                 FileState.progressManager = new ProgressManager(file, chunkSize, cid, 'upload');

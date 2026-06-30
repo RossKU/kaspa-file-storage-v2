@@ -1,4 +1,4 @@
-# Kaspa File Format Specification v3.4.4
+# Kaspa File Format Specification v3.4.5
 
 ## Overview
 
@@ -6,10 +6,10 @@ This is the standard file format specification for the distributed file storage 
 
 ## Format Version
 
-- **Current Version**: 3.4.4
+- **Current Version**: 3.4.5
 - **Reference Implementation**: v7.3.2
 - **Created**: 2025-07-07
-- **Updated**: 2026-01-05
+- **Updated**: 2026-06-30
 
 ## Terminology
 
@@ -23,12 +23,15 @@ This is the standard file format specification for the distributed file storage 
 - Larger unit containing multiple chunks
 - Enables efficient processing in payloadSplit mode
 
-### Payload Prefix (v3.4.4)
+### Payload Prefix (v3.4.5)
 - All transaction payloads are prefixed with a protocol identifier
-- **Prefix**: `kfs:1:` (6 bytes ASCII)
-- **Hex representation**: `6b66733a313a`
-- **Structure**: `kfs` (protocol) + `:` (delimiter) + `1` (version) + `:` (delimiter)
-- **Purpose**: Enables Kaspa Explorer to identify and track KFS transactions for usage statistics
+- **Structure**: `kfs` (protocol) + `:` + version + `:` (6 bytes ASCII)
+- **Protocol versions**:
+  - `kfs:1:` (hex `6b66733a313a`) — **pre-Toccata (hard-fork) files. READ-ONLY / legacy.** Written by reference implementation ≤ v7.3.2.
+  - `kfs:2:` (hex `6b66733a323a`) — **post-Toccata files. Current WRITE format.** Emitted by all new uploads.
+- **Reader**: accepts and strips **both** `kfs:1:` and `kfs:2:`, so files written before the Toccata hard fork remain readable.
+- **Writer**: emits **only** `kfs:2:`; `kfs:1:` is never produced by current builds.
+- **Purpose**: Enables Kaspa Explorer to identify/track KFS transactions for usage statistics, and to distinguish pre- vs post-hard-fork files.
 - Applied to both chunk payloads and metadata payloads
 
 ## File Type Definitions

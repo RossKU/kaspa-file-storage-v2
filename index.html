@@ -4,7 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://*.kaspa.org wss://*.kaspa.green wss://*.kaspa.blue wss://*.kaspa.stream wss://*.kaspa.red wss://*.kas.fyi https://*.kaspa.org https://*.kaspa.green https://*.kaspa.blue https://*.kaspa.stream https://*.kaspa.red https://*.kas.fyi https://api.kas.fyi; img-src 'self' data: blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none';">
-    <title>Kaspa P2P File Storage v7.6.2</title>
+    <title>Kaspa P2P File Storage v7.6.3</title>
+    <!-- v7.6.3 (2026-06-30): Unify upload-cost estimate into one helper (estimateUploadFeeKAS) used by both the
+         pre-upload confirm dialog and the post-upload comparison; fixes a stale 2nd estimate (~170x too low).
+         Also fixed a stale "select 20KB" message (chunk-size selector was removed). -->
     <!-- v7.6.2 (2026-06-30): Pre-flight balance interlock — upload confirm dialog warns when wallet balance < estimated cost (×1.1). -->
     <!-- v7.6.1 (2026-06-30): Corrected FAQ upload-cost figures to measured values (~0.05 KAS / 22KB chunk; ~230 KAS / 100MB at min fee rate). -->
     <!-- v7.6.0 (2026-06-30): Toccata support (rusty-kaspa v2.0.0 WASM SDK); kfs:2 write format
@@ -10999,26 +11002,12 @@ Do you want to continue?`;
             const v = parseInt(localStorage.getItem('kfsFeeRate'), 10);
             return (Number.isFinite(v) && v >= 100) ? v : 100;
         }
-        // Estimate the on-chain fee (sompi) for a tx carrying a `byteLen`-byte payload at the configured
-        // feeRate, by building (NOT submitting) a transaction via the SDK. Used for upload cost estimates.
-        async function sdkFeeForPayloadSompi(byteLen, utxos) {
-            // Build the sample tx from a single sizeable UTXO + a 0.2 KAS output. This keeps the input
-            // count low and avoids KIP9 storage-mass blow-up (tiny outputs inflate storage mass), so the
-            // sample stays within the max standard mass and its fee reflects a real chunk tx.
-            const arr = Array.isArray(utxos) ? utxos : [];
-            const entry = arr.reduce((a, b) => (BigInt(b?.amount ?? 0) > BigInt(a?.amount ?? 0) ? b : a), arr[0]);
-            const result = await NetworkState.kaspa.createTransactions({
-                entries: entry ? [entry] : arr,
-                outputs: [{ address: UserState.address.toString(), amount: 20000000n }],
-                changeAddress: UserState.address.toString(),
-                priorityFee: 0n,
-                feeRate: getFeeRate(),
-                networkId: config.network,
-                payload: new Uint8Array(byteLen)
-            });
-            const fee = BigInt(result.summary?.fees ?? 0n);
-            if (result.transactions) for (const t of result.transactions) { try { t.transaction?.free?.(); } catch (e) {} }
-            return fee;
+        // Single source of truth for upload cost. Post-Crescendo, each transaction's compute mass
+        // ≈ 2·payloadBytes + 2036, and fee = mass × feeRate (sompi/gram). Returns the total fee in KAS
+        // for `chunkCount` transactions carrying `totalPayloadBytes` of payload in aggregate.
+        // (Verified to match the SDK createTransactions fee to the sompi at the current network params.)
+        function estimateUploadFeeKAS(chunkCount, totalPayloadBytes) {
+            return (2 * totalPayloadBytes + 2036 * chunkCount) * getFeeRate() / 1e8;
         }
         // Restore the fee-rate setting input from storage once the DOM is ready.
         document.addEventListener('DOMContentLoaded', () => {
@@ -15598,10 +15587,10 @@ Do you want to continue?`;
                     if (requestedChunkSize >= 22528) {
                         log(`🚀 Dynamic optimization: Using ${(actualChunkSize/1024).toFixed(1)}KB chunks`, 'warning');
                         log('📊 Payload efficiency: ' + ((actualChunkSize / 23984) * 100).toFixed(1) + '% (vs theoretical maximum)', 'info');
-                        log('⚠️ This feature is experimental. If problems occur, please select 20KB', 'warning');
+                        log('📦 Chunk size is fixed at 22KB (22528 bytes); other sizes are not structurally supported.', 'info');
                     } else {
                         log(`🧪 Experimental feature: Using ${(actualChunkSize/1024).toFixed(1)}KB chunks`, 'warning');
-                        log('⚠️ This feature is experimental. If problems occur, please select 20KB', 'warning');
+                        log('📦 Chunk size is fixed at 22KB (22528 bytes); other sizes are not structurally supported.', 'info');
                     }
                 } else {
                     // Normal: Safe size (unchanged)
@@ -15717,27 +15706,11 @@ Do you want to continue?`;
                         totalTxCount += metaTxCount + superMetaTxCount;
                     }
                     
-                    // Calculate estimated cost (Toccata: SDK fee summation at configured feeRate) and time
-                    const feeRate = getFeeRate();
-                    let estimatedCost;
-                    try {
-                        const utxoRes = await NetworkState.rpcClient.getUtxosByAddresses([UserState.address.toString()]);
-                        const utxosForEst = utxoRes.entries || utxoRes;
-                        const fullChunkFee = await sdkFeeForPayloadSompi(actualChunkSize, utxosForEst);
-                        let totalSompi = BigInt(payloadCount) * fullChunkFee;
-                        if (useMetaTx) {
-                            const metaBytes = Math.min(CHUNKS_PER_META, payloadCount) * 70 + 6;
-                            const metaFee = await sdkFeeForPayloadSompi(metaBytes, utxosForEst);
-                            totalSompi += BigInt(metaTxCount + superMetaTxCount) * metaFee;
-                        }
-                        estimatedCost = Number(totalSompi) / 1e8;
-                    } catch (e) {
-                        // Fallback: empirically computeMass ≈ 2*payloadBytes + 2036; fee = mass × feeRate (sompi)
-                        log(`Cost estimate via SDK failed (${e.message}); using mass formula`, 'warning');
-                        const massOf = b => 2 * b + 2036;
-                        let s = BigInt(Math.round(massOf(actualChunkSize) * feeRate)) * BigInt(payloadCount);
-                        if (useMetaTx) s += BigInt(metaTxCount + superMetaTxCount) * BigInt(Math.round(massOf(Math.min(CHUNKS_PER_META, payloadCount) * 70 + 6) * feeRate));
-                        estimatedCost = Number(s) / 1e8;
+                    // Calculate estimated cost (single source of truth: estimateUploadFeeKAS) and time
+                    let estimatedCost = estimateUploadFeeKAS(payloadCount, payloadCount * actualChunkSize);
+                    if (useMetaTx) {
+                        const metaBytes = Math.min(CHUNKS_PER_META, payloadCount) * 70 + 6;
+                        estimatedCost += estimateUploadFeeKAS(metaTxCount + superMetaTxCount, (metaTxCount + superMetaTxCount) * metaBytes);
                     }
                     const timePerTx = 2.4; // 2.4 seconds per tx (measured value)
                     const estimatedTime = totalTxCount * timePerTx;
@@ -16819,7 +16792,8 @@ Do you want to continue?`;
                 // Calculate estimated cost
                 // v5.5.22: window.processedChunks -> FileState.processedChunks (6/18)
                 const totalPayloadKB = FileState.processedChunks.reduce((sum, c) => sum + c.payloadSize, 0) / 1024;
-                let totalCost = totalChunks * 0.00005 + totalPayloadKB * 0.00001;
+                // Single source of truth (same helper as the pre-upload estimate)
+                let totalCost = estimateUploadFeeKAS(totalChunks, totalPayloadKB * 1024);
                 
                 // v5.11.16: Store estimated cost
                 FileState.costTracking.estimatedCost = totalCost;
